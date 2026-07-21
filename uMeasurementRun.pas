@@ -258,6 +258,7 @@ type
     FLastResultsPerDevice: string;
     FLastRouteStopDiagnosticKey: string;
     FStableSinceMs: UInt64;
+    FRequireAutoStabilization: Boolean;
     FRequiredStabilizationSec: Double;
     FLastStableProgressSecond: Int64;
     FStableTimerResetReason: string;
@@ -271,7 +272,7 @@ type
     procedure EnterSelectEtalon;
     procedure EnterSetupPoint;
     procedure EnterWaitStable;
-    function CalcRequiredStabilizationSec(APoint: TDevicePoint): Double;
+    procedure LoadRequiredStabilization(APoint: TDevicePoint);
     procedure EnterWaitMeasureStart;
     procedure EnterMeasure;
     procedure EnterWaitMeasureStop;
@@ -610,7 +611,14 @@ begin
   ATarget.LimitImp := Max(ATarget.LimitImp, ASource.LimitImp);
   ATarget.LimitVolume := Max(ATarget.LimitVolume, ASource.LimitVolume);
   ATarget.LimitTime := Max(ATarget.LimitTime, ASource.LimitTime);
-  ATarget.Pause := Max(ATarget.Pause, ASource.Pause);
+  if ASource.Pause < 0 then
+    ATarget.RequireAutoStabilization := True
+  else
+    ATarget.RequiredStabilizationSec := Max(ATarget.RequiredStabilizationSec, ASource.Pause);
+  if ATarget.RequireAutoStabilization then
+    ATarget.Pause := -1
+  else
+    ATarget.Pause := Round(ATarget.RequiredStabilizationSec);
   ATarget.RepeatsProtocol := Max(ATarget.RepeatsProtocol, ASource.RepeatsProtocol);
   ATarget.Repeats := Max(ATarget.Repeats, ASource.Repeats);
   ATarget.Pressure := Max(ATarget.Pressure, ASource.Pressure);
@@ -657,6 +665,7 @@ begin
   FLastResultsPerDevice := '';
   FLastRouteStopDiagnosticKey := '';
   FStableSinceMs := 0;
+  FRequireAutoStabilization := False;
   FRequiredStabilizationSec := 0;
   FLastStableProgressSecond := -1;
   FStableTimerResetReason := '';
@@ -1114,17 +1123,19 @@ begin
 end;
 
 
-function TMeasurementRun.CalcRequiredStabilizationSec(APoint: TDevicePoint): Double;
+procedure TMeasurementRun.LoadRequiredStabilization(APoint: TDevicePoint);
 begin
-  Result := 0;
+  FRequireAutoStabilization := False;
+  FRequiredStabilizationSec := 0;
   if APoint = nil then
     Exit;
 
-  // Столбец "Стабилизация" хранится в TDevicePoint.Pause.
-  // Session-точка собирается через MergePointParams, где Pause берётся как Max
-  // среди точек включённых поверяемых приборов, поэтому здесь не суммируем.
-  if APoint.Pause > 0 then
-    Result := APoint.Pause;
+  // Runtime-поля session-точки рассчитываются при MergePointParams:
+  // Auto хранится отдельно от максимального числового Pause.
+  FRequireAutoStabilization := APoint.RequireAutoStabilization or (APoint.Pause < 0);
+  FRequiredStabilizationSec := Max(0.0, APoint.RequiredStabilizationSec);
+  if (not FRequireAutoStabilization) and (FRequiredStabilizationSec = 0) and (APoint.Pause > 0) then
+    FRequiredStabilizationSec := APoint.Pause;
 end;
 
 procedure TMeasurementRun.EnterWaitStable;
@@ -1137,8 +1148,8 @@ begin
   FStableSinceMs := 0;
   FStableTimerResetReason := '';
   FLastStableProgressSecond := -1;
-  FRequiredStabilizationSec := CalcRequiredStabilizationSec(GetCurrentPoint);
-  AddDiagnosticEvent(Format('RequiredStabilizationSec=%.3f; RequiredStabilizationSource=TDevicePoint.Pause', [FRequiredStabilizationSec]));
+  LoadRequiredStabilization(GetCurrentPoint);
+  AddDiagnosticEvent(Format('RequiredStabilizationSec=%.3f; RequireAutoStabilization=%s; RequiredStabilizationSource=TDevicePoint runtime', [FRequiredStabilizationSec, BoolToStr(FRequireAutoStabilization, True)]));
 
   if IsStopRequested then
     Exit;
@@ -1845,6 +1856,7 @@ begin
     Lines.Add('IsFlowStable=' + SBool(IsFlowStableResult));
     Lines.Add('IsStable=' + SBool(IsStableResult));
     Lines.Add('Reason=' + Reason);
+    Lines.Add('RequireAutoStabilization=' + SBool(FRequireAutoStabilization));
     Lines.Add('RequiredStabilizationSec=' + SFloat(FRequiredStabilizationSec));
     Lines.Add('StableSinceMs=' + UIntToStr(FStableSinceMs));
     if FStableSinceMs <> 0 then
@@ -2093,6 +2105,14 @@ begin
 
     for SourcePoint in Device.Points do
     begin
+      if (SourcePoint = nil) or (not SourcePoint.Enabled) or (SourcePoint.State = osDeleted) then
+        Continue;
+
+      AddDiagnosticEvent(Format(
+        'SourcePointStabilization: DeviceUUID=%s; DeviceName=%s; PointName=%s; Enabled=%s; Pause=%d; Mode=%s',
+        [Device.UUID, Device.Name, SourcePoint.Name, BoolToStr(SourcePoint.Enabled, True), SourcePoint.Pause,
+         IfThen(SourcePoint.Pause < 0, 'Auto', 'Time')]));
+
       ExistingPoint := nil;
       for SessionPoint in FPoints do
         if IsPointEquivalent(SessionPoint, SourcePoint) then
@@ -2105,12 +2125,26 @@ begin
       begin
         SessionPoint := TDevicePoint.Create(0);
         SessionPoint.Assign(SourcePoint, True);
+        SessionPoint.RequireAutoStabilization := SourcePoint.Pause < 0;
+        if SourcePoint.Pause >= 0 then
+          SessionPoint.RequiredStabilizationSec := SourcePoint.Pause
+        else
+          SessionPoint.RequiredStabilizationSec := 0;
         SessionPoint.Status := mptsNone;
         SessionPoint.RepeatsCompleted := 0;
         FPoints.Add(SessionPoint);
       end
       else
         MergePointParams(ExistingPoint, SourcePoint);
+
+      if ExistingPoint <> nil then
+        AddDiagnosticEvent(Format(
+          'MergedStabilization: SessionPointName=%s; SourcePointCount=%d; AutoRequired=%s; MaxStabilizationSec=%.3f',
+          [ExistingPoint.Name, 0, BoolToStr(ExistingPoint.RequireAutoStabilization, True), ExistingPoint.RequiredStabilizationSec]))
+      else
+        AddDiagnosticEvent(Format(
+          'MergedStabilization: SessionPointName=%s; SourcePointCount=%d; AutoRequired=%s; MaxStabilizationSec=%.3f',
+          [SessionPoint.Name, 1, BoolToStr(SessionPoint.RequireAutoStabilization, True), SessionPoint.RequiredStabilizationSec]));
     end;
   end;
 end;
@@ -2212,6 +2246,7 @@ begin
     FLastResultsPerDevice := '';
     FLastRouteStopDiagnosticKey := '';
     FStableSinceMs := 0;
+    FRequireAutoStabilization := False;
     FRequiredStabilizationSec := 0;
     FLastStableProgressSecond := -1;
     FStableTimerResetReason := '';
@@ -2894,6 +2929,10 @@ var
   DeviceElapsedSec: Double;
   DeviceRemainingSec: Double;
   DeviceElapsedSecond: Int64;
+  AutoConditionPassed: Boolean;
+  TimeConditionPassed: Boolean;
+  ReadyToMeasure: Boolean;
+  StableStatus: string;
 begin
   if FMode = mrmManual then
   begin
@@ -2904,118 +2943,88 @@ begin
   Point := GetCurrentPoint;
   if Point = nil then
   begin
-    FireEvent(
-      meMeasureError,
-      BuildError(1300, 'Нет текущей точки для стабилизации')
-    );
+    FireEvent(meMeasureError, BuildError(1300, 'Нет текущей точки для стабилизации'));
     SetStage(msDone);
     Exit;
   end;
 
   CurrentTick := TThread.GetTickCount64;
 
-  if not IsStable(StableInfo) then
-  begin
-    if FStableSinceMs <> 0 then
-    begin
-      DeviceElapsedSec := (CurrentTick - FStableSinceMs) / 1000;
-      FStableTimerResetReason := StableInfo.StatusText;
-      AddDiagnosticEvent(Format(
-        'DeviceStabilizationReset: ElapsedBeforeReset=%.3f; Reason=%s',
-        [DeviceElapsedSec, FStableTimerResetReason]));
-      ProtocolManager.AddMessage(
-        pcWarning,
-        psMeasurement,
-        'DeviceStabilizationReset',
-        'Эталон потерял стабильность. Стабилизация приборов начнётся заново',
-        FStableTimerResetReason
-      );
-      // После потери стабильности даём эталону полный интервал на повторную стабилизацию.
-      FWaitStartedTick := CurrentTick;
-    end;
-
-    FStableSinceMs := 0;
-    FLastStableProgressSecond := -1;
-
-    if CurrentTick - FLastStableProtocolTick >=
-       STABLE_PROTOCOL_INTERVAL_MS then
-    begin
-      FLastStableProtocolTick := CurrentTick;
-      AddDiagnosticEvent(Format(
-        'EtalonStability: IsStable=False; Reason=%s; CurrentValue=%.6f; LowerLimit=%.6f; UpperLimit=%.6f',
-        [StableInfo.StatusText, StableInfo.CurrentValue, StableInfo.LowerLimit, StableInfo.UpperLimit]));
-      ProtocolManager.AddMessage(
-        pcInfo,
-        psMeasurement,
-        'WaitEtalonStable',
-        'Ожидание стабилизации эталона',
-        StableInfo.StatusText
-      );
-    end;
-
-    if (((CurrentTick - FWaitStartedTick) / 1000) >
-       DEFAULT_STABLE_TIMEOUT_S) then
-    begin
-      Inc(FAttempt);
-
-      if FAttempt < FMaxAttemptCount then
-      begin
-        ProtocolManager.AddMessage(
-          pcWarning,
-          psMeasurement,
-          'StableTimeout',
-          'Таймаут установки параметров измерения',
-          Format(
-            'Попытка выхода на параметры: %d из %d',
-            [FAttempt, FMaxAttemptCount]
-          )
-        );
-
-        FireEvent(meStableRetry);
-        SetStage(msSetupPoint);
-        Exit;
-      end;
-
-      ProtocolManager.AddMessage(
-        pcError,
-        psMeasurement,
-        'StableFailed',
-        'Не удалось установить параметры измерения',
-        StableInfo.StatusText
-      );
-
-      FireEvent(
-        meStableTimeout,
-        BuildError(1301, 'Стабилизация не достигнута')
-      );
-
-      if FMode = mrmAutomatic then
-        ContinueAfterPointError(mptsSetupError, meStableTimeout, BuildError(1301, 'Стабилизация не достигнута'))
-      else
-        SetStage(msDone);
-    end;
-
-    Exit;
-  end;
-
-  // Эталон стабилен. Только теперь запускается выдержка поверяемых приборов.
+  // До первого успешного IsStable ожидаем отдельную стабилизацию эталона.
   if FStableSinceMs = 0 then
   begin
+    if not IsStable(StableInfo) then
+    begin
+      if CurrentTick - FLastStableProtocolTick >= STABLE_PROTOCOL_INTERVAL_MS then
+      begin
+        FLastStableProtocolTick := CurrentTick;
+        AddDiagnosticEvent(Format(
+          'EtalonStability: IsStable=False; Reason=%s; CurrentValue=%.6f; LowerLimit=%.6f; UpperLimit=%.6f',
+          [StableInfo.StatusText, StableInfo.CurrentValue, StableInfo.LowerLimit, StableInfo.UpperLimit]));
+        ProtocolManager.AddMessage(pcInfo, psMeasurement, 'WaitEtalonStable',
+          'Ожидание стабилизации эталона', StableInfo.StatusText);
+      end;
+
+      if (((CurrentTick - FWaitStartedTick) / 1000) > DEFAULT_STABLE_TIMEOUT_S) then
+      begin
+        Inc(FAttempt);
+        if FAttempt < FMaxAttemptCount then
+        begin
+          ProtocolManager.AddMessage(pcWarning, psMeasurement, 'StableTimeout',
+            'Таймаут установки параметров измерения',
+            Format('Попытка выхода на параметры: %d из %d', [FAttempt, FMaxAttemptCount]));
+          FireEvent(meStableRetry);
+          SetStage(msSetupPoint);
+          Exit;
+        end;
+
+        ProtocolManager.AddMessage(pcError, psMeasurement, 'StableFailed',
+          'Не удалось установить параметры измерения', StableInfo.StatusText);
+        FireEvent(meStableTimeout, BuildError(1301, 'Стабилизация не достигнута'));
+        if FMode = mrmAutomatic then
+          ContinueAfterPointError(mptsSetupError, meStableTimeout, BuildError(1301, 'Стабилизация не достигнута'))
+        else
+          SetStage(msDone);
+      end;
+      Exit;
+    end;
+
     FStableSinceMs := CurrentTick;
     FLastStableProgressSecond := -1;
     AddDiagnosticEvent(Format(
-      'EtalonStable: RequiredDeviceStabilizationSec=%.3f; StartTick=%s',
-      [FRequiredStabilizationSec, UIntToStr(FStableSinceMs)]));
-    ProtocolManager.AddMessage(
-      pcInfo,
-      psMeasurement,
-      'EtalonStable',
-      'Эталон стабилизирован; начат отсчёт стабилизации прибора',
-      Format('RequiredDeviceStabilizationSec=%.3f', [FRequiredStabilizationSec])
-    );
+      'EtalonStable: AutoRequired=%s; RequiredDeviceStabilizationSec=%.3f; StartTick=%s',
+      [BoolToStr(FRequireAutoStabilization, True), FRequiredStabilizationSec, UIntToStr(FStableSinceMs)]));
+    ProtocolManager.AddMessage(pcInfo, psMeasurement, 'EtalonStable',
+      'Эталон стабилизирован; начат отсчёт стабилизации приборов',
+      Format('AutoRequired=%s; RequiredDeviceStabilizationSec=%.3f',
+        [BoolToStr(FRequireAutoStabilization, True), FRequiredStabilizationSec]));
+  end;
+
+  AutoConditionPassed := not FRequireAutoStabilization;
+  StableStatus := 'NotRequired';
+  StableInfo := Default(RStableInfo);
+  if FRequireAutoStabilization then
+  begin
+    AutoConditionPassed := IsStable(StableInfo);
+    StableStatus := BoolToStr(AutoConditionPassed, True);
+    if not AutoConditionPassed then
+    begin
+      DeviceElapsedSec := (CurrentTick - FStableSinceMs) / 1000;
+      AddDiagnosticEvent(Format(
+        'DeviceStabilizationReset: PointName=%s; ElapsedBeforeReset=%.3f; Reason=%s; AutoRequired=True',
+        [Point.Name, DeviceElapsedSec, StableInfo.StatusText]));
+      ProtocolManager.AddMessage(pcWarning, psMeasurement, 'DeviceStabilizationReset',
+        'Ожидание автоматической стабилизации', StableInfo.StatusText);
+      FStableSinceMs := 0;
+      FLastStableProgressSecond := -1;
+      FWaitStartedTick := CurrentTick;
+      Exit;
+    end;
   end;
 
   DeviceElapsedSec := (CurrentTick - FStableSinceMs) / 1000;
+  TimeConditionPassed := DeviceElapsedSec >= FRequiredStabilizationSec;
+  ReadyToMeasure := AutoConditionPassed and TimeConditionPassed;
   DeviceRemainingSec := Max(0.0, FRequiredStabilizationSec - DeviceElapsedSec);
   DeviceElapsedSecond := Trunc(DeviceElapsedSec);
 
@@ -3023,30 +3032,33 @@ begin
   begin
     FLastStableProgressSecond := DeviceElapsedSecond;
     AddDiagnosticEvent(Format(
-      'DeviceStabilizationProgress: ElapsedSec=%.3f; RequiredSec=%.3f; RemainingSec=%.3f',
-      [DeviceElapsedSec, FRequiredStabilizationSec, DeviceRemainingSec]));
+      'DeviceStabilizationState: PointName=%s; AutoRequired=%s; AutoPassed=%s; StableStatus=%s; StableReason=%s; RequiredTimeSec=%.3f; ElapsedTimeSec=%.3f; TimePassed=%s; ReadyToMeasure=%s',
+      [Point.Name, BoolToStr(FRequireAutoStabilization, True), BoolToStr(AutoConditionPassed, True),
+       StableStatus, StableInfo.StatusText, FRequiredStabilizationSec, DeviceElapsedSec,
+       BoolToStr(TimeConditionPassed, True), BoolToStr(ReadyToMeasure, True)]));
   end;
 
-  if CurrentTick - FLastStableProtocolTick >=
-     STABLE_PROTOCOL_INTERVAL_MS then
+  if CurrentTick - FLastStableProtocolTick >= STABLE_PROTOCOL_INTERVAL_MS then
   begin
     FLastStableProtocolTick := CurrentTick;
-    ProtocolManager.AddMessage(
-      pcInfo,
-      psMeasurement,
-      'DeviceStabilization',
-      'Стабилизация поверяемых приборов',
-      Format('Эталон стабилен; прошло %.3f сек; требуется %.3f сек; осталось %.3f сек',
-        [DeviceElapsedSec, FRequiredStabilizationSec, DeviceRemainingSec])
-    );
+    if FRequireAutoStabilization and (FRequiredStabilizationSec > 0) and not TimeConditionPassed then
+      ProtocolManager.AddMessage(pcInfo, psMeasurement, 'DeviceStabilization',
+        'Автоматическая стабилизация подтверждена; выдержка ' +
+        Format('%.0f из %.0f с', [DeviceElapsedSec, FRequiredStabilizationSec]), '')
+    else if FRequireAutoStabilization then
+      ProtocolManager.AddMessage(pcInfo, psMeasurement, 'DeviceStabilization',
+        'Автоматическая стабилизация приборов', StableInfo.StatusText)
+    else
+      ProtocolManager.AddMessage(pcInfo, psMeasurement, 'DeviceStabilization',
+        Format('Стабилизация приборов: прошло %.0f из %.0f с',
+          [DeviceElapsedSec, FRequiredStabilizationSec]), '');
   end;
 
-  if DeviceElapsedSec < FRequiredStabilizationSec then
+  if not ReadyToMeasure then
     Exit;
 
-  AddDiagnosticEvent(Format(
-    'DeviceStabilizationCompleted: ElapsedSec=%.3f',
-    [DeviceElapsedSec]));
+  AddDiagnosticEvent(Format('DeviceStabilizationCompleted: AutoRequired=%s; ElapsedSec=%.3f',
+    [BoolToStr(FRequireAutoStabilization, True), DeviceElapsedSec]));
   FireEvent(meStableReached);
   SetStage(msWaitMeasureStart);
 end;

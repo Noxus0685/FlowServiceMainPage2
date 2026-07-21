@@ -176,7 +176,9 @@ type
     {====================================================================}
     { ДОПОЛНИТЕЛЬНЫЕ ПАРАМЕТРЫ }
     {====================================================================}
-    Pause: Integer;              // Время стабилизации перед измерением, сек
+    Pause: Integer;              // Время стабилизации перед измерением, сек (-1 = Авто)
+    RequireAutoStabilization: Boolean; // Runtime: в session-точке есть хотя бы одна исходная точка с Pause < 0
+    RequiredStabilizationSec: Double;  // Runtime: максимальный неотрицательный Pause исходных точек
 
     {====================================================================}
     { ПОВТОРЫ И СЕРИИ }
@@ -1190,6 +1192,8 @@ begin
 
   { Дополнительно }
   Pause := 0;
+  RequireAutoStabilization := False;
+  RequiredStabilizationSec := 0.0;
 
   { Повторы }
   RepeatsProtocol := 0;
@@ -1903,6 +1907,8 @@ begin
   { ДОПОЛНИТЕЛЬНЫЕ ПАРАМЕТРЫ }
   {====================================================================}
   Pause := ASource.Pause;
+  RequireAutoStabilization := ASource.RequireAutoStabilization;
+  RequiredStabilizationSec := ASource.RequiredStabilizationSec;
 
   {====================================================================}
   { ПОВТОРЫ И СЕРИИ }
