@@ -5076,7 +5076,7 @@ begin
 
   if WorkTable.ValueTime <> nil then
   begin
-    LabelTime.Text := WorkTable.ValueTime.GetStrValue;
+    LabelTime.Text := IntToStr(Trunc(WorkTable.ValueTime.GetDoubleValue));
   end
   else
     LabelTime.Text := '-';

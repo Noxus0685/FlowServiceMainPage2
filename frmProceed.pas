@@ -3490,7 +3490,7 @@ begin
         end;
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageSpillTime then
-    Value := FloatToStr(P.SpillTime)
+    Value := IntToStr(Trunc(P.SpillTime))
 
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQavgEtalon then
   begin
