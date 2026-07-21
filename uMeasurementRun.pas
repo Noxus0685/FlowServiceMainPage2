@@ -766,7 +766,7 @@ begin
     msResultsRead:
       Result := ANewStage in [msSave, msSelectPoint, msDone, msNone];
     msSave:
-      Result := ANewStage in [msSelectPoint, msSetupPoint, msDone, msNone];
+      Result := ANewStage in [msWaitMeasureStart, msSelectPoint, msSetupPoint, msDone, msNone];
     msDone:
       Result := ANewStage in [msNone, msSelectPoint, msSetupPoint];
   end;
@@ -1156,6 +1156,8 @@ begin
 end;
 
 procedure TMeasurementRun.EnterWaitMeasureStart;
+var
+  Point: TDevicePoint;
 begin
   if IsStopRequested then
   begin
@@ -1168,8 +1170,9 @@ begin
     Exit;
   end;
 
+  Point := GetCurrentPoint;
   SetCurrentPointStatus(mptsWaitMeasureStart);
-  FMeasureTimeout := CalcMeasureTimeout(GetCurrentPoint);
+  FMeasureTimeout := CalcMeasureTimeout(Point);
 
   if FWorkTable = nil then
   begin
@@ -1179,11 +1182,27 @@ begin
     Exit;
   end;
 
-  ProtocolManager.AddMessage(pcAction, psMeasurement, 'StartTest',
-    'Отдана команда запуска измерения', MeasurementStateToString(FCurrentStage));
-  AddDiagnosticEvent('StartTest called');
-  FPhysicalMeasureStarted := True;
-  FWorkTable.StartTest;
+  FLastMeasureCompletedEventSent := False;
+  FLastSaveDoneEventSent := False;
+  FPhysicalMeasureStarted := False;
+  FPhysicalStopRequested := False;
+
+  if (FMode <> mrmManual) and (FCurrentRepeat > 0) then
+  begin
+    ProtocolManager.AddMessage(pcAction, psMeasurement, 'StartTestRepeat',
+      'Отдана команда запуска повторного измерения без повторной стабилизации',
+      Format('PointIndex=%d; CurrentRepeat=%d', [FCurrentPointIndex, FCurrentRepeat]));
+    AddDiagnosticEvent(Format('RepeatMeasurementStart: Point=%s; CurrentRepeat=%d; StabilizationSkipped=True',
+      [IfThen(Point <> nil, Point.Name, '<none>'), FCurrentRepeat]));
+    FWorkTable.StartTestRepeat;
+  end
+  else
+  begin
+    ProtocolManager.AddMessage(pcAction, psMeasurement, 'StartTest',
+      'Отдана команда запуска измерения', MeasurementStateToString(FCurrentStage));
+    AddDiagnosticEvent('StartTest called');
+    FWorkTable.StartTest;
+  end;
 end;
 
 procedure TMeasurementRun.EnterMeasure;
@@ -1238,6 +1257,8 @@ procedure TMeasurementRun.EnterSave;
 var
   Point: TDevicePoint;
   RepeatsTarget: Integer;
+  IsLastRepeat: Boolean;
+  SavedRepeat: Integer;
 begin
   FNextStageAfterSave := msDone;
   SetCurrentPointStatus(mptsSave);
@@ -1266,8 +1287,10 @@ begin
   if (FMode <> mrmManual) and (Point <> nil) then
     RepeatsTarget := Max(Point.Repeats, 1);
   Inc(FCurrentRepeat);
+  IsLastRepeat := FCurrentRepeat >= RepeatsTarget;
+  SavedRepeat := FCurrentRepeat;
 
-  if FCurrentRepeat >= RepeatsTarget then
+  if IsLastRepeat then
   begin
     if Point <> nil then
     begin
@@ -1287,7 +1310,13 @@ begin
     end;
   end
   else
-    FNextStageAfterSave := msSetupPoint;
+    FNextStageAfterSave := msWaitMeasureStart;
+
+  AddDiagnosticEvent(Format(
+    'RepeatTransition: PointName=%s; CurrentRepeat=%d; RepeatsTarget=%d; IsLastRepeat=%s; NextStage=%s; StabilizationSkipped=%s',
+    [IfThen(Point <> nil, Point.Name, '<none>'), SavedRepeat, RepeatsTarget,
+     BoolToStr(IsLastRepeat, True), MeasurementStateToString(FNextStageAfterSave),
+     BoolToStr(FNextStageAfterSave = msWaitMeasureStart, True)]));
 end;
 
 procedure TMeasurementRun.EnterDone;
