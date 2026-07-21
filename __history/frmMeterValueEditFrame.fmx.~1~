@@ -1,4 +1,4 @@
-object FrameMeterValueEdit: TFrameMeterValueEdit
+﻿object FrameMeterValueEdit: TFrameMeterValueEdit
   Size.Width = 909.000000000000000000
   Size.Height = 620.000000000000000000
   Size.PlatformDefault = False
@@ -811,7 +811,7 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
               Size.Height = 130.000000000000000000
               Size.PlatformDefault = False
               Text = #1056#1072#1079#1073#1088#1086#1089
-              TabOrder = 1
+              TabOrder = 2
               object LabelMaxVariation: TLabel
                 Position.X = 12.000000000000000000
                 Position.Y = 32.000000000000000000
@@ -871,7 +871,7 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
               Size.Height = 100.000000000000000000
               Size.PlatformDefault = False
               Text = #1042#1099#1073#1088#1086#1089#1099
-              TabOrder = 2
+              TabOrder = 3
               object LabelMaxOutlierFractionPercent: TLabel
                 Position.X = 12.000000000000000000
                 Position.Y = 32.000000000000000000
@@ -914,7 +914,7 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
               Size.Height = 70.000000000000000000
               Size.PlatformDefault = False
               Text = #1055#1088#1086#1075#1085#1086#1079
-              TabOrder = 3
+              TabOrder = 4
               object LabelForecastHorizonSec: TLabel
                 Position.X = 12.000000000000000000
                 Position.Y = 32.000000000000000000
