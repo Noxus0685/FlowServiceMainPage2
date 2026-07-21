@@ -3073,14 +3073,6 @@ begin
         SetStage(msMeasure);
         Exit;
       end;
-    swtSTOPTEST,
-    swtSTOPWAIT,
-    swtCOMPLETE,
-    swtFINALREAD:
-      begin
-        SetStage(msWaitMeasureStop);
-        Exit;
-      end;
     swtFAILURE:
       begin
         ContinueAfterPointError(mptsMeasureError, meMeasureError, BuildError(1402, 'Ошибка запуска измерения'));

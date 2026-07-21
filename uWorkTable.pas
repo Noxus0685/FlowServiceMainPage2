@@ -5612,6 +5612,7 @@ begin
 
   ResetMeasurementValues;
   CaptureEnvironmentSimulationBase;
+  State := swtSTARTTEST;
 
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
     'Подготовка к запуску измерения. Данные очищены', Name);
@@ -5622,6 +5623,7 @@ end;
 procedure TWorkTable.StartTestRepeat;
 begin
   ResetSpillageRuntimeValues;
+  State := swtSTARTTEST;
 
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTestRepeat',
     'Подготовка к запуску повторного измерения. Сброшены только накопители проливки', Name);
