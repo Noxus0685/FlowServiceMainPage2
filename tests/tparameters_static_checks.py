@@ -53,14 +53,14 @@ for snippet in [
     require(snippet in fu_main, f'В TimerSetValuesTimer нет вызова {snippet}')
 
 # 4) Перекраска label/rectangle в зависимости от запуска и попадания в погрешность
-require('RectangleLabelFR.Fill.Color := $ffC9FFC7' in frm_main_table,
-        'FlowRate должен иметь зеленый цвет при стабильности')
-require('RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow' in frm_main_table,
-        'FlowRate должен иметь желтый цвет при нестабильности')
-require('Rectangle7.Fill.Color := $ffC9FFC7' in frm_main_table,
-        'Температура должна иметь зеленый цвет при стабильности')
-require('Rectangle11.Fill.Color := $ffC9FFC7' in frm_main_table,
-        'Давление должно иметь зеленый цвет при стабильности')
+require('RectangleLabelFR.Fill.Color := COLOR_COMPLETED' in frm_main_table,
+        'FlowRate должен использовать COLOR_COMPLETED при стабильности')
+require('RectangleLabelFR.Fill.Color := COLOR_WARNING' in frm_main_table,
+        'FlowRate должен использовать COLOR_WARNING при нестабильности')
+require('Rectangle7.Fill.Color := COLOR_COMPLETED' in frm_main_table,
+        'Температура должна использовать COLOR_COMPLETED при стабильности')
+require('Rectangle11.Fill.Color := COLOR_COMPLETED' in frm_main_table,
+        'Давление должно использовать COLOR_COMPLETED при стабильности')
 
 # 5) Ввод/вывод значения расхода и пересчет в имп/с
 require('ImpSec := (FlowRate * Coef) / 3.6;' in fu_main,
