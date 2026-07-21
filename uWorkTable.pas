@@ -673,7 +673,6 @@ type
 
   procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec: Double;
   const AImpSecValues: TArray<Double>; const AImpResult: Double);
-  procedure SyncRuntimeMeterValues;
 
   function FindPumpByUUID(const APumpUUID: string): TPump;
   function FindPumpByName(const APumpName: string): TPump;
@@ -3995,72 +3994,6 @@ begin
   AssignTableFlowAsEtalonToDevices;
 end;
 
-procedure TWorkTable.SyncRuntimeMeterValues;
-var
-  I: Integer;
-  Channel: TChannel;
-begin
-  if (FluidTemp <> nil) then
-  begin
-    SetTemperature(FluidTemp.BeforeValue, FluidTemp.AfterValue);
-    if ValueTempertureBefore <> nil then
-      ValueTempertureBefore.SetValue(FluidTemp.BeforeValue);
-    if ValueTempertureAfter <> nil then
-      ValueTempertureAfter.SetValue(FluidTemp.AfterValue);
-  end;
-
-  if (FluidPress <> nil) then
-  begin
-    SetPressure(FluidPress.BeforeValue, FluidPress.AfterValue);
-    if ValuePressureBefore <> nil then
-      ValuePressureBefore.SetValue(FluidPress.BeforeValue);
-    if ValuePressureAfter <> nil then
-      ValuePressureAfter.SetValue(FluidPress.AfterValue);
-  end;
-
-  if ValueTime <> nil then
-    ValueTime.SetValue(Time);
-
-  for I := 0 to EtalonChannels.Count - 1 do
-  begin
-    Channel := EtalonChannels[I];
-    if (Channel = nil) or (Channel.FlowMeter = nil) then
-      Continue;
-
-    if Channel.ValueCurrent <> nil then
-      Channel.ValueCurrent.SetValue(Channel.CurSec);
-    if Channel.ValueImp <> nil then
-      Channel.ValueImp.SetValue(Channel.ImpSec);
-    if Channel.ValueImpTotal <> nil then
-      Channel.ValueImpTotal.SetValue(Channel.ImpResult);
-  end;
-
-  for I := 0 to DeviceChannels.Count - 1 do
-  begin
-    Channel := DeviceChannels[I];
-    if (Channel = nil) or (Channel.FlowMeter = nil) then
-      Continue;
-
-    if Channel.ValueCurrent <> nil then
-      Channel.ValueCurrent.SetValue(Channel.CurSec);
-    if Channel.ValueImp <> nil then
-      Channel.ValueImp.SetValue(Channel.ImpSec);
-    if Channel.ValueImpTotal <> nil then
-      Channel.ValueImpTotal.SetValue(Channel.ImpResult);
-    if Channel.ValueInterface <> nil then
-      Channel.ValueInterface.SetValue(Channel.ValueSec);
-  end;
-
-  RecalculateAllMeterValues;
-
-  if (FluidTemp <> nil) and (FluidTemp.Value <> nil) and (ValueTemperture <> nil) then
-    FluidTemp.Value.Value := ValueTemperture.GetDoubleValue;
-  if (FluidPress <> nil) and (FluidPress.Value <> nil) and (ValuePressure <> nil) then
-    FluidPress.Value.Value := ValuePressure.GetDoubleValue;
-  if (FlowRate <> nil) and (FlowRate.Value <> nil) and (ValueFlowRate <> nil) then
-    FlowRate.Value.Value := ValueFlowRate.GetDoubleValue;
-end;
-
 procedure TWorkTable.SetValues;
 
 begin
@@ -6687,7 +6620,6 @@ begin
    end;
 end;
 
-
 procedure UpdateRandomFreq(const AWorkTable: TWorkTable);
 var
   Pump: tPump;             // Активный насос (исполнитель)
@@ -7296,6 +7228,126 @@ begin
   ResetDisabledChannelSignals(AWorkTable);
 end;
 
+procedure ResetDisabledChannelSignals(const AWorkTable: TWorkTable);
+var
+  I: Integer;
+begin
+  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+    if (AWorkTable.EtalonChannels[I] <> nil) and
+       (not IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I])) then
+      ResetChannelSimulation(AWorkTable.EtalonChannels[I], True);
+end;
+
+procedure AccumulateChannelImpResult(const AChannels: TObjectList<TChannel>; const ADeltaTimeSec: Double);
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  if AChannels = nil then
+    Exit;
+
+  for I := 0 to AChannels.Count - 1 do
+  begin
+    Channel := AChannels[I];
+    if IsSimulationChannelEnabled(Channel) then
+      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec * ADeltaTimeSec, 0.0, 1.0E12);
+  end;
+end;
+
+procedure LogFlowUnitsDiagnostic(const AWorkTable: TWorkTable; const ABaseTargetFlowLS: Double);
+const
+  TARGET_EPSILON = 1E-6;
+var
+  UnitName: string;
+  DisplayedSetValue: Double;
+  EtalonValueFlowLS: Double;
+  DeviceValueFlowLS: Double;
+  DisplayedEtalonFlow: Double;
+  DisplayedDeviceFlow: Double;
+begin
+  if (AWorkTable = nil) or (AWorkTable.ValueFlowRate = nil) or (ProtocolManager = nil) then
+    Exit;
+
+  if SameValue(AWorkTable.SimulationLastFlowUnitsLogTarget, ABaseTargetFlowLS, TARGET_EPSILON) then
+    Exit;
+
+  AWorkTable.SimulationLastFlowUnitsLogTarget := ABaseTargetFlowLS;
+  UnitName := AWorkTable.ValueFlowRate.GetDimName;
+  DisplayedSetValue := AWorkTable.ValueFlowRate.GetDoubleNum(ABaseTargetFlowLS,
+    AWorkTable.ValueFlowRate.CurrentDimIndex);
+
+  EtalonValueFlowLS := 0;
+  if (AWorkTable.EtalonChannels.Count > 0) and (AWorkTable.EtalonChannels[0] <> nil) and
+     (AWorkTable.EtalonChannels[0].FlowMeter <> nil) and
+     (AWorkTable.EtalonChannels[0].FlowMeter.ValueFlow <> nil) then
+    EtalonValueFlowLS := AWorkTable.EtalonChannels[0].FlowMeter.ValueFlow.GetDoubleValue;
+
+  DeviceValueFlowLS := 0;
+  if (AWorkTable.DeviceChannels.Count > 0) and (AWorkTable.DeviceChannels[0] <> nil) and
+     (AWorkTable.DeviceChannels[0].FlowMeter <> nil) and
+     (AWorkTable.DeviceChannels[0].FlowMeter.ValueFlow <> nil) then
+    DeviceValueFlowLS := AWorkTable.DeviceChannels[0].FlowMeter.ValueFlow.GetDoubleValue;
+
+  DisplayedEtalonFlow := AWorkTable.ValueFlowRate.GetDoubleNum(EtalonValueFlowLS,
+    AWorkTable.ValueFlowRate.CurrentDimIndex);
+  DisplayedDeviceFlow := AWorkTable.ValueFlowRate.GetDoubleNum(DeviceValueFlowLS,
+    AWorkTable.ValueFlowRate.CurrentDimIndex);
+
+  ProtocolManager.AddMessage(pcState, psWorkTable, 'FlowUnitsDiagnostic',
+    'Flow unit conversion diagnostic',
+    Format('DisplayedSetValue=%.6f SelectedUnit=%s BaseTargetFlowLS=%.6f EtalonValueFlowLS=%.6f DisplayedEtalonFlow=%.6f DeviceValueFlowLS=%.6f DisplayedDeviceFlow=%.6f',
+      [DisplayedSetValue, UnitName, ABaseTargetFlowLS, EtalonValueFlowLS,
+       DisplayedEtalonFlow, DeviceValueFlowLS, DisplayedDeviceFlow]));
+end;
+
+procedure UpdateChannelSimulation(const AWorkTable: TWorkTable);
+const
+  MAX_DELTA_TIME_SEC = 1.0;
+var
+  I: Integer;
+  CurrentTimeMs: Double;
+  DeltaTimeSec: Double;
+  TargetFlow: Double;
+  OldTargetFlow: Double;
+  EnabledEtalonChannels: TObjectList<TChannel>;
+  EtalonTargetImpSecValues: TArray<Double>;
+begin
+  if (AWorkTable = nil) or (AWorkTable.FlowRate = nil) or (not AWorkTable.FlowRate.IsRunning) then
+    Exit;
+
+  CurrentTimeMs := GetCurrentTimeMs;
+  if AWorkTable.SimulationLastUpdateTimeMs > 0 then
+    DeltaTimeSec := EnsureRange((CurrentTimeMs - AWorkTable.SimulationLastUpdateTimeMs) / 1000.0,
+      0.0, MAX_DELTA_TIME_SEC)
+  else
+    DeltaTimeSec := 1.0;
+  AWorkTable.SimulationLastUpdateTimeMs := CurrentTimeMs;
+  AWorkTable.Time := AWorkTable.Time + DeltaTimeSec;
+
+  TargetFlow := AWorkTable.FlowRate.ValueSet.Value;
+  OldTargetFlow := AWorkTable.SimulationTargetFlowBase;
+  LogFlowUnitsDiagnostic(AWorkTable, TargetFlow);
+  EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
+  try
+    for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+      if IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I]) then
+        EnabledEtalonChannels.Add(AWorkTable.EtalonChannels[I]);
+
+    EtalonTargetImpSecValues := CalculateEtalonTargetImpSecValues(AWorkTable,
+      EnabledEtalonChannels, TargetFlow);
+    UpdateEtalonChannelSignals(AWorkTable, EnabledEtalonChannels,
+      EtalonTargetImpSecValues, CurrentTimeMs, TargetFlow, OldTargetFlow);
+  finally
+    EnabledEtalonChannels.Free;
+  end;
+
+  UpdateDeviceChannelSignals(AWorkTable, TargetFlow, OldTargetFlow, CurrentTimeMs);
+  AWorkTable.SimulationTargetFlowBase := TargetFlow;
+  AccumulateChannelImpResult(AWorkTable.EtalonChannels, DeltaTimeSec);
+  AccumulateChannelImpResult(AWorkTable.DeviceChannels, DeltaTimeSec);
+  ResetDisabledChannelSignals(AWorkTable);
+end;
+
 begin
 
      for WorkTable in WorkTableManager.WorkTables do
@@ -7313,9 +7365,6 @@ begin
 
   // Обновление давления
   UpdateRandomPress(WorkTable);
-
-  if not (WorkTable.State in [swtMONITOR, swtEXECUTE]) then
-    WorkTable.SyncRuntimeMeterValues;
 
 
   // ============================================================
@@ -7356,10 +7405,7 @@ begin
     // Мониторинг (наблюдение без измерения)
     // ------------------------------------------------------------
     swtMONITOR:
-    begin
       RunChannelSimulationCycle(WorkTable); // обновление показаний
-      WorkTable.SyncRuntimeMeterValues;
-    end;
 
 
     // ------------------------------------------------------------
@@ -7392,7 +7438,6 @@ begin
     begin
       // Обновление сигналов (имитация работы датчиков)
       RunChannelSimulationCycle(WorkTable);
-      WorkTable.SyncRuntimeMeterValues;
 
 
       // ----------------------------------------------------------

@@ -306,15 +306,9 @@ type
   end;
 
 implementation
-
    uses
     uAppServices,
     uMeterValue;
-
-function FormatMeasurementTime(const ASeconds: Double): string;
-begin
-  Result := FormatFloat('0', ASeconds);
-end;
 {$R *.fmx}
 
 const
@@ -3496,7 +3490,7 @@ begin
         end;
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageSpillTime then
-    Value := FormatMeasurementTime(P.SpillTime)
+    Value := IntToStr(Trunc(P.SpillTime))
 
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQavgEtalon then
   begin
