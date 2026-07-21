@@ -829,6 +829,7 @@ type
     const ADescription: string = '');
 
   procedure StartTest;
+  procedure StartTestRepeat;
   procedure StopTest;
   procedure StartMonitor;
   procedure StopMonitor;
@@ -5611,11 +5612,23 @@ begin
 
   ResetMeasurementValues;
   CaptureEnvironmentSimulationBase;
+  State := swtSTARTTEST;
 
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
     'Подготовка к запуску измерения. Данные очищены', Name);
 
   FireAction(awtStartTest, 'StartTest', 'Запрошен запуск измерения');
+end;
+
+procedure TWorkTable.StartTestRepeat;
+begin
+  ResetSpillageRuntimeValues;
+  State := swtSTARTTEST;
+
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTestRepeat',
+    'Подготовка к запуску повторного измерения. Сброшены только накопители проливки', Name);
+
+  FireAction(awtStartTest, 'StartTestRepeat', 'Запрошен запуск повторного измерения');
 end;
 
 procedure TWorkTable.StartMonitor;
