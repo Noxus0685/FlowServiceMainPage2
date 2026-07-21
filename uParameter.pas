@@ -265,7 +265,7 @@ begin
   FMin := -50;
   FMax := 150;
   //FValue := 20.2;
-  //FValueSet := 24;
+  //FValueSet.Value := 24;
   FBefore := 23;
   FAfter := 25;
   DeltaValue := 0.1;

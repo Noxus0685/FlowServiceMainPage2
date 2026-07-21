@@ -6559,7 +6559,7 @@ begin
 
     // Давление ±0.03 (сейчас не используется)
     PressDelta := (Random * 0.06) - 0.03;
-
+    AWorkTable.FluidTemp.ValueSet.Value := 24;
 
     // ----------------------------------------------------------
     // 3.2 Регулирование температуры (имитация ПИД-подобного поведения)
@@ -6577,19 +6577,19 @@ begin
         if AWorkTable.FluidTemp.Value.Value < AWorkTable.FluidTemp.ValueSet.Value then
         begin
           AWorkTable.FluidTemp.BeforeValue :=
-            AWorkTable.FluidTemp.BeforeValue + 1;
+            AWorkTable.FluidTemp.BeforeValue + 0.2;
 
           AWorkTable.FluidTemp.AfterValue :=
-            AWorkTable.FluidTemp.AfterValue + 1;
+            AWorkTable.FluidTemp.AfterValue + 0.2;
         end
         else
         begin
           // Иначе → "охлаждаем"
           AWorkTable.FluidTemp.BeforeValue :=
-            AWorkTable.FluidTemp.BeforeValue - 1;
+            AWorkTable.FluidTemp.BeforeValue - 0.2;
 
           AWorkTable.FluidTemp.AfterValue :=
-            AWorkTable.FluidTemp.AfterValue - 1;
+            AWorkTable.FluidTemp.AfterValue - 0.2;
         end;
 
       end;
@@ -6633,7 +6633,7 @@ const
 begin
   if (AWorkTable = nil) or (AWorkTable.FluidPress = nil) then
     Exit;
-
+  AWorkTable.FluidPress.ValueSet.Value := 0.0001;
   if (AWorkTable.NextPressChangeAt = 0) or (Now >= AWorkTable.NextPressChangeAt) then
   begin
     EnsureEnvironmentSimulationBase(AWorkTable);
