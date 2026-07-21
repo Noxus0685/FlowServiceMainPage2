@@ -34,6 +34,7 @@ uses
   uDataManager,
   uObservable,
   uParameter,
+  uProtocols,
   uWorkTable;
 
 type
@@ -148,6 +149,11 @@ type
     procedure FluidPressEventHandler(Sender: TFluidPress; AEvent: ENotifyEvent; Data: TObject);
     procedure UpdateInstrumentNameEdit;
     procedure ApplyInstrumentName;
+    function TryNormalizeFloatInput(const AText: string; out AValue: Double): Boolean;
+    function FlowBaseToDisplayText(const ABaseFlow: Double): string;
+    procedure RestoreDeviceFlowRateText(const AWorkTable: TWorkTable);
+    procedure LogDeviceFlowRateApply(const ADetails: string);
+    procedure UpdateDeviceFlowRateEditFromWorkTable;
     procedure OnNotify(Sender: TObject; AEvent: Integer; Data: TObject);
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
     function _AddRef: Integer; stdcall;
@@ -221,10 +227,67 @@ begin
 end;
 
 
+
+function TTableMainForm.TryNormalizeFloatInput(const AText: string; out AValue: Double): Boolean;
+var
+  Tmp: string;
+  DecSep: Char;
+begin
+  Tmp := Trim(AText);
+  DecSep := FormatSettings.DecimalSeparator;
+  Tmp := StringReplace(Tmp, '.', DecSep, [rfReplaceAll]);
+  Tmp := StringReplace(Tmp, ',', DecSep, [rfReplaceAll]);
+  Result := (Tmp <> '') and TryStrToFloat(Tmp, AValue);
+end;
+
+function TTableMainForm.FlowBaseToDisplayText(const ABaseFlow: Double): string;
+var
+  WorkTable: TWorkTable;
+begin
+  WorkTable := FWorkTableManager.ActiveWorkTable;
+  if (WorkTable <> nil) and (WorkTable.ValueFlowRate <> nil) then
+    Result := FloatToStr(WorkTable.ValueFlowRate.GetDoubleNum(ABaseFlow,
+      WorkTable.ValueFlowRate.CurrentDimIndex))
+  else
+    Result := FloatToStr(ABaseFlow);
+end;
+
+procedure TTableMainForm.RestoreDeviceFlowRateText(const AWorkTable: TWorkTable);
+begin
+  if (AWorkTable <> nil) and AWorkTable.HasDeviceSimulationFlowRate then
+    EditDeviceFlowRate.Text := FlowBaseToDisplayText(AWorkTable.DeviceSimulationFlowRate)
+  else
+    EditDeviceFlowRate.Text := '';
+end;
+
+procedure TTableMainForm.LogDeviceFlowRateApply(const ADetails: string);
+begin
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcState, psWorkTable, 'DeviceFlowRateApply',
+      'Device flow rate apply', ADetails);
+end;
+
+
+procedure TTableMainForm.UpdateDeviceFlowRateEditFromWorkTable;
+var
+  WorkTable: TWorkTable;
+begin
+  WorkTable := FWorkTableManager.ActiveWorkTable;
+  if (WorkTable = nil) or ((EditDeviceFlowRate <> nil) and EditDeviceFlowRate.IsFocused) then
+    Exit;
+
+  if WorkTable.HasDeviceSimulationFlowRate then
+    EditDeviceFlowRate.Text := FlowBaseToDisplayText(WorkTable.DeviceSimulationFlowRate)
+  else
+    EditDeviceFlowRate.Text := '';
+end;
+
 procedure TTableMainForm.ButtonApplyDeviceValuesClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
-  FlowRate: Double;
+  InputText: string;
+  DisplayFlowRate: Double;
+  DeviceFlowBase: Double;
   ImpSecValues: TArray<Double>;
   EnabledDeviceChannels: TObjectList<TChannel>;
   I: Integer;
@@ -233,9 +296,34 @@ begin
   if WorkTable = nil then
     Exit;
 
+  InputText := Trim(EditDeviceFlowRate.Text);
   WorkTable.DeviceReady := CheckBoxDeviceReady.IsChecked;
-  WorkTable.EtalonFlowSet := NormalizeFloatInput(EditEtalonFlowRate.Text) / 3.6;
-  FlowRate := NormalizeFloatInput(EditDeviceFlowRate.Text);
+  WorkTable.EtalonFlowSet := WorkTable.ValueFlowRate.GetDoubleBaseNum(
+    NormalizeFloatInput(EditEtalonFlowRate.Text),
+    WorkTable.ValueFlowRate.CurrentDimIndex);
+
+  if InputText = '' then
+  begin
+    WorkTable.HasDeviceSimulationFlowRate := False;
+    LogDeviceFlowRateApply(Format('InputText=%s InputIsEmpty=True ParseSuccess=False HasSeparateDeviceFlow=False DeviceFlowBaseLps=%.6f FallbackToEtalon=True',
+      [InputText, WorkTable.DeviceSimulationFlowRate]));
+    Exit;
+  end;
+
+  if not TryNormalizeFloatInput(InputText, DisplayFlowRate) then
+  begin
+    RestoreDeviceFlowRateText(WorkTable);
+    LogDeviceFlowRateApply(Format('InputText=%s InputIsEmpty=False ParseSuccess=False HasSeparateDeviceFlow=%s DeviceFlowBaseLps=%.6f FallbackToEtalon=False PreviousTargetPreserved=True',
+      [InputText, BoolToStr(WorkTable.HasDeviceSimulationFlowRate, True),
+       WorkTable.DeviceSimulationFlowRate]));
+    Exit;
+  end;
+
+  DeviceFlowBase := WorkTable.ValueFlowRate.GetDoubleBaseNum(DisplayFlowRate,
+    WorkTable.ValueFlowRate.CurrentDimIndex);
+  WorkTable.DeviceSimulationFlowRate := DeviceFlowBase;
+  WorkTable.HasDeviceSimulationFlowRate := True;
+
   EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
   try
     for I := 0 to WorkTable.DeviceChannels.Count - 1 do
@@ -244,15 +332,15 @@ begin
         EnabledDeviceChannels.Add(WorkTable.DeviceChannels[I]);
 
     EditDeviceImpSec.Text := FloatToStr(
-      FWorkTableManager.UpdateDeviceImpSecFromFlowRate(WorkTable, FlowRate)
+      FWorkTableManager.UpdateDeviceImpSecFromFlowRate(WorkTable, DisplayFlowRate)
     );
     ImpSecValues := FWorkTableManager.BuildImpSecValuesForChannels(
       WorkTable,
       EnabledDeviceChannels,
-      FlowRate / 3.6,
+      DeviceFlowBase,
       NormalizeFloatInput(EditDeviceImpSec.Text),
       False,
-      True
+      False
     );
 
     WorkTable.ApplyChannelValues(
@@ -265,6 +353,9 @@ begin
     EnabledDeviceChannels.Free;
   end;
 
+  EditDeviceFlowRate.Text := FlowBaseToDisplayText(DeviceFlowBase);
+  LogDeviceFlowRateApply(Format('InputText=%s InputIsEmpty=False ParseSuccess=True HasSeparateDeviceFlow=True DeviceFlowBaseLps=%.6f FallbackToEtalon=False',
+    [InputText, DeviceFlowBase]));
 end;
 
 procedure TTableMainForm.ButtonApplyEtalonValuesClick(Sender: TObject);
@@ -1371,6 +1462,8 @@ begin
     FFrameProceed.RefreshResultsTab;
   if (tcMain.ActiveTab =  tiTable ) then
     FFrameMainTable.UpdateForm;
+  if tcMain.ActiveTab = tiTest then
+    UpdateDeviceFlowRateEditFromWorkTable;
 end;
 
 procedure TTableMainForm.UpdateInstrumentNameEdit;

@@ -486,6 +486,8 @@ type
     FSimulationLastUpdateTimeMs: Double;
     FSimulationLastFlowUnitsLogTarget: Double;
     FSimulationTargetFlowBase: Double;
+    FDeviceSimulationFlowRate: Double;
+    FHasDeviceSimulationFlowRate: Boolean;
 
     FHashValueTempertureBefore: string;
     FHashValueTempertureAfter: string;
@@ -780,6 +782,8 @@ type
     property SimulationLastUpdateTimeMs: Double read FSimulationLastUpdateTimeMs write FSimulationLastUpdateTimeMs;
     property SimulationLastFlowUnitsLogTarget: Double read FSimulationLastFlowUnitsLogTarget write FSimulationLastFlowUnitsLogTarget;
     property SimulationTargetFlowBase: Double read FSimulationTargetFlowBase write FSimulationTargetFlowBase;
+    property DeviceSimulationFlowRate: Double read FDeviceSimulationFlowRate write FDeviceSimulationFlowRate;
+    property HasDeviceSimulationFlowRate: Boolean read FHasDeviceSimulationFlowRate write FHasDeviceSimulationFlowRate;
 
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
@@ -2049,6 +2053,8 @@ begin
   FSimulationLastUpdateTimeMs := 0;
   FSimulationLastFlowUnitsLogTarget := 0;
   FSimulationTargetFlowBase := 0;
+  FDeviceSimulationFlowRate := 0;
+  FHasDeviceSimulationFlowRate := False;
 
   FCurrentPoint := TDevicePoint.Create(0);
   FCurrentPoint.LimitTime := -1;
@@ -7000,7 +7006,7 @@ begin
     end;
 end;
 
-procedure UpdateDeviceChannelSignals(const AWorkTable: TWorkTable; const ATargetFlow, AOldTargetFlow: Double;
+procedure UpdateDeviceChannelSignals(const AWorkTable: TWorkTable; const ATargetEtalonFlow, AOldTargetFlow: Double;
   const ACurrentTimeMs: Double);
 var
   I: Integer;
@@ -7008,6 +7014,7 @@ var
   EnabledDeviceChannels: TObjectList<TChannel>;
   TargetImpSecValues: TArray<Double>;
   TargetImpSec: Double;
+  TargetDeviceFlow: Double;
 begin
   EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
   try
@@ -7034,8 +7041,13 @@ begin
     end
     else
     begin
+      if AWorkTable.HasDeviceSimulationFlowRate then
+        TargetDeviceFlow := AWorkTable.DeviceSimulationFlowRate
+      else
+        TargetDeviceFlow := ATargetEtalonFlow;
+
       TargetImpSecValues := BuildImpSecValuesForChannels(AWorkTable,
-        EnabledDeviceChannels, ATargetFlow, 0, False, True);
+        EnabledDeviceChannels, TargetDeviceFlow, 0, False, False);
       for I := 0 to EnabledDeviceChannels.Count - 1 do
       begin
         Channel := EnabledDeviceChannels[I];
@@ -7043,7 +7055,7 @@ begin
         UpdateChannelRamp(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
           TargetImpSec, ACurrentTimeMs,
           Format('Reason=WorkTableTargetChanged TargetSource=WorkTableSetFlow TargetFlowBaseLS=%.6f OldTargetFlowBaseLS=%.6f PointUUID= DeviceReady=%s',
-            [ATargetFlow, AOldTargetFlow, IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
+            [TargetDeviceFlow, AOldTargetFlow, IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
         ApplySimpleSimulationNoise(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
           ACurrentTimeMs, 1.0, AWorkTable.DeviceReady);
         UpdateChannelCurSec(Channel, 0.3);
