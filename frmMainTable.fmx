@@ -1,4 +1,4 @@
-object FrameMainTable: TFrameMainTable
+﻿object FrameMainTable: TFrameMainTable
   Size.Width = 1940.000000000000000000
   Size.Height = 686.000000000000000000
   Size.PlatformDefault = False
@@ -5393,7 +5393,139 @@ object FrameMainTable: TFrameMainTable
         TabIndex = 0
         TabOrder = 1
         TabPosition = PlatformDefault
-        Visible = False
+        Visible = True
+        object TabItemWorkTable1: TTabItem
+          Text = #1043#1083#1072#1074#1085#1072#1103
+        end
+        object TabItemGraphs: TTabItem
+          Text = #1043#1088#1072#1092#1080#1082#1080
+          object LayoutGraphsClient: TLayout
+            Align = Client
+            Size.Width = 1059.000000000000000000
+            Size.Height = 420.000000000000000000
+            Size.PlatformDefault = False
+            object LayoutEtalonGraphSection: TLayout
+              Align = Top
+              Size.Width = 1059.000000000000000000
+              Size.Height = 190.000000000000000000
+              Size.PlatformDefault = False
+              object LayoutEtalonChart: TLayout
+                Align = Client
+                Size.Width = 1059.000000000000000000
+                Size.Height = 140.000000000000000000
+                Size.PlatformDefault = False
+                object ChartEtalonFlow: TChart
+                  Align = Client
+                  Size.Width = 1059.000000000000000000
+                  Size.Height = 140.000000000000000000
+                  Size.PlatformDefault = False
+                  Legend.Visible = True
+                  Title.Text.Strings = (
+                    #1056#1072#1089#1093#1086#1076' '#1101#1090#1072#1083#1086#1085#1086#1074)
+                  View3D = False
+                end
+              end
+              object LayoutEtalonSelection: TLayout
+                Align = Bottom
+                Size.Width = 1059.000000000000000000
+                Size.Height = 50.000000000000000000
+                Size.PlatformDefault = False
+                object LabelEtalonSelection: TLabel
+                  Align = Left
+                  Size.Width = 80.000000000000000000
+                  Size.Height = 50.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = #1069#1090#1072#1083#1086#1085#1099
+                end
+                object HorzScrollBoxEtalonSelection: THorzScrollBox
+                  Align = Client
+                  Position.X = 80.000000000000000000
+                  Size.Width = 979.000000000000000000
+                  Size.Height = 50.000000000000000000
+                  Size.PlatformDefault = False
+                  object FlowLayoutEtalonChecks: TFlowLayout
+                    Align = Left
+                    Size.Width = 979.000000000000000000
+                    Size.Height = 50.000000000000000000
+                    Size.PlatformDefault = False
+                  end
+                end
+              end
+            end
+            object SplitterFlowGraphs: TSplitter
+              Align = Top
+              Cursor = crVSplit
+              Position.Y = 190.000000000000000000
+              Size.Width = 1059.000000000000000000
+              Size.Height = 6.000000000000000000
+              Size.PlatformDefault = False
+            end
+            object LayoutDeviceGraphSection: TLayout
+              Align = Client
+              Position.Y = 196.000000000000000000
+              Size.Width = 1059.000000000000000000
+              Size.Height = 174.000000000000000000
+              Size.PlatformDefault = False
+              object LayoutDeviceChart: TLayout
+                Align = Client
+                Size.Width = 1059.000000000000000000
+                Size.Height = 124.000000000000000000
+                Size.PlatformDefault = False
+                object ChartDeviceFlow: TChart
+                  Align = Client
+                  Size.Width = 1059.000000000000000000
+                  Size.Height = 124.000000000000000000
+                  Size.PlatformDefault = False
+                  Legend.Visible = True
+                  Title.Text.Strings = (
+                    #1056#1072#1089#1093#1086#1076' '#1087#1088#1080#1073#1086#1088#1086#1074)
+                  View3D = False
+                end
+              end
+              object LayoutDeviceSelection: TLayout
+                Align = Bottom
+                Size.Width = 1059.000000000000000000
+                Size.Height = 50.000000000000000000
+                Size.PlatformDefault = False
+                object LabelDeviceSelection: TLabel
+                  Align = Left
+                  Size.Width = 80.000000000000000000
+                  Size.Height = 50.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = #1055#1088#1080#1073#1086#1088#1099
+                end
+                object HorzScrollBoxDeviceSelection: THorzScrollBox
+                  Align = Client
+                  Position.X = 80.000000000000000000
+                  Size.Width = 979.000000000000000000
+                  Size.Height = 50.000000000000000000
+                  Size.PlatformDefault = False
+                  object FlowLayoutDeviceChecks: TFlowLayout
+                    Align = Left
+                    Size.Width = 979.000000000000000000
+                    Size.Height = 50.000000000000000000
+                    Size.PlatformDefault = False
+                  end
+                end
+              end
+            end
+            object LayoutGraphCommands: TLayout
+              Align = Bottom
+              Position.Y = 370.000000000000000000
+              Size.Width = 1059.000000000000000000
+              Size.Height = 50.000000000000000000
+              Size.PlatformDefault = False
+              object ButtonClearFlowGraphs: TButton
+                Align = Right
+                Position.X = 899.000000000000000000
+                Size.Width = 160.000000000000000000
+                Size.Height = 50.000000000000000000
+                Size.PlatformDefault = False
+                Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1075#1088#1072#1092#1080#1082#1080
+              end
+            end
+          end
+        end
       end
       object Splitter2: TSplitter
         Align = Right
