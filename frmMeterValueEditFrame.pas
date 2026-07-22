@@ -1101,8 +1101,13 @@ procedure TFrameMeterValueEdit.SetSampleSource(const ASource: TMeterValueSampleS
 var
   WasLoading: Boolean;
 begin
+  DebugLog(Format('Scenario trace: SetSampleSource BEGIN current=%d requested=%d',
+    [Ord(FSampleSource), Ord(ASource)]));
   if FSampleSource = ASource then
+  begin
+    DebugLog('Scenario trace: SetSampleSource END unchanged');
     Exit;
+  end;
 
   FSampleSource := ASource;
 
@@ -1123,6 +1128,8 @@ begin
   else
     AnalyzeIfNeeded;
   UpdateStabilityAutoRefreshTimer;
+  DebugLog(Format('Scenario trace: SetSampleSource END source=%d samples=%d',
+    [Ord(FSampleSource), Length(FDisplayedSamples)]));
 end;
 
 procedure TFrameMeterValueEdit.UpdateSampleSourceControls;
@@ -1305,6 +1312,8 @@ end;
 
 procedure TFrameMeterValueEdit.RefreshSamplesGrid(const AReload: Boolean);
 begin
+  DebugLog(Format('Scenario trace: RefreshSamplesGrid BEGIN reload=%s displayed=%d test=%d loading=%s',
+    [BoolToStr(AReload, True), Length(FDisplayedSamples), FTestSamples.Count, BoolToStr(FLoading, True)]));
   GridSamples.BeginUpdate;
   try
     if AReload then
@@ -1324,7 +1333,9 @@ begin
   end;
   GridSamples.Repaint;
   UpdateSampleSourceControls;
+  DebugLog('Scenario trace: RefreshSamplesGrid before UpdateStabilityChart');
   UpdateStabilityChart;
+  DebugLog(Format('Scenario trace: RefreshSamplesGrid END rows=%d displayed=%d', [GridSamples.RowCount, Length(FDisplayedSamples)]));
 end;
 
 procedure TFrameMeterValueEdit.SortSamples;
@@ -1784,6 +1795,7 @@ end;
 
 procedure TFrameMeterValueEdit.RefreshAllTestControls;
 begin
+  DebugLog(Format('Scenario trace: RefreshAllTestControls BEGIN test=%d time=%d', [FTestSamples.Count, FTestCurrentTimeMs]));
   EditAnalysisTime.Text := FloatToStr(FTestCurrentTimeMs / 1000.0);
   LoadSettingsToControls;
   RefreshSamplesGrid;
@@ -1800,12 +1812,18 @@ begin
     EditSampleTime.Text := '';
     EditSampleValue.Text := '';
   end;
+  DebugLog(Format('Scenario trace: RefreshAllTestControls END rows=%d', [GridSamples.RowCount]));
 end;
 
 procedure TFrameMeterValueEdit.ApplySelectedScenario;
 begin
+  DebugLog(Format('Scenario trace: ApplySelectedScenario BEGIN index=%d source=%d', [ComboBoxStabilityScenario.ItemIndex, Ord(FSampleSource)]));
   if FSampleSource <> mssTestSamples then
+  begin
+    DebugLog('Scenario trace: ApplySelectedScenario before SetSampleSource');
     SetSampleSource(mssTestSamples);
+    DebugLog('Scenario trace: ApplySelectedScenario after SetSampleSource');
+  end;
 
   if (ComboBoxStabilityScenario.ItemIndex < Ord(Low(TMeterValueTestScenario))) or
      (ComboBoxStabilityScenario.ItemIndex > Ord(High(TMeterValueTestScenario))) then
@@ -1813,7 +1831,9 @@ begin
     ShowMessage('Сценарий не выбран.');
     Exit;
   end;
+  DebugLog('Scenario trace: ApplySelectedScenario before ApplyScenario');
   ApplyScenario(TMeterValueTestScenario(ComboBoxStabilityScenario.ItemIndex));
+  DebugLog('Scenario trace: ApplySelectedScenario END');
 end;
 
 procedure TFrameMeterValueEdit.ApplyScenario(const AScenario: TMeterValueTestScenario);
@@ -1904,6 +1924,7 @@ var
   end;
 
 begin
+  DebugLog(Format('Scenario trace: ApplyScenario BEGIN scenario=%d loading=%s', [Ord(AScenario), BoolToStr(FLoading, True)]));
   WasLoading := FLoading;
   FLoading := True;
   try
@@ -1998,8 +2019,11 @@ begin
     end;
 
     FTestSettings.TargetValue := FTestTargetValue;
+    DebugLog(Format('Scenario trace: ApplyScenario generated test=%d; before SortSamples', [FTestSamples.Count]));
     SortSamples;
+    DebugLog('Scenario trace: ApplyScenario after SortSamples; before RefreshAllTestControls');
     RefreshAllTestControls;
+    DebugLog('Scenario trace: ApplyScenario after RefreshAllTestControls');
   finally
     FLoading := WasLoading;
   end;
@@ -2022,7 +2046,12 @@ begin
     LogAllConditionsAnalysis('after second analyze');
   end
   else
+  begin
+    DebugLog('Scenario trace: ApplyScenario before Analyze');
     Analyze;
+    DebugLog('Scenario trace: ApplyScenario after Analyze');
+  end;
+  DebugLog(Format('Scenario trace: ApplyScenario END scenario=%d test=%d', [Ord(AScenario), FTestSamples.Count]));
 end;
 
 procedure TFrameMeterValueEdit.ButtonSampleAddClick(Sender: TObject);
@@ -2305,7 +2334,9 @@ end;
 
 procedure TFrameMeterValueEdit.Analyze;
 begin
+  DebugLog(Format('Scenario trace: Analyze BEGIN displayed=%d test=%d time=%d', [Length(FDisplayedSamples), FTestSamples.Count, FTestCurrentTimeMs]));
   AnalyzeDisplayedSamples(False, True, False);
+  DebugLog('Scenario trace: Analyze END');
 end;
 
 procedure TFrameMeterValueEdit.AnalyzeDisplayedSamples(const AUseLastWorkSampleTime: Boolean;
@@ -2525,8 +2556,12 @@ var
   ChartSettings: TMeterValueStabilitySettings;
 
 begin
+  DebugLog(Format('Scenario trace: UpdateStabilityChart BEGIN displayed=%d', [Length(FDisplayedSamples)]));
   if ChartStability = nil then
+  begin
+    DebugLog('Scenario trace: UpdateStabilityChart END chart=nil');
     Exit;
+  end;
 
   ChartSettings := FTestSettings;
   if FMeterValue <> nil then
@@ -2612,6 +2647,7 @@ begin
   end;
 
   ChartStability.InvalidateChart;
+  DebugLog('Scenario trace: UpdateStabilityChart END');
 end;
 
 procedure TFrameMeterValueEdit.UpdateDetailedConclusion(const AInfo: TMeterValueStabilityInfo);
