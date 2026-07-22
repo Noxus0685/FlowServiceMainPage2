@@ -14,9 +14,42 @@ uses
   FMX.Filter.Effects, FMX.StdCtrls, FMX.Colors, FMX.Effects,System.Math,
   FMX.ListBox, FMX.Controls.Presentation, FMX.Objects, FMX.Layouts, FMX.Edit,
   FMX.Memo.Types, FMX.ScrollBox, FMX.Memo,
-  FMX.EditBox, FMX.SpinBox, UnitParameter, uProtocols;
+  FMX.EditBox, FMX.SpinBox, FMXTee.Chart, FMXTee.Engine, UnitParameter, uMeasurementRun, uProtocols;
+
+
+const
+  GraphSampleIntervalMs = 1000;
+  MaxGraphSampleCountPerSeries = 3600;
 
 type
+
+  TGraphSample = record
+    TimeStampMs: Int64;
+    Value: Double;
+  end;
+
+  TFlowGraphSeries = class
+  public
+    Key: string;
+    Caption: string;
+    Visible: Boolean;
+    Samples: TList<TGraphSample>;
+    LineColor: TAlphaColor;
+    constructor Create;
+    destructor Destroy; override;
+  end;
+
+  TFlowGraphHistory = class
+  private
+    FSeries: TObjectDictionary<string, TFlowGraphSeries>;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Clear;
+    function EnsureSeries(const AKey, ACaption: string; const AColor: TAlphaColor): TFlowGraphSeries;
+    procedure RemoveMissing(const AValidKeys: TStrings);
+    property Series: TObjectDictionary<string, TFlowGraphSeries> read FSeries;
+  end;
   TFormMain = class(TForm)
     TabControlMain: TTabControl;
     TabItemTable: TTabItem;
@@ -94,7 +127,30 @@ type
     function UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0;
       AEtalonChannels: TObjectList<TChannel> = nil):Double;
     procedure UpdateDeviceImpSecFromFlowRate;
+    procedure CreateGraphsTab;
+    procedure RefreshFlowGraphChannels;
+    procedure AddFlowGraphSamples(const ATimeStampMs: Int64);
+    procedure UpdateFlowGraphCharts(const ATimeStampMs: Int64);
+    procedure ClearFlowGraphsClick(Sender: TObject);
+    procedure FlowGraphCheckChanged(Sender: TObject);
+    function IsFlowGraphSamplingActive(const AWorkTable: TWorkTable): Boolean;
+    function BuildFlowGraphKey(const APrefix: string; const AChannel: TChannel; const AIndex: Integer): string;
+    function BuildFlowGraphCaption(const APrefix: string; const AChannel: TChannel; const AIndex: Integer): string;
+    function NextGraphColor(const AKey: string): TAlphaColor;
+    procedure FillFlowGraphSelection(const AHistory: TFlowGraphHistory; const AParent: TFlowLayout);
+    procedure RenderFlowChart(const AChart: TSimpleChart; const AHistory: TFlowGraphHistory;
+      const ABaseTimeMs: Int64; const AWindowSec: Double; const ATitle: string);
+    procedure SyncFlowGraphWorkTable;
 
+    FTabItemGraphs: TTabItem;
+    FChartEtalonFlow: TSimpleChart;
+    FChartDeviceFlow: TSimpleChart;
+    FEtalonGraphChecks: TFlowLayout;
+    FDeviceGraphChecks: TFlowLayout;
+    FEtalonFlowHistory: TFlowGraphHistory;
+    FDeviceFlowHistory: TFlowGraphHistory;
+    FLastFlowGraphSampleMs: UInt64;
+    FFlowGraphWorkTable: TWorkTable;
 
   public
   end;
@@ -105,6 +161,61 @@ var
 implementation
 
 {$R *.fmx}
+
+
+constructor TFlowGraphSeries.Create;
+begin
+  inherited Create;
+  Visible := True;
+  Samples := TList<TGraphSample>.Create;
+end;
+
+destructor TFlowGraphSeries.Destroy;
+begin
+  Samples.Free;
+  inherited;
+end;
+
+constructor TFlowGraphHistory.Create;
+begin
+  inherited Create;
+  FSeries := TObjectDictionary<string, TFlowGraphSeries>.Create([doOwnsValues]);
+end;
+
+destructor TFlowGraphHistory.Destroy;
+begin
+  FSeries.Free;
+  inherited;
+end;
+
+procedure TFlowGraphHistory.Clear;
+begin
+  FSeries.Clear;
+end;
+
+function TFlowGraphHistory.EnsureSeries(const AKey, ACaption: string;
+  const AColor: TAlphaColor): TFlowGraphSeries;
+begin
+  if not FSeries.TryGetValue(AKey, Result) then
+  begin
+    Result := TFlowGraphSeries.Create;
+    Result.Key := AKey;
+    Result.LineColor := AColor;
+    FSeries.Add(AKey, Result);
+  end;
+  Result.Caption := ACaption;
+end;
+
+procedure TFlowGraphHistory.RemoveMissing(const AValidKeys: TStrings);
+var
+  Key: string;
+  Keys: TArray<string>;
+begin
+  Keys := FSeries.Keys.ToArray;
+  for Key in Keys do
+    if AValidKeys.IndexOf(Key) < 0 then
+      FSeries.Remove(Key);
+end;
 
 function PressureRandomAroundBase(const ABaseValue: Double;
   const ARelativeDeviation: Double): Double;
@@ -267,6 +378,9 @@ begin
 
   if FWorkTableManager <> nil then
     FWorkTableManager.Save;
+
+  FreeAndNil(FEtalonFlowHistory);
+  FreeAndNil(FDeviceFlowHistory);
 end;
 
 
@@ -300,6 +414,8 @@ begin
   end;
 
 
+  CreateGraphsTab;
+
   FFrameMainTable := TFrameMainTable.Create(Self);
   FFrameMainTable.Parent := TabItemTable;
   FFrameMainTable.Align := TAlignLayout.Client;
@@ -312,7 +428,7 @@ begin
   FFrameProceed.Parent := TabItemResults;
   FFrameProceed.Align := TAlignLayout.Client;
   FFrameProceed.Initialize(FWorkTableManager);
-
+  RefreshFlowGraphChannels;
 
 end;
 
@@ -320,6 +436,8 @@ procedure TFormMain.TabControlMainChange(Sender: TObject);
 begin
   if (TabControlMain.ActiveTab = TabItemResults) and (FFrameProceed <> nil) then
     FFrameProceed.RefreshResultsTab;
+  if (TabControlMain.ActiveTab = FTabItemGraphs) then
+    RefreshFlowGraphChannels;
 end;
 
 procedure TFormMain.UpdateTemp(const AWorkTable: TWorkTable);
@@ -922,6 +1040,375 @@ begin
   end;
 end;
 
+
+procedure TFormMain.CreateGraphsTab;
+var
+  Root, EtalonSection, DeviceSection, Selection, ChartLayout: TLayout;
+  Splitter: TSplitter;
+  LabelSelection: TLabel;
+  Scroll: THorzScrollBox;
+  ButtonClear: TButton;
+begin
+  FEtalonFlowHistory := TFlowGraphHistory.Create;
+  FDeviceFlowHistory := TFlowGraphHistory.Create;
+
+  FTabItemGraphs := TTabItem.Create(TabControlMain);
+  FTabItemGraphs.Text := 'Графики';
+  FTabItemGraphs.Name := 'TabItemGraphs';
+  TabControlMain.InsertObject(1, FTabItemGraphs);
+
+  Root := TLayout.Create(FTabItemGraphs);
+  Root.Parent := FTabItemGraphs;
+  Root.Align := TAlignLayout.Client;
+  Root.Padding.Rect := TRectF.Create(8, 8, 8, 8);
+
+  EtalonSection := TLayout.Create(Root);
+  EtalonSection.Parent := Root;
+  EtalonSection.Name := 'LayoutEtalonGraphSection';
+  EtalonSection.Align := TAlignLayout.Top;
+  EtalonSection.Height := 340;
+
+  Selection := TLayout.Create(EtalonSection);
+  Selection.Parent := EtalonSection;
+  Selection.Name := 'LayoutEtalonGraphSelection';
+  Selection.Align := TAlignLayout.Bottom;
+  Selection.Height := 48;
+
+  LabelSelection := TLabel.Create(Selection);
+  LabelSelection.Parent := Selection;
+  LabelSelection.Name := 'LabelEtalonGraphSelection';
+  LabelSelection.Align := TAlignLayout.Left;
+  LabelSelection.Width := 70;
+  LabelSelection.Text := 'Эталоны';
+
+  ButtonClear := TButton.Create(Selection);
+  ButtonClear.Parent := Selection;
+  ButtonClear.Align := TAlignLayout.Right;
+  ButtonClear.Width := 130;
+  ButtonClear.Text := 'Очистить графики';
+  ButtonClear.OnClick := ClearFlowGraphsClick;
+
+  Scroll := THorzScrollBox.Create(Selection);
+  Scroll.Parent := Selection;
+  Scroll.Name := 'HorzScrollBoxEtalonGraphSelection';
+  Scroll.Align := TAlignLayout.Client;
+  FEtalonGraphChecks := TFlowLayout.Create(Scroll);
+  FEtalonGraphChecks.Parent := Scroll;
+  FEtalonGraphChecks.Name := 'FlowLayoutEtalonGraphChecks';
+  FEtalonGraphChecks.Align := TAlignLayout.Left;
+  FEtalonGraphChecks.Width := 1000;
+  FEtalonGraphChecks.Height := 40;
+
+  ChartLayout := TLayout.Create(EtalonSection);
+  ChartLayout.Parent := EtalonSection;
+  ChartLayout.Name := 'LayoutEtalonChart';
+  ChartLayout.Align := TAlignLayout.Client;
+  FChartEtalonFlow := TSimpleChart.Create(ChartLayout);
+  FChartEtalonFlow.Parent := ChartLayout;
+  FChartEtalonFlow.Name := 'PaintBoxEtalonFlowChart';
+  FChartEtalonFlow.Align := TAlignLayout.Client;
+  FChartEtalonFlow.Title := 'Расход эталонов';
+  FChartEtalonFlow.XTitle := 'Время';
+  FChartEtalonFlow.YTitle := 'Расход';
+
+  Splitter := TSplitter.Create(Root);
+  Splitter.Parent := Root;
+  Splitter.Name := 'SplitterFlowGraphs';
+  Splitter.Align := TAlignLayout.Top;
+  Splitter.Height := 6;
+  Splitter.Cursor := crVSplit;
+
+  DeviceSection := TLayout.Create(Root);
+  DeviceSection.Parent := Root;
+  DeviceSection.Name := 'LayoutDeviceGraphSection';
+  DeviceSection.Align := TAlignLayout.Client;
+
+  Selection := TLayout.Create(DeviceSection);
+  Selection.Parent := DeviceSection;
+  Selection.Name := 'LayoutDeviceGraphSelection';
+  Selection.Align := TAlignLayout.Bottom;
+  Selection.Height := 48;
+
+  LabelSelection := TLabel.Create(Selection);
+  LabelSelection.Parent := Selection;
+  LabelSelection.Name := 'LabelDeviceGraphSelection';
+  LabelSelection.Align := TAlignLayout.Left;
+  LabelSelection.Width := 70;
+  LabelSelection.Text := 'Приборы';
+
+  Scroll := THorzScrollBox.Create(Selection);
+  Scroll.Parent := Selection;
+  Scroll.Name := 'HorzScrollBoxDeviceGraphSelection';
+  Scroll.Align := TAlignLayout.Client;
+  FDeviceGraphChecks := TFlowLayout.Create(Scroll);
+  FDeviceGraphChecks.Parent := Scroll;
+  FDeviceGraphChecks.Name := 'FlowLayoutDeviceGraphChecks';
+  FDeviceGraphChecks.Align := TAlignLayout.Left;
+  FDeviceGraphChecks.Width := 1000;
+  FDeviceGraphChecks.Height := 40;
+
+  ChartLayout := TLayout.Create(DeviceSection);
+  ChartLayout.Parent := DeviceSection;
+  ChartLayout.Name := 'LayoutDeviceChart';
+  ChartLayout.Align := TAlignLayout.Client;
+  FChartDeviceFlow := TSimpleChart.Create(ChartLayout);
+  FChartDeviceFlow.Parent := ChartLayout;
+  FChartDeviceFlow.Name := 'PaintBoxDeviceFlowChart';
+  FChartDeviceFlow.Align := TAlignLayout.Client;
+  FChartDeviceFlow.Title := 'Расход приборов';
+  FChartDeviceFlow.XTitle := 'Время';
+  FChartDeviceFlow.YTitle := 'Расход';
+end;
+
+function TFormMain.NextGraphColor(const AKey: string): TAlphaColor;
+const
+  Colors: array[0..9] of TAlphaColor = (claBlue, claRed, claGreen, claOrange, claPurple,
+    claTeal, claBrown, claMagenta, claDarkcyan, claCrimson);
+var
+  I, Hash: Integer;
+begin
+  Hash := 0;
+  for I := 1 to Length(AKey) do
+    Hash := Hash + Ord(AKey[I]) * I;
+  Result := Colors[Abs(Hash) mod Length(Colors)];
+end;
+
+function TFormMain.BuildFlowGraphKey(const APrefix: string; const AChannel: TChannel;
+  const AIndex: Integer): string;
+var
+  Id: string;
+begin
+  Id := '';
+  if AChannel <> nil then
+  begin
+    Id := Trim(AChannel.DeviceUUID);
+    if (Id = '') and (AChannel.FlowMeter <> nil) then
+      Id := Trim(AChannel.FlowMeter.UUID);
+  end;
+  if Id = '' then
+    Id := IntToStr(AIndex);
+  Result := APrefix + ':' + Id + ':' + IntToStr(AIndex);
+end;
+
+function TFormMain.BuildFlowGraphCaption(const APrefix: string; const AChannel: TChannel;
+  const AIndex: Integer): string;
+var
+  Device: TDevice;
+  Parts: string;
+begin
+  Device := nil;
+  if (AChannel <> nil) and (AChannel.FlowMeter <> nil) then
+    Device := AChannel.FlowMeter.Device;
+  if Device <> nil then
+  begin
+    Parts := Trim(Device.Name);
+    if Parts = '' then
+      Parts := Trim(Device.DeviceTypeName);
+    if Trim(Device.DN) <> '' then
+      Parts := Trim(Parts + ' DN' + Device.DN);
+    if Trim(Device.SerialNumber) <> '' then
+      Parts := Trim(Parts + ' — №' + Device.SerialNumber);
+    Result := Parts;
+  end
+  else
+    Result := '';
+  if Result = '' then
+  begin
+    if SameText(APrefix, 'Etalon') then
+      Result := 'Эталонный канал ' + IntToStr(AIndex + 1)
+    else
+      Result := 'Приборный канал ' + IntToStr(AIndex + 1);
+  end;
+end;
+
+procedure TFormMain.FillFlowGraphSelection(const AHistory: TFlowGraphHistory; const AParent: TFlowLayout);
+var
+  Pair: TPair<string, TFlowGraphSeries>;
+  Check: TCheckBox;
+begin
+  AParent.DeleteChildren;
+  AParent.Width := Max(1000, AHistory.Series.Count * 260);
+  for Pair in AHistory.Series do
+  begin
+    Check := TCheckBox.Create(AParent);
+    Check.Parent := AParent;
+    Check.Width := 250;
+    Check.Height := 36;
+    Check.Text := Pair.Value.Caption;
+    Check.IsChecked := Pair.Value.Visible;
+    Check.TagString := Pair.Key;
+    Check.OnChange := FlowGraphCheckChanged;
+    Check.TextSettings.FontColor := Pair.Value.LineColor;
+  end;
+end;
+
+procedure TFormMain.RefreshFlowGraphChannels;
+var
+  WorkTable: TWorkTable;
+  I: Integer;
+  Channel: TChannel;
+  Key: string;
+  ValidEtalons, ValidDevices: TStringList;
+begin
+  WorkTable := nil;
+  if FWorkTableManager <> nil then
+    WorkTable := FWorkTableManager.ActiveWorkTable;
+  if WorkTable <> FFlowGraphWorkTable then
+  begin
+    FFlowGraphWorkTable := WorkTable;
+    if FEtalonFlowHistory <> nil then FEtalonFlowHistory.Clear;
+    if FDeviceFlowHistory <> nil then FDeviceFlowHistory.Clear;
+    FLastFlowGraphSampleMs := 0;
+  end;
+  ValidEtalons := TStringList.Create;
+  ValidDevices := TStringList.Create;
+  try
+    if (WorkTable <> nil) and (WorkTable.EtalonChannels <> nil) then
+      for I := 0 to WorkTable.EtalonChannels.Count - 1 do
+      begin
+        Channel := WorkTable.EtalonChannels[I];
+        if (Channel = nil) or (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) or (Channel.State = osDeleted) then Continue;
+        Key := BuildFlowGraphKey('Etalon', Channel, I);
+        ValidEtalons.Add(Key);
+        if not FEtalonFlowHistory.Series.ContainsKey(Key) then
+          FEtalonFlowHistory.EnsureSeries(Key, BuildFlowGraphCaption('Etalon', Channel, I), NextGraphColor(Key)).Visible := Channel.Enabled
+        else
+          FEtalonFlowHistory.EnsureSeries(Key, BuildFlowGraphCaption('Etalon', Channel, I), NextGraphColor(Key));
+      end;
+    if (WorkTable <> nil) and (WorkTable.DeviceChannels <> nil) then
+      for I := 0 to WorkTable.DeviceChannels.Count - 1 do
+      begin
+        Channel := WorkTable.DeviceChannels[I];
+        if (Channel = nil) or (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) or (Channel.State = osDeleted) then Continue;
+        Key := BuildFlowGraphKey('Device', Channel, I);
+        ValidDevices.Add(Key);
+        if not FDeviceFlowHistory.Series.ContainsKey(Key) then
+          FDeviceFlowHistory.EnsureSeries(Key, BuildFlowGraphCaption('Device', Channel, I), NextGraphColor(Key)).Visible := Channel.Enabled
+        else
+          FDeviceFlowHistory.EnsureSeries(Key, BuildFlowGraphCaption('Device', Channel, I), NextGraphColor(Key));
+      end;
+    FEtalonFlowHistory.RemoveMissing(ValidEtalons);
+    FDeviceFlowHistory.RemoveMissing(ValidDevices);
+  finally
+    ValidEtalons.Free;
+    ValidDevices.Free;
+  end;
+  FillFlowGraphSelection(FEtalonFlowHistory, FEtalonGraphChecks);
+  FillFlowGraphSelection(FDeviceFlowHistory, FDeviceGraphChecks);
+  UpdateFlowGraphCharts(0);
+end;
+
+procedure TFormMain.FlowGraphCheckChanged(Sender: TObject);
+var
+  Check: TCheckBox;
+  Series: TFlowGraphSeries;
+begin
+  Check := Sender as TCheckBox;
+  if FEtalonFlowHistory.Series.TryGetValue(Check.TagString, Series) or
+     FDeviceFlowHistory.Series.TryGetValue(Check.TagString, Series) then
+    Series.Visible := Check.IsChecked;
+  UpdateFlowGraphCharts(0);
+end;
+
+procedure TFormMain.ClearFlowGraphsClick(Sender: TObject);
+begin
+  if FEtalonFlowHistory <> nil then FEtalonFlowHistory.Clear;
+  if FDeviceFlowHistory <> nil then FDeviceFlowHistory.Clear;
+  FLastFlowGraphSampleMs := 0;
+  RefreshFlowGraphChannels;
+end;
+
+function TFormMain.IsFlowGraphSamplingActive(const AWorkTable: TWorkTable): Boolean;
+begin
+  Result := (AWorkTable <> nil) and
+    ((AWorkTable.State in [swtMONITOR, swtSTARTMONITOR, swtSTARTMONITORWAIT,
+      swtSTARTTEST, swtSTARTWAIT, swtEXECUTE, swtSTOPTEST, swtSTOPWAIT, swtFINALREAD]) or
+     ((AWorkTable.MeasurementRun <> nil) and not (TMeasurementRun(AWorkTable.MeasurementRun).Stage in [msNone, msDone])));
+end;
+
+procedure TFormMain.AddFlowGraphSamples(const ATimeStampMs: Int64);
+var
+  WorkTable: TWorkTable;
+  I: Integer;
+  Channel: TChannel;
+  Series: TFlowGraphSeries;
+  Sample: TGraphSample;
+  Key: string;
+
+  procedure AddChannelSample(const APrefix: string; AChannel: TChannel; AIndex: Integer; AHistory: TFlowGraphHistory);
+  begin
+    if (AChannel = nil) or (AChannel.FlowMeter = nil) or (AChannel.FlowMeter.ValueFlow = nil) or (AChannel.State = osDeleted) then Exit;
+    Key := BuildFlowGraphKey(APrefix, AChannel, AIndex);
+    Series := AHistory.EnsureSeries(Key, BuildFlowGraphCaption(APrefix, AChannel, AIndex), NextGraphColor(Key));
+    if (Series.Samples.Count > 0) and (Series.Samples.Last.TimeStampMs = ATimeStampMs) then Exit;
+    Sample.TimeStampMs := ATimeStampMs;
+    Sample.Value := AChannel.FlowMeter.ValueFlow.GetDoubleValueDim;
+    if IsNan(Sample.Value) or IsInfinite(Sample.Value) then Exit;
+    Series.Samples.Add(Sample);
+    while Series.Samples.Count > MaxGraphSampleCountPerSeries do
+      Series.Samples.Delete(0);
+  end;
+
+begin
+  WorkTable := FWorkTableManager.ActiveWorkTable;
+  SyncFlowGraphWorkTable;
+  if (WorkTable = nil) or not IsFlowGraphSamplingActive(WorkTable) then Exit;
+  if WorkTable.EtalonChannels <> nil then
+    for I := 0 to WorkTable.EtalonChannels.Count - 1 do
+      AddChannelSample('Etalon', WorkTable.EtalonChannels[I], I, FEtalonFlowHistory);
+  if WorkTable.DeviceChannels <> nil then
+    for I := 0 to WorkTable.DeviceChannels.Count - 1 do
+      AddChannelSample('Device', WorkTable.DeviceChannels[I], I, FDeviceFlowHistory);
+  UpdateFlowGraphCharts(ATimeStampMs);
+end;
+
+procedure TFormMain.SyncFlowGraphWorkTable;
+begin
+  if (FWorkTableManager <> nil) and (FWorkTableManager.ActiveWorkTable <> FFlowGraphWorkTable) then
+    RefreshFlowGraphChannels;
+end;
+
+procedure TFormMain.RenderFlowChart(const AChart: TSimpleChart; const AHistory: TFlowGraphHistory;
+  const ABaseTimeMs: Int64; const AWindowSec: Double; const ATitle: string);
+var
+  Pair: TPair<string, TFlowGraphSeries>;
+  ChartSeries: TChartSeries;
+  Sample: TGraphSample;
+begin
+  if AChart = nil then Exit;
+  AChart.BeginUpdate;
+  try
+    AChart.ClearAllSeries;
+    AChart.Title := ATitle;
+    AChart.XTitle := 'Время, с';
+    AChart.YTitle := 'Расход';
+    AChart.XMin := 0;
+    AChart.XMax := AWindowSec;
+    for Pair in AHistory.Series do
+      if Pair.Value.Visible and (Pair.Value.Samples.Count > 0) then
+      begin
+        ChartSeries := AChart.AddSeries(Pair.Value.Caption);
+        ChartSeries.Color := Pair.Value.LineColor;
+        ChartSeries.Thickness := 2;
+        ChartSeries.ShowMarkers := False;
+        for Sample in Pair.Value.Samples do
+          ChartSeries.AddPoint((Sample.TimeStampMs - ABaseTimeMs) / 1000, Sample.Value);
+      end;
+  finally
+    AChart.EndUpdate;
+  end;
+end;
+
+procedure TFormMain.UpdateFlowGraphCharts(const ATimeStampMs: Int64);
+var
+  NowMs, MinMs: Int64;
+begin
+  if ATimeStampMs > 0 then NowMs := ATimeStampMs else NowMs := TThread.GetTickCount64;
+  MinMs := Max(0, NowMs - Int64(GraphSampleIntervalMs) * MaxGraphSampleCountPerSeries);
+  RenderFlowChart(FChartEtalonFlow, FEtalonFlowHistory, MinMs, (NowMs - MinMs) / 1000, 'Расход эталонов');
+  RenderFlowChart(FChartDeviceFlow, FDeviceFlowHistory, MinMs, (NowMs - MinMs) / 1000, 'Расход приборов');
+end;
+
 procedure TFormMain.TimerSetValuesTimer(Sender: TObject);
 var
   WorkTable: TWorkTable;   // Текущая рабочая таблица (сессия измерения)
@@ -1156,6 +1643,14 @@ begin
     swtCOMPLETE:
       WorkTable.State := swtFINALREAD;
 
+  end;
+
+  SyncFlowGraphWorkTable;
+  if IsFlowGraphSamplingActive(WorkTable) and
+     ((FLastFlowGraphSampleMs = 0) or (TThread.GetTickCount64 - FLastFlowGraphSampleMs >= GraphSampleIntervalMs)) then
+  begin
+    FLastFlowGraphSampleMs := TThread.GetTickCount64;
+    AddFlowGraphSamples(FLastFlowGraphSampleMs);
   end;
 end;
 
