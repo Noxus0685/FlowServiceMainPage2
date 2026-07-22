@@ -1086,53 +1086,7 @@ begin
 end;
 
 
-function TMeasurementRun.BuildScenarioStabilityFailureText: string;
-var
-  I: Integer;
-  Channel: TChannel;
-  ValueFlow: TMeterValue;
-  Settings: TMeterValueStabilitySettings;
-  Info: TMeterValueStabilityInfo;
-begin
-  Result := FLastDiagnosticIsStableText;
-  if (FWorkTable = nil) or (FWorkTable.DeviceChannels = nil) then
-    Exit;
 
-  for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
-  begin
-    Channel := FWorkTable.DeviceChannels[I];
-    if (Channel = nil) or (not Channel.Enabled) or
-       (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) then
-      Continue;
-    ValueFlow := Channel.FlowMeter.ValueFlow;
-    Settings := ValueFlow.StabilitySettings;
-    Info := ValueFlow.LastStabilityInfo;
-    if Settings.Enabled and (Settings.WindowDurationSec <= 0) then
-      Exit(Format('Стабилизация невозможна: Device[%d].WindowDurationSec=%.12g; SampleCount=%d; UsedSampleCount=%d; MinSampleCount=%d.',
-        [I, Settings.WindowDurationSec, Info.SampleCount, Info.UsedSampleCount, Settings.MinSampleCount]));
-    if Info.Status = mvssInvalidSettings then
-      Exit(Format('Стабилизация невозможна: Device[%d].%s; SampleCount=%d; UsedSampleCount=%d; MinSampleCount=%d.',
-        [I, Info.StatusText, Info.SampleCount, Info.UsedSampleCount, Settings.MinSampleCount]));
-  end;
-end;
-
-procedure TMeasurementRun.FinishScenario(const AStatus, AText: string; AStopWorkTable: Boolean);
-begin
-  AddScenarioLog('RunScenario: завершение; результат=' + AStatus + '; ' + AText);
-  if AStopWorkTable and (FWorkTable <> nil) then
-  begin
-    try
-      if WorkTableNeedsPhysicalStop then
-        FWorkTable.StopTest;
-    except
-      on E: Exception do
-        AddScenarioLog('Исключение при остановке WorkTable: ' + E.ClassName + ': ' + E.Message);
-    end;
-  end;
-  FScenarioRunning := False;
-  FIsScenarioRun := False;
-  FScenarioStepBusy := False;
-end;
 
 function TMeasurementRun.RunScenario(AScenario: EMeasurementScenario; out AResultText: string): Boolean;
 const
@@ -2286,6 +2240,7 @@ var
   SignalInfo: TMeterValueStabilityInfo;
   ActualValue: Double;
   ParticipatingDeviceCount: Integer;
+   Settings: TMeterValueStabilitySettings;
   AnalysisTimeMs: Int64;
 begin
   StableInfo := Default(RStableInfo);
@@ -2376,6 +2331,7 @@ var
   ToleranceSource: string;
   FlowReached: Boolean;
   HistoryStable: Boolean;
+   Settings: TMeterValueStabilitySettings;
   AnalysisTimeMs: Int64;
 begin
   StableInfo := Default(RStableInfo);
