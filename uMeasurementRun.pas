@@ -1480,6 +1480,33 @@ var
   ToleranceSource: string;
   FlowReached: Boolean;
   HistoryStable: Boolean;
+  AllDeviceSignalsStable: Boolean;
+  ParticipatingDeviceCount: Integer;
+  SampleBeforeCount: Integer;
+  SampleAfterCount: Integer;
+  SampleTimeMs: Int64;
+  MeterValueId: string;
+  DeviceUUID: string;
+  MeterUUID: string;
+  DeviceDetails: TStringList;
+
+  function MeterValueRuntimeId(const AValue: TMeterValue): string;
+  begin
+    if AValue = nil then
+      Exit('nil');
+    Result := '0x' + IntToHex(NativeUInt(AValue), SizeOf(NativeUInt) * 2);
+  end;
+
+  function TrendDirectionText(const ADirection: TMeterValueTrendDirection): string;
+  begin
+    Result := GetEnumName(TypeInfo(TMeterValueTrendDirection), Ord(ADirection));
+  end;
+
+  function DiagnosticFloat(const AValue: Double): string;
+  begin
+    Result := FloatToStrF(AValue, ffFixed, 18, 9);
+  end;
+
 begin
   StableInfo := Default(RStableInfo);
   Result := False;
@@ -1546,48 +1573,114 @@ begin
   StableInfo.IsForecastInRange := True;
   FlowReached := StableInfo.IsCurrentInRange;
 
-  HistoryStable := True;
-  if Settings.Enabled then
-  begin
-    StableValue.AddSample(ActualValue);
-    HistoryStable := StableValue.AnalyzeStability(SignalInfo);
-    StableInfo.SignalInfo := SignalInfo;
-    StableInfo.IsSignalStable := HistoryStable;
-    StableInfo.MeanValue := SignalInfo.MeanValue;
-    StableInfo.ForecastValue := SignalInfo.ForecastValue;
-    StableInfo.IsMeanInRange := (not Settings.RequireMeanValueInRange) or
-      ((SignalInfo.MeanValue >= StableInfo.LowerLimit) and (SignalInfo.MeanValue <= StableInfo.UpperLimit));
-    StableInfo.IsForecastInRange := (not Settings.RequireForecastInRange) or
-      ((SignalInfo.ForecastValue >= StableInfo.LowerLimit) and (SignalInfo.ForecastValue <= StableInfo.UpperLimit));
-    HistoryStable := HistoryStable and StableInfo.IsMeanInRange and StableInfo.IsForecastInRange;
-  end
-  else
-  begin
-    StableInfo.SignalInfo.Status := mvssDisabled;
-    StableInfo.IsSignalStable := True;
-    StableInfo.MeanValue := ActualValue;
-    StableInfo.ForecastValue := ActualValue;
+  AllDeviceSignalsStable := True;
+  ParticipatingDeviceCount := 0;
+  DeviceDetails := TStringList.Create;
+  try
+    if FWorkTable.DeviceChannels <> nil then
+      for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+      begin
+        Channel := FWorkTable.DeviceChannels[I];
+        if (Channel = nil) or (not Channel.Enabled) or
+           (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) then
+          Continue;
+
+        Inc(ParticipatingDeviceCount);
+        StableValue := Channel.FlowMeter.ValueFlow;
+        Settings := StableValue.StabilitySettings;
+        ActualValue := StableValue.GetDoubleValue;
+        MeterValueId := MeterValueRuntimeId(StableValue);
+        DeviceUUID := Channel.DeviceUUID;
+        MeterUUID := StableValue.Hash;
+        SampleBeforeCount := Length(StableValue.GetStabilitySamples);
+
+        HistoryStable := False;
+        SignalInfo := Default(TMeterValueStabilityInfo);
+        if Settings.Enabled then
+        begin
+          SampleTimeMs := TMeterValue.GetMonotonicTimeMs;
+          StableValue.AddSample(ActualValue);
+          SampleAfterCount := Length(StableValue.GetStabilitySamples);
+          HistoryStable := StableValue.AnalyzeStability(SignalInfo);
+        end
+        else
+        begin
+          SampleTimeMs := TMeterValue.GetMonotonicTimeMs;
+          SampleAfterCount := SampleBeforeCount;
+          SignalInfo.Status := mvssDisabled;
+          SignalInfo.StatusText := 'Анализ стабильности расхода поверяемого канала отключён.';
+          Include(SignalInfo.FailReasons, mvsfrAnalysisDisabled);
+        end;
+
+        AllDeviceSignalsStable := AllDeviceSignalsStable and SignalInfo.IsSignalStable;
+        if not SignalInfo.IsSignalStable then
+          HistoryStable := False;
+
+        DeviceDetails.Add('FlowStabilitySampleAdded: DeviceFlow[' + IntToStr(I) + ']: '
+          + 'DeviceUUID=' + DeviceUUID
+          + '; ChannelIndex=' + IntToStr(Channel.ID)
+          + '; MeterValuePtr=' + MeterValueId
+          + '; MeterUUID=' + MeterUUID
+          + '; Parameter=ValueFlow'
+          + '; CurrentValue=' + DiagnosticFloat(ActualValue)
+          + '; HistoryAnalysisEnabled=' + BoolToStr(Settings.Enabled, True)
+          + '; SampleAdded=' + BoolToStr(Settings.Enabled and (SampleAfterCount <> SampleBeforeCount), True)
+          + '; TimeStampMs=' + IntToStr(SampleTimeMs)
+          + '; HistoryCountBefore=' + IntToStr(SampleBeforeCount)
+          + '; HistoryCountAfter=' + IntToStr(SampleAfterCount)
+          + '; UsedSampleCount=' + IntToStr(SignalInfo.UsedSampleCount)
+          + '; WindowDurationSec=' + DiagnosticFloat(SignalInfo.WindowDurationSec)
+          + '; LastSampleAgeSec=' + DiagnosticFloat(SignalInfo.LastSampleAgeSec)
+          + '; TrendRate=' + DiagnosticFloat(SignalInfo.TrendRate)
+          + '; TrendRateUnit=value/s'
+          + '; MaxTrendRate=' + DiagnosticFloat(Settings.MaxTrendRate)
+          + '; MaxTrendRateUnit=value/s'
+          + '; TrendExceeded=' + BoolToStr((not SignalInfo.IsTrendStable) and SignalInfo.HasTrend, True)
+          + '; TrendDirection=' + TrendDirectionText(SignalInfo.TrendDirection)
+          + '; Variation=' + DiagnosticFloat(SignalInfo.Variation)
+          + '; StdDeviation=' + DiagnosticFloat(SignalInfo.StdDeviation)
+          + '; OutlierFraction=' + DiagnosticFloat(SignalInfo.OutlierFraction)
+          + '; IsSignalStable=' + BoolToStr(SignalInfo.IsSignalStable, True)
+          + '; IsStabilityConfirmed=' + BoolToStr(SignalInfo.IsStabilityConfirmed, True)
+          + '; IsSuitableForMeasurement=' + BoolToStr(SignalInfo.IsSuitableForMeasurement, True)
+          + '; Result=' + BoolToStr(HistoryStable, True)
+          + '; Reason=' + SignalInfo.StatusText);
+
+        if StableInfo.SignalInfo.Status = mvssUnknown then
+          StableInfo.SignalInfo := SignalInfo;
+      end;
+
+    if ParticipatingDeviceCount = 0 then
+    begin
+      AllDeviceSignalsStable := False;
+      StableInfo.StatusText := 'NoParticipatingDeviceChannels.';
+    end;
+
+    StableInfo.IsSignalStable := AllDeviceSignalsStable;
+    StableInfo.IsTargetConditionPassed := FlowReached;
+    StableInfo.IsReadyForMeasurement := FlowReached and AllDeviceSignalsStable;
+    Result := StableInfo.IsReadyForMeasurement;
+
+    if Result then
+      StableInfo.Status := sOk
+    else
+      StableInfo.Status := sRun_NN;
+
+    StableInfo.StatusText := StableInfo.StatusText + Format(' FlowReached=%s; HistoryAnalysisEnabled=%s; DeviceSignalStable=%s; ParticipatingDeviceCount=%d; '
+      + 'ToleranceSource=%s; Target=%.6f; ActualFlowSource=EtalonOrAggregate; Actual=%.6f; FlowMin=%.6f; FlowMax=%.6f; '
+      + 'AllowedDeviationLS=%.6f/%.6f; ActualDeviationLS=%.6f; ActualDeviationPercent=%.6f; Result=%s',
+      [BoolToStr(FlowReached, True), BoolToStr(ParticipatingDeviceCount > 0, True),
+       BoolToStr(AllDeviceSignalsStable, True), ParticipatingDeviceCount,
+       ToleranceSource, TargetValue, StableInfo.CurrentValue, StableInfo.LowerLimit, StableInfo.UpperLimit,
+       AllowedMinus, AllowedPlus, Abs(StableInfo.CurrentValue - TargetValue),
+       IfThen(not SameValue(TargetValue, 0), Abs(StableInfo.CurrentValue - TargetValue) / Abs(TargetValue) * 100.0, 0.0),
+       BoolToStr(Result, True)]);
+
+    if DeviceDetails.Count > 0 then
+      StableInfo.StatusText := StableInfo.StatusText + '; ' + StringReplace(DeviceDetails.Text.Trim, sLineBreak, '; ', [rfReplaceAll]);
+  finally
+    DeviceDetails.Free;
   end;
-
-  StableInfo.IsTargetConditionPassed := FlowReached and StableInfo.IsMeanInRange and StableInfo.IsForecastInRange;
-  StableInfo.IsReadyForMeasurement := FlowReached and HistoryStable;
-  Result := StableInfo.IsReadyForMeasurement;
-
-  if Result then
-    StableInfo.Status := sOk
-  else
-    StableInfo.Status := sRun_NN;
-
-  StableInfo.StatusText := Format('FlowReached=%s; HistoryAnalysisEnabled=%s; HistoryAnalysisSkipped=%s; '
-    + 'ToleranceSource=%s; Target=%.6f; Actual=%.6f; FlowMin=%.6f; FlowMax=%.6f; '
-    + 'AllowedDeviationLS=%.6f/%.6f; ActualDeviationLS=%.6f; ActualDeviationPercent=%.6f',
-    [BoolToStr(FlowReached, True), BoolToStr(Settings.Enabled, True), BoolToStr(not Settings.Enabled, True),
-     ToleranceSource, TargetValue, ActualValue, StableInfo.LowerLimit, StableInfo.UpperLimit,
-     AllowedMinus, AllowedPlus, Abs(ActualValue - TargetValue),
-     IfThen(not SameValue(TargetValue, 0), Abs(ActualValue - TargetValue) / Abs(TargetValue) * 100.0, 0.0)]);
-
-  if Settings.Enabled and (not HistoryStable) and (SignalInfo.StatusText <> '') then
-    StableInfo.StatusText := StableInfo.StatusText + '; HistoryReason=' + SignalInfo.StatusText;
 end;
 
 procedure TMeasurementRun.ContinueAfterPointError(const AStatus: EMeasurementPointStatus;
