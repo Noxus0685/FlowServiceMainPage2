@@ -1892,12 +1892,6 @@ begin
 
   FInitialized := True;
 
-  TabControlWorkTables.Align := TAlignLayout.Left;
-  TabControlWorkTables.Width := Max(520.0, LayoutCenter.Width * 0.50);
-  Splitter2.Align := TAlignLayout.Left;
-  Splitter2.MinSize := 420;
-  PanelProperties.Align := TAlignLayout.Client;
-
   ButtonMonitor.Align := TAlignLayout.Left;
   ButtonMonitor.Margins.Left := 24;
   ButtonMonitor.Margins.Top := 24;
