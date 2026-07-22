@@ -1,0 +1,47 @@
+unit UnitFrameCalibrCoefs;
+
+interface
+
+uses
+  System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants, 
+  FMX.Types, FMX.Graphics, FMX.Controls, FMX.Forms, FMX.Dialogs, FMX.StdCtrls,
+  System.Rtti, FMX.Grid.Style, FMX.Layouts, FMX.Controls.Presentation,
+  FMX.ScrollBox, FMX.Grid, FMXTee.Engine, FMXTee.Procs, FMXTee.Chart,
+  FMX.ListBox;
+
+type
+  TFrameCalibrCoefs = class(TFrame)
+    Grid1: TGrid;
+    Layout1: TLayout;
+    ToolBar1: TToolBar;
+    SpeedButtonCoefsClear: TSpeedButton;
+    SpeedButtonCoefDelete: TSpeedButton;
+    SpeedButtonCefAdd: TSpeedButton;
+    SpeedButtonCoefsRefresh: TSpeedButton;
+    CheckColumnCoefEnable: TCheckColumn;
+    StringColumnCoefEtalonValue: TStringColumn;
+    StringColumnCoefDeviceValue: TStringColumn;
+    StringColumnCoefInitError: TStringColumn;
+    StringColumnCoefError: TStringColumn;
+    StringColumnCoefK: TStringColumn;
+    StringColumnCoefb: TStringColumn;
+    StringColumnCoefFrom: TStringColumn;
+    StringColumnCoefTo: TStringColumn;
+    StringColumnCoefName: TStringColumn;
+    ComboBoxUnitsResult: TComboBox;
+    Chart1: TChart;
+    Layout2: TLayout;
+    Layout3: TLayout;
+    ComboBox1: TComboBox;
+    Splitter1: TSplitter;
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+implementation
+
+{$R *.fmx}
+
+end.

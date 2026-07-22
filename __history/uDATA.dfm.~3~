@@ -1,0 +1,151 @@
+object DM: TDM
+  Height = 480
+  Width = 640
+  object TypesConnection: TFDConnection
+    Params.Strings = (
+      'Database='
+      'DriverID=SQLite')
+    Connected = True
+    Left = 224
+    Top = 8
+  end
+  object qryTmp: TFDQuery
+    Connection = TypesConnection
+    Left = 224
+    Top = 72
+  end
+  object FDPhysSQLiteDriverLink1: TFDPhysSQLiteDriverLink
+    Left = 384
+    Top = 24
+  end
+  object FlowmeterTypes: TFDTable
+    Connection = TypesConnection
+    UpdateOptions.UpdateTableName = 'FlowmeterTypes'
+    TableName = 'FlowmeterTypes'
+    Left = 224
+    Top = 184
+  end
+  object Diameters: TFDTable
+    Connection = TypesConnection
+    UpdateOptions.UpdateTableName = 'Diabeters'
+    TableName = 'Diameters'
+    Left = 224
+    Top = 304
+  end
+  object TypePoints: TFDTable
+    Connection = TypesConnection
+    UpdateOptions.UpdateTableName = 'TypePoints'
+    TableName = 'TypePoints'
+    Left = 224
+    Top = 360
+  end
+  object FDQuery1: TFDQuery
+    Connection = TypesConnection
+    Left = 224
+    Top = 416
+  end
+  object qryFlowmeterTypes: TFDQuery
+    BeforeOpen = qryFlowmeterTypesBeforeOpen
+    Connection = TypesConnection
+    SQL.Strings = (
+      'SELECT * FROM FlowmeterTypes')
+    Left = 224
+    Top = 240
+    object qryFlowmeterTypesID: TIntegerField
+      FieldName = 'ID'
+      Origin = 'ID'
+      ProviderFlags = [pfInUpdate, pfInWhere, pfInKey]
+    end
+    object qryFlowmeterTypesName: TStringField
+      FieldName = 'Name'
+      Origin = 'Name'
+      Required = True
+      Size = 200
+    end
+    object qryFlowmeterTypesCategory: TIntegerField
+      FieldName = 'Category'
+      Origin = 'Category'
+    end
+    object qryFlowmeterTypesManufacturer: TStringField
+      FieldName = 'Manufacturer'
+      Origin = 'Manufacturer'
+      Size = 100
+    end
+    object qryFlowmeterTypesModification: TStringField
+      FieldName = 'Modification'
+      Origin = 'Modification'
+      Size = 100
+    end
+    object qryFlowmeterTypesAccuracyClass: TStringField
+      FieldName = 'AccuracyClass'
+      Origin = 'AccuracyClass'
+      Size = 50
+    end
+    object qryFlowmeterTypesReestrNumber: TStringField
+      FieldName = 'ReestrNumber'
+      Origin = 'ReestrNumber'
+      Size = 50
+    end
+    object qryFlowmeterTypesRegDate: TDateField
+      FieldName = 'RegDate'
+      Origin = 'RegDate'
+    end
+    object qryFlowmeterTypesValidityDate: TDateField
+      FieldName = 'ValidityDate'
+      Origin = 'ValidityDate'
+    end
+    object qryFlowmeterTypesIVI: TStringField
+      FieldName = 'IVI'
+      Origin = 'IVI'
+      Size = 50
+    end
+    object qryFlowmeterTypesVerificationMethod: TStringField
+      FieldName = 'VerificationMethod'
+      Origin = 'VerificationMethod'
+      Size = 200
+    end
+    object qryFlowmeterTypesProcedureName: TStringField
+      FieldName = 'ProcedureName'
+      Origin = 'ProcedureName'
+      Size = 200
+    end
+  end
+  object FlowmeterTypePoints: TFDTable
+    FieldOptions.PositionMode = poFirst
+    IndexFieldNames = 'DiameterID'
+    MasterFields = 'ID'
+    Connection = TypesConnection
+    FormatOptions.AssignedValues = [fvSortLocale, fvSortOptions]
+    FormatOptions.SortOptions = [soUnique, soPrimary]
+    ResourceOptions.AssignedValues = [rvEscapeExpand]
+    TableName = 'FlowmeterTypePoints'
+    Left = 225
+    Top = 130
+  end
+  object DevicesConnection: TFDConnection
+    Params.Strings = (
+      'Database='
+      'DriverID=SQLite')
+    Connected = True
+    Left = 72
+    Top = 24
+  end
+  object Devices: TFDTable
+    Connection = DevicesConnection
+    TableName = 'Devices'
+    Left = 72
+    Top = 88
+  end
+  object DevicePoints: TFDTable
+    Connection = DevicesConnection
+    TableName = 'DevicePoints'
+    Left = 72
+    Top = 152
+  end
+  object SpillagePoints: TFDTable
+    Connection = DevicesConnection
+    TableName = 'SpillagePoints'
+    Left = 72
+    Top = 224
+  end
+end
