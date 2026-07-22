@@ -727,10 +727,13 @@ type
     FDeviceLowerToleranceSeries: TLineSeries;
     FDeviceUpperToleranceSeries: TLineSeries;
     FDeviceTargetSeries: TLineSeries;
-    FFlowGraphsScrollBox: TVertScrollBox;
     FFlowGraphsContent: TLayout;
     FEtalonGraphsHeader: TLabel;
+    FEtalonGraphsScrollBox: THorzScrollBox;
+    FEtalonGraphsLayout: TLayout;
     FDeviceGraphsHeader: TLabel;
+    FDeviceGraphsScrollBox: THorzScrollBox;
+    FDeviceGraphsLayout: TLayout;
     FGraphPanels: TObjectDictionary<string, TFlowGraphPanel>;
   FFrameMeasurementRun: TFrameMeasurementRun;
   FFrameMRResults: TFrameMRResults;
@@ -1022,9 +1025,10 @@ begin
   inherited Create;
   RootLayout := TLayout.Create(AOwner);
   RootLayout.Parent := AParent;
-  RootLayout.Align := TAlignLayout.Top;
+  RootLayout.Align := TAlignLayout.Left;
+  RootLayout.Width := 420;
   RootLayout.Height := 250;
-  RootLayout.Margins.Bottom := 8;
+  RootLayout.Margins.Right := 8;
   HeaderLayout := TLayout.Create(AOwner);
   HeaderLayout.Parent := RootLayout;
   HeaderLayout.Align := TAlignLayout.Top;
@@ -5320,28 +5324,43 @@ begin
     FDeviceChartSeries := TObjectDictionary<string, TLineSeries>.Create;
   if FGraphPanels = nil then
     FGraphPanels := TObjectDictionary<string, TFlowGraphPanel>.Create([doOwnsValues]);
-  if (FFlowGraphsScrollBox = nil) and (LayoutGraphsClient <> nil) then
+  if (FFlowGraphsContent = nil) and (LayoutGraphsClient <> nil) then
   begin
     if LayoutEtalonGraphSection <> nil then LayoutEtalonGraphSection.Visible := False;
     if SplitterFlowGraphs <> nil then SplitterFlowGraphs.Visible := False;
     if LayoutDeviceGraphSection <> nil then LayoutDeviceGraphSection.Visible := False;
-    FFlowGraphsScrollBox := TVertScrollBox.Create(Self);
-    FFlowGraphsScrollBox.Parent := LayoutGraphsClient;
-    FFlowGraphsScrollBox.Align := TAlignLayout.Client;
     FFlowGraphsContent := TLayout.Create(Self);
-    FFlowGraphsContent.Parent := FFlowGraphsScrollBox;
-    FFlowGraphsContent.Align := TAlignLayout.Top;
-    FFlowGraphsContent.Height := 1;
+    FFlowGraphsContent.Parent := LayoutGraphsClient;
+    FFlowGraphsContent.Align := TAlignLayout.Client;
+
     FEtalonGraphsHeader := TLabel.Create(Self);
     FEtalonGraphsHeader.Parent := FFlowGraphsContent;
     FEtalonGraphsHeader.Align := TAlignLayout.Top;
     FEtalonGraphsHeader.Height := 32;
     FEtalonGraphsHeader.Text := 'ЭТАЛОНЫ';
+    FEtalonGraphsScrollBox := THorzScrollBox.Create(Self);
+    FEtalonGraphsScrollBox.Parent := FFlowGraphsContent;
+    FEtalonGraphsScrollBox.Align := TAlignLayout.Top;
+    FEtalonGraphsScrollBox.Height := 258;
+    FEtalonGraphsLayout := TLayout.Create(Self);
+    FEtalonGraphsLayout.Parent := FEtalonGraphsScrollBox;
+    FEtalonGraphsLayout.Align := TAlignLayout.Left;
+    FEtalonGraphsLayout.Height := 250;
+    FEtalonGraphsLayout.Width := 1;
+
     FDeviceGraphsHeader := TLabel.Create(Self);
     FDeviceGraphsHeader.Parent := FFlowGraphsContent;
     FDeviceGraphsHeader.Align := TAlignLayout.Top;
     FDeviceGraphsHeader.Height := 32;
     FDeviceGraphsHeader.Text := 'ПОВЕРЯЕМЫЕ ПРИБОРЫ';
+    FDeviceGraphsScrollBox := THorzScrollBox.Create(Self);
+    FDeviceGraphsScrollBox.Parent := FFlowGraphsContent;
+    FDeviceGraphsScrollBox.Align := TAlignLayout.Client;
+    FDeviceGraphsLayout := TLayout.Create(Self);
+    FDeviceGraphsLayout.Parent := FDeviceGraphsScrollBox;
+    FDeviceGraphsLayout.Align := TAlignLayout.Left;
+    FDeviceGraphsLayout.Height := 250;
+    FDeviceGraphsLayout.Width := 1;
   end;
   EnsureToleranceSeries;
 end;
@@ -5593,7 +5612,10 @@ procedure TFrameMainTable.RefreshFlowGraphChannels(const AReason: string);
     Panel: TFlowGraphPanel;
     ParentObj: TFmxObject;
   begin
-    ParentObj := FFlowGraphsContent;
+    if AKind = fgckEtalon then
+      ParentObj := FEtalonGraphsLayout
+    else
+      ParentObj := FDeviceGraphsLayout;
     if not FGraphPanels.TryGetValue(ASeries.Key, Panel) then
     begin
       Panel := TFlowGraphPanel.Create(Self, ParentObj);
@@ -5676,8 +5698,10 @@ begin
   finally
     ValidKeys.Free;
   end;
-  if FFlowGraphsContent <> nil then
-    FFlowGraphsContent.Height := 80 + (FGraphPanels.Count * 258);
+  if FEtalonGraphsLayout <> nil then
+    FEtalonGraphsLayout.Width := Max(1, FFlowGraphHistory.EtalonSeries.Count * 428);
+  if FDeviceGraphsLayout <> nil then
+    FDeviceGraphsLayout.Width := Max(1, FFlowGraphHistory.DeviceSeries.Count * 428);
   if FActiveWorkTable <> nil then
     RenderFlowGraphs;
 end;
