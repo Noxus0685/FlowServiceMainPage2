@@ -5107,14 +5107,22 @@ end;
 
 function TFrameMainTable.BuildFlowGraphSeriesKey(const AKind: string; AWorkTable: TWorkTable; AChannel: TChannel; AChannelIndex: Integer): string;
 var
-  MeterUUID: string;
+  WorkTableUUID, ChannelUUID, ChannelPart: string;
 begin
-  MeterUUID := '';
-  if (AChannel <> nil) and (AChannel.FlowMeter <> nil) then
-    MeterUUID := Trim(AChannel.FlowMeter.UUID);
-  if MeterUUID = '' then
-    MeterUUID := Trim(AChannel.DeviceUUID);
-  Result := Format('%s:%s:%s:%d', [AKind, AWorkTable.UUID, MeterUUID, AChannelIndex + 1]);
+  WorkTableUUID := '';
+  if AWorkTable <> nil then
+    WorkTableUUID := Trim(AWorkTable.UUID);
+
+  ChannelUUID := '';
+  if AChannel <> nil then
+    ChannelUUID := Trim(AChannel.UUID);
+
+  if ChannelUUID <> '' then
+    ChannelPart := ChannelUUID
+  else
+    ChannelPart := IntToStr(AChannelIndex);
+
+  Result := Format('%s:%s:%s', [AKind, WorkTableUUID, ChannelPart]);
 end;
 
 function TFrameMainTable.BuildFlowGraphCaption(AChannel: TChannel; AChannelIndex: Integer; const AFallbackPrefix: string): string;
@@ -5495,6 +5503,72 @@ procedure TFrameMainTable.RefreshFlowGraphChannels(const AReason: string);
       Check.OnChange := FlowGraphCheckBoxChange;
     end;
   end;
+
+  function FlowGraphLogicalKeysToText(ADict: TObjectDictionary<string,TFlowGraphSeries>): string;
+  var
+    Key: string;
+  begin
+    Result := '';
+    if ADict = nil then
+      Exit;
+    for Key in ADict.Keys do
+    begin
+      if Result <> '' then
+        Result := Result + '|';
+      Result := Result + Key;
+    end;
+  end;
+
+  function FlowGraphChartKeysToText(ADict: TObjectDictionary<string,TLineSeries>): string;
+  var
+    Key: string;
+  begin
+    Result := '';
+    if ADict = nil then
+      Exit;
+    for Key in ADict.Keys do
+    begin
+      if Result <> '' then
+        Result := Result + '|';
+      Result := Result + Key;
+    end;
+  end;
+
+  procedure VerifyFlowGraphKeys(AList: TObjectList<TChannel>; ALogical: TObjectDictionary<string,TFlowGraphSeries>; AVisual: TObjectDictionary<string,TLineSeries>; const AKind: string);
+  var
+    I: Integer;
+    C: TChannel;
+    ExpectedKey, ChannelDeviceUUID, ProcessingDeviceUUID: string;
+    LogicalFound, ChartFound: Boolean;
+  begin
+    if AList = nil then
+      Exit;
+    for I := 0 to AList.Count - 1 do
+    begin
+      C := AList[I];
+      if not IsValidFlowGraphChannel(C) then
+        Continue;
+      ExpectedKey := BuildFlowGraphSeriesKey(AKind, FActiveWorkTable, C, I);
+      LogicalFound := (ALogical <> nil) and ALogical.ContainsKey(ExpectedKey);
+      ChartFound := (AVisual <> nil) and AVisual.ContainsKey(ExpectedKey);
+      if LogicalFound and ChartFound then
+        Continue;
+
+      ChannelDeviceUUID := '';
+      ProcessingDeviceUUID := '';
+      if C <> nil then
+      begin
+        ChannelDeviceUUID := Trim(C.DeviceUUID);
+        if C.FlowMeter <> nil then
+          ProcessingDeviceUUID := Trim(C.FlowMeter.UUID);
+      end;
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcWarning, psForm, 'FlowGraphKeyMismatch',
+          Format('Kind=%s; ChannelIndex=%d; ExpectedKey=%s; LogicalKeys=%s; ChartKeys=%s; ChannelDeviceUUID=%s; ProcessingDeviceUUID=%s',
+            [AKind, I, ExpectedKey, FlowGraphLogicalKeysToText(ALogical), FlowGraphChartKeysToText(AVisual), ChannelDeviceUUID, ProcessingDeviceUUID]), '');
+    end;
+  end;
+
 var
   SamplesBefore: Integer;
 begin
@@ -5530,6 +5604,8 @@ begin
   begin
     BuildChecks(FActiveWorkTable.EtalonChannels, FFlowGraphHistory.EtalonSeries, FEtalonChartSeries, FlowLayoutEtalonChecks, 'Etalon', 'Эталонный канал');
     BuildChecks(FActiveWorkTable.DeviceChannels, FFlowGraphHistory.DeviceSeries, FDeviceChartSeries, FlowLayoutDeviceChecks, 'Device', 'Приборный канал');
+    VerifyFlowGraphKeys(FActiveWorkTable.EtalonChannels, FFlowGraphHistory.EtalonSeries, FEtalonChartSeries, 'Etalon');
+    VerifyFlowGraphKeys(FActiveWorkTable.DeviceChannels, FFlowGraphHistory.DeviceSeries, FDeviceChartSeries, 'Device');
     FGraphChannelsReady := True;
   end
   else
