@@ -5815,6 +5815,7 @@ begin
     NewRunStarted := RunActive and not FLastGraphRunActive;
     if NewRunStarted then
     begin
+      FMeasurementRunInstance := Run;
       FCurrentGraphPointUUID := '';
       FCurrentGraphPointIndex := -1;
       FCurrentGraphPointKey := '';
