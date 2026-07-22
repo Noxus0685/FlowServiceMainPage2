@@ -5420,6 +5420,7 @@
                   Size.Height = 140.000000000000000000
                   Size.PlatformDefault = False
                   Legend.Visible = True
+                  Legend.LegendStyle = lsSeries
                   Title.Text.Strings = (
                     #1056#1072#1089#1093#1086#1076' '#1101#1090#1072#1083#1086#1085#1086#1074)
                   View3D = False
@@ -5477,6 +5478,7 @@
                   Size.Height = 124.000000000000000000
                   Size.PlatformDefault = False
                   Legend.Visible = True
+                  Legend.LegendStyle = lsSeries
                   Title.Text.Strings = (
                     #1056#1072#1089#1093#1086#1076' '#1087#1088#1080#1073#1086#1088#1086#1074)
                   View3D = False
