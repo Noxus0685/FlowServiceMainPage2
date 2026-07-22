@@ -764,7 +764,13 @@ var
     AMeterValue.IsToSave := Ini.ReadBool(ASection, 'IsToSave', True);
     AMeterValue.FStabilitySettings.Enabled := Ini.ReadBool(ASection, 'StabilityEnabled', AMeterValue.FStabilitySettings.Enabled);
     AMeterValue.FStabilitySettings.MinSampleCount := Ini.ReadInteger(ASection, 'StabilityMinSampleCount', AMeterValue.FStabilitySettings.MinSampleCount);
-    AMeterValue.FStabilitySettings.WindowDurationSec := S2F(Ini.ReadString(ASection, 'StabilityWindowDurationSec', F2S(AMeterValue.FStabilitySettings.WindowDurationSec)));
+    if Ini.ValueExists(ASection, 'StabilityWindowDurationSec') then
+      AMeterValue.FStabilitySettings.WindowDurationSec := S2F(Ini.ReadString(ASection, 'StabilityWindowDurationSec', F2S(AMeterValue.FStabilitySettings.WindowDurationSec)))
+    else
+    begin
+      AMeterValue.FStabilitySettings.WindowDurationSec := 10.0;
+      DebugLog('Stability Load: missing StabilityWindowDurationSec; default 10.0 applied for section ' + ASection);
+    end;
     AMeterValue.FStabilitySettings.MaxSampleAgeSec := S2F(Ini.ReadString(ASection, 'StabilityMaxSampleAgeSec', F2S(AMeterValue.FStabilitySettings.MaxSampleAgeSec)));
     AMeterValue.FStabilitySettings.MaxVariation := S2F(Ini.ReadString(ASection, 'StabilityMaxVariation', F2S(AMeterValue.FStabilitySettings.MaxVariation)));
     AMeterValue.FStabilitySettings.MaxStdDeviation := S2F(Ini.ReadString(ASection, 'StabilityMaxStdDeviation', F2S(AMeterValue.FStabilitySettings.MaxStdDeviation)));
@@ -1394,24 +1400,40 @@ end;
 
 function TMeterValue.ValidateStabilitySettings(out AErrorText: string): Boolean;
 begin
-  Result := (FStabilitySettings.MinSampleCount >= 1) and
-    (FStabilitySettings.WindowDurationSec > 0) and
-    (FStabilitySettings.MaxSampleAgeSec >= 0) and
-    (FStabilitySettings.MaxVariation >= 0) and
-    (FStabilitySettings.MaxStdDeviation >= 0) and
-    (FStabilitySettings.MaxTrendRate >= 0) and
-    (FStabilitySettings.ForecastHorizonSec >= 0) and
-    (FStabilitySettings.ConfirmationTimeSec >= 0) and
-    (FStabilitySettings.MaxOutlierFraction >= 0) and (FStabilitySettings.MaxOutlierFraction <= 1) and
-    (FStabilitySettings.OutlierFactor > 0) and
-    (FStabilitySettings.TargetAccuracyPlusPercent >= 0) and
-    (FStabilitySettings.TargetAccuracyMinusPercent >= 0) and
-    (FStabilitySettings.TargetToleranceAbsolute >= 0) and
-    (FStabilitySettings.ExitThresholdFactor >= 1);
-  if not Result then
-    AErrorText := 'Некорректные настройки анализа стабильности.'
+  Result := False;
+  if FStabilitySettings.MinSampleCount <= 0 then
+    AErrorText := Format('Invalid StabilitySettings: MinSampleCount=%d', [FStabilitySettings.MinSampleCount])
+  else if FStabilitySettings.WindowDurationSec <= 0 then
+    AErrorText := Format('Invalid StabilitySettings: WindowDurationSec=%.12g', [FStabilitySettings.WindowDurationSec])
+  else if FStabilitySettings.MaxSampleAgeSec < 0 then
+    AErrorText := Format('Invalid StabilitySettings: MaxSampleAgeSec=%.12g', [FStabilitySettings.MaxSampleAgeSec])
+  else if FStabilitySettings.MaxVariation < 0 then
+    AErrorText := Format('Invalid StabilitySettings: MaxVariation=%.12g', [FStabilitySettings.MaxVariation])
+  else if FStabilitySettings.MaxStdDeviation < 0 then
+    AErrorText := Format('Invalid StabilitySettings: MaxStdDeviation=%.12g', [FStabilitySettings.MaxStdDeviation])
+  else if FStabilitySettings.MaxTrendRate < 0 then
+    AErrorText := Format('Invalid StabilitySettings: MaxTrendRate=%.12g', [FStabilitySettings.MaxTrendRate])
+  else if FStabilitySettings.ForecastHorizonSec < 0 then
+    AErrorText := Format('Invalid StabilitySettings: ForecastHorizonSec=%.12g', [FStabilitySettings.ForecastHorizonSec])
+  else if FStabilitySettings.ConfirmationTimeSec < 0 then
+    AErrorText := Format('Invalid StabilitySettings: ConfirmationTimeSec=%.12g', [FStabilitySettings.ConfirmationTimeSec])
+  else if (FStabilitySettings.MaxOutlierFraction < 0) or (FStabilitySettings.MaxOutlierFraction > 1) then
+    AErrorText := Format('Invalid StabilitySettings: MaxOutlierFraction=%.12g', [FStabilitySettings.MaxOutlierFraction])
+  else if FStabilitySettings.OutlierFactor <= 0 then
+    AErrorText := Format('Invalid StabilitySettings: OutlierFactor=%.12g', [FStabilitySettings.OutlierFactor])
+  else if FStabilitySettings.TargetAccuracyPlusPercent < 0 then
+    AErrorText := Format('Invalid StabilitySettings: TargetAccuracyPlusPercent=%.12g', [FStabilitySettings.TargetAccuracyPlusPercent])
+  else if FStabilitySettings.TargetAccuracyMinusPercent < 0 then
+    AErrorText := Format('Invalid StabilitySettings: TargetAccuracyMinusPercent=%.12g', [FStabilitySettings.TargetAccuracyMinusPercent])
+  else if FStabilitySettings.TargetToleranceAbsolute < 0 then
+    AErrorText := Format('Invalid StabilitySettings: TargetToleranceAbsolute=%.12g', [FStabilitySettings.TargetToleranceAbsolute])
+  else if FStabilitySettings.ExitThresholdFactor <= 0 then
+    AErrorText := Format('Invalid StabilitySettings: ExitThresholdFactor=%.12g', [FStabilitySettings.ExitThresholdFactor])
   else
+  begin
     AErrorText := '';
+    Result := True;
+  end;
 end;
 
 function TMeterValue.GetDoubleStdDeviation: Double;
@@ -1470,7 +1492,7 @@ begin
   end;
   if not ValidateStabilitySettings(ErrorText) then
   begin
-    AInfo.Status := mvssUnstable;
+    AInfo.Status := mvssInvalidSettings;
     Include(AInfo.FailReasons, mvsfrInvalidSettings);
     AInfo.StatusText := ErrorText;
     FLastStabilityInfo := AInfo;
@@ -1701,19 +1723,24 @@ begin
     Exit(False);
   end;
 
-  if (ASettings.MinSampleCount < 2) or (ASettings.WindowDurationSec <= 0) or
-     (ASettings.MaxSampleAgeSec <= 0) or (ASettings.MaxVariation < 0) or
+  if (ASettings.MinSampleCount <= 0) or (ASettings.WindowDurationSec <= 0) or
+     (ASettings.MaxSampleAgeSec < 0) or (ASettings.MaxVariation < 0) or
      (ASettings.MaxStdDeviation < 0) or (ASettings.MaxTrendRate < 0) or
      (ASettings.ForecastHorizonSec < 0) or (ASettings.ConfirmationTimeSec < 0) or
      (ASettings.MaxOutlierFraction < 0) or (ASettings.MaxOutlierFraction > 1) or
-     (ASettings.OutlierFactor <= 0) or (ASettings.ExitThresholdFactor < 1) or
+     (ASettings.OutlierFactor <= 0) or (ASettings.ExitThresholdFactor <= 0) or
      (ASettings.TargetAccuracyPlusPercent < 0) or
      (ASettings.TargetAccuracyMinusPercent < 0) or
      (ASettings.TargetToleranceAbsolute < 0) then
   begin
-    AInfo.Status := mvssUnstable;
+    AInfo.Status := mvssInvalidSettings;
     Include(AInfo.FailReasons, mvsfrInvalidSettings);
-    AInfo.StatusText := 'Некорректные настройки анализа стабильности.';
+    if ASettings.WindowDurationSec <= 0 then
+      AInfo.StatusText := Format('Invalid StabilitySettings: WindowDurationSec=%.12g', [ASettings.WindowDurationSec])
+    else if ASettings.MinSampleCount <= 0 then
+      AInfo.StatusText := Format('Invalid StabilitySettings: MinSampleCount=%d', [ASettings.MinSampleCount])
+    else
+      AInfo.StatusText := 'Invalid StabilitySettings.';
     Exit(False);
   end;
 
@@ -3865,7 +3892,13 @@ begin
 
       MV.FStabilitySettings.Enabled := Ini.ReadBool(Section, 'StabilityEnabled', MV.FStabilitySettings.Enabled);
       MV.FStabilitySettings.MinSampleCount := Ini.ReadInteger(Section, 'StabilityMinSampleCount', MV.FStabilitySettings.MinSampleCount);
-      MV.FStabilitySettings.WindowDurationSec := S2F(Ini.ReadString(Section, 'StabilityWindowDurationSec', F2S(MV.FStabilitySettings.WindowDurationSec)));
+      if Ini.ValueExists(Section, 'StabilityWindowDurationSec') then
+      MV.FStabilitySettings.WindowDurationSec := S2F(Ini.ReadString(Section, 'StabilityWindowDurationSec', F2S(MV.FStabilitySettings.WindowDurationSec)))
+    else
+    begin
+      MV.FStabilitySettings.WindowDurationSec := 10.0;
+      DebugLog('Stability LoadFromFile: missing StabilityWindowDurationSec; default 10.0 applied for section ' + Section);
+    end;
       MV.FStabilitySettings.MaxSampleAgeSec := S2F(Ini.ReadString(Section, 'StabilityMaxSampleAgeSec', F2S(MV.FStabilitySettings.MaxSampleAgeSec)));
       MV.FStabilitySettings.MaxVariation := S2F(Ini.ReadString(Section, 'StabilityMaxVariation', F2S(MV.FStabilitySettings.MaxVariation)));
       MV.FStabilitySettings.MaxStdDeviation := S2F(Ini.ReadString(Section, 'StabilityMaxStdDeviation', F2S(MV.FStabilitySettings.MaxStdDeviation)));

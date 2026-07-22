@@ -382,6 +382,7 @@ type
     procedure LogScenarioStability(const APrefix: string; const AInfo: TMeterValueStabilityInfo;
       const AStableInfo: RStableInfo; const ASettings: TMeterValueStabilitySettings;
       const AActualValue, ATargetValue, ALowerLimit, AUpperLimit, AStableDurationSec: Double);
+    function BuildScenarioStabilityFailureText: string;
     function AreDeviceSignalsStable(out StableInfo: RStableInfo): Boolean;
     function GetScenarioAllowedError(APoint: TDevicePoint; ADeviceIndex: Integer): Double;
     function GetScenarioDeviceValue(AScenario: EMeasurementScenario; APoint: TDevicePoint; ADeviceIndex: Integer; const AReferenceValue: Double): Double;
@@ -946,7 +947,7 @@ begin
     Exit;
 
   LogSecond := FScenarioCurrentTimeMs div 1000;
-  Text := Format('%s: AnalysisTimeSource=%s; AnalysisTimeMs=%d; FScenarioCurrentTimeMs=%d; NowTickMs=%d; SampleCount=%d; UsedSampleCount=%d; MinSampleCount=%d; WindowDurationSec=%.3f; LastSampleAgeSec=%.3f; IsSignalStable=%s; IsStabilityConfirmed=%s; IsCurrentValueInRange=%s; IsMeanValueInRange=%s; IsForecastInRange=%s; IsSuitableForMeasurement=%s; Status=%s; Reason=%s; Flow=%.6f; Target=%.6f; Lower=%.6f; Upper=%.6f; StableDurationSec=%.3f; RequiredStabilizationSec=%.3f',
+  Text := Format('%s: AnalysisTimeSource=%s; AnalysisTimeMs=%d; FScenarioCurrentTimeMs=%d; RuntimeNowTickMs=%d; SampleCount=%d; UsedSampleCount=%d; MinSampleCount=%d; WindowDurationSec=%.3f; LastSampleAgeSec=%.3f; IsSignalStable=%s; IsStabilityConfirmed=%s; IsCurrentValueInRange=%s; IsMeanValueInRange=%s; IsForecastInRange=%s; IsSuitableForMeasurement=%s; Status=%s; Reason=%s; Flow=%.6f; Target=%.6f; Lower=%.6f; Upper=%.6f; StableDurationSec=%.3f; RequiredStabilizationSec=%.3f',
     [APrefix, IfThen(FScenarioRunning, 'Scenario', 'Runtime'), GetStabilityAnalysisTimeMs,
      FScenarioCurrentTimeMs, Int64(NowTickMs), AInfo.SampleCount, AInfo.UsedSampleCount,
      ASettings.MinSampleCount, AInfo.WindowDurationSec, AInfo.LastSampleAgeSec,
@@ -962,6 +963,37 @@ begin
     FLastScenarioStabilityLogText := Text;
     FLastScenarioStabilityLogSecond := LogSecond;
     AddScenarioLog(Text);
+  end;
+end;
+
+
+function TMeasurementRun.BuildScenarioStabilityFailureText: string;
+var
+  I: Integer;
+  Channel: TChannel;
+  ValueFlow: TMeterValue;
+  Settings: TMeterValueStabilitySettings;
+  Info: TMeterValueStabilityInfo;
+begin
+  Result := FLastDiagnosticIsStableText;
+  if (FWorkTable = nil) or (FWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.DeviceChannels[I];
+    if (Channel = nil) or (not Channel.Enabled) or
+       (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) then
+      Continue;
+    ValueFlow := Channel.FlowMeter.ValueFlow;
+    Settings := ValueFlow.StabilitySettings;
+    Info := ValueFlow.LastStabilityInfo;
+    if Settings.Enabled and (Settings.WindowDurationSec <= 0) then
+      Exit(Format('Стабилизация невозможна: Device[%d].WindowDurationSec=%.12g; SampleCount=%d; UsedSampleCount=%d; MinSampleCount=%d.',
+        [I, Settings.WindowDurationSec, Info.SampleCount, Info.UsedSampleCount, Settings.MinSampleCount]));
+    if Info.Status = mvssInvalidSettings then
+      Exit(Format('Стабилизация невозможна: Device[%d].%s; SampleCount=%d; UsedSampleCount=%d; MinSampleCount=%d.',
+        [I, Info.StatusText, Info.SampleCount, Info.UsedSampleCount, Settings.MinSampleCount]));
   end;
 end;
 
@@ -1000,6 +1032,7 @@ var
   HasEnabledEtalon: Boolean;
   HasEnabledDevice: Boolean;
   StepResult: string;
+  MaxStableWaitSec: Double;
 begin
   Result := False;
   AResultText := '';
@@ -1130,13 +1163,30 @@ begin
         AddDiagnosticEvent(AResultText);
       end;
 
-      if (AResultText = '') and (AScenario <> mrsSuccessfulPass) and (Point <> nil) and
-         (((FScenarioCurrentTimeMs - FScenarioPointStartTimeMs) / 1000.0) > GetScenarioVirtualPointTimeoutSec(Point)) and
-         (FCurrentStage = msWaitStable) then
+      if (AResultText = '') and (Point <> nil) and (FCurrentStage = msWaitStable) then
       begin
-        ContinueAfterPointError(mptsSetupError, meStableTimeout,
-          BuildError(1901, 'Сценарный таймаут стабильности: ' + FLastDiagnosticIsStableText));
-        StepResult := 'StableTimeout: ' + FLastDiagnosticIsStableText;
+        if AScenario = mrsSuccessfulPass then
+        begin
+          MaxStableWaitSec := 30.0;
+          if (FWorkTable <> nil) and (FWorkTable.ValueFlowRate <> nil) then
+            MaxStableWaitSec := Max(MaxStableWaitSec,
+              FWorkTable.ValueFlowRate.StabilitySettings.WindowDurationSec +
+              FWorkTable.ValueFlowRate.StabilitySettings.ConfirmationTimeSec +
+              FRequiredStabilizationSec + 10.0);
+          if (((FScenarioCurrentTimeMs - FScenarioPointStartTimeMs) / 1000.0) > MaxStableWaitSec) then
+          begin
+            AResultText := BuildScenarioStabilityFailureText;
+            if AResultText = '' then
+              AResultText := 'Стабилизация невозможна: ' + FLastDiagnosticIsStableText;
+            StepResult := AResultText;
+          end;
+        end
+        else if (((FScenarioCurrentTimeMs - FScenarioPointStartTimeMs) / 1000.0) > GetScenarioVirtualPointTimeoutSec(Point)) then
+        begin
+          ContinueAfterPointError(mptsSetupError, meStableTimeout,
+            BuildError(1901, 'Сценарный таймаут стабильности: ' + FLastDiagnosticIsStableText));
+          StepResult := 'StableTimeout: ' + FLastDiagnosticIsStableText;
+        end;
       end;
 
       AddScenarioLog(Format('RunScenario: step; Stage %s -> %s; StageTransitionRequested=%s; RequestedStage=%s; SetStageResult=%s; WorkTable %s -> %s; Point %d/%s; Stop %s -> %s; Result=%s', [
@@ -1743,12 +1793,35 @@ begin
 end;
 
 procedure TMeasurementRun.EnterWaitStable;
+var
+  I: Integer;
+  Channel: TChannel;
+  StableValue: TMeterValue;
+
+  procedure LogValue(const AIndex: Integer; const AChannelName, ADeviceUUID: string;
+    AFlowMeter: TObject; AValue: TMeterValue);
+  var
+    LocalSettings: TMeterValueStabilitySettings;
+    SampleCount: Integer;
+  begin
+    if AValue <> nil then
+    begin
+      LocalSettings := AValue.StabilitySettings;
+      SampleCount := Length(AValue.GetSamples);
+      AddScenarioLog(Format('WaitStableValue: ChannelIndex=%d; ChannelName=%s; DeviceUUID=%s; FlowMeter=%x; ValueFlow.Hash=%s; ValueFlow.Name=%s; Source=RuntimeObject; StabilityEnabled=%s; MinSampleCount=%d; WindowDurationSec=%.3f; MaxSampleAgeSec=%.3f; ConfirmationTimeSec=%.3f; SampleCount=%d',
+        [AIndex, AChannelName, ADeviceUUID, NativeUInt(AFlowMeter), AValue.Hash, AValue.Name,
+         BoolToStr(LocalSettings.Enabled, True), LocalSettings.MinSampleCount,
+         LocalSettings.WindowDurationSec, LocalSettings.MaxSampleAgeSec,
+         LocalSettings.ConfirmationTimeSec, SampleCount]));
+    end
+    else
+      AddScenarioLog(Format('WaitStableValue: ChannelIndex=%d; ChannelName=%s; DeviceUUID=%s; FlowMeter=%x; ValueFlow=nil',
+        [AIndex, AChannelName, ADeviceUUID, NativeUInt(AFlowMeter)]));
+  end;
+
 begin
   SetCurrentPointStatus(mptsWaitStable);
 
-  // Начать новый период публикации состояния стабилизации.
-  // Первое промежуточное сообщение появится через 2 секунды.
-  FLastStableProtocolTick := NowTickMs;
   FStableSinceMs := 0;
   FDeviceStableSinceMs := 0;
   FLastDeviceStableStateKnown := False;
@@ -1756,7 +1829,27 @@ begin
   FStableTimerResetReason := '';
   FLastStableProgressSecond := -1;
   LoadRequiredStabilization(GetCurrentPoint);
+  FLastStableProtocolTick := UInt64(GetStabilityAnalysisTimeMs);
   AddDiagnosticEvent(Format('RequiredStabilizationSec=%.3f; RequireAutoStabilization=%s; RequiredStabilizationSource=TDevicePoint runtime', [FRequiredStabilizationSec, BoolToStr(FRequireAutoStabilization, True)]));
+
+  if FWorkTable <> nil then
+  begin
+    LogValue(-1, 'Etalon', '', FWorkTable, FWorkTable.ValueFlowRate);
+    if FWorkTable.DeviceChannels <> nil then
+      for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+      begin
+        Channel := FWorkTable.DeviceChannels[I];
+        if (Channel = nil) or (not Channel.Enabled) then
+          Continue;
+        StableValue := nil;
+        if (Channel.FlowMeter <> nil) then
+          StableValue := Channel.FlowMeter.ValueFlow;
+        if Channel.FlowMeter <> nil then
+          LogValue(I, Channel.Name, Channel.FlowMeter.UUID, Channel.FlowMeter, StableValue)
+        else
+          LogValue(I, Channel.Name, '', nil, StableValue);
+      end;
+  end;
 
   if IsStopRequested then
     Exit;
@@ -2060,7 +2153,6 @@ var
   I: Integer;
   Channel: TChannel;
   StableValue: TMeterValue;
-  Settings: TMeterValueStabilitySettings;
   SignalInfo: TMeterValueStabilityInfo;
   ActualValue: Double;
   ParticipatingDeviceCount: Integer;
@@ -2143,7 +2235,6 @@ var
   I: Integer;
   Channel: TChannel;
   StableValue: TMeterValue;
-  Settings: TMeterValueStabilitySettings;
   SignalInfo: TMeterValueStabilityInfo;
   Point: TDevicePoint;
   TargetValue: Double;
