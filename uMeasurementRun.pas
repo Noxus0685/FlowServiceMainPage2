@@ -1008,6 +1008,9 @@ begin
   FScenarioStepBusy := False;
 end;
 
+
+
+
 function TMeasurementRun.RunScenario(AScenario: EMeasurementScenario; out AResultText: string): Boolean;
 const
   MaxNoProgressSteps = 20;
@@ -2164,7 +2167,6 @@ var
   I: Integer;
   Channel: TChannel;
   StableValue: TMeterValue;
-  Settings: TMeterValueStabilitySettings;
   SignalInfo: TMeterValueStabilityInfo;
   ActualValue: Double;
   ParticipatingDeviceCount: Integer;
@@ -2251,7 +2253,6 @@ var
   I: Integer;
   Channel: TChannel;
   StableValue: TMeterValue;
-  Settings: TMeterValueStabilitySettings;
   SignalInfo: TMeterValueStabilityInfo;
   Point: TDevicePoint;
   TargetValue: Double;
