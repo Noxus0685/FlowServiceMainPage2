@@ -274,6 +274,9 @@ procedure TFormMain.FormCreate(Sender: TObject);
 var
 i:integer;
 begin
+  Constraints.MinWidth := 1280;
+  Constraints.MinHeight := 720;
+  WindowState := TWindowState.wsMaximized;
 
 
   FWorkTableManager := TWorkTableManager.Create(

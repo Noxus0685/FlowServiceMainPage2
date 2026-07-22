@@ -9,6 +9,7 @@ uses
   FMX.Graphics,
   FMX.Grid,
   FMX.Grid.Style,
+  FMX.Layouts,
   FMX.ListBox,
   FMX.ScrollBox,
   FMX.StdCtrls,
@@ -53,6 +54,8 @@ type
     ComboBoxMeasurementScenario: TComboBox;
     ButtonStartMeasurementScenario: TButton;
     LabelScenarioResult: TLabel;
+    LayoutMeasurementControls: TLayout;
+    LayoutScenarioControls: TLayout;
     procedure GridMeasurmentRunGetValue(Sender: TObject; const ACol,
       ARow: Integer; var Value: TValue);
     procedure GridMeasurmentRunDrawColumnCell(Sender: TObject;
@@ -105,12 +108,48 @@ constructor TFrameMeasurementRun.Create(AOwner: TComponent);
 begin
   inherited;
   FInvalidPointIndexes := TList<Integer>.Create;
+
+  LayoutMeasurementControls := TLayout.Create(Self);
+  LayoutMeasurementControls.Parent := ToolBarGridMR;
+  LayoutMeasurementControls.Align := TAlignLayout.Left;
+  LayoutMeasurementControls.Width := 321;
+
+  LayoutScenarioControls := TLayout.Create(Self);
+  LayoutScenarioControls.Parent := ToolBarGridMR;
+  LayoutScenarioControls.Align := TAlignLayout.Client;
+  LayoutScenarioControls.Margins.Left := 8;
+
+  SpeedButtonPointPrev.Parent := LayoutMeasurementControls;
+  SpeedButtonPause.Parent := LayoutMeasurementControls;
+  SpeedButtonPointNext.Parent := LayoutMeasurementControls;
+  SpeedButtonPointDelete.Parent := LayoutMeasurementControls;
+  SpeedButtonCreatePoints.Parent := LayoutMeasurementControls;
+
+  LabelMeasurementScenario.Parent := LayoutScenarioControls;
+  LabelMeasurementScenario.Align := TAlignLayout.Left;
+  LabelMeasurementScenario.Width := 115;
+  LabelMeasurementScenario.Margins.Right := 6;
+
+  ButtonStartMeasurementScenario.Parent := LayoutScenarioControls;
+  ButtonStartMeasurementScenario.Align := TAlignLayout.Right;
+  ButtonStartMeasurementScenario.Width := 145;
+  ButtonStartMeasurementScenario.Margins.Left := 6;
+  ButtonStartMeasurementScenario.Text := 'Запустить';
+
+  LabelScenarioResult.Parent := LayoutScenarioControls;
+  LabelScenarioResult.Align := TAlignLayout.Right;
+  LabelScenarioResult.Width := 180;
+  LabelScenarioResult.Margins.Left := 6;
+
+  ComboBoxMeasurementScenario.Parent := LayoutScenarioControls;
+  ComboBoxMeasurementScenario.Align := TAlignLayout.Client;
+  ComboBoxMeasurementScenario.ItemIndex := 0;
+
   SpeedButtonPointPrev.OnClick := SpeedButtonPointPrevClick;
   SpeedButtonPointNext.OnClick := SpeedButtonPointNextClick;
   SpeedButtonPause.OnClick := SpeedButtonPauseClick;
   SpeedButtonPointDelete.OnClick := SpeedButtonPointDeleteClick;
   SpeedButtonCreatePoints.OnClick := SpeedButtonCreatePointsClick;
-  ComboBoxMeasurementScenario.ItemIndex := 0;
   ButtonStartMeasurementScenario.OnClick := ButtonStartMeasurementScenarioClick;
   GridMeasurmentRun.ShowHint := True;
   GridMeasurmentRun.OnCellClick := GridMeasurmentRunCellClick;
@@ -441,11 +480,37 @@ end;
 
 
 procedure TFrameMeasurementRun.UpdateGridMRHeaders;
+var
+  ReservedWidth: Single;
 begin
   if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
     StringColumnMRFlowRate.Header := 'Расход, ' + FActiveWorkTable.ValueFlowRate.GetDimName
   else
     StringColumnMRFlowRate.Header := 'Расход';
+
+  CheckColumnMREnable.Width := 32;
+  StringColumnPointer.Width := 36;
+  StringColumnMRFlowRate.Width := 82;
+  StringColumnMRStopCriterea.Width := 86;
+  StringColumnLimitTime.Width := 58;
+  StringColumnLimitVolume.Width := 64;
+  StringColumnLimitImp.Width := 64;
+  StringColumnRepeats.Width := 58;
+  StringColumnMRStatus.Width := 96;
+
+  ReservedWidth := CheckColumnMREnable.Width + StringColumnPointer.Width +
+    StringColumnMRFlowRate.Width + StringColumnMRStopCriterea.Width +
+    StringColumnRepeats.Width + StringColumnMRStatus.Width + 24;
+  if StringColumnLimitTime.Visible then
+    ReservedWidth := ReservedWidth + StringColumnLimitTime.Width;
+  if StringColumnLimitVolume.Visible then
+    ReservedWidth := ReservedWidth + StringColumnLimitVolume.Width;
+  if StringColumnLimitImp.Visible then
+    ReservedWidth := ReservedWidth + StringColumnLimitImp.Width;
+
+  StringColumnMRStopCriterea.Header := 'Остановка';
+  StringColumnRepeats.Header := 'Повтор';
+  StringColumnMRPointName.Width := Max(120.0, GridMeasurmentRun.Width - ReservedWidth);
 end;
 
 procedure TFrameMeasurementRun.UpdateStopCriteriaColumns;
@@ -521,7 +586,7 @@ begin
       LabelScenarioResult.Text := ResultText;
     UpdateGridMesurmentRun;
   finally
-    ButtonStartMeasurementScenario.Text := 'Запустить сценарий';
+    ButtonStartMeasurementScenario.Text := 'Запустить';
     ComboBoxMeasurementScenario.Enabled := True;
     ButtonStartMeasurementScenario.Enabled := True;
   end;

@@ -362,6 +362,8 @@ type
     function NowTickMs: UInt64;
     procedure ResetRuntimeForScenario;
     procedure GenerateScenarioValues(AScenario: EMeasurementScenario; const ATimeMs: Int64);
+    procedure AddScenarioSamples(const ATimeMs: Int64);
+    function AreDeviceSignalsStable(out StableInfo: RStableInfo): Boolean;
     function GetScenarioAllowedError(APoint: TDevicePoint; ADeviceIndex: Integer): Double;
     function GetScenarioDeviceValue(AScenario: EMeasurementScenario; APoint: TDevicePoint; ADeviceIndex: Integer; const AReferenceValue: Double): Double;
     function GetScenarioVirtualPointTimeoutSec(APoint: TDevicePoint): Double;
@@ -729,6 +731,11 @@ begin
   if FWorkTable <> nil then
   begin
     if FWorkTable.ValueFlowRate <> nil then FWorkTable.ValueFlowRate.ClearStabilitySamples;
+    if FWorkTable.EtalonChannels <> nil then
+      for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+        if (FWorkTable.EtalonChannels[I] <> nil) and (FWorkTable.EtalonChannels[I].FlowMeter <> nil) and
+           (FWorkTable.EtalonChannels[I].FlowMeter.ValueFlow <> nil) then
+          FWorkTable.EtalonChannels[I].FlowMeter.ValueFlow.ClearStabilitySamples;
     if FWorkTable.DeviceChannels <> nil then
       for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
         if (FWorkTable.DeviceChannels[I] <> nil) and (FWorkTable.DeviceChannels[I].FlowMeter <> nil) and
@@ -741,12 +748,17 @@ procedure TMeasurementRun.GenerateScenarioValues(AScenario: EMeasurementScenario
 var
   Point: TDevicePoint;
   Elapsed: Double;
-  Target, Flow, DeviceFlow: Double;
+  Target, Flow, DeviceFlow, ChannelFlow: Double;
   I: Integer;
+  EnabledEtalonCount: Integer;
 begin
-  if FWorkTable = nil then Exit;
+  if FWorkTable = nil then
+    Exit;
+
   Point := GetCurrentPoint;
-  if Point = nil then Exit;
+  if Point = nil then
+    Exit;
+
   Target := Point.Q;
   Elapsed := (ATimeMs - FScenarioPointStartTimeMs) / 1000.0;
   Flow := Target;
@@ -757,26 +769,89 @@ begin
     mrsSecondAttemptStabilization: if Elapsed < 20 then Flow := Target * (0.75 + Elapsed * 0.015);
     mrsFlowOvershoot: if Elapsed < 8 then Flow := Target * (0.8 + Elapsed * 0.07) else Flow := Target * (1.0 + Max(0.0, 16 - Elapsed) * 0.015);
   else
-    if Elapsed < 5 then Flow := Target * Min(1.0, Elapsed / 5.0);
+    if Elapsed < 5 then
+      Flow := Target * Min(1.0, Elapsed / 5.0);
   end;
+
+  if IsNan(Flow) or IsInfinite(Flow) then
+    raise Exception.CreateFmt('Некорректный сценарный расход: Point=%s; Stage=%s; Value=%g',
+      [Point.Name, MeasurementStateToString(FCurrentStage), Flow]);
+
   FWorkTable.CurentValue := Flow;
-  if FWorkTable.ValueFlowRate <> nil then FWorkTable.ValueFlowRate.SetValue(Flow);
-  if FWorkTable.ValueTime <> nil then FWorkTable.ValueTime.SetValue(Elapsed);
-  if FWorkTable.ValueQuantity <> nil then FWorkTable.ValueQuantity.SetValue(Max(0.0, Flow * Elapsed));
+  if FWorkTable.ValueFlowRate <> nil then
+    FWorkTable.ValueFlowRate.SetValue(Flow);
+  if (FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.Value <> nil) then
+    FWorkTable.FlowRate.Value.SetValue(Flow);
+  if FWorkTable.ValueTime <> nil then
+    FWorkTable.ValueTime.SetValue(Elapsed);
+  if FWorkTable.ValueQuantity <> nil then
+    FWorkTable.ValueQuantity.SetValue(Max(0.0, Flow * Elapsed));
+
+  EnabledEtalonCount := 0;
+  if FWorkTable.EtalonChannels <> nil then
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+      if (FWorkTable.EtalonChannels[I] <> nil) and FWorkTable.EtalonChannels[I].Enabled then
+        Inc(EnabledEtalonCount);
+
+  if FWorkTable.EtalonChannels <> nil then
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+      if (FWorkTable.EtalonChannels[I] <> nil) and
+         (FWorkTable.EtalonChannels[I].FlowMeter <> nil) and
+         (FWorkTable.EtalonChannels[I].FlowMeter.ValueFlow <> nil) then
+      begin
+        if FWorkTable.EtalonChannels[I].Enabled and (EnabledEtalonCount > 0) then
+          ChannelFlow := Flow / EnabledEtalonCount
+        else
+          ChannelFlow := 0.0;
+        FWorkTable.EtalonChannels[I].FlowMeter.ValueFlow.SetValue(ChannelFlow);
+        FWorkTable.EtalonChannels[I].ImpResult := Round(Max(0.0, ChannelFlow * Elapsed));
+      end;
+
   if FWorkTable.DeviceChannels <> nil then
     for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
       if (FWorkTable.DeviceChannels[I] <> nil) and FWorkTable.DeviceChannels[I].Enabled and
          (FWorkTable.DeviceChannels[I].FlowMeter <> nil) and (FWorkTable.DeviceChannels[I].FlowMeter.ValueFlow <> nil) then
       begin
         DeviceFlow := GetScenarioDeviceValue(AScenario, Point, I, Flow);
+        if IsNan(DeviceFlow) or IsInfinite(DeviceFlow) then
+          raise Exception.CreateFmt('Некорректный сценарный расход прибора: Point=%s; DeviceIndex=%d; Stage=%s; Value=%g',
+            [Point.Name, I, MeasurementStateToString(FCurrentStage), DeviceFlow]);
         FWorkTable.DeviceChannels[I].FlowMeter.ValueFlow.SetValue(DeviceFlow);
-        FWorkTable.DeviceChannels[I].FlowMeter.ValueFlow.AddStabilitySampleManual(ATimeMs, DeviceFlow);
         FWorkTable.DeviceChannels[I].ImpResult := Round(Max(0.0, DeviceFlow * Elapsed));
       end;
+
   if FCurrentStage = msWaitMeasureStart then
     FWorkTable.State := swtEXECUTE
   else if FCurrentStage = msWaitMeasureStop then
     FWorkTable.State := swtCOMPLETE;
+end;
+
+procedure TMeasurementRun.AddScenarioSamples(const ATimeMs: Int64);
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  if not FScenarioRunning then
+    Exit;
+
+  if (FWorkTable <> nil) and (FWorkTable.ValueFlowRate <> nil) then
+    FWorkTable.ValueFlowRate.AddStabilitySampleManual(ATimeMs, FWorkTable.ValueFlowRate.GetDoubleValue);
+
+  if (FWorkTable <> nil) and (FWorkTable.EtalonChannels <> nil) then
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.EtalonChannels[I];
+      if (Channel <> nil) and (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+        Channel.FlowMeter.ValueFlow.AddStabilitySampleManual(ATimeMs, Channel.FlowMeter.ValueFlow.GetDoubleValue);
+    end;
+
+  if (FWorkTable <> nil) and (FWorkTable.DeviceChannels <> nil) then
+    for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.DeviceChannels[I];
+      if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+        Channel.FlowMeter.ValueFlow.AddStabilitySampleManual(ATimeMs, Channel.FlowMeter.ValueFlow.GetDoubleValue);
+    end;
 end;
 
 function TMeasurementRun.RunScenario(AScenario: EMeasurementScenario; out AResultText: string): Boolean;
@@ -812,9 +887,37 @@ begin
   try
     for Step := 1 to MaxScenarioSteps do
     begin
-      FScenarioCurrentTimeMs := FScenarioCurrentTimeMs + FScenarioStepMs;
-      if FCurrentPointIndex <> PrevIndex then begin FScenarioPointStartTimeMs := FScenarioCurrentTimeMs; PrevIndex := FCurrentPointIndex; end;
+      if FCurrentPointIndex <> PrevIndex then
+      begin
+        FScenarioPointStartTimeMs := FScenarioCurrentTimeMs;
+        PrevIndex := FCurrentPointIndex;
+        if FWorkTable <> nil then
+        begin
+          if FWorkTable.ValueFlowRate <> nil then
+            FWorkTable.ValueFlowRate.ClearStabilitySamples;
+          if FWorkTable.EtalonChannels <> nil then
+            for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+              if (FWorkTable.EtalonChannels[I] <> nil) and (FWorkTable.EtalonChannels[I].FlowMeter <> nil) and
+                 (FWorkTable.EtalonChannels[I].FlowMeter.ValueFlow <> nil) then
+                FWorkTable.EtalonChannels[I].FlowMeter.ValueFlow.ClearStabilitySamples;
+          if FWorkTable.DeviceChannels <> nil then
+            for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+              if (FWorkTable.DeviceChannels[I] <> nil) and (FWorkTable.DeviceChannels[I].FlowMeter <> nil) and
+                 (FWorkTable.DeviceChannels[I].FlowMeter.ValueFlow <> nil) then
+                FWorkTable.DeviceChannels[I].FlowMeter.ValueFlow.ClearStabilitySamples;
+        end;
+      end;
       GenerateScenarioValues(AScenario, FScenarioCurrentTimeMs);
+      AddScenarioSamples(FScenarioCurrentTimeMs);
+      Point := GetCurrentPoint;
+      if (Point <> nil) and (Point.Q > 0.000001) and (FWorkTable <> nil) and
+         (FWorkTable.ValueFlowRate <> nil) and SameValue(FWorkTable.ValueFlowRate.GetDoubleValue, 0.0) and
+         (((FScenarioCurrentTimeMs - FScenarioPointStartTimeMs) / 1000.0) > 10.0) then
+      begin
+        AResultText := 'Сценарий не обновляет runtime-расход эталона';
+        AddDiagnosticEvent(AResultText);
+        Break;
+      end;
       ProcessStage;
       Point := GetCurrentPoint;
       if (AScenario in [mrsFlowPassesPoint, mrsHighVariation]) and (Point <> nil) and
@@ -822,8 +925,9 @@ begin
          (FCurrentStage = msWaitStable) then
         ContinueAfterPointError(mptsSetupError, meStableTimeout, BuildError(1901, 'Сценарный таймаут стабильности'));
       if FCurrentStage = msDone then begin Result := True; Break; end;
+      FScenarioCurrentTimeMs := FScenarioCurrentTimeMs + FScenarioStepMs;
     end;
-    if not Result then begin AResultText := 'ScenarioStepLimitExceeded'; SetStage(msDone); end
+    if not Result then begin if AResultText = '' then AResultText := 'ScenarioStepLimitExceeded'; SetStage(msDone); end
     else AResultText := 'Сценарий завершён';
   finally
     FScenarioRunning := False;
@@ -1665,6 +1769,84 @@ begin
 end;
 
 
+function TMeasurementRun.AreDeviceSignalsStable(out StableInfo: RStableInfo): Boolean;
+var
+  I: Integer;
+  Channel: TChannel;
+  StableValue: TMeterValue;
+  Settings: TMeterValueStabilitySettings;
+  SignalInfo: TMeterValueStabilityInfo;
+  ActualValue: Double;
+  ParticipatingDeviceCount: Integer;
+begin
+  StableInfo := Default(RStableInfo);
+  Result := True;
+  ParticipatingDeviceCount := 0;
+
+  if (FWorkTable = nil) or (FWorkTable.DeviceChannels = nil) then
+  begin
+    StableInfo.StatusText := 'NoDeviceChannels.';
+    Exit(False);
+  end;
+
+  for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.DeviceChannels[I];
+    if (Channel = nil) or (not Channel.Enabled) or
+       (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) then
+      Continue;
+
+    Inc(ParticipatingDeviceCount);
+    StableValue := Channel.FlowMeter.ValueFlow;
+    Settings := StableValue.StabilitySettings;
+    ActualValue := StableValue.GetDoubleValue;
+    SignalInfo := Default(TMeterValueStabilityInfo);
+
+    if Settings.Enabled then
+    begin
+      if not FScenarioRunning then
+        StableValue.AddStabilitySampleManual(NowTickMs, ActualValue);
+      StableValue.AnalyzeStabilityAt(NowTickMs, SignalInfo);
+    end
+    else
+    begin
+      SignalInfo.Status := mvssDisabled;
+      SignalInfo.StatusText := 'Анализ стабильности расхода поверяемого канала отключён.';
+      SignalInfo.IsSignalStable := True;
+      SignalInfo.IsStabilityConfirmed := True;
+    end;
+
+    if not SignalInfo.IsSignalStable then
+    begin
+      Result := False;
+      if StableInfo.StatusText <> '' then
+        StableInfo.StatusText := StableInfo.StatusText + '; ';
+      StableInfo.StatusText := StableInfo.StatusText +
+        Format('Device[%d] unstable: %s', [I, SignalInfo.StatusText]);
+    end;
+
+    if StableInfo.SignalInfo.Status = mvssUnknown then
+      StableInfo.SignalInfo := SignalInfo;
+  end;
+
+  if ParticipatingDeviceCount = 0 then
+  begin
+    StableInfo.StatusText := 'NoParticipatingDeviceChannels.';
+    Exit(False);
+  end;
+
+  StableInfo.IsSignalStable := Result;
+  StableInfo.IsReadyForMeasurement := Result;
+  StableInfo.IsTargetConditionPassed := Result;
+  if Result then
+  begin
+    StableInfo.Status := sOk;
+    StableInfo.StatusText := Format('DeviceSignalsStable=True; ParticipatingDeviceCount=%d', [ParticipatingDeviceCount]);
+  end
+  else
+    StableInfo.Status := sRun_NN;
+end;
+
 function TMeasurementRun.CheckFlowStable(out StableInfo: RStableInfo): Boolean;
 var
   I: Integer;
@@ -1682,33 +1864,6 @@ var
   ToleranceSource: string;
   FlowReached: Boolean;
   HistoryStable: Boolean;
-  AllDeviceSignalsStable: Boolean;
-  ParticipatingDeviceCount: Integer;
-  SampleBeforeCount: Integer;
-  SampleAfterCount: Integer;
-  SampleTimeMs: Int64;
-  MeterValueId: string;
-  DeviceUUID: string;
-  MeterUUID: string;
-  DeviceDetails: TStringList;
-
-  function MeterValueRuntimeId(const AValue: TMeterValue): string;
-  begin
-    if AValue = nil then
-      Exit('nil');
-    Result := '0x' + IntToHex(NativeUInt(AValue), SizeOf(NativeUInt) * 2);
-  end;
-
-  function TrendDirectionText(const ADirection: TMeterValueTrendDirection): string;
-  begin
-    Result := GetEnumName(TypeInfo(TMeterValueTrendDirection), Ord(ADirection));
-  end;
-
-  function DiagnosticFloat(const AValue: Double): string;
-  begin
-    Result := FloatToStrF(AValue, ffFixed, 18, 9);
-  end;
-
 begin
   StableInfo := Default(RStableInfo);
   Result := False;
@@ -1717,8 +1872,10 @@ begin
   if (FWorkTable = nil) or (FWorkTable.FlowRate = nil) or (Point = nil) then
     Exit;
 
-  StableValue := nil;
-  if FWorkTable.EtalonChannels <> nil then
+  StableValue := FWorkTable.ValueFlowRate;
+  if StableValue = nil then
+    StableValue := FWorkTable.FlowRate.Value;
+  if (StableValue = nil) and (FWorkTable.EtalonChannels <> nil) then
     for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
     begin
       Channel := FWorkTable.EtalonChannels[I];
@@ -1729,9 +1886,6 @@ begin
         Break;
       end;
     end;
-
-  if StableValue = nil then
-    StableValue := FWorkTable.FlowRate.Value;
   if StableValue = nil then
     Exit;
 
@@ -1775,114 +1929,29 @@ begin
   StableInfo.IsForecastInRange := True;
   FlowReached := StableInfo.IsCurrentInRange;
 
-  AllDeviceSignalsStable := True;
-  ParticipatingDeviceCount := 0;
-  DeviceDetails := TStringList.Create;
-  try
-    if FWorkTable.DeviceChannels <> nil then
-      for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
-      begin
-        Channel := FWorkTable.DeviceChannels[I];
-        if (Channel = nil) or (not Channel.Enabled) or
-           (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) then
-          Continue;
-
-        Inc(ParticipatingDeviceCount);
-        StableValue := Channel.FlowMeter.ValueFlow;
-        Settings := StableValue.StabilitySettings;
-        ActualValue := StableValue.GetDoubleValue;
-        MeterValueId := MeterValueRuntimeId(StableValue);
-        DeviceUUID := Channel.DeviceUUID;
-        MeterUUID := StableValue.Hash;
-        SampleBeforeCount := Length(StableValue.GetStabilitySamples);
-
-        HistoryStable := False;
-        SignalInfo := Default(TMeterValueStabilityInfo);
-        if Settings.Enabled then
-        begin
-          SampleTimeMs := NowTickMs;
-          StableValue.AddStabilitySampleManual(NowTickMs, ActualValue);
-          SampleAfterCount := Length(StableValue.GetStabilitySamples);
-          HistoryStable := StableValue.AnalyzeStability(SignalInfo);
-        end
-        else
-        begin
-          SampleTimeMs := NowTickMs;
-          SampleAfterCount := SampleBeforeCount;
-          SignalInfo.Status := mvssDisabled;
-          SignalInfo.StatusText := 'Анализ стабильности расхода поверяемого канала отключён.';
-          Include(SignalInfo.FailReasons, mvsfrAnalysisDisabled);
-        end;
-
-        AllDeviceSignalsStable := AllDeviceSignalsStable and SignalInfo.IsSignalStable;
-        if not SignalInfo.IsSignalStable then
-          HistoryStable := False;
-
-        DeviceDetails.Add('FlowStabilitySampleAdded: DeviceFlow[' + IntToStr(I) + ']: '
-          + 'DeviceUUID=' + DeviceUUID
-          + '; ChannelIndex=' + IntToStr(Channel.ID)
-          + '; MeterValuePtr=' + MeterValueId
-          + '; MeterUUID=' + MeterUUID
-          + '; Parameter=ValueFlow'
-          + '; CurrentValue=' + DiagnosticFloat(ActualValue)
-          + '; HistoryAnalysisEnabled=' + BoolToStr(Settings.Enabled, True)
-          + '; SampleAdded=' + BoolToStr(Settings.Enabled and (SampleAfterCount <> SampleBeforeCount), True)
-          + '; TimeStampMs=' + IntToStr(SampleTimeMs)
-          + '; HistoryCountBefore=' + IntToStr(SampleBeforeCount)
-          + '; HistoryCountAfter=' + IntToStr(SampleAfterCount)
-          + '; UsedSampleCount=' + IntToStr(SignalInfo.UsedSampleCount)
-          + '; WindowDurationSec=' + DiagnosticFloat(SignalInfo.WindowDurationSec)
-          + '; LastSampleAgeSec=' + DiagnosticFloat(SignalInfo.LastSampleAgeSec)
-          + '; TrendRate=' + DiagnosticFloat(SignalInfo.TrendRate)
-          + '; TrendRateUnit=value/s'
-          + '; MaxTrendRate=' + DiagnosticFloat(Settings.MaxTrendRate)
-          + '; MaxTrendRateUnit=value/s'
-          + '; TrendExceeded=' + BoolToStr((not SignalInfo.IsTrendStable) and SignalInfo.HasTrend, True)
-          + '; TrendDirection=' + TrendDirectionText(SignalInfo.TrendDirection)
-          + '; Variation=' + DiagnosticFloat(SignalInfo.Variation)
-          + '; StdDeviation=' + DiagnosticFloat(SignalInfo.StdDeviation)
-          + '; OutlierFraction=' + DiagnosticFloat(SignalInfo.OutlierFraction)
-          + '; IsSignalStable=' + BoolToStr(SignalInfo.IsSignalStable, True)
-          + '; IsStabilityConfirmed=' + BoolToStr(SignalInfo.IsStabilityConfirmed, True)
-          + '; IsSuitableForMeasurement=' + BoolToStr(SignalInfo.IsSuitableForMeasurement, True)
-          + '; Result=' + BoolToStr(HistoryStable, True)
-          + '; Reason=' + SignalInfo.StatusText);
-
-        if StableInfo.SignalInfo.Status = mvssUnknown then
-          StableInfo.SignalInfo := SignalInfo;
-      end;
-
-    if ParticipatingDeviceCount = 0 then
-    begin
-      AllDeviceSignalsStable := False;
-      StableInfo.StatusText := 'NoParticipatingDeviceChannels.';
-    end;
-
-    StableInfo.IsSignalStable := AllDeviceSignalsStable;
-    StableInfo.IsTargetConditionPassed := FlowReached;
-    StableInfo.IsReadyForMeasurement := FlowReached and AllDeviceSignalsStable;
-    Result := StableInfo.IsReadyForMeasurement;
-
-    if Result then
-      StableInfo.Status := sOk
-    else
-      StableInfo.Status := sRun_NN;
-
-    StableInfo.StatusText := StableInfo.StatusText + Format(' FlowReached=%s; HistoryAnalysisEnabled=%s; DeviceSignalStable=%s; ParticipatingDeviceCount=%d; '
-      + 'ToleranceSource=%s; Target=%.6f; ActualFlowSource=EtalonOrAggregate; Actual=%.6f; FlowMin=%.6f; FlowMax=%.6f; '
-      + 'AllowedDeviationLS=%.6f/%.6f; ActualDeviationLS=%.6f; ActualDeviationPercent=%.6f; Result=%s',
-      [BoolToStr(FlowReached, True), BoolToStr(ParticipatingDeviceCount > 0, True),
-       BoolToStr(AllDeviceSignalsStable, True), ParticipatingDeviceCount,
-       ToleranceSource, TargetValue, StableInfo.CurrentValue, StableInfo.LowerLimit, StableInfo.UpperLimit,
-       AllowedMinus, AllowedPlus, Abs(StableInfo.CurrentValue - TargetValue),
-       IfThen(not SameValue(TargetValue, 0), Abs(StableInfo.CurrentValue - TargetValue) / Abs(TargetValue) * 100.0, 0.0),
-       BoolToStr(Result, True)]);
-
-    if DeviceDetails.Count > 0 then
-      StableInfo.StatusText := StableInfo.StatusText + '; ' + StringReplace(DeviceDetails.Text.Trim, sLineBreak, '; ', [rfReplaceAll]);
-  finally
-    DeviceDetails.Free;
+  HistoryStable := True;
+  SignalInfo := Default(TMeterValueStabilityInfo);
+  if Settings.Enabled then
+  begin
+    if not FScenarioRunning then
+      StableValue.AddStabilitySampleManual(NowTickMs, ActualValue);
+    HistoryStable := StableValue.AnalyzeStabilityAt(NowTickMs, SignalInfo);
+    StableInfo.SignalInfo := SignalInfo;
   end;
+
+  StableInfo.IsSignalStable := HistoryStable;
+  StableInfo.IsTargetConditionPassed := FlowReached;
+  StableInfo.IsReadyForMeasurement := FlowReached and HistoryStable;
+  Result := StableInfo.IsReadyForMeasurement;
+
+  if Result then
+    StableInfo.Status := sOk
+  else
+    StableInfo.Status := sRun_NN;
+
+  StableInfo.StatusText := Format('FlowReached=%s; EtalonSignalStable=%s; ToleranceSource=%s; Target=%.6f; ActualFlowSource=WorkTable.ValueFlowRate; Actual=%.6f; FlowMin=%.6f; FlowMax=%.6f; Result=%s',
+    [BoolToStr(FlowReached, True), BoolToStr(HistoryStable, True), ToleranceSource, TargetValue, ActualValue,
+     StableInfo.LowerLimit, StableInfo.UpperLimit, BoolToStr(Result, True)]);
 end;
 
 procedure TMeasurementRun.ContinueAfterPointError(const AStatus: EMeasurementPointStatus;
@@ -3327,7 +3396,7 @@ begin
     ReadyToMeasure := True
   else
   begin
-    DeviceStable := IsStable(StableInfo);
+    DeviceStable := AreDeviceSignalsStable(StableInfo);
     StableStatus := BoolToStr(DeviceStable, True);
     if not DeviceStable then
     begin
