@@ -885,12 +885,54 @@ type
 
 implementation
 
+uses
+  fuTable_Main;
+
 const
   GraphSampleIntervalMs = 1000;
   MaxGraphSampleCountPerSeries = 3600;
 
+  CVolumeFlowUnits: array[0..4] of string = (
+    'л/с',
+    'л/мин',
+    'л/ч',
+    'м3/мин',
+    'м3/ч'
+  );
 
+  CMassFlowUnits: array[0..4] of string = (
+    'кг/с',
+    'кг/мин',
+    'кг/ч',
+    'т/мин',
+    'т/ч'
+  );
 
+  CScaleUnits: array[0..4] of string = (
+    'г',
+    'кг',
+    'т',
+    'л',
+    'м3'
+  );
+
+  CFlowMeterTypes: array[0..2] of string = (
+    'Расходомер ПРЭМ',
+    'Расходомер ЭЛЕМЕР',
+    'Расходомер ВЗЛЕТ'
+  );
+
+  CFlowMeterSerials: array[0..3] of string = (
+    'SN-1001',
+    'SN-1002',
+    'SN-1003',
+    'SN-1004'
+  );
+
+  CProcessingDevicesSection = 'ProcessingDevices';
+  CProcessingDevicesCountKey = 'Count';
+  CProcessingDevicesItemKeyPrefix = 'Item';
+  CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
 
 {$R *.fmx}
 
@@ -935,52 +977,6 @@ begin
 end;
 
 
-uses
-  fuTable_Main;
-
-
-const
-  CVolumeFlowUnits: array[0..4] of string = (
-    'л/с',
-    'л/мин',
-    'л/ч',
-    'м3/мин',
-    'м3/ч'
-  );
-
-  CMassFlowUnits: array[0..4] of string = (
-    'кг/с',
-    'кг/мин',
-    'кг/ч',
-    'т/мин',
-    'т/ч'
-  );
-
-  CScaleUnits: array[0..4] of string = (
-    'г',
-    'кг',
-    'т',
-    'л',
-    'м3'
-  );
-
-  CFlowMeterTypes: array[0..2] of string = (
-    'Расходомер ПРЭМ',
-    'Расходомер ЭЛЕМЕР',
-    'Расходомер ВЗЛЕТ'
-  );
-
-  CFlowMeterSerials: array[0..3] of string = (
-    'SN-1001',
-    'SN-1002',
-    'SN-1003',
-    'SN-1004'
-  );
-
-  CProcessingDevicesSection = 'ProcessingDevices';
-  CProcessingDevicesCountKey = 'Count';
-  CProcessingDevicesItemKeyPrefix = 'Item';
-  CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
 
 function IsVolumeFlowUnit(const AUnit: string): Boolean;
 var
@@ -5204,18 +5200,16 @@ procedure TFrameMainTable.EnsureToleranceSeries;
     ALine.ShowInLegend := False;
     ALine.Active := False;
     ALine.LinePen.Width := 1;
-    if ADashed then
-      ALine.LinePen.Dash := TStrokeDash.Dash;
     ALine.Pointer.Visible := False;
     Result := ALine;
   end;
 begin
-  EnsureLine(ChartEtalonFlow, FEtalonLowerToleranceSeries, 'Нижний допуск', claRed, True);
-  EnsureLine(ChartEtalonFlow, FEtalonUpperToleranceSeries, 'Верхний допуск', claRed, True);
-  EnsureLine(ChartEtalonFlow, FEtalonTargetSeries, 'Заданный расход', claGreen, False);
-  EnsureLine(ChartDeviceFlow, FDeviceLowerToleranceSeries, 'Нижний допуск', claRed, True);
-  EnsureLine(ChartDeviceFlow, FDeviceUpperToleranceSeries, 'Верхний допуск', claRed, True);
-  EnsureLine(ChartDeviceFlow, FDeviceTargetSeries, 'Заданный расход', claGreen, False);
+  EnsureLine(ChartEtalonFlow, FEtalonLowerToleranceSeries, 'Нижний допуск', TAlphaColors.Red, True);
+  EnsureLine(ChartEtalonFlow, FEtalonUpperToleranceSeries, 'Верхний допуск', TAlphaColors.Red, True);
+  EnsureLine(ChartEtalonFlow, FEtalonTargetSeries, 'Заданный расход', TAlphaColors.Green, False);
+  EnsureLine(ChartDeviceFlow, FDeviceLowerToleranceSeries, 'Нижний допуск', TAlphaColors.Red, True);
+  EnsureLine(ChartDeviceFlow, FDeviceUpperToleranceSeries, 'Верхний допуск', TAlphaColors.Red, True);
+  EnsureLine(ChartDeviceFlow, FDeviceTargetSeries, 'Заданный расход', TAlphaColors.Green, False);
 end;
 
 
