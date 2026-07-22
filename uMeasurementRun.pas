@@ -114,6 +114,7 @@ uses
   System.Classes,
   System.Generics.Collections,
   System.IniFiles,
+  System.IOUtils,
   System.Math,
   System.StrUtils,
   System.SyncObjs,
@@ -282,9 +283,17 @@ type
     FScenarioStepMs: Int64;
     FScenarioPointStartTimeMs: Int64;
     FIsScenarioRun: Boolean;
+    FScenarioNoProgressCount: Integer;
+    FScenarioLastProgressSignature: string;
+    FScenarioStepBusy: Boolean;
+    FLastSetStageRequested: EMeasurementState;
+    FLastSetStageResult: Boolean;
+    FLastSetStageTransitionRequested: Boolean;
+    FLastScenarioStabilityLogText: string;
+    FLastScenarioStabilityLogSecond: Int64;
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
-    procedure SetStage(const ANewStage: EMeasurementState);
+    function SetStage(const ANewStage: EMeasurementState): Boolean;
     function CanChangeStage(AOldStage, ANewStage: EMeasurementState): Boolean;
     procedure DoExitStage(AOldStage, ANewStage: EMeasurementState);
     procedure DoEnterStage(AOldStage, ANewStage: EMeasurementState);
@@ -363,6 +372,18 @@ type
     procedure ResetRuntimeForScenario;
     procedure GenerateScenarioValues(AScenario: EMeasurementScenario; const ATimeMs: Int64);
     procedure AddScenarioSamples(const ATimeMs: Int64);
+    procedure AddScenarioLog(const AText: string);
+    function BuildScenarioProgressSignature(const AStepResult: string): string;
+    procedure FinishScenario(const AStatus, AText: string; AStopWorkTable: Boolean);
+    function IsScenarioRegularWait: Boolean;
+    function ScenarioWorkTableStateText: string;
+    function ScenarioPointUuid(APoint: TDevicePoint): string;
+    function GetStabilityAnalysisTimeMs: Int64;
+    procedure LogScenarioStability(const APrefix: string; const AInfo: TMeterValueStabilityInfo;
+      const AStableInfo: RStableInfo; const ASettings: TMeterValueStabilitySettings;
+      const AActualValue, ATargetValue, ALowerLimit, AUpperLimit, AStableDurationSec: Double);
+    function BuildScenarioStabilityFailureText: string;
+    function ValidateScenarioStabilityConfiguration(out AErrorText: string): Boolean;
     function AreDeviceSignalsStable(out StableInfo: RStableInfo): Boolean;
     function GetScenarioAllowedError(APoint: TDevicePoint; ADeviceIndex: Integer): Double;
     function GetScenarioDeviceValue(AScenario: EMeasurementScenario; APoint: TDevicePoint; ADeviceIndex: Integer; const AReferenceValue: Double): Double;
@@ -662,10 +683,7 @@ end;
 
 function TMeasurementRun.NowTickMs: UInt64;
 begin
-  if FScenarioRunning then
-    Result := UInt64(FScenarioCurrentTimeMs)
-  else
-    Result := TThread.GetTickCount64;
+  Result := TThread.GetTickCount64;
 end;
 
 function TMeasurementRun.GetScenarioAllowedError(APoint: TDevicePoint; ADeviceIndex: Integer): Double;
@@ -830,67 +848,258 @@ procedure TMeasurementRun.AddScenarioSamples(const ATimeMs: Int64);
 var
   I: Integer;
   Channel: TChannel;
+
+  procedure AddSampleOnce(const ALabel: string; AValue: TMeterValue);
+  var
+    Samples: TArray<TMeterValueSample>;
+  begin
+    if AValue = nil then
+      Exit;
+    Samples := AValue.GetSamples;
+    if (Length(Samples) > 0) and (Samples[High(Samples)].TimeStampMs = ATimeMs) then
+    begin
+      AddScenarioLog(Format('AddScenarioSamples: skip duplicate; %s; ValueFlow=%x; Hash=%s; TimeStampMs=%d; SampleCount=%d',
+        [ALabel, NativeUInt(AValue), AValue.Hash, ATimeMs, Length(Samples)]));
+      Exit;
+    end;
+    AValue.AddStabilitySampleManual(ATimeMs, AValue.GetDoubleValue);
+    Samples := AValue.GetSamples;
+    AddScenarioLog(Format('AddScenarioSamples: added; %s; ValueFlow=%x; Hash=%s; TimeStampMs=%d; SampleCount=%d',
+      [ALabel, NativeUInt(AValue), AValue.Hash, ATimeMs, Length(Samples)]));
+  end;
 begin
   if not FScenarioRunning then
     Exit;
 
-  if (FWorkTable <> nil) and (FWorkTable.ValueFlowRate <> nil) then
-    FWorkTable.ValueFlowRate.AddStabilitySampleManual(ATimeMs, FWorkTable.ValueFlowRate.GetDoubleValue);
+  if FWorkTable = nil then
+    Exit;
 
-  if (FWorkTable <> nil) and (FWorkTable.EtalonChannels <> nil) then
+  AddSampleOnce('WorkTable.ValueFlowRate', FWorkTable.ValueFlowRate);
+
+  if FWorkTable.EtalonChannels <> nil then
     for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
     begin
       Channel := FWorkTable.EtalonChannels[I];
       if (Channel <> nil) and (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
-        Channel.FlowMeter.ValueFlow.AddStabilitySampleManual(ATimeMs, Channel.FlowMeter.ValueFlow.GetDoubleValue);
+        AddSampleOnce(Format('Etalon[%d].ValueFlow', [I]), Channel.FlowMeter.ValueFlow);
     end;
 
-  if (FWorkTable <> nil) and (FWorkTable.DeviceChannels <> nil) then
+  if FWorkTable.DeviceChannels <> nil then
     for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
     begin
       Channel := FWorkTable.DeviceChannels[I];
       if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
-        Channel.FlowMeter.ValueFlow.AddStabilitySampleManual(ATimeMs, Channel.FlowMeter.ValueFlow.GetDoubleValue);
+        AddSampleOnce(Format('Device[%d].ValueFlow', [I]), Channel.FlowMeter.ValueFlow);
     end;
+end;
+
+
+function TMeasurementRun.ValidateScenarioStabilityConfiguration(out AErrorText: string): Boolean;
+var
+  I: Integer;
+  Channel: TChannel;
+  ValueFlow: TMeterValue;
+  Settings: TMeterValueStabilitySettings;
+  LookupMode, LookupKey, MatchedSection, MatchedHash, MatchedHashOwner, MatchedValueKind: string;
+
+  function CheckValue(const ALabel: string; AValue: TMeterValue): Boolean;
+  begin
+    Result := True;
+    if AValue = nil then
+      Exit;
+    if TMeterValue.LoadStabilitySettingsByPersistentKey(AValue, LookupMode, LookupKey,
+      MatchedSection, MatchedHash, MatchedHashOwner, MatchedValueKind) then
+      AddScenarioLog(Format('ScenarioStabilitySettingsReload: %s; ValueFlow=%x; Hash=%s; Section=%s; Mode=%s; WindowDurationSec=%.3f',
+        [ALabel, NativeUInt(AValue), AValue.Hash, MatchedSection, LookupMode,
+         AValue.StabilitySettings.WindowDurationSec]));
+
+    Settings := AValue.StabilitySettings;
+    if Settings.Enabled and (Settings.WindowDurationSec <= 0) then
+    begin
+      AErrorText := Format('Сценарий не запущен: некорректные настройки стабильности %s, Hash=%s, Name=%s, WindowDurationSec=%.12g.',
+        [ALabel, AValue.Hash, AValue.Name, Settings.WindowDurationSec]);
+      AddScenarioLog(AErrorText);
+      Exit(False);
+    end;
+  end;
+
+begin
+  Result := False;
+  AErrorText := '';
+  if FWorkTable = nil then
+    Exit(True);
+
+  if not CheckValue('Etalon.ValueFlowRate', FWorkTable.ValueFlowRate) then
+    Exit;
+
+  if FWorkTable.DeviceChannels <> nil then
+    for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.DeviceChannels[I];
+      if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
+        Continue;
+      ValueFlow := Channel.FlowMeter.ValueFlow;
+      if not CheckValue(Format('Device[%d].ValueFlow', [I]), ValueFlow) then
+        Exit;
+    end;
+  Result := True;
+end;
+
+function TMeasurementRun.BuildScenarioStabilityFailureText: string;
+var
+  I: Integer;
+  Channel: TChannel;
+  ValueFlow: TMeterValue;
+  Settings: TMeterValueStabilitySettings;
+  Info: TMeterValueStabilityInfo;
+begin
+  Result := FLastDiagnosticIsStableText;
+  if (FWorkTable = nil) or (FWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.DeviceChannels[I];
+    if (Channel = nil) or (not Channel.Enabled) or
+       (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) then
+      Continue;
+    ValueFlow := Channel.FlowMeter.ValueFlow;
+    Settings := ValueFlow.StabilitySettings;
+    Info := ValueFlow.LastStabilityInfo;
+    if Settings.Enabled and (Settings.WindowDurationSec <= 0) then
+      Exit(Format('Стабилизация невозможна: Device[%d].WindowDurationSec=%.12g; SampleCount=%d; UsedSampleCount=%d; MinSampleCount=%d.',
+        [I, Settings.WindowDurationSec, Info.SampleCount, Info.UsedSampleCount, Settings.MinSampleCount]));
+    if Info.Status = mvssInvalidSettings then
+      Exit(Format('Стабилизация невозможна: Device[%d].%s; SampleCount=%d; UsedSampleCount=%d; MinSampleCount=%d.',
+        [I, Info.StatusText, Info.SampleCount, Info.UsedSampleCount, Settings.MinSampleCount]));
+  end;
+end;
+
+procedure TMeasurementRun.FinishScenario(const AStatus, AText: string; AStopWorkTable: Boolean);
+begin
+  AddScenarioLog('RunScenario: завершение; результат=' + AStatus + '; ' + AText);
+  if AStopWorkTable and (FWorkTable <> nil) then
+  begin
+    try
+      if WorkTableNeedsPhysicalStop then
+        FWorkTable.StopTest;
+    except
+      on E: Exception do
+        AddScenarioLog('Исключение при остановке WorkTable: ' + E.ClassName + ': ' + E.Message);
+    end;
+  end;
+  FScenarioRunning := False;
+  FIsScenarioRun := False;
+  FScenarioStepBusy := False;
 end;
 
 function TMeasurementRun.RunScenario(AScenario: EMeasurementScenario; out AResultText: string): Boolean;
 const
-  MaxScenarioSteps = 1000000;
+  MaxNoProgressSteps = 20;
 var
-  Step: Integer;
   PrevIndex: Integer;
+  OldStage: EMeasurementState;
+  OldWorkTableState: EStateWorkTable;
+  OldPointIndex: Integer;
+  OldStopRequested: Boolean;
+  OldSignature: string;
+  NewSignature: string;
   Point: TDevicePoint;
+  PointUuid: string;
   I: Integer;
   HasEnabledEtalon: Boolean;
   HasEnabledDevice: Boolean;
+  StepResult: string;
+  MaxStableWaitSec: Double;
+  ConfigErrorText: string;
 begin
   Result := False;
   AResultText := '';
-  if FScenarioRunning or IsThreadRunning then begin AResultText := 'Измерение уже выполняется'; Exit; end;
-  if (FWorkTable = nil) or (FPoints = nil) or (FindNextEnabledPointIndex(0) < 0) then begin AResultText := 'Нет включённых точек'; Exit; end;
-  HasEnabledEtalon := False;
-  if FWorkTable.EtalonChannels <> nil then
-    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
-      HasEnabledEtalon := HasEnabledEtalon or ((FWorkTable.EtalonChannels[I] <> nil) and FWorkTable.EtalonChannels[I].Enabled);
-  if not HasEnabledEtalon then begin AResultText := 'Нет участвующего эталона'; Exit; end;
-  HasEnabledDevice := False;
-  if FWorkTable.DeviceChannels <> nil then
-    for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
-      HasEnabledDevice := HasEnabledDevice or ((FWorkTable.DeviceChannels[I] <> nil) and FWorkTable.DeviceChannels[I].Enabled);
-  if not HasEnabledDevice then begin AResultText := 'Нет участвующих поверяемых приборов'; Exit; end;
-  FScenarioRunning := True; FIsScenarioRun := True; FScenarioStartTimeMs := 0; FScenarioCurrentTimeMs := 0; FScenarioStepMs := 1000;
-  ResetRuntimeForScenario;
-  FMode := mrmAutomatic;
-  PrevIndex := -2;
-  SetStage(msSelectPoint);
+
+  if FScenarioStepBusy then
+  begin
+    AddScenarioLog('RunScenario: повторный вход пропущен');
+    Exit;
+  end;
+
+  FScenarioStepBusy := True;
   try
-    for Step := 1 to MaxScenarioSteps do
+    if (not FScenarioRunning) and IsThreadRunning then
     begin
+      AResultText := 'Измерение уже выполняется';
+      FinishScenario('ошибка', AResultText, False);
+      Exit;
+    end;
+
+    if not FScenarioRunning then
+    begin
+      if (FWorkTable = nil) or (FPoints = nil) or (FindNextEnabledPointIndex(0) < 0) then
+      begin
+        AResultText := 'Нет включённых точек';
+        FinishScenario('ошибка', AResultText, False);
+        Exit;
+      end;
+
+      HasEnabledEtalon := False;
+      if FWorkTable.EtalonChannels <> nil then
+        for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+          HasEnabledEtalon := HasEnabledEtalon or ((FWorkTable.EtalonChannels[I] <> nil) and FWorkTable.EtalonChannels[I].Enabled);
+      if not HasEnabledEtalon then
+      begin
+        AResultText := 'Нет участвующего эталона';
+        FinishScenario('ошибка', AResultText, False);
+        Exit;
+      end;
+
+      HasEnabledDevice := False;
+      if FWorkTable.DeviceChannels <> nil then
+        for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+          HasEnabledDevice := HasEnabledDevice or ((FWorkTable.DeviceChannels[I] <> nil) and FWorkTable.DeviceChannels[I].Enabled);
+      if not HasEnabledDevice then
+      begin
+        AResultText := 'Нет участвующих поверяемых приборов';
+        FinishScenario('ошибка', AResultText, False);
+        Exit;
+      end;
+
+      if not ValidateScenarioStabilityConfiguration(ConfigErrorText) then
+      begin
+        AResultText := ConfigErrorText;
+        FinishScenario('ошибка', AResultText, False);
+        Exit;
+      end;
+
+      FScenarioRunning := True;
+      FIsScenarioRun := True;
+      FScenarioStartTimeMs := 0;
+      FScenarioCurrentTimeMs := 0;
+      FScenarioStepMs := 1000;
+      FScenarioPointStartTimeMs := 0;
+      FScenarioNoProgressCount := 0;
+      FScenarioLastProgressSignature := '';
+      FLastSetStageRequested := msNone;
+      FLastSetStageResult := True;
+      FLastSetStageTransitionRequested := False;
+      ResetRuntimeForScenario;
+      FMode := mrmAutomatic;
+      AddScenarioLog('RunScenario: начало; WorkTable=' + GetEnumName(TypeInfo(EStateWorkTable), Ord(FWorkTable.State)));
+      if not SetStage(msSelectPoint) then
+      begin
+        AResultText := Format('Запрещён переход %s -> %s; WorkTable=%s', [
+          MeasurementStateToString(FCurrentStage), MeasurementStateToString(msSelectPoint),
+          GetEnumName(TypeInfo(EStateWorkTable), Ord(FWorkTable.State))]);
+        FinishScenario('ошибка', AResultText, True);
+        Exit;
+      end;
+    end;
+
+    try
+      PrevIndex := FLastProcessedPointIndex;
       if FCurrentPointIndex <> PrevIndex then
       begin
+        AddScenarioLog(Format('Переход к следующей точке: %d -> %d', [PrevIndex, FCurrentPointIndex]));
         FScenarioPointStartTimeMs := FScenarioCurrentTimeMs;
-        PrevIndex := FCurrentPointIndex;
+        FLastProcessedPointIndex := FCurrentPointIndex;
         if FWorkTable <> nil then
         begin
           if FWorkTable.ValueFlowRate <> nil then
@@ -907,31 +1116,134 @@ begin
                 FWorkTable.DeviceChannels[I].FlowMeter.ValueFlow.ClearStabilitySamples;
         end;
       end;
+
+      OldStage := FCurrentStage;
+      OldPointIndex := FCurrentPointIndex;
+      OldStopRequested := IsStopRequested;
+      if FWorkTable <> nil then OldWorkTableState := FWorkTable.State else OldWorkTableState := swtNONE;
+      Point := GetCurrentPoint;
+      if Point <> nil then PointUuid := Point.UUID else PointUuid := 'nil';
+      OldSignature := BuildScenarioProgressSignature('before');
+      FLastSetStageRequested := msNone;
+      FLastSetStageResult := True;
+      FLastSetStageTransitionRequested := False;
+
+      if IsScenarioRegularWait then
+        AddScenarioLog('Вход в штатное ожидание: Stage=' + MeasurementStateToString(FCurrentStage));
+
       GenerateScenarioValues(AScenario, FScenarioCurrentTimeMs);
       AddScenarioSamples(FScenarioCurrentTimeMs);
+      StepResult := 'ProcessStage';
+      ProcessStage;
+
+      if IsScenarioRegularWait then
+        AddScenarioLog('Выход из штатного ожидания: Stage=' + MeasurementStateToString(FCurrentStage));
+
       Point := GetCurrentPoint;
       if (Point <> nil) and (Point.Q > 0.000001) and (FWorkTable <> nil) and
          (FWorkTable.ValueFlowRate <> nil) and SameValue(FWorkTable.ValueFlowRate.GetDoubleValue, 0.0) and
          (((FScenarioCurrentTimeMs - FScenarioPointStartTimeMs) / 1000.0) > 10.0) then
       begin
         AResultText := 'Сценарий не обновляет runtime-расход эталона';
+        StepResult := AResultText;
         AddDiagnosticEvent(AResultText);
-        Break;
       end;
-      ProcessStage;
-      Point := GetCurrentPoint;
-      if (AScenario in [mrsFlowPassesPoint, mrsHighVariation]) and (Point <> nil) and
-         (((FScenarioCurrentTimeMs - FScenarioPointStartTimeMs) / 1000.0) > GetScenarioVirtualPointTimeoutSec(Point)) and
-         (FCurrentStage = msWaitStable) then
-        ContinueAfterPointError(mptsSetupError, meStableTimeout, BuildError(1901, 'Сценарный таймаут стабильности'));
-      if FCurrentStage = msDone then begin Result := True; Break; end;
+
+      if (AResultText = '') and (Point <> nil) and (FCurrentStage = msWaitStable) then
+      begin
+        if AScenario = mrsSuccessfulPass then
+        begin
+          MaxStableWaitSec := 30.0;
+          if (FWorkTable <> nil) and (FWorkTable.ValueFlowRate <> nil) then
+            MaxStableWaitSec := Max(MaxStableWaitSec,
+              FWorkTable.ValueFlowRate.StabilitySettings.WindowDurationSec +
+              FWorkTable.ValueFlowRate.StabilitySettings.ConfirmationTimeSec +
+              FRequiredStabilizationSec + 10.0);
+          if (((FScenarioCurrentTimeMs - FScenarioPointStartTimeMs) / 1000.0) > MaxStableWaitSec) then
+          begin
+            AResultText := BuildScenarioStabilityFailureText;
+            if AResultText = '' then
+              AResultText := 'Стабилизация невозможна: ' + FLastDiagnosticIsStableText;
+            ContinueAfterPointError(mptsSetupError, meStableTimeout, BuildError(1902,
+              AResultText + Format('; Stage=%s; Point=%d; AnalysisTimeMs=%d',
+                [MeasurementStateToString(FCurrentStage), FCurrentPointIndex, GetStabilityAnalysisTimeMs])));
+            StepResult := AResultText;
+          end;
+        end
+        else if (((FScenarioCurrentTimeMs - FScenarioPointStartTimeMs) / 1000.0) > GetScenarioVirtualPointTimeoutSec(Point)) then
+        begin
+          ContinueAfterPointError(mptsSetupError, meStableTimeout,
+            BuildError(1901, 'Сценарный таймаут стабильности: ' + FLastDiagnosticIsStableText));
+          StepResult := 'StableTimeout: ' + FLastDiagnosticIsStableText;
+        end;
+      end;
+
+      AddScenarioLog(Format('RunScenario: step; Stage %s -> %s; StageTransitionRequested=%s; RequestedStage=%s; SetStageResult=%s; WorkTable %s -> %s; Point %d/%s; Stop %s -> %s; Result=%s', [
+        MeasurementStateToString(OldStage), MeasurementStateToString(FCurrentStage),
+        BoolToStr(FLastSetStageTransitionRequested, True), MeasurementStateToString(FLastSetStageRequested),
+        BoolToStr(FLastSetStageResult, True),
+        GetEnumName(TypeInfo(EStateWorkTable), Ord(OldWorkTableState)),
+        ScenarioWorkTableStateText,
+        OldPointIndex, PointUuid, BoolToStr(OldStopRequested, True), BoolToStr(IsStopRequested, True), StepResult]));
+
+      if not FLastSetStageResult then
+      begin
+        AResultText := Format('Запрещён переход %s -> %s; WorkTable=%s; Point=%d/%s', [
+          MeasurementStateToString(OldStage), MeasurementStateToString(FLastSetStageRequested),
+          ScenarioWorkTableStateText,
+          OldPointIndex, PointUuid]);
+      end;
+
+      NewSignature := BuildScenarioProgressSignature(StepResult);
+      if IsScenarioRegularWait then
+        FScenarioNoProgressCount := 0
+      else if (NewSignature = OldSignature) or (NewSignature = FScenarioLastProgressSignature) then
+        Inc(FScenarioNoProgressCount)
+      else
+      begin
+        FScenarioLastProgressSignature := NewSignature;
+        FScenarioNoProgressCount := 0;
+      end;
+
+      if (AResultText = '') and (FScenarioNoProgressCount >= MaxNoProgressSteps) then
+      begin
+        AResultText := Format('Сценарий остановлен: нет прогресса на этапе %s; WorkTable=%s; Point=%d/%s', [
+          MeasurementStateToString(FCurrentStage),
+          ScenarioWorkTableStateText,
+          FCurrentPointIndex, ScenarioPointUuid(Point)]);
+        AddScenarioLog('Остановка по защите от отсутствия прогресса: ' + AResultText);
+      end;
+
+      if (AResultText = '') and (FCurrentStage = msDone) then
+      begin
+        Result := True;
+        AResultText := 'Сценарий завершён';
+      end;
+
+      if (AResultText <> '') and (not Result) then
+      begin
+        SetStage(msDone);
+        FinishScenario('ошибка', AResultText, True);
+      end
+      else if Result then
+        FinishScenario('успешно', AResultText, False);
+
       FScenarioCurrentTimeMs := FScenarioCurrentTimeMs + FScenarioStepMs;
+    except
+      on E: Exception do
+      begin
+        Point := GetCurrentPoint;
+        AResultText := Format('Исключение сценария: %s: %s', [E.ClassName, E.Message]);
+        AddScenarioLog(Format('Исключение: %s: %s; Stage=%s; WorkTable=%s; Point=%d/%s', [
+          E.ClassName, E.Message, MeasurementStateToString(FCurrentStage),
+          ScenarioWorkTableStateText,
+          FCurrentPointIndex, ScenarioPointUuid(Point)]));
+        SetStage(msDone);
+        FinishScenario('ошибка', AResultText, True);
+      end;
     end;
-    if not Result then begin if AResultText = '' then AResultText := 'ScenarioStepLimitExceeded'; SetStage(msDone); end
-    else AResultText := 'Сценарий завершён';
   finally
-    FScenarioRunning := False;
-    FIsScenarioRun := False;
+    FScenarioStepBusy := False;
   end;
 end;
 
@@ -1093,16 +1405,23 @@ begin
   end;
 end;
 
-procedure TMeasurementRun.SetStage(const ANewStage: EMeasurementState);
+function TMeasurementRun.SetStage(const ANewStage: EMeasurementState): Boolean;
 var
   OldStage: EMeasurementState;
   TransitionText: string;
 begin
+  Result := False;
+  FLastSetStageRequested := ANewStage;
+  FLastSetStageResult := False;
+  FLastSetStageTransitionRequested := True;
 
   if FCurrentStage = ANewStage then
-    Exit;
+  begin
+    FLastSetStageResult := True;
+    Exit(True);
+  end;
 
-  FWaitStartedTick := NowTickMs;
+  FWaitStartedTick := UInt64(GetStabilityAnalysisTimeMs);
 
   OldStage := FCurrentStage;
   TransitionText := Format('%s -> %s', [MeasurementStateToString(OldStage),
@@ -1112,21 +1431,27 @@ begin
   begin
     ProtocolManager.AddMessage(pcWarning, psMeasurement, 'SetStage',
       'Недопустимый переход этапа измерения', TransitionText);
-    FireEvent(meMeasureWarning, BuildError(9001,
-      'Invalid measurement stage transition: ' + TransitionText));
-    Exit;
+    AddScenarioLog('CanChangeStage отказ: ' + TransitionText +
+      '; WorkTable=' + ScenarioWorkTableStateText);
+    FireEvent(meMeasureError, BuildError(9001,
+      'Недопустимый переход этапа измерения: ' + TransitionText));
+    Exit(False);
   end;
 
   DoExitStage(OldStage, ANewStage);
   FCurrentStage := ANewStage;
 
   ProtocolManager.AddMessage(pcState, psMeasurement, 'SetStage',
-    'Переход этапа измерения, тайм аут: ' +inttostr(NowTickMs - FWaitStartedTick)+'; ', TransitionText);
+    'Переход этапа измерения, тайм аут: ' +IntToStr(GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick))+'; ', TransitionText);
   AddDiagnosticEvent('Stage ' + MeasurementStateToString(OldStage) + ' -> ' + MeasurementStateToString(ANewStage));
+  AddScenarioLog('Stage ' + MeasurementStateToString(OldStage) + ' -> ' + MeasurementStateToString(ANewStage) +
+    '; WorkTable=' + ScenarioWorkTableStateText);
   if FWorkTable <> nil then
     FWorkTable.MeasurementRunStateChanged(Self, ANewStage);
   Notify(Integer(meStateChanged));
   DoEnterStage(OldStage, ANewStage);
+  FLastSetStageResult := True;
+  Result := True;
 end;
 
 procedure TMeasurementRun.DoExitStage(AOldStage, ANewStage: EMeasurementState);
@@ -1140,7 +1465,7 @@ end;
 
 procedure TMeasurementRun.DoEnterStage(AOldStage, ANewStage: EMeasurementState);
 begin
-  FWaitStartedTick := NowTickMs;
+  FWaitStartedTick := UInt64(GetStabilityAnalysisTimeMs);
   if ANewStage in [msNone, msSelectPoint, msSetupPoint, msDone] then
   begin
     FDeviceStableSinceMs := 0;
@@ -1457,12 +1782,35 @@ begin
 end;
 
 procedure TMeasurementRun.EnterWaitStable;
+var
+  I: Integer;
+  Channel: TChannel;
+  StableValue: TMeterValue;
+
+  procedure LogValue(const AIndex: Integer; const AChannelName, ADeviceUUID: string;
+    AFlowMeter: TObject; AValue: TMeterValue);
+  var
+    LocalSettings: TMeterValueStabilitySettings;
+    SampleCount: Integer;
+  begin
+    if AValue <> nil then
+    begin
+      LocalSettings := AValue.StabilitySettings;
+      SampleCount := Length(AValue.GetSamples);
+      AddScenarioLog(Format('WaitStableValue: ChannelIndex=%d; ChannelName=%s; DeviceUUID=%s; FlowMeter=%x; ValueFlow.Hash=%s; ValueFlow.Name=%s; Source=RuntimeObject; StabilityEnabled=%s; MinSampleCount=%d; WindowDurationSec=%.3f; MaxSampleAgeSec=%.3f; ConfirmationTimeSec=%.3f; SampleCount=%d',
+        [AIndex, AChannelName, ADeviceUUID, NativeUInt(AFlowMeter), AValue.Hash, AValue.Name,
+         BoolToStr(LocalSettings.Enabled, True), LocalSettings.MinSampleCount,
+         LocalSettings.WindowDurationSec, LocalSettings.MaxSampleAgeSec,
+         LocalSettings.ConfirmationTimeSec, SampleCount]));
+    end
+    else
+      AddScenarioLog(Format('WaitStableValue: ChannelIndex=%d; ChannelName=%s; DeviceUUID=%s; FlowMeter=%x; ValueFlow=nil',
+        [AIndex, AChannelName, ADeviceUUID, NativeUInt(AFlowMeter)]));
+  end;
+
 begin
   SetCurrentPointStatus(mptsWaitStable);
 
-  // Начать новый период публикации состояния стабилизации.
-  // Первое промежуточное сообщение появится через 2 секунды.
-  FLastStableProtocolTick := NowTickMs;
   FStableSinceMs := 0;
   FDeviceStableSinceMs := 0;
   FLastDeviceStableStateKnown := False;
@@ -1470,7 +1818,27 @@ begin
   FStableTimerResetReason := '';
   FLastStableProgressSecond := -1;
   LoadRequiredStabilization(GetCurrentPoint);
+  FLastStableProtocolTick := UInt64(GetStabilityAnalysisTimeMs);
   AddDiagnosticEvent(Format('RequiredStabilizationSec=%.3f; RequireAutoStabilization=%s; RequiredStabilizationSource=TDevicePoint runtime', [FRequiredStabilizationSec, BoolToStr(FRequireAutoStabilization, True)]));
+
+  if FWorkTable <> nil then
+  begin
+    LogValue(-1, 'Etalon', '', FWorkTable, FWorkTable.ValueFlowRate);
+    if FWorkTable.DeviceChannels <> nil then
+      for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+      begin
+        Channel := FWorkTable.DeviceChannels[I];
+        if (Channel = nil) or (not Channel.Enabled) then
+          Continue;
+        StableValue := nil;
+        if (Channel.FlowMeter <> nil) then
+          StableValue := Channel.FlowMeter.ValueFlow;
+        if Channel.FlowMeter <> nil then
+          LogValue(I, Channel.Name, Channel.FlowMeter.UUID, Channel.FlowMeter, StableValue)
+        else
+          LogValue(I, Channel.Name, '', nil, StableValue);
+      end;
+  end;
 
   if IsStopRequested then
     Exit;
@@ -1757,7 +2125,7 @@ begin
       StableInfo := ParamInfo;
   end;
 
-  DiagnosticSecond := Trunc((NowTickMs - FWaitStartedTick) / 1000);
+  DiagnosticSecond := Trunc((GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick)) / 1000);
   DiagnosticText := Format('IsStable=%s; Reason=%s', [BoolToStr(Result, True), StableInfo.StatusText]);
   if (DiagnosticText <> FLastDiagnosticIsStableText) or
      (DiagnosticSecond <> FLastDiagnosticIsStableSecond) then
@@ -1778,10 +2146,12 @@ var
   SignalInfo: TMeterValueStabilityInfo;
   ActualValue: Double;
   ParticipatingDeviceCount: Integer;
+  AnalysisTimeMs: Int64;
 begin
   StableInfo := Default(RStableInfo);
   Result := True;
   ParticipatingDeviceCount := 0;
+  AnalysisTimeMs := GetStabilityAnalysisTimeMs;
 
   if (FWorkTable = nil) or (FWorkTable.DeviceChannels = nil) then
   begin
@@ -1805,8 +2175,11 @@ begin
     if Settings.Enabled then
     begin
       if not FScenarioRunning then
-        StableValue.AddStabilitySampleManual(NowTickMs, ActualValue);
-      StableValue.AnalyzeStabilityAt(NowTickMs, SignalInfo);
+        StableValue.AddStabilitySampleManual(AnalysisTimeMs, ActualValue);
+      StableValue.AnalyzeStabilityAt(AnalysisTimeMs, SignalInfo);
+      LogScenarioStability(Format('DeviceStability[%d]', [I]), SignalInfo, StableInfo, Settings, ActualValue, ActualValue,
+        ActualValue - Settings.TargetToleranceAbsolute, ActualValue + Settings.TargetToleranceAbsolute,
+        IfThen(FDeviceStableSinceMs > 0, (AnalysisTimeMs - Int64(FDeviceStableSinceMs)) / 1000.0, 0.0));
     end
     else
     begin
@@ -1864,9 +2237,11 @@ var
   ToleranceSource: string;
   FlowReached: Boolean;
   HistoryStable: Boolean;
+  AnalysisTimeMs: Int64;
 begin
   StableInfo := Default(RStableInfo);
   Result := False;
+  AnalysisTimeMs := GetStabilityAnalysisTimeMs;
 
   Point := GetCurrentPoint;
   if (FWorkTable = nil) or (FWorkTable.FlowRate = nil) or (Point = nil) then
@@ -1934,8 +2309,8 @@ begin
   if Settings.Enabled then
   begin
     if not FScenarioRunning then
-      StableValue.AddStabilitySampleManual(NowTickMs, ActualValue);
-    HistoryStable := StableValue.AnalyzeStabilityAt(NowTickMs, SignalInfo);
+      StableValue.AddStabilitySampleManual(AnalysisTimeMs, ActualValue);
+    HistoryStable := StableValue.AnalyzeStabilityAt(AnalysisTimeMs, SignalInfo);
     StableInfo.SignalInfo := SignalInfo;
   end;
 
@@ -1952,6 +2327,9 @@ begin
   StableInfo.StatusText := Format('FlowReached=%s; EtalonSignalStable=%s; ToleranceSource=%s; Target=%.6f; ActualFlowSource=WorkTable.ValueFlowRate; Actual=%.6f; FlowMin=%.6f; FlowMax=%.6f; Result=%s',
     [BoolToStr(FlowReached, True), BoolToStr(HistoryStable, True), ToleranceSource, TargetValue, ActualValue,
      StableInfo.LowerLimit, StableInfo.UpperLimit, BoolToStr(Result, True)]);
+  LogScenarioStability('EtalonStability', SignalInfo, StableInfo, Settings, ActualValue, TargetValue,
+    StableInfo.LowerLimit, StableInfo.UpperLimit,
+    IfThen(FStableSinceMs > 0, (AnalysisTimeMs - Int64(FStableSinceMs)) / 1000.0, 0.0));
 end;
 
 procedure TMeasurementRun.ContinueAfterPointError(const AStatus: EMeasurementPointStatus;
@@ -2110,10 +2488,10 @@ begin
 
     WaitStableSec := 0;
     if FCurrentStage = msWaitStable then
-      WaitStableSec := (NowTickMs - FWaitStartedTick) / 1000;
+      WaitStableSec := (GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick)) / 1000;
     MeasureSec := 0;
     if FCurrentStage = msMeasure then
-      MeasureSec := (NowTickMs - FWaitStartedTick) / 1000;
+      MeasureSec := (GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick)) / 1000;
 
     if FCurrentStage = msDone then
       NextIndex := -1
@@ -3330,7 +3708,7 @@ begin
     Exit;
   end;
 
-  CurrentTick := NowTickMs;
+  CurrentTick := UInt64(GetStabilityAnalysisTimeMs);
 
   // До первого успешного IsStable ожидаем отдельную стабилизацию эталона.
   if FStableSinceMs = 0 then
@@ -3493,7 +3871,7 @@ begin
         Exit;
       end;
   end;
-   timeout := (NowTickMs - FWaitStartedTick)/1000;
+   timeout := (GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick))/1000;
   if timeout > DEFAULT_START_TIMEOUT_S then
   begin
     ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1403, 'Таймаут ожидания запуска измерения'));
@@ -3722,7 +4100,7 @@ begin
     end;
   end;
 
-  if Int64(NowTickMs - FWaitStartedTick) > Int64(FMeasureTimeout) * 1000 then
+  if Int64(GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick)) > Int64(FMeasureTimeout) * 1000 then
   begin
     SetStopReason(msrError);
     FireEvent(meMeasureTimeout, BuildError(1401, 'Таймаут измерения'));
@@ -3751,7 +4129,8 @@ begin
             MeasurementStopReasonToString(GetStopReason));
           MarkInterruptedPointIfNeeded;
         end;
-        SetStage(msSave);
+        AddScenarioLog('Штатное ожидание завершено: msWaitMeasureStop; WorkTable=swtCOMPLETE');
+        SetStage(msResultsRead);
         Exit;
       end;
 
@@ -3772,7 +4151,7 @@ begin
       end;
   end;
 
-  if (NowTickMs - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
+  if (GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick)) > DEFAULT_STOP_TIMEOUT_MS then
   begin
     ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1406, 'Таймаут ожидания остановки измерения'));
   end;
@@ -3816,7 +4195,7 @@ begin
       end;
   end;
 
-  if (NowTickMs - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
+  if (GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick)) > DEFAULT_STOP_TIMEOUT_MS then
   begin
     ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1411, 'Таймаут чтения результатов'));
   end;

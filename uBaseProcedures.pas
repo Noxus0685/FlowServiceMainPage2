@@ -165,7 +165,8 @@ type
     mvssNotEnoughData, // The window lacks required sample count or duration.
     mvssStaleData,     // Last sample is older than MaxSampleAgeSec.
     mvssUnstable,      // Data is available but at least one criterion failed or confirmation is pending.
-    mvssStable         // All criteria passed continuously for ConfirmationTimeSec.
+    mvssStable,        // All criteria passed continuously for ConfirmationTimeSec.
+    mvssInvalidSettings // Stability settings are invalid and must be fixed before analysis can pass.
   );
 
   /// <summary>Individual reasons why a stability analysis did not become stable.</summary>
