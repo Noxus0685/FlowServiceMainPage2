@@ -12,18 +12,54 @@ uses
   System.IOUtils,
   System.SysUtils;
 
+const
+  DEBUG_LOG_FILE_NAME = 'MAIN2_UPDATE_COMMENTS.md';
+
 var
   GDebugLogFile: string;
   GDebugLogLock: TObject;
+
+function FindExistingLogFile(const AStartDirectory: string): string;
+var
+  CurrentDirectory: string;
+  ParentDirectory: string;
+  Candidate: string;
+begin
+  Result := '';
+  CurrentDirectory := ExcludeTrailingPathDelimiter(AStartDirectory);
+
+  while CurrentDirectory <> '' do
+  begin
+    Candidate := TPath.Combine(CurrentDirectory, DEBUG_LOG_FILE_NAME);
+    if TFile.Exists(Candidate) then
+      Exit(Candidate);
+
+    ParentDirectory := ExtractFileDir(CurrentDirectory);
+    if SameText(ParentDirectory, CurrentDirectory) then
+      Break;
+    CurrentDirectory := ParentDirectory;
+  end;
+end;
+
+function ResolveDebugLogFile: string;
+begin
+  Result := FindExistingLogFile(GetCurrentDir);
+  if Result <> '' then
+    Exit;
+
+  Result := FindExistingLogFile(ExtractFilePath(ParamStr(0)));
+  if Result <> '' then
+    Exit;
+
+  Result := TPath.Combine(TPath.GetDocumentsPath, DEBUG_LOG_FILE_NAME);
+end;
 
 procedure InitDebugLog;
 var
   Header: string;
 begin
   try
-    GDebugLogFile := TPath.Combine(
-      ExtractFilePath(ParamStr(0)),
-      'MAIN2_UPDATE_COMMENTS.md');
+    GDebugLogFile := ResolveDebugLogFile;
 
     if not TFile.Exists(GDebugLogFile) then
     begin
