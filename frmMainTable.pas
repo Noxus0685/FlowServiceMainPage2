@@ -132,6 +132,8 @@ type
   end;
 
   TFlowGraphLimits = record
+    TargetValid: Boolean;
+    ToleranceValid: Boolean;
     Valid: Boolean;
     TargetLS: Double;
     LowerLS: Double;
@@ -688,6 +690,9 @@ type
     FCurrentGraphPointStartMs: Int64;
     FGraphMonitorStartMs: Int64;
     FMeasurementRunInstance: TMeasurementRun;
+    FGraphChannelsReady: Boolean;
+    FGraphSamplingActive: Boolean;
+    FLastGraphRunActive: Boolean;
     FEtalonChartSeries: TObjectDictionary<string, TLineSeries>;
     FDeviceChartSeries: TObjectDictionary<string, TLineSeries>;
     FEtalonLowerToleranceSeries: TLineSeries;
@@ -755,6 +760,8 @@ type
     procedure EnsureToleranceSeries;
     procedure FreeToleranceSeries;
     procedure UpdateToleranceSeries(AChart: TChart; ALowerSeries, AUpperSeries, ATargetSeries: TLineSeries; const ALimits: TFlowGraphLimits; const AAxisMinSec, AAxisMaxSec: Double);
+    function TryGetCurrentPointGraphTarget(out ATargetLS: Double): Boolean;
+    function TryGetCurrentPointGraphTolerance(out ALowerLS: Double; out AUpperLS: Double): Boolean;
     function TryGetCurrentPointGraphLimits(out ATargetLS: Double; out ALowerLS: Double; out AUpperLS: Double): Boolean;
     function TryGetFlowGraphLimits(out ALimits: TFlowGraphLimits): Boolean;
     function IsFlowGraphSamplingActive(AWorkTable: TWorkTable): Boolean;
@@ -5162,7 +5169,7 @@ function TFrameMainTable.IsFlowGraphSamplingActive(AWorkTable: TWorkTable): Bool
 var
   Run: TMeasurementRun;
 begin
-  Result := (AWorkTable <> nil) and (AWorkTable.State in [swtMONITOR, swtSTARTTEST, swtSTARTWAIT, swtEXECUTE, swtSTOPTEST, swtSTOPWAIT, swtFINALREAD]);
+  Result := (AWorkTable <> nil) and (AWorkTable.State in [swtSTARTMONITOR, swtSTARTMONITORWAIT, swtMONITOR, swtSTARTTEST, swtSTARTWAIT, swtEXECUTE, swtSTOPTEST, swtSTOPWAIT, swtFINALREAD]);
   if (not Result) and (AWorkTable <> nil) and (AWorkTable.MeasurementRun is TMeasurementRun) then
   begin
     Run := TMeasurementRun(AWorkTable.MeasurementRun);
@@ -5244,50 +5251,71 @@ begin
   FreeLine(ChartDeviceFlow, FDeviceTargetSeries);
 end;
 
-function TFrameMainTable.TryGetCurrentPointGraphLimits(out ATargetLS: Double; out ALowerLS: Double; out AUpperLS: Double): Boolean;
+function TFrameMainTable.TryGetCurrentPointGraphTarget(out ATargetLS: Double): Boolean;
 var
   Run: TMeasurementRun;
   Point: TDevicePoint;
-  AccuracyText: string;
-  PointErrorPercent: Double;
-  AllowedDeviationLS: Double;
 begin
   ATargetLS := 0;
-  ALowerLS := 0;
-  AUpperLS := 0;
   Result := False;
   if (FActiveWorkTable = nil) or not (FActiveWorkTable.MeasurementRun is TMeasurementRun) then
     Exit;
-
   Run := TMeasurementRun(FActiveWorkTable.MeasurementRun);
   if Run.Stage in [msNone, msDone] then
     Exit;
   Point := Run.CurrentPoint;
   if (Point = nil) or IsNan(Point.Q) or IsInfinite(Point.Q) then
     Exit;
+  ATargetLS := Point.Q;
+  Result := True;
+end;
 
-  AccuracyText := NormalizeAccuracyInput(Point.FlowAccuracy);
-  if AccuracyText = '' then
+function TFrameMainTable.TryGetCurrentPointGraphTolerance(out ALowerLS: Double; out AUpperLS: Double): Boolean;
+var
+  TargetLS: Double;
+  Run: TMeasurementRun;
+  Point: TDevicePoint;
+  PointErrorPercent: Double;
+  AllowedDeviationLS: Double;
+begin
+  ALowerLS := 0;
+  AUpperLS := 0;
+  Result := False;
+  if not TryGetCurrentPointGraphTarget(TargetLS) then
     Exit;
-  if (AccuracyText[1] = '+') or (AccuracyText[1] = '-') then
-    AccuracyText := Copy(AccuracyText, 2, MaxInt);
-  PointErrorPercent := Abs(NormalizeFloatInput(AccuracyText));
+  Run := TMeasurementRun(FActiveWorkTable.MeasurementRun);
+  Point := Run.CurrentPoint;
+  PointErrorPercent := Abs(Point.Error);
   if IsNan(PointErrorPercent) or IsInfinite(PointErrorPercent) or (PointErrorPercent <= 0) then
     Exit;
-
-  ATargetLS := Point.Q;
-  AllowedDeviationLS := Abs(ATargetLS) * PointErrorPercent / 100.0;
-  ALowerLS := ATargetLS - AllowedDeviationLS;
-  AUpperLS := ATargetLS + AllowedDeviationLS;
+  AllowedDeviationLS := Abs(TargetLS) * PointErrorPercent / 100.0;
+  ALowerLS := TargetLS - AllowedDeviationLS;
+  AUpperLS := TargetLS + AllowedDeviationLS;
   Result := (not IsNan(ALowerLS)) and (not IsInfinite(ALowerLS)) and
     (not IsNan(AUpperLS)) and (not IsInfinite(AUpperLS));
+end;
+
+function TFrameMainTable.TryGetCurrentPointGraphLimits(out ATargetLS: Double; out ALowerLS: Double; out AUpperLS: Double): Boolean;
+begin
+  Result := TryGetCurrentPointGraphTarget(ATargetLS);
+  if not Result then
+  begin
+    ALowerLS := 0;
+    AUpperLS := 0;
+    Exit;
+  end;
+  Result := TryGetCurrentPointGraphTolerance(ALowerLS, AUpperLS);
 end;
 
 function TFrameMainTable.TryGetFlowGraphLimits(out ALimits: TFlowGraphLimits): Boolean;
 begin
   ALimits := Default(TFlowGraphLimits);
-  Result := TryGetCurrentPointGraphLimits(ALimits.TargetLS, ALimits.LowerLS, ALimits.UpperLS);
-  ALimits.Valid := Result;
+  ALimits.TargetValid := TryGetCurrentPointGraphTarget(ALimits.TargetLS);
+  ALimits.ToleranceValid := False;
+  if ALimits.TargetValid then
+    ALimits.ToleranceValid := TryGetCurrentPointGraphTolerance(ALimits.LowerLS, ALimits.UpperLS);
+  ALimits.Valid := ALimits.ToleranceValid;
+  Result := ALimits.TargetValid;
 end;
 
 procedure TFrameMainTable.SyncFlowChartSeries(AChart: TChart; AGraphSeries: TObjectDictionary<string, TFlowGraphSeries>; AChartSeries: TObjectDictionary<string, TLineSeries>);
@@ -5447,6 +5475,9 @@ begin
     FGraphMonitorStartMs := 0;
     FLastFlowGraphSampleMs := 0;
     FMeasurementRunInstance := nil;
+    FGraphChannelsReady := False;
+    FGraphSamplingActive := False;
+    FLastGraphRunActive := False;
   end;
   ClearChecks(FlowLayoutEtalonChecks);
   ClearChecks(FlowLayoutDeviceChecks);
@@ -5454,8 +5485,12 @@ begin
   begin
     BuildChecks(FActiveWorkTable.EtalonChannels, FFlowGraphHistory.EtalonSeries, FEtalonChartSeries, FlowLayoutEtalonChecks, 'Etalon', 'Эталонный канал');
     BuildChecks(FActiveWorkTable.DeviceChannels, FFlowGraphHistory.DeviceSeries, FDeviceChartSeries, FlowLayoutDeviceChecks, 'Device', 'Приборный канал');
-  end;
-  RenderFlowGraphs;
+    FGraphChannelsReady := True;
+  end
+  else
+    FGraphChannelsReady := False;
+  if FActiveWorkTable <> nil then
+    RenderFlowGraphs;
 end;
 
 procedure TFrameMainTable.AddFlowGraphSamples(const ATimeStampMs: Int64);
@@ -5504,26 +5539,32 @@ begin
   ALowerSeries.ShowInLegend := False;
   AUpperSeries.ShowInLegend := False;
   ATargetSeries.ShowInLegend := False;
-  if not ALimits.Valid then
+  if ALimits.TargetValid then
+  begin
+    TargetValue := FlowGraphDisplayValue(FActiveWorkTable, ALimits.TargetLS);
+    ATargetSeries.AddXY(AAxisMinSec, TargetValue);
+    ATargetSeries.AddXY(AAxisMaxSec, TargetValue);
+    ATargetSeries.Active := True;
+  end
+  else
+    ATargetSeries.Active := False;
+
+  if ALimits.ToleranceValid then
+  begin
+    LowerValue := FlowGraphDisplayValue(FActiveWorkTable, ALimits.LowerLS);
+    UpperValue := FlowGraphDisplayValue(FActiveWorkTable, ALimits.UpperLS);
+    ALowerSeries.AddXY(AAxisMinSec, LowerValue);
+    ALowerSeries.AddXY(AAxisMaxSec, LowerValue);
+    AUpperSeries.AddXY(AAxisMinSec, UpperValue);
+    AUpperSeries.AddXY(AAxisMaxSec, UpperValue);
+    ALowerSeries.Active := True;
+    AUpperSeries.Active := True;
+  end
+  else
   begin
     ALowerSeries.Active := False;
     AUpperSeries.Active := False;
-    ATargetSeries.Active := False;
-    Exit;
   end;
-
-  TargetValue := FlowGraphDisplayValue(FActiveWorkTable, ALimits.TargetLS);
-  LowerValue := FlowGraphDisplayValue(FActiveWorkTable, ALimits.LowerLS);
-  UpperValue := FlowGraphDisplayValue(FActiveWorkTable, ALimits.UpperLS);
-  ALowerSeries.AddXY(AAxisMinSec, LowerValue);
-  ALowerSeries.AddXY(AAxisMaxSec, LowerValue);
-  AUpperSeries.AddXY(AAxisMinSec, UpperValue);
-  AUpperSeries.AddXY(AAxisMaxSec, UpperValue);
-  ATargetSeries.AddXY(AAxisMinSec, TargetValue);
-  ATargetSeries.AddXY(AAxisMaxSec, TargetValue);
-  ALowerSeries.Active := True;
-  AUpperSeries.Active := True;
-  ATargetSeries.Active := True;
 end;
 
 procedure TFrameMainTable.RenderFlowChart(AChart: TChart; ASeries: TObjectDictionary<string, TFlowGraphSeries>; AChartSeries: TObjectDictionary<string, TLineSeries>; const AVisibleXMinMs, AVisibleXMaxMs: Int64; const AAxisMinSec, AAxisMaxSec: Double; AMeasurementSegment: Boolean);
@@ -5598,32 +5639,39 @@ begin
       Line.Pointer.Visible := Pair.Value.Visible and (VisibleCount = 1);
       if Line.Pointer.Visible then
       begin
-        Line.Pointer.HorizSize := 3;
-        Line.Pointer.VertSize := 3;
+        Line.Pointer.HorizSize := 4;
+        Line.Pointer.VertSize := 4;
+        Line.Pointer.Pen.Visible := True;
+        Line.Pointer.Brush.Color := Pair.Value.Color;
       end;
+      Line.LinePen.Visible := Pair.Value.Visible and (VisibleCount >= 2);
+      Line.LinePen.Width := 2;
 
     end;
 
   if TryGetFlowGraphLimits(Limits) then
   begin
     TargetDisplay := FlowGraphDisplayValue(FActiveWorkTable, Limits.TargetLS);
-    V := FlowGraphDisplayValue(FActiveWorkTable, Limits.LowerLS);
     if not HasValue then
     begin
-      MinValue := V;
-      MaxValue := V;
+      MinValue := TargetDisplay;
+      MaxValue := TargetDisplay;
       HasValue := True;
     end
     else
     begin
+      MinValue := Min(MinValue, TargetDisplay);
+      MaxValue := Max(MaxValue, TargetDisplay);
+    end;
+    if Limits.ToleranceValid then
+    begin
+      V := FlowGraphDisplayValue(FActiveWorkTable, Limits.LowerLS);
+      MinValue := Min(MinValue, V);
+      MaxValue := Max(MaxValue, V);
+      V := FlowGraphDisplayValue(FActiveWorkTable, Limits.UpperLS);
       MinValue := Min(MinValue, V);
       MaxValue := Max(MaxValue, V);
     end;
-    V := FlowGraphDisplayValue(FActiveWorkTable, Limits.UpperLS);
-    MinValue := Min(MinValue, V);
-    MaxValue := Max(MaxValue, V);
-    MinValue := Min(MinValue, TargetDisplay);
-    MaxValue := Max(MaxValue, TargetDisplay);
   end
   else
     Limits := Default(TFlowGraphLimits);
@@ -5664,13 +5712,18 @@ var
   Point: TDevicePoint;
   PointUUID, PointKey: string;
   PointIndex: Integer;
-  MeasurementSegment: Boolean;
+  MeasurementSegment, RunActive, NewRunStarted, PointChanged: Boolean;
 begin
   if FFlowGraphHistory = nil then
     Exit;
 
   CurrentTimeMs := TMeterValue.GetMonotonicTimeMs;
   MeasurementSegment := False;
+  RunActive := False;
+  NewRunStarted := False;
+  PointChanged := False;
+  if (not FGraphChannelsReady) and (FActiveWorkTable <> nil) then
+    RefreshFlowGraphChannels;
   Run := nil;
   Point := nil;
   PointIndex := -1;
@@ -5686,7 +5739,19 @@ begin
       FCurrentGraphPointStartMs := 0;
       FLastFlowGraphSampleMs := 0;
     end;
-    if not (Run.Stage in [msNone, msDone]) then
+    RunActive := not (Run.Stage in [msNone, msDone]);
+    NewRunStarted := RunActive and not FLastGraphRunActive;
+    if NewRunStarted then
+    begin
+      FMeasurementRunInstance := Run;
+      FCurrentGraphPointUUID := '';
+      FCurrentGraphPointIndex := -1;
+      FCurrentGraphPointKey := '';
+      FCurrentGraphPointStartMs := 0;
+      FLastFlowGraphSampleMs := 0;
+      FGraphSamplingActive := False;
+    end;
+    if RunActive then
     begin
       Point := Run.CurrentPoint;
       PointIndex := Run.CurrentPointIndex;
@@ -5705,15 +5770,18 @@ begin
     else
       PointKey := Point.Name + ':' + FloatToStr(Point.Q);
 
-    if (FCurrentGraphPointStartMs = 0) or (not SameText(FCurrentGraphPointKey, PointKey)) then
+    PointChanged := RunActive and ((FCurrentGraphPointStartMs = 0) or
+      (not SameText(FCurrentGraphPointKey, PointKey)) or (FCurrentGraphPointIndex <> PointIndex));
+    if PointChanged then
     begin
       FCurrentGraphPointKey := PointKey;
       FCurrentGraphPointUUID := PointUUID;
       FCurrentGraphPointIndex := PointIndex;
       FCurrentGraphPointStartMs := CurrentTimeMs;
       FLastFlowGraphSampleMs := 0;
+      FGraphSamplingActive := True;
     end;
-    MeasurementSegment := True;
+    MeasurementSegment := RunActive and (FCurrentGraphPointStartMs > 0);
   end;
 
   if (not MeasurementSegment) and IsFlowGraphSamplingActive(FActiveWorkTable) and (FGraphMonitorStartMs = 0) then
@@ -5722,7 +5790,7 @@ begin
     FLastFlowGraphSampleMs := 0;
   end;
 
-  if IsFlowGraphSamplingActive(FActiveWorkTable) and
+  if (FGraphChannelsReady or (FActiveWorkTable <> nil)) and IsFlowGraphSamplingActive(FActiveWorkTable) and
      ((FLastFlowGraphSampleMs = 0) or (CurrentTimeMs < FLastFlowGraphSampleMs) or
       (CurrentTimeMs - FLastFlowGraphSampleMs >= GraphSampleIntervalMs)) then
   begin
@@ -5769,6 +5837,17 @@ begin
 
   RenderFlowChart(ChartEtalonFlow, FFlowGraphHistory.EtalonSeries, FEtalonChartSeries, VisibleXMinMs, VisibleXMaxMs, AxisMinSec, AxisMaxSec, MeasurementSegment);
   RenderFlowChart(ChartDeviceFlow, FFlowGraphHistory.DeviceSeries, FDeviceChartSeries, VisibleXMinMs, VisibleXMaxMs, AxisMinSec, AxisMaxSec, MeasurementSegment);
+  if ChartEtalonFlow <> nil then
+  begin
+    ChartEtalonFlow.Invalidate;
+    ChartEtalonFlow.Repaint;
+  end;
+  if ChartDeviceFlow <> nil then
+  begin
+    ChartDeviceFlow.Invalidate;
+    ChartDeviceFlow.Repaint;
+  end;
+  FLastGraphRunActive := RunActive;
 end;
 
 procedure TFrameMainTable.ButtonClearFlowGraphsClick(Sender: TObject);
