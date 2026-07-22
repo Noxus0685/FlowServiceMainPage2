@@ -667,12 +667,15 @@ begin
 end;
 
 function TMeasurementRun.GetScenarioAllowedError(APoint: TDevicePoint; ADeviceIndex: Integer): Double;
+var
+  FlowMin: Double;
+  FlowMax: Double;
 begin
   Result := 1.0;
   if APoint <> nil then
   begin
-    Result := Max(Result, Abs(NormalizeFloatInput(APoint.Accuracy)));
-    Result := Max(Result, Abs(APoint.FlowAccuracy));
+    if AccuracyToRange(APoint.FlowAccuracy, FlowMin, FlowMax) then
+      Result := Max(Result, Max(Abs(FlowMin), Abs(FlowMax)));
     Result := Max(Result, Abs(APoint.Error));
   end;
 end;
@@ -767,7 +770,7 @@ begin
       begin
         DeviceFlow := GetScenarioDeviceValue(AScenario, Point, I, Flow);
         FWorkTable.DeviceChannels[I].FlowMeter.ValueFlow.SetValue(DeviceFlow);
-        FWorkTable.DeviceChannels[I].FlowMeter.ValueFlow.AddSample(DeviceFlow, ATimeMs);
+        FWorkTable.DeviceChannels[I].FlowMeter.ValueFlow.AddStabilitySampleManual(ATimeMs, DeviceFlow);
         FWorkTable.DeviceChannels[I].ImpResult := Round(Max(0.0, DeviceFlow * Elapsed));
       end;
   if FCurrentStage = msWaitMeasureStart then
@@ -1797,14 +1800,14 @@ begin
         SignalInfo := Default(TMeterValueStabilityInfo);
         if Settings.Enabled then
         begin
-          SampleTimeMs := TMeterValue.GetMonotonicTimeMs;
-          StableValue.AddSample(ActualValue, NowTickMs);
+          SampleTimeMs := NowTickMs;
+          StableValue.AddStabilitySampleManual(NowTickMs, ActualValue);
           SampleAfterCount := Length(StableValue.GetStabilitySamples);
           HistoryStable := StableValue.AnalyzeStability(SignalInfo);
         end
         else
         begin
-          SampleTimeMs := TMeterValue.GetMonotonicTimeMs;
+          SampleTimeMs := NowTickMs;
           SampleAfterCount := SampleBeforeCount;
           SignalInfo.Status := mvssDisabled;
           SignalInfo.StatusText := 'Анализ стабильности расхода поверяемого канала отключён.';
