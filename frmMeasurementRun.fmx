@@ -1,4 +1,4 @@
-﻿object FrameMeasurementRun: TFrameMeasurementRun
+object FrameMeasurementRun: TFrameMeasurementRun
   Size.Width = 1228.000000000000000000
   Size.Height = 888.000000000000000000
   Size.PlatformDefault = False
@@ -14,8 +14,8 @@
     OnDrawColumnCell = GridMeasurmentRunDrawColumnCell
     OnGetValue = GridMeasurmentRunGetValue
     OnCellClick = GridMeasurmentRunCellClick
-    Viewport.Width = 1228.000000000000000000
-    Viewport.Height = 676.000000000000000000
+    Viewport.Width = 1224.000000000000000000
+    Viewport.Height = 831.000000000000000000
     object CheckColumnMREnable: TCheckColumn
       HeaderSettings.TextSettings.Trimming = Character
       HeaderSettings.TextSettings.WordWrap = False
@@ -133,16 +133,9 @@
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
       Text = #1057#1094#1077#1085#1072#1088#1080#1081' '#1087#1086#1074#1077#1088#1082#1080
-      TextSettings.VertAlign = Center
     end
     object ComboBoxMeasurementScenario: TComboBox
       Align = Left
-      Position.X = 441.000000000000000000
-      Size.Width = 360.000000000000000000
-      Size.Height = 32.000000000000000000
-      Size.PlatformDefault = False
-      TabOrder = 0
-      ItemIndex = 0
       Items.Strings = (
         #1059#1089#1087#1077#1096#1085#1099#1081' '#1087#1088#1086#1093#1086#1076
         #1057#1090#1072#1073#1080#1083#1100#1085#1099#1077' '#1087#1088#1080#1073#1086#1088#1099', '#1095#1072#1089#1090#1080#1095#1085#1086#1077' '#1087#1088#1077#1074#1099#1096#1077#1085#1080#1077' '#1087#1086#1075#1088#1077#1096#1085#1086#1089#1090#1080
@@ -152,6 +145,11 @@
         #1055#1086#1090#1077#1088#1103' '#1089#1090#1072#1073#1080#1083#1100#1085#1086#1089#1090#1080' '#1074#1086' '#1074#1088#1077#1084#1103' '#1074#1099#1076#1077#1088#1078#1082#1080
         #1057#1090#1072#1073#1080#1083#1080#1079#1072#1094#1080#1103' '#1089#1086' '#1074#1090#1086#1088#1086#1081' '#1087#1086#1087#1099#1090#1082#1080
         #1055#1077#1088#1077#1088#1077#1075#1091#1083#1080#1088#1086#1074#1072#1085#1080#1077' '#1088#1072#1089#1093#1086#1076#1072)
+      Position.X = 441.000000000000000000
+      Size.Width = 360.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
     end
     object ButtonStartMeasurementScenario: TButton
       Align = Left
@@ -160,15 +158,15 @@
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
       Text = #1047#1072#1087#1091#1089#1090#1080#1090#1100' '#1089#1094#1077#1085#1072#1088#1080#1081
+      TextSettings.Trimming = None
       OnClick = ButtonStartMeasurementScenarioClick
     end
     object LabelScenarioResult: TLabel
-      Align = Client
+      Align = Left
       Position.X = 951.000000000000000000
       Size.Width = 277.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
-      TextSettings.VertAlign = Center
     end
   end
 end

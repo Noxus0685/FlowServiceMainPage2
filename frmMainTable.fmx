@@ -5416,33 +5416,31 @@ object FrameMainTable: TFrameMainTable
           Size.Width = 674.000000000000000000
           Size.Height = 453.000000000000000000
           Size.PlatformDefault = False
-          TabIndex = 6
+          TabIndex = 0
           TabOrder = 1
           TabPosition = PlatformDefault
           OnChange = TabControl1Change
           Sizes = (
             674s
-            448s
+            427s
             674s
-            448s
+            427s
             674s
-            448s
+            427s
             674s
-            448s
+            427s
             674s
-            448s
+            427s
             674s
-            448s
-            674s
-            448s)
+            427s)
           object TabItemMeasurmentRun: TTabItem
             CustomIcon = <
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            IsSelected = True
+            Size.Width = 105.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5456,8 +5454,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 81.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5471,8 +5469,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 120.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5486,8 +5484,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 95.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5501,8 +5499,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 74.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5512,7 +5510,7 @@ object FrameMainTable: TFrameMainTable
             object LayoutProtocolHost: TLayout
               Align = Client
               Size.Width = 674.000000000000000000
-              Size.Height = 448.000000000000000000
+              Size.Height = 427.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
             end
@@ -5522,9 +5520,9 @@ object FrameMainTable: TFrameMainTable
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = True
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            IsSelected = False
+            Size.Width = 138.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
