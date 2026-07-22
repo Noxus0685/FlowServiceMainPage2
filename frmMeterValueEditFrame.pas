@@ -1817,6 +1817,8 @@ begin
 end;
 
 procedure TFrameMeterValueEdit.ApplyScenario(const AScenario: TMeterValueTestScenario);
+var
+  WasLoading: Boolean;
 
   procedure AddSamplePoint(const ATimeSec: Integer; const AValue: Double);
   var
@@ -1902,6 +1904,7 @@ procedure TFrameMeterValueEdit.ApplyScenario(const AScenario: TMeterValueTestSce
   end;
 
 begin
+  WasLoading := FLoading;
   FLoading := True;
   try
     ClearTestAnalysis;
@@ -1998,7 +2001,7 @@ begin
     SortSamples;
     RefreshAllTestControls;
   finally
-    FLoading := False;
+    FLoading := WasLoading;
   end;
 
   FTestDataModified := True;
@@ -2712,7 +2715,10 @@ begin
 end;
 
 procedure TFrameMeterValueEdit.LoadSettingsToControls;
+var
+  WasLoading: Boolean;
 begin
+  WasLoading := FLoading;
   FLoading := True;
   try
     CheckBoxStabilityEnabled.IsChecked := FTestSettings.Enabled;
@@ -2742,7 +2748,7 @@ begin
     ComboBoxChartToleranceWidth.ItemIndex := ChartWidthToComboIndex(FTestSettings.ChartToleranceLineWidth);
     UpdateTargetLimits;
   finally
-    FLoading := False;
+    FLoading := WasLoading;
   end;
 end;
 
