@@ -288,6 +288,9 @@ type
     FScenarioStepBusy: Boolean;
     FLastSetStageRequested: EMeasurementState;
     FLastSetStageResult: Boolean;
+    FLastSetStageTransitionRequested: Boolean;
+    FLastScenarioStabilityLogText: string;
+    FLastScenarioStabilityLogSecond: Int64;
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
     function SetStage(const ANewStage: EMeasurementState): Boolean;
@@ -375,6 +378,10 @@ type
     function IsScenarioRegularWait: Boolean;
     function ScenarioWorkTableStateText: string;
     function ScenarioPointUuid(APoint: TDevicePoint): string;
+    function GetStabilityAnalysisTimeMs: Int64;
+    procedure LogScenarioStability(const APrefix: string; const AInfo: TMeterValueStabilityInfo;
+      const AStableInfo: RStableInfo; const ASettings: TMeterValueStabilitySettings;
+      const AActualValue, ATargetValue, ALowerLimit, AUpperLimit, AStableDurationSec: Double);
     function AreDeviceSignalsStable(out StableInfo: RStableInfo): Boolean;
     function GetScenarioAllowedError(APoint: TDevicePoint; ADeviceIndex: Integer): Double;
     function GetScenarioDeviceValue(AScenario: EMeasurementScenario; APoint: TDevicePoint; ADeviceIndex: Integer; const AReferenceValue: Double): Double;
@@ -920,6 +927,44 @@ begin
     Result := 'nil';
 end;
 
+function TMeasurementRun.GetStabilityAnalysisTimeMs: Int64;
+begin
+  if FScenarioRunning then
+    Result := FScenarioCurrentTimeMs
+  else
+    Result := Int64(NowTickMs);
+end;
+
+procedure TMeasurementRun.LogScenarioStability(const APrefix: string; const AInfo: TMeterValueStabilityInfo;
+  const AStableInfo: RStableInfo; const ASettings: TMeterValueStabilitySettings;
+  const AActualValue, ATargetValue, ALowerLimit, AUpperLimit, AStableDurationSec: Double);
+var
+  LogSecond: Int64;
+  Text: string;
+begin
+  if FCurrentStage <> msWaitStable then
+    Exit;
+
+  LogSecond := FScenarioCurrentTimeMs div 1000;
+  Text := Format('%s: AnalysisTimeSource=%s; AnalysisTimeMs=%d; FScenarioCurrentTimeMs=%d; NowTickMs=%d; SampleCount=%d; UsedSampleCount=%d; MinSampleCount=%d; WindowDurationSec=%.3f; LastSampleAgeSec=%.3f; IsSignalStable=%s; IsStabilityConfirmed=%s; IsCurrentValueInRange=%s; IsMeanValueInRange=%s; IsForecastInRange=%s; IsSuitableForMeasurement=%s; Status=%s; Reason=%s; Flow=%.6f; Target=%.6f; Lower=%.6f; Upper=%.6f; StableDurationSec=%.3f; RequiredStabilizationSec=%.3f',
+    [APrefix, IfThen(FScenarioRunning, 'Scenario', 'Runtime'), GetStabilityAnalysisTimeMs,
+     FScenarioCurrentTimeMs, Int64(NowTickMs), AInfo.SampleCount, AInfo.UsedSampleCount,
+     ASettings.MinSampleCount, AInfo.WindowDurationSec, AInfo.LastSampleAgeSec,
+     BoolToStr(AInfo.IsSignalStable, True), BoolToStr(AInfo.IsStabilityConfirmed, True),
+     BoolToStr(AInfo.IsCurrentValueInRange, True), BoolToStr(AInfo.IsMeanValueInRange, True),
+     BoolToStr(AInfo.IsForecastInRange, True), BoolToStr(AInfo.IsSuitableForMeasurement, True),
+     GetEnumName(TypeInfo(TMeterValueStabilityStatus), Ord(AInfo.Status)), AInfo.StatusText,
+     AActualValue, ATargetValue, ALowerLimit, AUpperLimit, AStableDurationSec,
+     FRequiredStabilizationSec]);
+
+  if (Text <> FLastScenarioStabilityLogText) or (LogSecond <> FLastScenarioStabilityLogSecond) then
+  begin
+    FLastScenarioStabilityLogText := Text;
+    FLastScenarioStabilityLogSecond := LogSecond;
+    AddScenarioLog(Text);
+  end;
+end;
+
 procedure TMeasurementRun.FinishScenario(const AStatus, AText: string; AStopWorkTable: Boolean);
 begin
   AddScenarioLog('RunScenario: завершение; результат=' + AStatus + '; ' + AText);
@@ -1013,8 +1058,9 @@ begin
       FScenarioPointStartTimeMs := 0;
       FScenarioNoProgressCount := 0;
       FScenarioLastProgressSignature := '';
-      FLastSetStageRequested := FCurrentStage;
+      FLastSetStageRequested := msNone;
       FLastSetStageResult := True;
+      FLastSetStageTransitionRequested := False;
       ResetRuntimeForScenario;
       FMode := mrmAutomatic;
       AddScenarioLog('RunScenario: начало; WorkTable=' + GetEnumName(TypeInfo(EStateWorkTable), Ord(FWorkTable.State)));
@@ -1059,8 +1105,9 @@ begin
       Point := GetCurrentPoint;
       if Point <> nil then PointUuid := Point.UUID else PointUuid := 'nil';
       OldSignature := BuildScenarioProgressSignature('before');
-      FLastSetStageRequested := FCurrentStage;
+      FLastSetStageRequested := msNone;
       FLastSetStageResult := True;
+      FLastSetStageTransitionRequested := False;
 
       if IsScenarioRegularWait then
         AddScenarioLog('Вход в штатное ожидание: Stage=' + MeasurementStateToString(FCurrentStage));
@@ -1083,17 +1130,19 @@ begin
         AddDiagnosticEvent(AResultText);
       end;
 
-      if (AResultText = '') and (AScenario in [mrsFlowPassesPoint, mrsHighVariation]) and (Point <> nil) and
+      if (AResultText = '') and (AScenario <> mrsSuccessfulPass) and (Point <> nil) and
          (((FScenarioCurrentTimeMs - FScenarioPointStartTimeMs) / 1000.0) > GetScenarioVirtualPointTimeoutSec(Point)) and
          (FCurrentStage = msWaitStable) then
       begin
-        ContinueAfterPointError(mptsSetupError, meStableTimeout, BuildError(1901, 'Сценарный таймаут стабильности'));
-        StepResult := 'StableTimeout';
+        ContinueAfterPointError(mptsSetupError, meStableTimeout,
+          BuildError(1901, 'Сценарный таймаут стабильности: ' + FLastDiagnosticIsStableText));
+        StepResult := 'StableTimeout: ' + FLastDiagnosticIsStableText;
       end;
 
-      AddScenarioLog(Format('RunScenario: step; Stage %s -> %s; RequestedStage=%s; SetStageResult=%s; WorkTable %s -> %s; Point %d/%s; Stop %s -> %s; Result=%s', [
+      AddScenarioLog(Format('RunScenario: step; Stage %s -> %s; StageTransitionRequested=%s; RequestedStage=%s; SetStageResult=%s; WorkTable %s -> %s; Point %d/%s; Stop %s -> %s; Result=%s', [
         MeasurementStateToString(OldStage), MeasurementStateToString(FCurrentStage),
-        MeasurementStateToString(FLastSetStageRequested), BoolToStr(FLastSetStageResult, True),
+        BoolToStr(FLastSetStageTransitionRequested, True), MeasurementStateToString(FLastSetStageRequested),
+        BoolToStr(FLastSetStageResult, True),
         GetEnumName(TypeInfo(EStateWorkTable), Ord(OldWorkTableState)),
         ScenarioWorkTableStateText,
         OldPointIndex, PointUuid, BoolToStr(OldStopRequested, True), BoolToStr(IsStopRequested, True), StepResult]));
@@ -1325,6 +1374,7 @@ begin
   Result := False;
   FLastSetStageRequested := ANewStage;
   FLastSetStageResult := False;
+  FLastSetStageTransitionRequested := True;
 
   if FCurrentStage = ANewStage then
   begin
@@ -1332,7 +1382,7 @@ begin
     Exit(True);
   end;
 
-  FWaitStartedTick := NowTickMs;
+  FWaitStartedTick := UInt64(GetStabilityAnalysisTimeMs);
 
   OldStage := FCurrentStage;
   TransitionText := Format('%s -> %s', [MeasurementStateToString(OldStage),
@@ -1353,7 +1403,7 @@ begin
   FCurrentStage := ANewStage;
 
   ProtocolManager.AddMessage(pcState, psMeasurement, 'SetStage',
-    'Переход этапа измерения, тайм аут: ' +inttostr(NowTickMs - FWaitStartedTick)+'; ', TransitionText);
+    'Переход этапа измерения, тайм аут: ' +IntToStr(GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick))+'; ', TransitionText);
   AddDiagnosticEvent('Stage ' + MeasurementStateToString(OldStage) + ' -> ' + MeasurementStateToString(ANewStage));
   AddScenarioLog('Stage ' + MeasurementStateToString(OldStage) + ' -> ' + MeasurementStateToString(ANewStage) +
     '; WorkTable=' + ScenarioWorkTableStateText);
@@ -1376,7 +1426,7 @@ end;
 
 procedure TMeasurementRun.DoEnterStage(AOldStage, ANewStage: EMeasurementState);
 begin
-  FWaitStartedTick := NowTickMs;
+  FWaitStartedTick := UInt64(GetStabilityAnalysisTimeMs);
   if ANewStage in [msNone, msSelectPoint, msSetupPoint, msDone] then
   begin
     FDeviceStableSinceMs := 0;
@@ -1993,7 +2043,7 @@ begin
       StableInfo := ParamInfo;
   end;
 
-  DiagnosticSecond := Trunc((NowTickMs - FWaitStartedTick) / 1000);
+  DiagnosticSecond := Trunc((GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick)) / 1000);
   DiagnosticText := Format('IsStable=%s; Reason=%s', [BoolToStr(Result, True), StableInfo.StatusText]);
   if (DiagnosticText <> FLastDiagnosticIsStableText) or
      (DiagnosticSecond <> FLastDiagnosticIsStableSecond) then
@@ -2014,10 +2064,12 @@ var
   SignalInfo: TMeterValueStabilityInfo;
   ActualValue: Double;
   ParticipatingDeviceCount: Integer;
+  AnalysisTimeMs: Int64;
 begin
   StableInfo := Default(RStableInfo);
   Result := True;
   ParticipatingDeviceCount := 0;
+  AnalysisTimeMs := GetStabilityAnalysisTimeMs;
 
   if (FWorkTable = nil) or (FWorkTable.DeviceChannels = nil) then
   begin
@@ -2041,8 +2093,11 @@ begin
     if Settings.Enabled then
     begin
       if not FScenarioRunning then
-        StableValue.AddStabilitySampleManual(NowTickMs, ActualValue);
-      StableValue.AnalyzeStabilityAt(NowTickMs, SignalInfo);
+        StableValue.AddStabilitySampleManual(AnalysisTimeMs, ActualValue);
+      StableValue.AnalyzeStabilityAt(AnalysisTimeMs, SignalInfo);
+      LogScenarioStability(Format('DeviceStability[%d]', [I]), SignalInfo, StableInfo, Settings, ActualValue, ActualValue,
+        ActualValue - Settings.TargetToleranceAbsolute, ActualValue + Settings.TargetToleranceAbsolute,
+        IfThen(FDeviceStableSinceMs > 0, (AnalysisTimeMs - Int64(FDeviceStableSinceMs)) / 1000.0, 0.0));
     end
     else
     begin
@@ -2100,9 +2155,11 @@ var
   ToleranceSource: string;
   FlowReached: Boolean;
   HistoryStable: Boolean;
+  AnalysisTimeMs: Int64;
 begin
   StableInfo := Default(RStableInfo);
   Result := False;
+  AnalysisTimeMs := GetStabilityAnalysisTimeMs;
 
   Point := GetCurrentPoint;
   if (FWorkTable = nil) or (FWorkTable.FlowRate = nil) or (Point = nil) then
@@ -2170,8 +2227,8 @@ begin
   if Settings.Enabled then
   begin
     if not FScenarioRunning then
-      StableValue.AddStabilitySampleManual(NowTickMs, ActualValue);
-    HistoryStable := StableValue.AnalyzeStabilityAt(NowTickMs, SignalInfo);
+      StableValue.AddStabilitySampleManual(AnalysisTimeMs, ActualValue);
+    HistoryStable := StableValue.AnalyzeStabilityAt(AnalysisTimeMs, SignalInfo);
     StableInfo.SignalInfo := SignalInfo;
   end;
 
@@ -2188,6 +2245,9 @@ begin
   StableInfo.StatusText := Format('FlowReached=%s; EtalonSignalStable=%s; ToleranceSource=%s; Target=%.6f; ActualFlowSource=WorkTable.ValueFlowRate; Actual=%.6f; FlowMin=%.6f; FlowMax=%.6f; Result=%s',
     [BoolToStr(FlowReached, True), BoolToStr(HistoryStable, True), ToleranceSource, TargetValue, ActualValue,
      StableInfo.LowerLimit, StableInfo.UpperLimit, BoolToStr(Result, True)]);
+  LogScenarioStability('EtalonStability', SignalInfo, StableInfo, Settings, ActualValue, TargetValue,
+    StableInfo.LowerLimit, StableInfo.UpperLimit,
+    IfThen(FStableSinceMs > 0, (AnalysisTimeMs - Int64(FStableSinceMs)) / 1000.0, 0.0));
 end;
 
 procedure TMeasurementRun.ContinueAfterPointError(const AStatus: EMeasurementPointStatus;
@@ -2346,10 +2406,10 @@ begin
 
     WaitStableSec := 0;
     if FCurrentStage = msWaitStable then
-      WaitStableSec := (NowTickMs - FWaitStartedTick) / 1000;
+      WaitStableSec := (GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick)) / 1000;
     MeasureSec := 0;
     if FCurrentStage = msMeasure then
-      MeasureSec := (NowTickMs - FWaitStartedTick) / 1000;
+      MeasureSec := (GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick)) / 1000;
 
     if FCurrentStage = msDone then
       NextIndex := -1
@@ -3566,7 +3626,7 @@ begin
     Exit;
   end;
 
-  CurrentTick := NowTickMs;
+  CurrentTick := UInt64(GetStabilityAnalysisTimeMs);
 
   // До первого успешного IsStable ожидаем отдельную стабилизацию эталона.
   if FStableSinceMs = 0 then
@@ -3729,7 +3789,7 @@ begin
         Exit;
       end;
   end;
-   timeout := (NowTickMs - FWaitStartedTick)/1000;
+   timeout := (GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick))/1000;
   if timeout > DEFAULT_START_TIMEOUT_S then
   begin
     ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1403, 'Таймаут ожидания запуска измерения'));
@@ -3958,7 +4018,7 @@ begin
     end;
   end;
 
-  if Int64(NowTickMs - FWaitStartedTick) > Int64(FMeasureTimeout) * 1000 then
+  if Int64(GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick)) > Int64(FMeasureTimeout) * 1000 then
   begin
     SetStopReason(msrError);
     FireEvent(meMeasureTimeout, BuildError(1401, 'Таймаут измерения'));
@@ -4009,7 +4069,7 @@ begin
       end;
   end;
 
-  if (NowTickMs - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
+  if (GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick)) > DEFAULT_STOP_TIMEOUT_MS then
   begin
     ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1406, 'Таймаут ожидания остановки измерения'));
   end;
@@ -4053,7 +4113,7 @@ begin
       end;
   end;
 
-  if (NowTickMs - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
+  if (GetStabilityAnalysisTimeMs - Int64(FWaitStartedTick)) > DEFAULT_STOP_TIMEOUT_MS then
   begin
     ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1411, 'Таймаут чтения результатов'));
   end;

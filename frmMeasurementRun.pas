@@ -168,7 +168,7 @@ begin
   ButtonStartMeasurementScenario.OnClick := ButtonStartMeasurementScenarioClick;
   FScenarioTimer := TTimer.Create(Self);
   FScenarioTimer.Enabled := False;
-  FScenarioTimer.Interval := 1;
+  FScenarioTimer.Interval := 1000;
   FScenarioTimer.OnTimer := ScenarioTimerTimer;
   GridMeasurmentRun.ShowHint := True;
   GridMeasurmentRun.OnCellClick := GridMeasurmentRunCellClick;
