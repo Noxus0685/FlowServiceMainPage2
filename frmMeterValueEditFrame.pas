@@ -1098,10 +1098,24 @@ begin
 end;
 
 procedure TFrameMeterValueEdit.SetSampleSource(const ASource: TMeterValueSampleSource);
+var
+  WasLoading: Boolean;
 begin
+  if FSampleSource = ASource then
+    Exit;
+
   FSampleSource := ASource;
-  if ComboBoxSampleSource <> nil then
-    ComboBoxSampleSource.ItemIndex := Ord(FSampleSource);
+
+  WasLoading := FLoading;
+  FLoading := True;
+  try
+    if (ComboBoxSampleSource <> nil) and
+       (ComboBoxSampleSource.ItemIndex <> Ord(FSampleSource)) then
+      ComboBoxSampleSource.ItemIndex := Ord(FSampleSource);
+  finally
+    FLoading := WasLoading;
+  end;
+
   UpdateSampleSourceControls;
   RefreshSamplesGrid;
   if FSampleSource = mssWorkHistory then
