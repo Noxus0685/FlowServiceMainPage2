@@ -9,8 +9,8 @@ uses
   FMX.Graphics,
   FMX.Grid,
   FMX.Grid.Style,
-  FMX.Memo,
-  FMX.Platform,
+  FMX.Layouts,
+  FMX.ListBox,
   FMX.ScrollBox,
   FMX.StdCtrls,
   FMX.Types,
@@ -50,10 +50,12 @@ type
     StringColumnLimitTime: TStringColumn;
     StringColumnLimitImp: TStringColumn;
     StringColumnLimitVolume: TStringColumn;
-    ButtonAddMeasurementLog: TButton;
-    ButtonCopyMeasurementLog: TButton;
-    ButtonClearMeasurementLog: TButton;
-    MemoMeasurementLog: TMemo;
+    LabelMeasurementScenario: TLabel;
+    ComboBoxMeasurementScenario: TComboBox;
+    ButtonStartMeasurementScenario: TButton;
+    LabelScenarioResult: TLabel;
+    LayoutMeasurementControls: TLayout;
+    LayoutScenarioControls: TLayout;
     procedure GridMeasurmentRunGetValue(Sender: TObject; const ACol,
       ARow: Integer; var Value: TValue);
     procedure GridMeasurmentRunDrawColumnCell(Sender: TObject;
@@ -67,9 +69,7 @@ type
     procedure SpeedButtonPointDeleteClick(Sender: TObject);
     procedure SpeedButtonPointNextClick(Sender: TObject);
     procedure SpeedButtonPointPrevClick(Sender: TObject);
-    procedure ButtonAddMeasurementLogClick(Sender: TObject);
-    procedure ButtonCopyMeasurementLogClick(Sender: TObject);
-    procedure ButtonClearMeasurementLogClick(Sender: TObject);
+    procedure ButtonStartMeasurementScenarioClick(Sender: TObject);
   private
     FActiveWorkTable: TWorkTable;
     FInvalidPointIndexes: TList<Integer>;
@@ -88,7 +88,6 @@ type
     procedure UpdateStopCriteriaColumns;
     function IsPointInvalid(APoint: TDevicePoint): Boolean;
     function GetRowColor(const ARow: Integer): TAlphaColor;
-    function BuildMeasurementDiagnosticBlock: string;
      procedure UpdateGridMesurmentRun;
 
   public
@@ -109,14 +108,49 @@ constructor TFrameMeasurementRun.Create(AOwner: TComponent);
 begin
   inherited;
   FInvalidPointIndexes := TList<Integer>.Create;
+
+  LayoutMeasurementControls := TLayout.Create(Self);
+  LayoutMeasurementControls.Parent := ToolBarGridMR;
+  LayoutMeasurementControls.Align := TAlignLayout.Left;
+  LayoutMeasurementControls.Width := 321;
+
+  LayoutScenarioControls := TLayout.Create(Self);
+  LayoutScenarioControls.Parent := ToolBarGridMR;
+  LayoutScenarioControls.Align := TAlignLayout.Client;
+  LayoutScenarioControls.Margins.Left := 8;
+
+  SpeedButtonPointPrev.Parent := LayoutMeasurementControls;
+  SpeedButtonPause.Parent := LayoutMeasurementControls;
+  SpeedButtonPointNext.Parent := LayoutMeasurementControls;
+  SpeedButtonPointDelete.Parent := LayoutMeasurementControls;
+  SpeedButtonCreatePoints.Parent := LayoutMeasurementControls;
+
+  LabelMeasurementScenario.Parent := LayoutScenarioControls;
+  LabelMeasurementScenario.Align := TAlignLayout.Left;
+  LabelMeasurementScenario.Width := 115;
+  LabelMeasurementScenario.Margins.Right := 6;
+
+  ButtonStartMeasurementScenario.Parent := LayoutScenarioControls;
+  ButtonStartMeasurementScenario.Align := TAlignLayout.Right;
+  ButtonStartMeasurementScenario.Width := 145;
+  ButtonStartMeasurementScenario.Margins.Left := 6;
+  ButtonStartMeasurementScenario.Text := 'Запустить';
+
+  LabelScenarioResult.Parent := LayoutScenarioControls;
+  LabelScenarioResult.Align := TAlignLayout.Right;
+  LabelScenarioResult.Width := 180;
+  LabelScenarioResult.Margins.Left := 6;
+
+  ComboBoxMeasurementScenario.Parent := LayoutScenarioControls;
+  ComboBoxMeasurementScenario.Align := TAlignLayout.Client;
+  ComboBoxMeasurementScenario.ItemIndex := 0;
+
   SpeedButtonPointPrev.OnClick := SpeedButtonPointPrevClick;
   SpeedButtonPointNext.OnClick := SpeedButtonPointNextClick;
   SpeedButtonPause.OnClick := SpeedButtonPauseClick;
   SpeedButtonPointDelete.OnClick := SpeedButtonPointDeleteClick;
   SpeedButtonCreatePoints.OnClick := SpeedButtonCreatePointsClick;
-  ButtonAddMeasurementLog.OnClick := ButtonAddMeasurementLogClick;
-  ButtonCopyMeasurementLog.OnClick := ButtonCopyMeasurementLogClick;
-  ButtonClearMeasurementLog.OnClick := ButtonClearMeasurementLogClick;
+  ButtonStartMeasurementScenario.OnClick := ButtonStartMeasurementScenarioClick;
   GridMeasurmentRun.ShowHint := True;
   GridMeasurmentRun.OnCellClick := GridMeasurmentRunCellClick;
 end;
@@ -446,11 +480,37 @@ end;
 
 
 procedure TFrameMeasurementRun.UpdateGridMRHeaders;
+var
+  ReservedWidth: Single;
 begin
   if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
     StringColumnMRFlowRate.Header := 'Расход, ' + FActiveWorkTable.ValueFlowRate.GetDimName
   else
     StringColumnMRFlowRate.Header := 'Расход';
+
+  CheckColumnMREnable.Width := 32;
+  StringColumnPointer.Width := 36;
+  StringColumnMRFlowRate.Width := 82;
+  StringColumnMRStopCriterea.Width := 86;
+  StringColumnLimitTime.Width := 58;
+  StringColumnLimitVolume.Width := 64;
+  StringColumnLimitImp.Width := 64;
+  StringColumnRepeats.Width := 58;
+  StringColumnMRStatus.Width := 96;
+
+  ReservedWidth := CheckColumnMREnable.Width + StringColumnPointer.Width +
+    StringColumnMRFlowRate.Width + StringColumnMRStopCriterea.Width +
+    StringColumnRepeats.Width + StringColumnMRStatus.Width + 24;
+  if StringColumnLimitTime.Visible then
+    ReservedWidth := ReservedWidth + StringColumnLimitTime.Width;
+  if StringColumnLimitVolume.Visible then
+    ReservedWidth := ReservedWidth + StringColumnLimitVolume.Width;
+  if StringColumnLimitImp.Visible then
+    ReservedWidth := ReservedWidth + StringColumnLimitImp.Width;
+
+  StringColumnMRStopCriterea.Header := 'Остановка';
+  StringColumnRepeats.Header := 'Повтор';
+  StringColumnMRPointName.Width := Max(120.0, GridMeasurmentRun.Width - ReservedWidth);
 end;
 
 procedure TFrameMeasurementRun.UpdateStopCriteriaColumns;
@@ -504,60 +564,32 @@ end;
 
 
 
-function TFrameMeasurementRun.BuildMeasurementDiagnosticBlock: string;
+procedure TFrameMeasurementRun.ButtonStartMeasurementScenarioClick(Sender: TObject);
 var
-  Run: TMeasurementRun;
-  Events: TArray<string>;
-  Lines: TStringList;
-  EventText: string;
+  ResultText: string;
+  Scenario: EMeasurementScenario;
 begin
-  Run := MeasurementRun;
-  if Run = nil then
-    Exit('==================================================' + sLineBreak +
-      'Время снимка: ' + FormatDateTime('dd.mm.yyyy hh:nn:ss.zzz', Now) + sLineBreak +
-      'Причина: ручное нажатие «Добавить лог»' + sLineBreak +
-      'MeasurementRun=<нет данных>' + sLineBreak +
-      '==================================================' + sLineBreak);
-
-  Lines := TStringList.Create;
-  try
-    Lines.Text := Run.BuildDiagnosticSnapshot('<нет данных>');
-    Lines.Add('');
-    Lines.Add('[ИЗМЕНЕНИЯ ПОСЛЕ ПРЕДЫДУЩЕГО СНИМКА]');
-    Events := Run.DrainDiagnosticEvents;
-    if Length(Events) = 0 then
-      Lines.Add('<нет новых событий>')
-    else
-      for EventText in Events do
-        Lines.Add(EventText);
-    Lines.Add('==================================================');
-    Result := Lines.Text;
-  finally
-    Lines.Free;
+  if MeasurementRun = nil then
+  begin
+    LabelScenarioResult.Text := 'MeasurementRun не подготовлен';
+    Exit;
   end;
-end;
 
-procedure TFrameMeasurementRun.ButtonAddMeasurementLogClick(Sender: TObject);
-begin
-  if MemoMeasurementLog = nil then
-    Exit;
-  MemoMeasurementLog.Lines.Add(BuildMeasurementDiagnosticBlock);
-end;
-
-procedure TFrameMeasurementRun.ButtonCopyMeasurementLogClick(Sender: TObject);
-var
-  Clipboard: IFMXClipboardService;
-begin
-  if MemoMeasurementLog = nil then
-    Exit;
-  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, Clipboard) then
-    Clipboard.SetClipboard(TValue.From<string>(MemoMeasurementLog.Text));
-end;
-
-procedure TFrameMeasurementRun.ButtonClearMeasurementLogClick(Sender: TObject);
-begin
-  if MemoMeasurementLog <> nil then
-    MemoMeasurementLog.Lines.Clear;
+  Scenario := EMeasurementScenario(Max(0, ComboBoxMeasurementScenario.ItemIndex));
+  ComboBoxMeasurementScenario.Enabled := False;
+  ButtonStartMeasurementScenario.Enabled := False;
+  ButtonStartMeasurementScenario.Text := 'Выполняется...';
+  try
+    if MeasurementRun.RunScenario(Scenario, ResultText) then
+      LabelScenarioResult.Text := ResultText
+    else
+      LabelScenarioResult.Text := ResultText;
+    UpdateGridMesurmentRun;
+  finally
+    ButtonStartMeasurementScenario.Text := 'Запустить';
+    ComboBoxMeasurementScenario.Enabled := True;
+    ButtonStartMeasurementScenario.Enabled := True;
+  end;
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointPrevClick(Sender: TObject);

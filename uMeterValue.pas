@@ -228,6 +228,7 @@ type
     function FormatBaseDeltaValue(const AValue: Double): string;
     /// <summary>Analyzes the current time window and returns True only when stability is confirmed.</summary>
     function AnalyzeStability(out AInfo: TMeterValueStabilityInfo): Boolean;
+    function AnalyzeStabilityAt(const ACurrentMs: Int64; out AInfo: TMeterValueStabilityInfo): Boolean;
     /// <summary>Calculates a forecast for a custom horizon using the same regression-based analyzer.</summary>
     function GetForecastValue(const AHorizonSec: Double; out AValue: Double): Boolean;
     /// <summary>Validates stability and target-range settings and returns a Russian diagnostic on failure.</summary>
@@ -1424,6 +1425,25 @@ begin
   SumSquares := 0;
   for ItemValue in Values do SumSquares := SumSquares + Sqr(ItemValue - MeanHistory);
   Result := Sqrt(SumSquares / Values.Count);
+end;
+
+
+function TMeterValue.AnalyzeStabilityAt(const ACurrentMs: Int64; out AInfo: TMeterValueStabilityInfo): Boolean;
+var
+  Settings: TMeterValueStabilitySettings;
+  TargetValue: Double;
+  LowerLimit: Double;
+  UpperLimit: Double;
+begin
+  Settings := FStabilitySettings;
+  TargetValue := Settings.TargetValue;
+  LowerLimit := TargetValue - Max(Abs(TargetValue) * Abs(Settings.TargetAccuracyMinusPercent) / 100.0,
+    Settings.TargetToleranceAbsolute);
+  UpperLimit := TargetValue + Max(Abs(TargetValue) * Abs(Settings.TargetAccuracyPlusPercent) / 100.0,
+    Settings.TargetToleranceAbsolute);
+  Result := AnalyzeStabilitySamples(GetSamples, Settings, ACurrentMs, TargetValue, LowerLimit, UpperLimit,
+    FStableCandidateSinceMs, FStabilityConfirmed, AInfo);
+  FLastStabilityInfo := AInfo;
 end;
 
 function TMeterValue.AnalyzeStability(out AInfo: TMeterValueStabilityInfo): Boolean;
