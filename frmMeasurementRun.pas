@@ -15,6 +15,7 @@ uses
   FMX.StdCtrls,
   FMX.Types,
   System.Classes,
+  System.IOUtils,
   System.Generics.Collections,
   System.Math,
   System.Rtti,
@@ -73,6 +74,8 @@ type
   private
     FActiveWorkTable: TWorkTable;
     FInvalidPointIndexes: TList<Integer>;
+    FScenarioTimer: TTimer;
+    FScenarioSelected: EMeasurementScenario;
     function GetMeasurementRun: TMeasurementRun;
     function GetStopCriteriaText(APoint: TDevicePoint): string;
 
@@ -86,6 +89,8 @@ type
     procedure SetPointEnabledFromGrid(APoint: TDevicePoint; const AEnabled: Boolean);
     procedure UpdateGridMRHeaders;
     procedure UpdateStopCriteriaColumns;
+    procedure ScenarioTimerTimer(Sender: TObject);
+    procedure FinishScenarioRun(const AResultText: string);
     function IsPointInvalid(APoint: TDevicePoint): Boolean;
     function GetRowColor(const ARow: Integer): TAlphaColor;
      procedure UpdateGridMesurmentRun;
@@ -103,6 +108,16 @@ type
 implementation
 
 {$R *.fmx}
+
+procedure AppendScenarioUiLog(const AText: string);
+begin
+  try
+    TFile.AppendAllText('MAIN2_UPDATE_COMMENTS.md',
+      FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now) + ' UI: ' + AText + sLineBreak, TEncoding.UTF8);
+  except
+    // Ошибка записи лога не должна мешать UI.
+  end;
+end;
 
 constructor TFrameMeasurementRun.Create(AOwner: TComponent);
 begin
@@ -151,12 +166,18 @@ begin
   SpeedButtonPointDelete.OnClick := SpeedButtonPointDeleteClick;
   SpeedButtonCreatePoints.OnClick := SpeedButtonCreatePointsClick;
   ButtonStartMeasurementScenario.OnClick := ButtonStartMeasurementScenarioClick;
+  FScenarioTimer := TTimer.Create(Self);
+  FScenarioTimer.Enabled := False;
+  FScenarioTimer.Interval := 1000;
+  FScenarioTimer.OnTimer := ScenarioTimerTimer;
   GridMeasurmentRun.ShowHint := True;
   GridMeasurmentRun.OnCellClick := GridMeasurmentRunCellClick;
 end;
 
 destructor TFrameMeasurementRun.Destroy;
 begin
+    if FScenarioTimer <> nil then
+      FScenarioTimer.Enabled := False;
     FreeAndNil(FInvalidPointIndexes);
     inherited;
 end;
@@ -564,10 +585,42 @@ end;
 
 
 
-procedure TFrameMeasurementRun.ButtonStartMeasurementScenarioClick(Sender: TObject);
+procedure TFrameMeasurementRun.FinishScenarioRun(const AResultText: string);
+begin
+  if FScenarioTimer <> nil then
+    FScenarioTimer.Enabled := False;
+  LabelScenarioResult.Text := AResultText;
+  UpdateGridMesurmentRun;
+  ButtonStartMeasurementScenario.Text := 'Запустить';
+  ComboBoxMeasurementScenario.Enabled := True;
+  ButtonStartMeasurementScenario.Enabled := True;
+  AppendScenarioUiLog('восстановление доступности элементов управления: ' + AResultText);
+end;
+
+procedure TFrameMeasurementRun.ScenarioTimerTimer(Sender: TObject);
 var
   ResultText: string;
-  Scenario: EMeasurementScenario;
+begin
+  if MeasurementRun = nil then
+  begin
+    FinishScenarioRun('MeasurementRun не подготовлен');
+    Exit;
+  end;
+
+  FScenarioTimer.Enabled := False;
+  try
+    MeasurementRun.RunScenario(FScenarioSelected, ResultText);
+    if ResultText <> '' then
+      FinishScenarioRun(ResultText)
+    else
+      FScenarioTimer.Enabled := True;
+  except
+    on E: Exception do
+      FinishScenarioRun('Ошибка сценария: ' + E.Message);
+  end;
+end;
+
+procedure TFrameMeasurementRun.ButtonStartMeasurementScenarioClick(Sender: TObject);
 begin
   if MeasurementRun = nil then
   begin
@@ -575,21 +628,12 @@ begin
     Exit;
   end;
 
-  Scenario := EMeasurementScenario(Max(0, ComboBoxMeasurementScenario.ItemIndex));
+  FScenarioSelected := EMeasurementScenario(Max(0, ComboBoxMeasurementScenario.ItemIndex));
   ComboBoxMeasurementScenario.Enabled := False;
   ButtonStartMeasurementScenario.Enabled := False;
   ButtonStartMeasurementScenario.Text := 'Выполняется...';
-  try
-    if MeasurementRun.RunScenario(Scenario, ResultText) then
-      LabelScenarioResult.Text := ResultText
-    else
-      LabelScenarioResult.Text := ResultText;
-    UpdateGridMesurmentRun;
-  finally
-    ButtonStartMeasurementScenario.Text := 'Запустить';
-    ComboBoxMeasurementScenario.Enabled := True;
-    ButtonStartMeasurementScenario.Enabled := True;
-  end;
+  LabelScenarioResult.Text := 'Выполняется...';
+  FScenarioTimer.Enabled := True;
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointPrevClick(Sender: TObject);
