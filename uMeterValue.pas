@@ -11,6 +11,7 @@ uses
   System.SyncObjs,
   System.Diagnostics,
   System.SysUtils,
+  System.TypInfo,
   uBaseProcedures;
 
   const
@@ -764,7 +765,13 @@ var
     AMeterValue.IsToSave := Ini.ReadBool(ASection, 'IsToSave', True);
     AMeterValue.FStabilitySettings.Enabled := Ini.ReadBool(ASection, 'StabilityEnabled', AMeterValue.FStabilitySettings.Enabled);
     AMeterValue.FStabilitySettings.MinSampleCount := Ini.ReadInteger(ASection, 'StabilityMinSampleCount', AMeterValue.FStabilitySettings.MinSampleCount);
-    AMeterValue.FStabilitySettings.WindowDurationSec := S2F(Ini.ReadString(ASection, 'StabilityWindowDurationSec', F2S(AMeterValue.FStabilitySettings.WindowDurationSec)));
+    if Ini.ValueExists(ASection, 'StabilityWindowDurationSec') then
+      AMeterValue.FStabilitySettings.WindowDurationSec := S2F(Ini.ReadString(ASection, 'StabilityWindowDurationSec', F2S(AMeterValue.FStabilitySettings.WindowDurationSec)))
+    else
+    begin
+      AMeterValue.FStabilitySettings.WindowDurationSec := 10.0;
+      DebugLog('Stability Load: missing StabilityWindowDurationSec; default 10.0 applied for section ' + ASection);
+    end;
     AMeterValue.FStabilitySettings.MaxSampleAgeSec := S2F(Ini.ReadString(ASection, 'StabilityMaxSampleAgeSec', F2S(AMeterValue.FStabilitySettings.MaxSampleAgeSec)));
     AMeterValue.FStabilitySettings.MaxVariation := S2F(Ini.ReadString(ASection, 'StabilityMaxVariation', F2S(AMeterValue.FStabilitySettings.MaxVariation)));
     AMeterValue.FStabilitySettings.MaxStdDeviation := S2F(Ini.ReadString(ASection, 'StabilityMaxStdDeviation', F2S(AMeterValue.FStabilitySettings.MaxStdDeviation)));
@@ -1394,24 +1401,40 @@ end;
 
 function TMeterValue.ValidateStabilitySettings(out AErrorText: string): Boolean;
 begin
-  Result := (FStabilitySettings.MinSampleCount >= 1) and
-    (FStabilitySettings.WindowDurationSec > 0) and
-    (FStabilitySettings.MaxSampleAgeSec >= 0) and
-    (FStabilitySettings.MaxVariation >= 0) and
-    (FStabilitySettings.MaxStdDeviation >= 0) and
-    (FStabilitySettings.MaxTrendRate >= 0) and
-    (FStabilitySettings.ForecastHorizonSec >= 0) and
-    (FStabilitySettings.ConfirmationTimeSec >= 0) and
-    (FStabilitySettings.MaxOutlierFraction >= 0) and (FStabilitySettings.MaxOutlierFraction <= 1) and
-    (FStabilitySettings.OutlierFactor > 0) and
-    (FStabilitySettings.TargetAccuracyPlusPercent >= 0) and
-    (FStabilitySettings.TargetAccuracyMinusPercent >= 0) and
-    (FStabilitySettings.TargetToleranceAbsolute >= 0) and
-    (FStabilitySettings.ExitThresholdFactor >= 1);
-  if not Result then
-    AErrorText := 'Некорректные настройки анализа стабильности.'
+  Result := False;
+  if FStabilitySettings.MinSampleCount <= 0 then
+    AErrorText := Format('Invalid StabilitySettings: MinSampleCount=%d', [FStabilitySettings.MinSampleCount])
+  else if FStabilitySettings.WindowDurationSec <= 0 then
+    AErrorText := Format('Invalid StabilitySettings: WindowDurationSec must be > 0, actual=%.12g', [FStabilitySettings.WindowDurationSec])
+  else if FStabilitySettings.MaxSampleAgeSec < 0 then
+    AErrorText := Format('Invalid StabilitySettings: MaxSampleAgeSec=%.12g', [FStabilitySettings.MaxSampleAgeSec])
+  else if FStabilitySettings.MaxVariation < 0 then
+    AErrorText := Format('Invalid StabilitySettings: MaxVariation=%.12g', [FStabilitySettings.MaxVariation])
+  else if FStabilitySettings.MaxStdDeviation < 0 then
+    AErrorText := Format('Invalid StabilitySettings: MaxStdDeviation=%.12g', [FStabilitySettings.MaxStdDeviation])
+  else if FStabilitySettings.MaxTrendRate < 0 then
+    AErrorText := Format('Invalid StabilitySettings: MaxTrendRate=%.12g', [FStabilitySettings.MaxTrendRate])
+  else if FStabilitySettings.ForecastHorizonSec < 0 then
+    AErrorText := Format('Invalid StabilitySettings: ForecastHorizonSec=%.12g', [FStabilitySettings.ForecastHorizonSec])
+  else if FStabilitySettings.ConfirmationTimeSec < 0 then
+    AErrorText := Format('Invalid StabilitySettings: ConfirmationTimeSec=%.12g', [FStabilitySettings.ConfirmationTimeSec])
+  else if (FStabilitySettings.MaxOutlierFraction < 0) or (FStabilitySettings.MaxOutlierFraction > 1) then
+    AErrorText := Format('Invalid StabilitySettings: MaxOutlierFraction=%.12g', [FStabilitySettings.MaxOutlierFraction])
+  else if FStabilitySettings.OutlierFactor <= 0 then
+    AErrorText := Format('Invalid StabilitySettings: OutlierFactor=%.12g', [FStabilitySettings.OutlierFactor])
+  else if FStabilitySettings.TargetAccuracyPlusPercent < 0 then
+    AErrorText := Format('Invalid StabilitySettings: TargetAccuracyPlusPercent=%.12g', [FStabilitySettings.TargetAccuracyPlusPercent])
+  else if FStabilitySettings.TargetAccuracyMinusPercent < 0 then
+    AErrorText := Format('Invalid StabilitySettings: TargetAccuracyMinusPercent=%.12g', [FStabilitySettings.TargetAccuracyMinusPercent])
+  else if FStabilitySettings.TargetToleranceAbsolute < 0 then
+    AErrorText := Format('Invalid StabilitySettings: TargetToleranceAbsolute=%.12g', [FStabilitySettings.TargetToleranceAbsolute])
+  else if FStabilitySettings.ExitThresholdFactor <= 0 then
+    AErrorText := Format('Invalid StabilitySettings: ExitThresholdFactor=%.12g', [FStabilitySettings.ExitThresholdFactor])
   else
+  begin
     AErrorText := '';
+    Result := True;
+  end;
 end;
 
 function TMeterValue.GetDoubleStdDeviation: Double;
@@ -1434,209 +1457,51 @@ var
   TargetValue: Double;
   LowerLimit: Double;
   UpperLimit: Double;
+  Samples: TArray<TMeterValueSample>;
+  FirstMs: Int64;
+  LastMs: Int64;
+
+  function BoolText(const AValue: Boolean): string;
+  begin
+    if AValue then
+      Result := 'True'
+    else
+      Result := 'False';
+  end;
 begin
   Settings := FStabilitySettings;
+  Samples := GetStabilitySamples;
+  if Length(Samples) > 0 then
+  begin
+    FirstMs := Samples[0].TimeStampMs;
+    LastMs := Samples[High(Samples)].TimeStampMs;
+  end
+  else
+  begin
+    FirstMs := 0;
+    LastMs := 0;
+  end;
+  DebugLog(Format('AnalyzeStabilityAt input: MeterValue=%x; Hash=%s; Name=%s; ACurrentMs=%d; SampleCount=%d; Enabled=%s; MinSampleCount=%d; WindowDurationSec=%.12g; MaxSampleAgeSec=%.12g; ConfirmationTimeSec=%.12g; FirstMs=%d; LastMs=%d',
+    [NativeUInt(Self), Hash, Name, ACurrentMs, Length(Samples), BoolText(Settings.Enabled),
+     Settings.MinSampleCount, Settings.WindowDurationSec, Settings.MaxSampleAgeSec,
+     Settings.ConfirmationTimeSec, FirstMs, LastMs]));
   TargetValue := Settings.TargetValue;
   LowerLimit := TargetValue - Max(Abs(TargetValue) * Abs(Settings.TargetAccuracyMinusPercent) / 100.0,
     Settings.TargetToleranceAbsolute);
   UpperLimit := TargetValue + Max(Abs(TargetValue) * Abs(Settings.TargetAccuracyPlusPercent) / 100.0,
     Settings.TargetToleranceAbsolute);
-  Result := AnalyzeStabilitySamples(GetSamples, Settings, ACurrentMs, TargetValue, LowerLimit, UpperLimit,
+  Result := AnalyzeStabilitySamples(Samples, Settings, ACurrentMs, TargetValue, LowerLimit, UpperLimit,
     FStableCandidateSinceMs, FStabilityConfirmed, AInfo);
+  DebugLog(Format('AnalyzeStabilityAt result: MeterValue=%x; Hash=%s; SampleCount=%d; UsedSampleCount=%d; ResultWindowDurationSec=%.12g; Status=%s; IsSignalStable=%s; IsStabilityConfirmed=%s; IsSuitableForMeasurement=%s; Reason=%s',
+    [NativeUInt(Self), Hash, AInfo.SampleCount, AInfo.UsedSampleCount, AInfo.WindowDurationSec,
+     GetEnumName(TypeInfo(TMeterValueStabilityStatus), Ord(AInfo.Status)), BoolText(AInfo.IsSignalStable),
+     BoolText(AInfo.IsStabilityConfirmed), BoolText(AInfo.IsSuitableForMeasurement), AInfo.StatusText]));
   FLastStabilityInfo := AInfo;
 end;
 
 function TMeterValue.AnalyzeStability(out AInfo: TMeterValueStabilityInfo): Boolean;
-var
-  Samples, Window, Used: TArray<TMeterValueSample>;
-  CurrentMs, CutoffMs, FirstMs, LastMs: Int64;
-  I, N: Integer;
-  Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept: Double;
-  ErrorText, Msg: string;
-  OutlierValues: TArray<Double>;
-  Outliers: TArray<Boolean>;
-  LimitsFactor: Double;
-  MathStable: Boolean;
 begin
-  AInfo := Default(TMeterValueStabilityInfo);
-  AInfo.Status := mvssUnknown;
-  if not FStabilitySettings.Enabled then
-  begin
-    AInfo.Status := mvssDisabled;
-    Include(AInfo.FailReasons, mvsfrAnalysisDisabled);
-    AInfo.StatusText := 'Анализ стабильности отключён.';
-    FLastStabilityInfo := AInfo;
-    Exit(False);
-  end;
-  if not ValidateStabilitySettings(ErrorText) then
-  begin
-    AInfo.Status := mvssUnstable;
-    Include(AInfo.FailReasons, mvsfrInvalidSettings);
-    AInfo.StatusText := ErrorText;
-    FLastStabilityInfo := AInfo;
-    Exit(False);
-  end;
-
-  CurrentMs := GetMonotonicTimeMs;
-  Samples := GetSamples;
-  AInfo.SampleCount := Length(Samples);
-  CutoffMs := CurrentMs - Round(FStabilitySettings.WindowDurationSec * 1000.0);
-  SetLength(Window, 0);
-  for I := 0 to High(Samples) do
-    if (Samples[I].TimeStampMs >= CutoffMs) and
-       (Samples[I].TimeStampMs <= CurrentMs) then
-    begin
-      SetLength(Window, Length(Window) + 1);
-      Window[High(Window)] := Samples[I];
-    end;
-
-  N := Length(Window);
-  AInfo.UsedSampleCount := N;
-  if N = 0 then Include(AInfo.FailReasons, mvsfrNoData);
-  if N > 0 then
-  begin
-    FirstMs := Window[0].TimeStampMs;
-    LastMs := Window[N - 1].TimeStampMs;
-    AInfo.CurrentValue := Window[N - 1].Value;
-    AInfo.LastSampleAgeSec := (CurrentMs - LastMs) / 1000.0;
-    AInfo.WindowDurationSec := (LastMs - FirstMs) / 1000.0;
-    AInfo.HasCurrentValue := True;
-    AInfo.HasLastSampleAge := True;
-  end;
-  AInfo.HasEnoughSamples := N >= FStabilitySettings.MinSampleCount;
-  AInfo.HasEnoughWindow := N > 0;
-  AInfo.IsDataActual := (N > 0) and (AInfo.LastSampleAgeSec <= FStabilitySettings.MaxSampleAgeSec);
-  if not AInfo.HasEnoughSamples then Include(AInfo.FailReasons, mvsfrNotEnoughSamples);
-  if not AInfo.IsDataActual then Include(AInfo.FailReasons, mvsfrStaleData);
-
-  Used := Window;
-  if N > 0 then
-  begin
-    SetLength(OutlierValues, N);
-    for I := 0 to N - 1 do
-      OutlierValues[I] := Window[I].Value;
-    DetectStabilityOutliers(OutlierValues, FStabilitySettings.OutlierFactor,
-      Outliers, AInfo.OutlierCount);
-    SetLength(Used, 0);
-    for I := 0 to N - 1 do
-      if not Outliers[I] then
-      begin
-        SetLength(Used, Length(Used) + 1);
-        Used[High(Used)] := Window[I];
-      end;
-    if Length(Used) = 0 then
-      Used := Window;
-
-    AInfo.MinValue := Used[0].Value; AInfo.MaxValue := Used[0].Value; Sum := 0;
-    for I := 0 to High(Used) do begin Sum := Sum + Used[I].Value; AInfo.MinValue := Min(AInfo.MinValue, Used[I].Value); AInfo.MaxValue := Max(AInfo.MaxValue, Used[I].Value); end;
-    AInfo.MeanValue := Sum / Length(Used);
-    SumSq := 0; for I := 0 to High(Used) do SumSq := SumSq + Sqr(Used[I].Value - AInfo.MeanValue);
-    AInfo.StdDeviation := Sqrt(SumSq / Length(Used));
-    AInfo.Variation := AInfo.MaxValue - AInfo.MinValue;
-    AInfo.HasStatistics := True;
-  end;
-if N > 0 then   //!!!
-  AInfo.OutlierFraction := AInfo.OutlierCount / Double(N)
-else
-  AInfo.OutlierFraction := 0.0;
-
-  AInfo.IsOutlierLevelAcceptable := AInfo.OutlierFraction <= FStabilitySettings.MaxOutlierFraction;
-  if not AInfo.IsOutlierLevelAcceptable then Include(AInfo.FailReasons, mvsfrTooManyOutliers);
-
-  N := Length(Used);
-  if N >= 2 then
-  begin
-    Sum := 0; AInfo.MinValue := Used[0].Value; AInfo.MaxValue := Used[0].Value;
-    for I := 0 to N - 1 do begin Sum := Sum + Used[I].Value; AInfo.MinValue := Min(AInfo.MinValue, Used[I].Value); AInfo.MaxValue := Max(AInfo.MaxValue, Used[I].Value); end;
-    AInfo.MeanValue := Sum / N;
-    AInfo.Variation := AInfo.MaxValue - AInfo.MinValue;
-    SumSq := 0; for I := 0 to N - 1 do SumSq := SumSq + Sqr(Used[I].Value - AInfo.MeanValue);
-    AInfo.StdDeviation := Sqrt(SumSq / N);
-
-    // Linear regression uses all non-outlier samples and their real timestamps.
-    // The slope is a physical rate per second and is less noise-sensitive than
-    // comparing only the first and last samples.
-    FirstMs := Used[0].TimeStampMs; SumT := 0;
-    for I := 0 to N - 1 do SumT := SumT + (Used[I].TimeStampMs - FirstMs) / 1000.0;
-    MeanT := SumT / N; Num := 0; Den := 0;
-    for I := 0 to N - 1 do begin T := (Used[I].TimeStampMs - FirstMs) / 1000.0; Num := Num + (T - MeanT) * (Used[I].Value - AInfo.MeanValue); Den := Den + Sqr(T - MeanT); end;
-    if Den > EPS then
-    begin
-      AInfo.TrendRate := Num / Den;
-      AInfo.HasTrend := True;
-      if AInfo.TrendRate > EPS then
-        AInfo.TrendDirection := tdIncreasing
-      else if AInfo.TrendRate < -EPS then
-        AInfo.TrendDirection := tdDecreasing
-      else
-        AInfo.TrendDirection := tdNone;
-    end
-    else Include(AInfo.FailReasons, mvsfrInsufficientTimeSpread);
-    T := (Used[N-1].TimeStampMs - FirstMs) / 1000.0;
-    Intercept := AInfo.MeanValue - AInfo.TrendRate * MeanT;
-    AInfo.ForecastValue := Intercept + AInfo.TrendRate * (T + FStabilitySettings.ForecastHorizonSec);
-    AInfo.HasForecast := AInfo.HasTrend;
-  end;
-
-if FStabilityConfirmed then
-  LimitsFactor := FStabilitySettings.ExitThresholdFactor
-else
-  LimitsFactor := 1.0;
-
-  AInfo.IsVariationStable := AInfo.Variation <= FStabilitySettings.MaxVariation * LimitsFactor;
-  AInfo.IsDeviationStable := AInfo.StdDeviation <= FStabilitySettings.MaxStdDeviation * LimitsFactor;
-  AInfo.IsTrendStable := Abs(AInfo.TrendRate) <= FStabilitySettings.MaxTrendRate * LimitsFactor;
-  if not AInfo.IsVariationStable then Include(AInfo.FailReasons, mvsfrVariationTooHigh);
-  if not AInfo.IsDeviationStable then Include(AInfo.FailReasons, mvsfrDeviationTooHigh);
-  if not AInfo.IsTrendStable then Include(AInfo.FailReasons, mvsfrTrendTooHigh);
-
-  MathStable := AInfo.HasEnoughSamples and AInfo.IsDataActual and AInfo.HasStatistics and AInfo.HasTrend and
-    AInfo.IsVariationStable and AInfo.IsDeviationStable and AInfo.IsTrendStable and AInfo.IsOutlierLevelAcceptable and
-    not (mvsfrInvalidSettings in AInfo.FailReasons);
-  AInfo.IsSignalStable := MathStable;
-
-  FSampleLock.Enter;
-  try
-    if MathStable then
-    begin
-      if FStableCandidateSinceMs = 0 then FStableCandidateSinceMs := CurrentMs;
-      AInfo.StableCandidateDurationSec := (CurrentMs - FStableCandidateSinceMs) / 1000.0;
-      FStabilityConfirmed := AInfo.StableCandidateDurationSec >= FStabilitySettings.ConfirmationTimeSec;
-    end
-    else begin FStableCandidateSinceMs := 0; FStabilityConfirmed := False; end;
-    AInfo.IsConfirmed := FStabilityConfirmed;
-    AInfo.IsStabilityConfirmed := FStabilityConfirmed;
-  finally
-    FSampleLock.Leave;
-  end;
-
-  if MathStable and not AInfo.IsConfirmed then Include(AInfo.FailReasons, mvsfrWaitingForConfirmation);
-  AInfo.IsSuitableForMeasurement := MathStable and AInfo.IsConfirmed;
-
-  if mvsfrStaleData in AInfo.FailReasons then AInfo.Status := mvssStaleData
-  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.Status := mvssNotEnoughData
-  else if MathStable and AInfo.IsConfirmed then AInfo.Status := mvssStable
-  else AInfo.Status := mvssUnstable;
-
-  Msg := '';
-  if mvsfrNotEnoughSamples in AInfo.FailReasons then Msg := Msg + Format('Недостаточно данных: в окне %d точек, требуется минимум %d. ', [AInfo.UsedSampleCount, FStabilitySettings.MinSampleCount]);
-  if (mvsfrInsufficientWindow in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then Msg := Msg + 'Недостаточный временной интервал между точками для расчёта тренда. ';
-  if mvsfrStaleData in AInfo.FailReasons then Msg := Msg + Format('Данные устарели: последнее значение получено %.1f с назад. ', [AInfo.LastSampleAgeSec]);
-  if mvsfrVariationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Размах %.4f превышает допустимые %.4f. ', [AInfo.Variation, FStabilitySettings.MaxVariation]);
-  if mvsfrDeviationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Стандартное отклонение %.4f превышает допустимые %.4f. ', [AInfo.StdDeviation, FStabilitySettings.MaxStdDeviation]);
-  if mvsfrTrendTooHigh in AInfo.FailReasons then Msg := Msg + Format('Тренд %.6f ед./с превышает допустимые %.6f ед./с. ', [AInfo.TrendRate, FStabilitySettings.MaxTrendRate]);
-  if mvsfrTooManyOutliers in AInfo.FailReasons then Msg := Msg + Format('Доля выбросов %.2f превышает допустимые %.2f. ', [AInfo.OutlierFraction, FStabilitySettings.MaxOutlierFraction]);
-  if MathStable and not AInfo.IsConfirmed then Msg := Format('Предварительная стабильность достигнута, ожидается подтверждение: %.1f из %.1f с.', [AInfo.StableCandidateDurationSec, FStabilitySettings.ConfirmationTimeSec]);
-  if AInfo.Status = mvssStable then Msg := Format('Сигнал стабилен: среднее %.4f; размах %.4f; стандартное отклонение %.4f; тренд %.6f ед./с.', [AInfo.MeanValue, AInfo.Variation, AInfo.StdDeviation, AInfo.TrendRate]);
-  if AInfo.IsSuitableForMeasurement then AInfo.StatusText := 'Значение пригодно для измерения.'
-  else if mvsfrAnalysisDisabled in AInfo.FailReasons then AInfo.StatusText := 'Анализ стабильности отключён.'
-  else if mvsfrNoData in AInfo.FailReasons then AInfo.StatusText := 'Нет доступных данных.'
-  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.StatusText := 'Недостаточно данных.'
-  else if AInfo.IsSignalStable and not AInfo.IsConfirmed then AInfo.StatusText := 'Предварительная стабильность достигнута, ожидается подтверждение.'
-  else if AInfo.IsSignalStable and AInfo.IsConfirmed then AInfo.StatusText := 'Стабильность подтверждена, но значение вне диапазона.'
-  else AInfo.StatusText := 'Сигнал нестабилен.';
-  FLastStabilityInfo := AInfo;
-  Result := AInfo.Status = mvssStable;
+  Result := AnalyzeStabilityAt(GetMonotonicTimeMs, AInfo);
 end;
 
 
@@ -1701,19 +1566,24 @@ begin
     Exit(False);
   end;
 
-  if (ASettings.MinSampleCount < 2) or (ASettings.WindowDurationSec <= 0) or
-     (ASettings.MaxSampleAgeSec <= 0) or (ASettings.MaxVariation < 0) or
+  if (ASettings.MinSampleCount <= 0) or (ASettings.WindowDurationSec <= 0) or
+     (ASettings.MaxSampleAgeSec < 0) or (ASettings.MaxVariation < 0) or
      (ASettings.MaxStdDeviation < 0) or (ASettings.MaxTrendRate < 0) or
      (ASettings.ForecastHorizonSec < 0) or (ASettings.ConfirmationTimeSec < 0) or
      (ASettings.MaxOutlierFraction < 0) or (ASettings.MaxOutlierFraction > 1) or
-     (ASettings.OutlierFactor <= 0) or (ASettings.ExitThresholdFactor < 1) or
+     (ASettings.OutlierFactor <= 0) or (ASettings.ExitThresholdFactor <= 0) or
      (ASettings.TargetAccuracyPlusPercent < 0) or
      (ASettings.TargetAccuracyMinusPercent < 0) or
      (ASettings.TargetToleranceAbsolute < 0) then
   begin
-    AInfo.Status := mvssUnstable;
+    AInfo.Status := mvssInvalidSettings;
     Include(AInfo.FailReasons, mvsfrInvalidSettings);
-    AInfo.StatusText := 'Некорректные настройки анализа стабильности.';
+    if ASettings.WindowDurationSec <= 0 then
+      AInfo.StatusText := Format('Invalid StabilitySettings: WindowDurationSec must be > 0, actual=%.12g', [ASettings.WindowDurationSec])
+    else if ASettings.MinSampleCount <= 0 then
+      AInfo.StatusText := Format('Invalid StabilitySettings: MinSampleCount=%d', [ASettings.MinSampleCount])
+    else
+      AInfo.StatusText := 'Invalid StabilitySettings.';
     Exit(False);
   end;
 
@@ -3865,7 +3735,13 @@ begin
 
       MV.FStabilitySettings.Enabled := Ini.ReadBool(Section, 'StabilityEnabled', MV.FStabilitySettings.Enabled);
       MV.FStabilitySettings.MinSampleCount := Ini.ReadInteger(Section, 'StabilityMinSampleCount', MV.FStabilitySettings.MinSampleCount);
-      MV.FStabilitySettings.WindowDurationSec := S2F(Ini.ReadString(Section, 'StabilityWindowDurationSec', F2S(MV.FStabilitySettings.WindowDurationSec)));
+      if Ini.ValueExists(Section, 'StabilityWindowDurationSec') then
+      MV.FStabilitySettings.WindowDurationSec := S2F(Ini.ReadString(Section, 'StabilityWindowDurationSec', F2S(MV.FStabilitySettings.WindowDurationSec)))
+    else
+    begin
+      MV.FStabilitySettings.WindowDurationSec := 10.0;
+      DebugLog('Stability LoadFromFile: missing StabilityWindowDurationSec; default 10.0 applied for section ' + Section);
+    end;
       MV.FStabilitySettings.MaxSampleAgeSec := S2F(Ini.ReadString(Section, 'StabilityMaxSampleAgeSec', F2S(MV.FStabilitySettings.MaxSampleAgeSec)));
       MV.FStabilitySettings.MaxVariation := S2F(Ini.ReadString(Section, 'StabilityMaxVariation', F2S(MV.FStabilitySettings.MaxVariation)));
       MV.FStabilitySettings.MaxStdDeviation := S2F(Ini.ReadString(Section, 'StabilityMaxStdDeviation', F2S(MV.FStabilitySettings.MaxStdDeviation)));
