@@ -1502,6 +1502,11 @@ var
     Result := GetEnumName(TypeInfo(TMeterValueTrendDirection), Ord(ADirection));
   end;
 
+  function DiagnosticFloat(const AValue: Double): string;
+  begin
+    Result := FloatToStrF(AValue, ffFixed, 18, 9);
+  end;
+
 begin
   StableInfo := Default(RStableInfo);
   Result := False;
@@ -1611,16 +1616,35 @@ begin
         if not SignalInfo.IsSignalStable then
           HistoryStable := False;
 
-        DeviceDetails.Add(Format('FlowStabilitySampleAdded: DeviceFlow[%d]: DeviceUUID=%s; ChannelIndex=%d; MeterValuePtr=%s; MeterUUID=%s; Parameter=ValueFlow; CurrentValue=%.6f; HistoryAnalysisEnabled=%s; SampleAdded=%s; TimeStampMs=%d; HistoryCountBefore=%d; HistoryCountAfter=%d; UsedSampleCount=%d; WindowDurationSec=%.3f; LastSampleAgeSec=%.3f; TrendRate=%.9f; TrendRateUnit=value/s; MaxTrendRate=%.9f; MaxTrendRateUnit=value/s; TrendExceeded=%s; TrendDirection=%s; Variation=%.9f; StdDeviation=%.9f; OutlierFraction=%.6f; IsSignalStable=%s; IsStabilityConfirmed=%s; IsSuitableForMeasurement=%s; Result=%s; Reason=%s',
-          [I, DeviceUUID, Channel.ID, MeterValueId, MeterUUID, ActualValue,
-           BoolToStr(Settings.Enabled, True), BoolToStr(Settings.Enabled and (SampleAfterCount <> SampleBeforeCount), True),
-           SampleTimeMs, SampleBeforeCount, SampleAfterCount, SignalInfo.UsedSampleCount,
-           SignalInfo.WindowDurationSec, SignalInfo.LastSampleAgeSec, SignalInfo.TrendRate,
-           BoolToStr((not SignalInfo.IsTrendStable) and SignalInfo.HasTrend, True),
-           TrendDirectionText(SignalInfo.TrendDirection), SignalInfo.Variation, SignalInfo.StdDeviation,
-           SignalInfo.OutlierFraction, BoolToStr(SignalInfo.IsSignalStable, True),
-           BoolToStr(SignalInfo.IsStabilityConfirmed, True), BoolToStr(SignalInfo.IsSuitableForMeasurement, True),
-           BoolToStr(HistoryStable, True), SignalInfo.StatusText]));
+        DeviceDetails.Add('FlowStabilitySampleAdded: DeviceFlow[' + IntToStr(I) + ']: '
+          + 'DeviceUUID=' + DeviceUUID
+          + '; ChannelIndex=' + IntToStr(Channel.ID)
+          + '; MeterValuePtr=' + MeterValueId
+          + '; MeterUUID=' + MeterUUID
+          + '; Parameter=ValueFlow'
+          + '; CurrentValue=' + DiagnosticFloat(ActualValue)
+          + '; HistoryAnalysisEnabled=' + BoolToStr(Settings.Enabled, True)
+          + '; SampleAdded=' + BoolToStr(Settings.Enabled and (SampleAfterCount <> SampleBeforeCount), True)
+          + '; TimeStampMs=' + IntToStr(SampleTimeMs)
+          + '; HistoryCountBefore=' + IntToStr(SampleBeforeCount)
+          + '; HistoryCountAfter=' + IntToStr(SampleAfterCount)
+          + '; UsedSampleCount=' + IntToStr(SignalInfo.UsedSampleCount)
+          + '; WindowDurationSec=' + DiagnosticFloat(SignalInfo.WindowDurationSec)
+          + '; LastSampleAgeSec=' + DiagnosticFloat(SignalInfo.LastSampleAgeSec)
+          + '; TrendRate=' + DiagnosticFloat(SignalInfo.TrendRate)
+          + '; TrendRateUnit=value/s'
+          + '; MaxTrendRate=' + DiagnosticFloat(Settings.MaxTrendRate)
+          + '; MaxTrendRateUnit=value/s'
+          + '; TrendExceeded=' + BoolToStr((not SignalInfo.IsTrendStable) and SignalInfo.HasTrend, True)
+          + '; TrendDirection=' + TrendDirectionText(SignalInfo.TrendDirection)
+          + '; Variation=' + DiagnosticFloat(SignalInfo.Variation)
+          + '; StdDeviation=' + DiagnosticFloat(SignalInfo.StdDeviation)
+          + '; OutlierFraction=' + DiagnosticFloat(SignalInfo.OutlierFraction)
+          + '; IsSignalStable=' + BoolToStr(SignalInfo.IsSignalStable, True)
+          + '; IsStabilityConfirmed=' + BoolToStr(SignalInfo.IsStabilityConfirmed, True)
+          + '; IsSuitableForMeasurement=' + BoolToStr(SignalInfo.IsSuitableForMeasurement, True)
+          + '; Result=' + BoolToStr(HistoryStable, True)
+          + '; Reason=' + SignalInfo.StatusText);
 
         if StableInfo.SignalInfo.Status = mvssUnknown then
           StableInfo.SignalInfo := SignalInfo;
