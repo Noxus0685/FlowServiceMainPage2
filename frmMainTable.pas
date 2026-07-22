@@ -661,6 +661,7 @@ type
     function ShouldReleaseGridDeviceBeforeSave(AChannel: TChannel; ADevice: TDevice): Boolean;
     function GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
     function GetDeviceGroupColor(const AGroup: Integer): TAlphaColor;
+    function GetDisplayFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
 
     procedure UpdateUIFromValues;
     procedure SetValues;
@@ -5075,7 +5076,7 @@ begin
 
   if WorkTable.ValueTime <> nil then
   begin
-    LabelTime.Text := WorkTable.ValueTime.GetStrValue;
+    LabelTime.Text := IntToStr(Trunc(WorkTable.ValueTime.GetDoubleValue));
   end
   else
     LabelTime.Text := '-';
@@ -6106,9 +6107,9 @@ begin
 
   Result := True;
   if Abs(ActualError) <= AllowedError then
-    AColor := $FFE6F4E6
+    AColor := COLOR_COMPLETED
   else if  Abs(ActualError) <= NormalizeFloatInput(MatchedPoint.FlowAccuracy )  then
-    AColor := TAlphaColorRec.Lightyellow
+    AColor := COLOR_WARNING
   else AColor:= TAlphaColors.Null;
 end;
 
@@ -6490,6 +6491,19 @@ begin
   );
 end;
 
+function TFrameMainTable.GetDisplayFlowText(AFlowMeter: TFlowMeter;
+  AWorkTable: TWorkTable): string;
+begin
+  Result := '-';
+  if (AFlowMeter = nil) or (AFlowMeter.ValueFlow = nil) then
+    Exit;
+
+  if (AWorkTable <> nil) and (AWorkTable.ValueFlowRate <> nil) then
+    Result := AWorkTable.ValueFlowRate.GetStrNum(AFlowMeter.ValueFlow.GetDoubleValue)
+  else
+    Result := AFlowMeter.ValueFlow.GetStrValue;
+end;
+
 function TFrameMainTable.GetAverageFlowText(AFlowMeter: TFlowMeter;
   AWorkTable: TWorkTable): string;
 var
@@ -6507,7 +6521,10 @@ begin
     Exit;
 
   AvgFlow := AFlowMeter.ValueQuantity.GetDoubleValue / MeasureTime;
-  Result := AFlowMeter.ValueFlow.GetStrNum(AvgFlow);
+  if AWorkTable.ValueFlowRate <> nil then
+    Result := AWorkTable.ValueFlowRate.GetStrNum(AvgFlow)
+  else
+    Result := AFlowMeter.ValueFlow.GetStrNum(AvgFlow);
 end;
 
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
@@ -6547,7 +6564,7 @@ begin
     begin
       if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStrValue
+        Value := GetDisplayFlowText(WorkTable.DeviceChannels[ARow].FlowMeter, WorkTable)
       else
         Value := '-';
     end
@@ -6983,7 +7000,7 @@ begin
      (AWorkTable.FlowRate.ValueSet.Value > 0) then
     Flow := AWorkTable.FlowRate.ValueSet.Value
   else if AWorkTable.EtalonFlowSet > 0 then
-    Flow := AWorkTable.EtalonFlowSet * 3.6;
+    Flow := AWorkTable.EtalonFlowSet;
   if Flow <= 0 then
     Exit;
 
@@ -7074,7 +7091,7 @@ begin
     begin
       if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStrValue
+        Value := GetDisplayFlowText(WorkTable.EtalonChannels[ARow].FlowMeter, WorkTable)
       else
         Value := '-';
     end
@@ -7407,7 +7424,7 @@ end;
 procedure TFrameMainTable.ResetUIPump;
 begin
   LabelFreq.Text := '-';
-  Rectangle1.Fill.Color := TAlphaColorRec.White;
+  Rectangle1.Fill.Color := COLOR_NONE;
 
   LayoutPump.Tag := 2;
   try
@@ -7446,11 +7463,11 @@ begin
       LabelFreq.Text := '-';
 
     if (WorkTable.ActivePump.Value.Value = 0) or not (WorkTable.ActivePump.IsRunning) then
-       Rectangle1.Fill.Color := TAlphaColorRec.White
+       Rectangle1.Fill.Color := COLOR_NONE
     else if (WorkTable.ActivePump.Value.Value < WorkTable.ActivePump.ValueSet.Value) then
-      Rectangle1.Fill.Color := TAlphaColorRec.Lightyellow
+      Rectangle1.Fill.Color := COLOR_WARNING
     else if WorkTable.ActivePump.Value.Value = WorkTable.ActivePump.ValueSet.Value then
-      Rectangle1.Fill.Color := $ffC9FFC7 ;
+      Rectangle1.Fill.Color := COLOR_COMPLETED;
 
 
 
@@ -7554,16 +7571,16 @@ begin
 if WorkTable.FlowRate.IsRunning then
   begin
         if WorkTable.FlowRate.Value.Value = 0 then
-           RectangleLabelFR.Fill.Color := TAlphaColorRec.White
+           RectangleLabelFR.Fill.Color := COLOR_NONE
        ELSE if WorkTable.FlowRate.IsStable(StableStatus) THEN
-          RectangleLabelFR.Fill.Color := $ffC9FFC7
+          RectangleLabelFR.Fill.Color := COLOR_COMPLETED
        else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
-          RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow;
+          RectangleLabelFR.Fill.Color := COLOR_WARNING;
   end
   else
   begin
 
-    RectangleLabelFR.Fill.Color := TAlphaColorRec.White
+    RectangleLabelFR.Fill.Color := COLOR_NONE
   end;
 
 
@@ -7592,16 +7609,16 @@ begin
 IF WorkTable.FluidTemp.IsRunning THEN
   begin
      if (WorkTable.FluidTemp.ValueSet.Value=0) or (WorkTable.FluidTemp.Value.Value=0) then
-      Rectangle7.Fill.Color := TAlphaColorRec.White
+      Rectangle7.Fill.Color := COLOR_NONE
      ELSE if WorkTable.FluidTemp.IsStable(TempStableStatus)   THEN
-      Rectangle7.Fill.Color := $ffC9FFC7
+      Rectangle7.Fill.Color := COLOR_COMPLETED
      else
-      Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
+      Rectangle7.Fill.Color := COLOR_WARNING;
   end
   else
   begin
 
-      Rectangle7.Fill.Color := TAlphaColorRec.White
+      Rectangle7.Fill.Color := COLOR_NONE
 
   end;
 
@@ -7609,16 +7626,16 @@ IF WorkTable.FluidPress.IsRunning THEN
   begin
    if (WorkTable.FluidPress.ValueSet.Value=0) or (WorkTable.FluidPress.Value.Value=0 )  then
 
-    Rectangle11.Fill.Color := TAlphaColorRec.White
+    Rectangle11.Fill.Color := COLOR_NONE
    else IF not(WorkTable.FluidPress.IsStable(PressStableStatus)) then
-    Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
+    Rectangle11.Fill.Color := COLOR_WARNING
    else
-    Rectangle11.Fill.Color := $ffC9FFC7;
+    Rectangle11.Fill.Color := COLOR_COMPLETED;
   end
   else
   begin
 
-    Rectangle11.Fill.Color := TAlphaColorRec.White
+    Rectangle11.Fill.Color := COLOR_NONE
 
 
   end;

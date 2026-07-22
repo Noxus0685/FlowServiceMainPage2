@@ -254,6 +254,14 @@ type
 
     FValueSec: Double;
     FValueResult: Double;
+    FSimulationStartImpSec: Double;
+    FSimulationTargetImpSec: Double;
+    FSimulationRampStartTimeMs: Double;
+    FSimulationRampDurationSec: Double;
+    FSimulationRampActive: Boolean;
+    FSimulationLastProgressLogMs: Double;
+    FReadinessBaseFlow: Double;
+    FHasReadinessBaseFlow: Boolean;
 
     FFlowMeter: TFlowMeter;
     FValueImp: TMeterValue;
@@ -396,6 +404,14 @@ type
     property VolResult: Double read GetVolResultProxy write SetVolResultProxy;
     property ValueSec: Double read GetValueSecProxy write SetValueSecProxy;
     property ValueResult: Double read GetValueResultProxy write SetValueResultProxy;
+    property SimulationStartImpSec: Double read FSimulationStartImpSec write FSimulationStartImpSec;
+    property SimulationTargetImpSec: Double read FSimulationTargetImpSec write FSimulationTargetImpSec;
+    property SimulationRampStartTimeMs: Double read FSimulationRampStartTimeMs write FSimulationRampStartTimeMs;
+    property SimulationRampDurationSec: Double read FSimulationRampDurationSec write FSimulationRampDurationSec;
+    property SimulationRampActive: Boolean read FSimulationRampActive write FSimulationRampActive;
+    property SimulationLastProgressLogMs: Double read FSimulationLastProgressLogMs write FSimulationLastProgressLogMs;
+    property ReadinessBaseFlow: Double read FReadinessBaseFlow write FReadinessBaseFlow;
+    property HasReadinessBaseFlow: Boolean read FHasReadinessBaseFlow write FHasReadinessBaseFlow;
 
     property ValueImp: TMeterValue read FValueImp write SetValueImp;
     property ValueImpTotal: TMeterValue read FValueImpTotal write SetValueImpTotal;
@@ -468,6 +484,14 @@ type
     FNextClimateChangeAt: TDateTime;
     FNextPressChangeAt: TDateTime;
     FNextFreqChangeAt: TDateTime;
+    FSimulationBasePressBefore: Double;
+    FSimulationBasePressAfter: Double;
+    FEnvironmentSimulationBaseInitialized: Boolean;
+    FSimulationLastUpdateTimeMs: Double;
+    FSimulationLastFlowUnitsLogTarget: Double;
+    FSimulationTargetFlowBase: Double;
+    FDeviceSimulationFlowRate: Double;
+    FHasDeviceSimulationFlowRate: Boolean;
 
     FHashValueTempertureBefore: string;
     FHashValueTempertureAfter: string;
@@ -617,6 +641,7 @@ type
 
 
   public
+  procedure CaptureEnvironmentSimulationBase;
   procedure InitChannels;
   constructor Create;
   destructor Destroy; override;
@@ -755,6 +780,14 @@ type
     property NextClimateChangeAt: TDateTime  read FNextClimateChangeAt write FNextClimateChangeAt;
     property NextPressChangeAt: TDateTime  read FNextPressChangeAt write FNextPressChangeAt;
     property NextFreqChangeAt: TDateTime  read FNextFreqChangeAt write FNextFreqChangeAt;
+    property SimulationBasePressBefore: Double read FSimulationBasePressBefore;
+    property SimulationBasePressAfter: Double read FSimulationBasePressAfter;
+    property EnvironmentSimulationBaseInitialized: Boolean read FEnvironmentSimulationBaseInitialized;
+    property SimulationLastUpdateTimeMs: Double read FSimulationLastUpdateTimeMs write FSimulationLastUpdateTimeMs;
+    property SimulationLastFlowUnitsLogTarget: Double read FSimulationLastFlowUnitsLogTarget write FSimulationLastFlowUnitsLogTarget;
+    property SimulationTargetFlowBase: Double read FSimulationTargetFlowBase write FSimulationTargetFlowBase;
+    property DeviceSimulationFlowRate: Double read FDeviceSimulationFlowRate write FDeviceSimulationFlowRate;
+    property HasDeviceSimulationFlowRate: Boolean read FHasDeviceSimulationFlowRate write FHasDeviceSimulationFlowRate;
 
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
@@ -804,6 +837,7 @@ type
     const ADescription: string = '');
 
   procedure StartTest;
+  procedure StartTestRepeat;
   procedure StopTest;
   procedure StartMonitor;
   procedure StopMonitor;
@@ -1428,6 +1462,14 @@ begin
   FImpSec := 0;
   FImpResult := 0;
   FCurSec := 0;
+  FSimulationStartImpSec := 0;
+  FSimulationTargetImpSec := 0;
+  FSimulationRampStartTimeMs := 0;
+  FSimulationRampDurationSec := 0;
+  FSimulationRampActive := False;
+  FSimulationLastProgressLogMs := 0;
+  FReadinessBaseFlow := 0;
+  FHasReadinessBaseFlow := False;
   FCurResult := 0;
   FValueSec := 0;
   FValueResult := 0;
@@ -2014,6 +2056,11 @@ begin
   FTimeSet := 0;
   FLimitImpSet := 0;
   FLimitVolumeSet := 0;
+  FSimulationLastUpdateTimeMs := 0;
+  FSimulationLastFlowUnitsLogTarget := 0;
+  FSimulationTargetFlowBase := 0;
+  FDeviceSimulationFlowRate := 0;
+  FHasDeviceSimulationFlowRate := False;
 
   FCurrentPoint := TDevicePoint.Create(0);
   FCurrentPoint.LimitTime := -1;
@@ -2911,7 +2958,8 @@ var
 
     // Канал без назначенного расходомера не может участвовать
     // в выборе эталонного набора.
-    if (AChannel = nil) or (AChannel.FlowMeter = nil) then
+    if (AChannel = nil) or (not AChannel.Enabled) or (AChannel.State = osDeleted) or
+       (AChannel.FlowMeter = nil) then
       Exit;
 
     ChannelFlowMin := GetChannelFlowMin(AChannel);
@@ -3502,7 +3550,6 @@ function TWorkTable.CalcEtalonFlowRateMax: Double;
 var
   I: Integer;
   Channel: TChannel;
-  Device: TDevice;
   QmaxBase: Double;
   GroupSum: Double;
   GroupSums: TDictionary<Integer, Double>;
@@ -3517,15 +3564,11 @@ begin
     for I := 0 to FEtalonChannels.Count - 1 do
     begin
       Channel := FEtalonChannels[I];
-      if (Channel = nil) or
+      if (Channel = nil) or (not Channel.Enabled) or (Channel.State = osDeleted) or
          (Channel.FlowMeter = nil) or (Channel.FlowMeter.Device = nil) then
         Continue;
 
-      Device := Channel.FlowMeter.Device;
-      if Device.Qmax <= 0 then
-        Continue;
-
-      QmaxBase := Device.Qmax;
+      QmaxBase := Channel.QMaxWork;
       if QmaxBase <= 0 then
         Continue;
 
@@ -5215,6 +5258,7 @@ end;
 
 procedure TWorkTable.DoStartMonitor;
 begin
+  CaptureEnvironmentSimulationBase;
 
  // SetState(swtSTARTMONITOR);
 
@@ -5229,7 +5273,23 @@ end;
 
 procedure TWorkTable.DoStartTest;
 begin
+  CaptureEnvironmentSimulationBase;
+end;
 
+procedure TWorkTable.CaptureEnvironmentSimulationBase;
+begin
+  if FFluidPress <> nil then
+  begin
+    FSimulationBasePressBefore := FFluidPress.BeforeValue;
+    FSimulationBasePressAfter := FFluidPress.AfterValue;
+  end
+  else
+  begin
+    FSimulationBasePressBefore := 0;
+    FSimulationBasePressAfter := 0;
+  end;
+
+  FEnvironmentSimulationBaseInitialized := True;
 end;
 
 procedure TWorkTable.DoStopTest;
@@ -5290,10 +5350,12 @@ var
 begin
 
   // Сброс полей, участвующих в имитации
-  // (используются в UpdateRandomClimate/UpdateRandomSignals).
+  // (используются в имитации климата и каналов).
   //FActiveWorkTable.Temp := 0;
   //FActiveWorkTable.Press := 0;
   FNextClimateChangeAt := 0;
+  FNextPressChangeAt := 0;
+  FEnvironmentSimulationBaseInitialized := False;
 
   Time  := 0;
   TimeResult  := 0;
@@ -5561,6 +5623,8 @@ begin
       'Переход из режима монитора к измерению без промежуточной остановки', Name);
 
   ResetMeasurementValues;
+  CaptureEnvironmentSimulationBase;
+  State := swtSTARTTEST;
 
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
     'Подготовка к запуску измерения. Данные очищены', Name);
@@ -5568,9 +5632,21 @@ begin
   FireAction(awtStartTest, 'StartTest', 'Запрошен запуск измерения');
 end;
 
+procedure TWorkTable.StartTestRepeat;
+begin
+  ResetSpillageRuntimeValues;
+  State := swtSTARTTEST;
+
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTestRepeat',
+    'Подготовка к запуску повторного измерения. Сброшены только накопители проливки', Name);
+
+  FireAction(awtStartTest, 'StartTestRepeat', 'Запрошен запуск повторного измерения');
+end;
+
 procedure TWorkTable.StartMonitor;
 begin
   ResetMeasurementValues;
+  CaptureEnvironmentSimulationBase;
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartMonitor',
     'Подготовка к запуску монитра. Очищены данные', Name);
   FireAction(awtStartMonitor, 'StartMonitor', 'Действие: запуск монитора');
@@ -6297,18 +6373,33 @@ begin
 end;
 
 function TWorkTableManager.GetChannelFlowCoef(const AChannel: TChannel): Double;
+
+  function IsValidCoef(const AValue: Double): Boolean;
+  begin
+    Result := (AValue > 0.0) and (Abs(AValue) < MaxDouble);
+  end;
+
+var
+  ValueCoef: Double;
 begin
   Result := 0.0;
   if (AChannel = nil) or (AChannel.FlowMeter = nil) then
     Exit;
 
+  // Базовый контракт коэффициента для импульсных каналов: имп/л.
+  // Device.Coef является паспортным коэффициентом прибора и не зависит от
+  // выбранной размерности UI; ValueCoef используем только если паспортного
+  // коэффициента нет.
+  if Assigned(AChannel.FlowMeter.Device) and IsValidCoef(AChannel.FlowMeter.Device.Coef) then
+    Exit(AChannel.FlowMeter.Device.Coef);
+
+  ValueCoef := 0.0;
   if (AChannel.FlowMeter.ValueCoef <> nil) then
-    Result := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
+    ValueCoef := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
+  if IsValidCoef(ValueCoef) then
+    Exit(ValueCoef);
 
-  if SameValue(Result, 0.0, 1E-12) and Assigned(AChannel.FlowMeter.Device) then
-    Result := AChannel.FlowMeter.Device.Coef;
-
-  if SameValue(Result, 0.0, 1E-12) then
+  if IsValidCoef(AChannel.FlowMeter.Kp) then
     Result := AChannel.FlowMeter.Kp;
 end;
 
@@ -6407,9 +6498,16 @@ begin
     if (not AChannels[I].Enabled) then
       Result[I] := 0
     else if Coef > 0 then
-      Result[I] := (AFlowRate * MaxRatio * Coef) / 3.6
+      Result[I] := AFlowRate * MaxRatio * Coef
     else
+    begin
+      if ProtocolManager <> nil then
+        ProtocolManager.AddMessage(pcError, psWorkTable, 'ChannelCoefficientInvalid',
+          'Не удалось рассчитать частоту канала',
+          Format('ChannelIndex=%d TargetFlowLS=%.6f CoefImpPerLiter=%.6f',
+            [I, AFlowRate * MaxRatio, Coef]));
       Result[I] := AFallbackImpSec;
+    end;
   end;
 end;
 
@@ -6425,6 +6523,34 @@ procedure TWorkTableManager.UpdateSimulation;
  HasLimits: Boolean;
  LimitReached: Boolean;   // Флаг: достигнут хотя бы один критерий остановки
 
+
+function PressureRandomAroundBase(const ABaseValue: Double;
+  const ARelativeDeviation: Double): Double;
+var
+  RandomUnit: Double;
+  MinValue: Double;
+  MaxValue: Double;
+begin
+  if ABaseValue = 0 then
+    Exit(0);
+
+  RandomUnit := Random;
+  Result := ABaseValue *
+    (1 - ARelativeDeviation + RandomUnit * 2 * ARelativeDeviation);
+
+  MinValue := Min(ABaseValue * (1 - ARelativeDeviation),
+    ABaseValue * (1 + ARelativeDeviation));
+  MaxValue := Max(ABaseValue * (1 - ARelativeDeviation),
+    ABaseValue * (1 + ARelativeDeviation));
+  Result := EnsureRange(Result, MinValue, MaxValue);
+end;
+
+procedure EnsureEnvironmentSimulationBase(const AWorkTable: TWorkTable);
+begin
+  if (AWorkTable <> nil) and
+     (not AWorkTable.EnvironmentSimulationBaseInitialized) then
+    AWorkTable.CaptureEnvironmentSimulationBase;
+end;
 
 procedure UpdateRandomTemp(const AWorkTable: TWorkTable);
 var
@@ -6458,7 +6584,7 @@ begin
 
     // Давление ±0.03 (сейчас не используется)
     PressDelta := (Random * 0.06) - 0.03;
-
+    AWorkTable.FluidTemp.ValueSet.Value := 24;
 
     // ----------------------------------------------------------
     // 3.2 Регулирование температуры (имитация ПИД-подобного поведения)
@@ -6476,19 +6602,19 @@ begin
         if AWorkTable.FluidTemp.Value.Value < AWorkTable.FluidTemp.ValueSet.Value then
         begin
           AWorkTable.FluidTemp.BeforeValue :=
-            AWorkTable.FluidTemp.BeforeValue + 1;
+            AWorkTable.FluidTemp.BeforeValue + 0.2;
 
           AWorkTable.FluidTemp.AfterValue :=
-            AWorkTable.FluidTemp.AfterValue + 1;
+            AWorkTable.FluidTemp.AfterValue + 0.2;
         end
         else
         begin
           // Иначе → "охлаждаем"
           AWorkTable.FluidTemp.BeforeValue :=
-            AWorkTable.FluidTemp.BeforeValue - 1;
+            AWorkTable.FluidTemp.BeforeValue - 0.2;
 
           AWorkTable.FluidTemp.AfterValue :=
-            AWorkTable.FluidTemp.AfterValue - 1;
+            AWorkTable.FluidTemp.AfterValue - 0.2;
         end;
 
       end;
@@ -6527,52 +6653,49 @@ begin
 end;
 
 procedure UpdateRandomPress(const AWorkTable: TWorkTable);
-var
-  TempDelta, PressDelta: Double;
+const
+  RelativeDeviation = 0.05;
+begin
+  if (AWorkTable = nil) or (AWorkTable.FluidPress = nil) then
+    Exit;
+  AWorkTable.FluidPress.ValueSet.Value := 0.0001;
+  if (AWorkTable.NextPressChangeAt = 0) or (Now >= AWorkTable.NextPressChangeAt) then
+  begin
+    EnsureEnvironmentSimulationBase(AWorkTable);
+
+    AWorkTable.FluidPress.BeforeValue :=
+      PressureRandomAroundBase(AWorkTable.SimulationBasePressBefore, RelativeDeviation);
+    AWorkTable.FluidPress.AfterValue :=
+      PressureRandomAroundBase(AWorkTable.SimulationBasePressAfter, RelativeDeviation);
+
+    AWorkTable.NextPressChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
+  end;
+end;
+
+procedure SyncEnvironmentMeterValues(const AWorkTable: TWorkTable);
 begin
   if AWorkTable = nil then
     Exit;
 
-
-  if (AWorkTable.NextPressChangeAt = 0) or (Now >= AWorkTable.NextPressChangeAt) then
+  if (AWorkTable.FluidTemp <> nil) then
   begin
+    AWorkTable.SetTemperature(AWorkTable.FluidTemp.BeforeValue, AWorkTable.FluidTemp.AfterValue);
+    if AWorkTable.ValueTempertureBefore <> nil then
+      AWorkTable.ValueTempertureBefore.SetValue(AWorkTable.FluidTemp.BeforeValue);
+    if AWorkTable.ValueTempertureAfter <> nil then
+      AWorkTable.ValueTempertureAfter.SetValue(AWorkTable.FluidTemp.AfterValue);
+  end;
 
-    TempDelta :=  (Random * 0.30) - 0.15;
-    PressDelta :=  (Random * 0.06) - 0.03;
-    if (AWorkTable.FluidPress.IsRunning) then
-    begin
-      if  (AWorkTable.FluidPress.Value.value<AWorkTable.FluidPress.ValueSet.value) then
-      begin
-        AWorkTable.FluidPress.BeforeValue:=(AWorkTable.FluidPress.BeforeValue+1);
-        AWorkTable.FluidPress.AfterValue:=(AWorkTable.FluidPress.AfterValue+1);
-      end
-      else if  (AWorkTable.FluidPress.Value.value>AWorkTable.FluidPress.ValueSet.value)  then
-      begin
-        AWorkTable.FluidPress.BeforeValue:=(AWorkTable.FluidPress.BeforeValue-0.3);
-        AWorkTable.FluidPress.AfterValue:=(AWorkTable.FluidPress.AfterValue-0.3);
-      end;
+  if (AWorkTable.FluidPress <> nil) then
+  begin
+    AWorkTable.SetPressure(AWorkTable.FluidPress.BeforeValue, AWorkTable.FluidPress.AfterValue);
+    if AWorkTable.ValuePressureBefore <> nil then
+      AWorkTable.ValuePressureBefore.SetValue(AWorkTable.FluidPress.BeforeValue);
+    if AWorkTable.ValuePressureAfter <> nil then
+      AWorkTable.ValuePressureAfter.SetValue(AWorkTable.FluidPress.AfterValue);
+  end;
 
-
-    end;
-      if  (AWorkTable.FluidPress.Value.value<AWorkTable.FluidPress.ValueSet.value)  then
-      begin
-        AWorkTable.FluidPress.BeforeValue:=(EnsureRange(AWorkTable.FluidPress.BeforeValue + 0.1, -50.0, 150.0));
-        AWorkTable.FluidPress.AfterValue:=(EnsureRange(AWorkTable.FluidPress.AfterValue + 0.1, -50.0, 150.0));
-      end;
-      if AWorkTable.FluidPress.ValueSet.value<>0 then
-      begin
-        AWorkTable.FluidPress.BeforeValue:=(EnsureRange(AWorkTable.FluidPress.BeforeValue + PressDelta, -50.0, 150.0));
-        AWorkTable.FluidPress.AfterValue:=(EnsureRange(AWorkTable.FluidPress.AfterValue + PressDelta, -50.0, 150.0));
-      end;
-
-
-
-
-      //AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
-      //AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
-
-      AWorkTable.NextPressChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
-   end;
+  AWorkTable.SetValues;
 end;
 
 procedure UpdateRandomFreq(const AWorkTable: TWorkTable);
@@ -6611,313 +6734,672 @@ begin
    end;
 end;
 
-procedure UpdateRandomFlowRate(const AWorkTable: TWorkTable);
-var
-  Flow: Double;
-
-  WorkTable:TWorkTable;
-  FlowRate: TFlowRate;
-  i:integer;
-  EnabledEtalonChannels: TObjectList<TChannel>;
-  EnabledDeviceChannels: TObjectList<TChannel>;
-  AValue:Double;
-  ImpSecValues: TArray<Double>;
-  TotalQmax: Double;
-  ChannelQmax: Double;
-  ChannelFlowRate: Double;
-  ChannelCoef: Double;
-  ChannelRatio: Double;
+procedure ResetChannelSimulation(const AChannel: TChannel; const AResetImpResult: Boolean);
 begin
-
-  FlowRate := AWorkTable.FlowRate; // Контроллер расхода
-  if FlowRate = nil then
+  if AChannel = nil then
     Exit;
 
-   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
-  if (AWorkTable.NextFreqChangeAt = 0) or (Now >= AWorkTable.NextFreqChangeAt) then
-  begin
-
-    if AWorkTable=nil then
-    exit;
-
-    if AWorkTable.ActivePump=nil then
-    exit;
-
-      if FlowRate.IsRunning then
-      begin
-        EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
-        try
-          for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
-            if AWorkTable.EtalonChannels[I] <> nil then
-              EnabledEtalonChannels.Add(AWorkTable.EtalonChannels[I]);
-
-              IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
-               Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
-              else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
-                Flow  :=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
-              else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
-                Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
-
-
-
-             ImpSecValues := BuildImpSecValuesForChannels(AWorkTable,
-              EnabledEtalonChannels,
-              Flow,
-              //UpdateEtalonImpSecFromFlowRate(Flow, EnabledEtalonChannels)
-              12
-            );
-
-            AWorkTable.ApplyChannelValues(
-              EnabledEtalonChannels,
-              NormalizeFloatInput('0'),
-              ImpSecValues,
-              NormalizeFloatInput('0')
-            );
-
-        finally
-          EnabledEtalonChannels.Free;
-        end;
-        EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
-        try
-          for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
-            begin
-            if (AWorkTable.DeviceChannels[I] <> nil) and (AWorkTable.DeviceChannels[I].Enabled) then
-              EnabledDeviceChannels.Add(AWorkTable.DeviceChannels[I]);
-            end;
-
-              IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
-               Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
-              else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
-                Flow  :=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
-              else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
-                Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
-
-          ImpSecValues := BuildImpSecValuesForChannels(AWorkTable,
-            EnabledDeviceChannels,
-            Flow,
-            12,
-            False,
-            True
-          );
-
-            AWorkTable.ApplyChannelValues(
-              EnabledDeviceChannels,
-              NormalizeFloatInput('0'),
-              ImpSecValues,
-              NormalizeFloatInput('0')
-            );
-
-        finally
-          EnabledDeviceChannels.Free;
-        end;
-
-      end;
-
-
-
-    AWorkTable.NextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
-   end;
+  AChannel.CurSec := 0;
+  AChannel.ImpSec := 0;
+  if AResetImpResult then
+    AChannel.ImpResult := 0;
+  AChannel.SimulationStartImpSec := 0;
+  AChannel.SimulationTargetImpSec := 0;
+  AChannel.SimulationRampStartTimeMs := 0;
+  AChannel.SimulationRampDurationSec := 0;
+  AChannel.SimulationRampActive := False;
+  AChannel.SimulationLastProgressLogMs := 0;
 end;
 
-procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
-var
-  I, J: Integer;
-  Channel: TChannel;
-  CurDelta: Double;
-  ImpDelta: Double;
-  MaxImpDelta: Double;
-  MinImpSec: Double;
-  MaxImpSec: Double;
-  EtalonFlowSet: Double;
-  EtalonFlowActual: Double;
-  ChannelCoef: Double;
-  TargetImpSec: Double;
-  CurrentFlow,GroupKey: Double;
-  DeviceReady: Boolean;
-  GroupChannelCount: Integer;
-  DeviceFlow: Double;
-  ActiveEtalonIndex: Integer;
-  GroupFlowMax: Double;
-  ChannelFlowMax: Double;
-
-  function GetEnabledGroupFlowMax(AChannels: TObjectList<TChannel>; const AGroup, AChannelIndex: Integer): Double;
-  var
-    K: Integer;
-  begin
-    Result := 0;
-    if AChannels = nil then
-      Exit;
-
-    for K := 0 to AChannels.Count - 1 do
-      if (AChannels[K] <> nil) and AChannels[K].Enabled and
-         (((AGroup > 0) and (AChannels[K].Group = AGroup)) or
-          ((AGroup <= 0) and (K = AChannelIndex))) and
-         (AChannels[K].FlowMeter <> nil) and (AChannels[K].FlowMeter.Device <> nil) then
-        Result := Result + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[K].FlowMeter.Device.Qmax, 4);
-  end;
-
-  function GetSignalChannelFlowCoef(const AChannel: TChannel): Double;
-  begin
-    Result := 0.0;
-    if (AChannel = nil) or (AChannel.FlowMeter = nil) then
-      Exit;
-
-    if AChannel.FlowMeter.ValueCoef <> nil then
-      Result := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
-
-    if SameValue(Result, 0.0, 1E-12) and Assigned(AChannel.FlowMeter.Device) then
-      Result := AChannel.FlowMeter.Device.Coef;
-
-    if SameValue(Result, 0.0, 1E-12) then
-      Result := AChannel.FlowMeter.Kp;
-  end;
+function IsSimulationChannelEnabled(const AChannel: TChannel): Boolean;
 begin
-  if AWorkTable = nil then
+  Result := (AChannel <> nil) and AChannel.Enabled and (AChannel.State <> osDeleted) and
+    (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil);
+end;
+
+function GetCurrentTimeMs: Double;
+begin
+  Result := Now * MSecsPerDay;
+end;
+
+function CalculateRampDurationByFlowDelta(const AStartFlowLS, ATargetFlowLS: Double): Double;
+const
+  MIN_SIMULATION_RAMP_DURATION_SEC = 0.3;
+  SIMULATION_RAMP_MAX_DURATION_SEC = 10.0;
+  SIMULATION_RAMP_FLOW_SPEED_LS_PER_SEC = 0.666667;
+var
+  FlowDeltaLS: Double;
+begin
+  FlowDeltaLS := Abs(ATargetFlowLS - AStartFlowLS);
+  if SIMULATION_RAMP_FLOW_SPEED_LS_PER_SEC <= 0 then
+    Result := SIMULATION_RAMP_MAX_DURATION_SEC
+  else
+    Result := FlowDeltaLS / SIMULATION_RAMP_FLOW_SPEED_LS_PER_SEC;
+  Result := EnsureRange(Result, MIN_SIMULATION_RAMP_DURATION_SEC,
+    SIMULATION_RAMP_MAX_DURATION_SEC);
+end;
+
+function CalculateChannelFlowLS(const AChannel: TChannel): Double;
+var
+  ChannelCoef: Double;
+begin
+  Result := 0;
+  ChannelCoef := GetChannelFlowCoef(AChannel);
+  if ChannelCoef > 0 then
+    Result := AChannel.ImpSec / ChannelCoef;
+end;
+
+procedure LogSimulationRamp(const AEvent, AChannelKind: string; const AChannelIndex: Integer;
+  const ADetails: string);
+begin
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcState, psWorkTable, AEvent,
+      'Channel simulation',
+      Format('ChannelKind=%s ChannelIndex=%d %s', [AChannelKind, AChannelIndex, ADetails]));
+end;
+
+procedure UpdateChannelRamp(const AChannel: TChannel; const AChannelKind: string;
+  const AChannelIndex: Integer; const ATargetImpSec, ACurrentTimeMs: Double;
+  const AStartDetails: string);
+const
+  TARGET_EPSILON = 1E-6;
+  SIMULATION_RAMP_MAX_DURATION_SEC = 10.0;
+var
+  ElapsedSec: Double;
+  Progress: Double;
+  NewImpSec: Double;
+  ChannelCoef: Double;
+  StartFlowLS: Double;
+  TargetFlowLS: Double;
+  FlowDeltaLS: Double;
+begin
+  if AChannel = nil then
     Exit;
 
-  DeviceReady := AWorkTable.DeviceReady;
-  EtalonFlowSet := AWorkTable.EtalonFlowSet;
-  if (AWorkTable.FlowRate <> nil) and (AWorkTable.FlowRate.ValueSet <> nil) and
-     (AWorkTable.FlowRate.ValueSet.Value > 0) then
-    EtalonFlowSet := AWorkTable.FlowRate.ValueSet.Value;
-  if EtalonFlowSet <= 0 then
-    for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
-      if (AWorkTable.EtalonChannels[I] <> nil) and
-         AWorkTable.EtalonChannels[I].Enabled then
-      begin
-        ChannelCoef := GetSignalChannelFlowCoef(AWorkTable.EtalonChannels[I]);
-        if ChannelCoef > 0 then
-          EtalonFlowSet := AWorkTable.EtalonChannels[I].ImpSec / ChannelCoef;
-        Break;
-      end;
-
-    AWorkTable.Time := AWorkTable.Time + 1;
-
-  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+  if not SameValue(AChannel.SimulationTargetImpSec, ATargetImpSec, TARGET_EPSILON) then
   begin
-    Channel := AWorkTable.EtalonChannels[I];
-    if Channel = nil then
-      Continue;
-
-    CurDelta := (Random * 0.06) - 0.03;
-    if Channel.Enabled then
+    AChannel.SimulationStartImpSec := AChannel.ImpSec;
+    AChannel.SimulationTargetImpSec := Max(0.0, ATargetImpSec);
+    ChannelCoef := GetChannelFlowCoef(AChannel);
+    if ChannelCoef > 0 then
     begin
-      Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
-      ChannelCoef := GetSignalChannelFlowCoef(Channel);
-      if Channel.ImpSec > 0 then
-      begin
-        MaxImpDelta := EnsureRange(Abs(Channel.ImpSec) * 0.01, 0.1, 1000.0);
-        ImpDelta := (Random * 2.0 - 1.0) * MaxImpDelta;
-        MinImpSec := Max(0.0, Channel.ImpSec * 0.99);
-        MaxImpSec := Channel.ImpSec * 1.01;
-        Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, MinImpSec, MaxImpSec);
-      end;
-      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+      StartFlowLS := AChannel.SimulationStartImpSec / ChannelCoef;
+      TargetFlowLS := AChannel.SimulationTargetImpSec / ChannelCoef;
     end
     else
     begin
-      Channel.CurSec :=0;
-      Channel.ImpSec := 0;
-      Channel.ImpResult := 0;
+      StartFlowLS := 0.0;
+      TargetFlowLS := 0.0;
     end;
-
+    FlowDeltaLS := Abs(TargetFlowLS - StartFlowLS);
+    AChannel.SimulationRampStartTimeMs := ACurrentTimeMs;
+    AChannel.SimulationRampDurationSec := CalculateRampDurationByFlowDelta(StartFlowLS,
+      TargetFlowLS);
+    AChannel.SimulationRampActive := not SameValue(AChannel.SimulationStartImpSec,
+      AChannel.SimulationTargetImpSec, TARGET_EPSILON);
+    AChannel.SimulationLastProgressLogMs := 0;
+    LogSimulationRamp('SimulationRampStarted', AChannelKind, AChannelIndex,
+      Format('%s StartFlowLS=%.6f TargetFlowLS=%.6f FlowDeltaLS=%.6f RampFlowSpeedLSPerSec=%.6f StartImpSec=%.6f TargetImpSec=%.6f CoefImpPerLiter=%.6f RampDurationSec=%.3f',
+        [AStartDetails, StartFlowLS, TargetFlowLS, FlowDeltaLS, 0.666667,
+         AChannel.SimulationStartImpSec, AChannel.SimulationTargetImpSec,
+         ChannelCoef, AChannel.SimulationRampDurationSec]));
   end;
 
-  EtalonFlowActual := 0;
+  if AChannel.SimulationRampActive then
+  begin
+    ElapsedSec := Max(0.0, (ACurrentTimeMs - AChannel.SimulationRampStartTimeMs) / 1000.0);
+    if AChannel.SimulationRampDurationSec > 0 then
+      Progress := EnsureRange(ElapsedSec / AChannel.SimulationRampDurationSec, 0.0, 1.0)
+    else
+      Progress := 1.0;
+
+    NewImpSec := AChannel.SimulationStartImpSec +
+      (AChannel.SimulationTargetImpSec - AChannel.SimulationStartImpSec) * Progress;
+    AChannel.ImpSec := Max(0.0, NewImpSec);
+
+    if ((AChannel.SimulationLastProgressLogMs = 0) or
+        (ACurrentTimeMs - AChannel.SimulationLastProgressLogMs >= 1000.0)) and
+       (Progress < 1.0) then
+    begin
+      AChannel.SimulationLastProgressLogMs := ACurrentTimeMs;
+      LogSimulationRamp('SimulationRampProgress', AChannelKind, AChannelIndex,
+        Format('CurrentImpSec=%.6f TargetImpSec=%.6f ElapsedSec=%.3f DurationSec=%.3f ProgressPercent=%.2f CalculatedFlowLS=%.6f',
+          [AChannel.ImpSec, AChannel.SimulationTargetImpSec, ElapsedSec,
+           AChannel.SimulationRampDurationSec, Progress * 100.0, CalculateChannelFlowLS(AChannel)]));
+    end;
+
+    if Progress >= 1.0 then
+    begin
+      AChannel.ImpSec := Max(0.0, AChannel.SimulationTargetImpSec);
+      AChannel.SimulationRampActive := False;
+      LogSimulationRamp('SimulationRampCompleted', AChannelKind, AChannelIndex,
+        Format('ElapsedSec=%.3f TargetImpSec=%.6f ActualImpSec=%.6f CalculatedFlowLS=%.6f',
+          [ElapsedSec, AChannel.SimulationTargetImpSec, AChannel.ImpSec,
+           CalculateChannelFlowLS(AChannel)]));
+    end
+    else if ElapsedSec > SIMULATION_RAMP_MAX_DURATION_SEC + 0.5 then
+      LogSimulationRamp('SimulationRampDeadlineExceeded', AChannelKind, AChannelIndex,
+        Format('ElapsedSec=%.3f CurrentImpSec=%.6f TargetImpSec=%.6f',
+          [ElapsedSec, AChannel.ImpSec, AChannel.SimulationTargetImpSec]));
+  end;
+end;
+
+procedure ApplySimpleSimulationNoise(const AChannel: TChannel; const AChannelKind: string;
+  const AChannelIndex: Integer; const ACurrentTimeMs, ANoisePercent: Double;
+  const ADeviceReady: Boolean);
+var
+  TargetImpSec: Double;
+  AllowedDelta: Double;
+  RandomStep: Double;
+  BeforeImpSec: Double;
+  AfterImpSec: Double;
+begin
+  if (AChannel = nil) or AChannel.SimulationRampActive then
+    Exit;
+
+  TargetImpSec := AChannel.SimulationTargetImpSec;
+  if TargetImpSec <= 0 then
+    Exit;
+
+  BeforeImpSec := AChannel.ImpSec;
+  AllowedDelta := EnsureRange(Abs(TargetImpSec) * ANoisePercent / 100.0, 0.1, 30.0);
+  RandomStep := (Random * 2.0 - 1.0) * AllowedDelta;
+  AfterImpSec := EnsureRange(BeforeImpSec + RandomStep,
+    Max(0.0, TargetImpSec - AllowedDelta), TargetImpSec + AllowedDelta);
+  AChannel.ImpSec := AfterImpSec;
+
+  if (ProtocolManager <> nil) and
+     ((AChannel.SimulationLastProgressLogMs = 0) or
+      (ACurrentTimeMs - AChannel.SimulationLastProgressLogMs >= 1000.0)) then
+  begin
+    AChannel.SimulationLastProgressLogMs := ACurrentTimeMs;
+    ProtocolManager.AddMessage(pcState, psWorkTable, 'SimulationNoise',
+      'Simple channel simulation noise',
+      Format('ChannelKind=%s ChannelIndex=%d DeviceReady=%s TargetImpSec=%.6f BeforeImpSec=%.6f RandomStep=%.6f AllowedDelta=%.6f AfterImpSec=%.6f',
+        [AChannelKind, AChannelIndex, IfThen(ADeviceReady, 'True', 'False'),
+         TargetImpSec, BeforeImpSec, RandomStep, AllowedDelta, AfterImpSec]));
+  end;
+end;
+
+procedure UpdateChannelCurSec(const AChannel: TChannel; const ADeltaRange: Double);
+var
+  CurDelta: Double;
+begin
+  if AChannel = nil then
+    Exit;
+
+  CurDelta := (Random * ADeltaRange * 2.0) - ADeltaRange;
+  AChannel.CurSec := EnsureRange(AChannel.CurSec + CurDelta, 0.0, 1000.0);
+end;
+
+function CalculateEtalonTargetImpSecValues(const AWorkTable: TWorkTable;
+  const AEnabledEtalonChannels: TObjectList<TChannel>; const ATargetFlow: Double): TArray<Double>;
+begin
+  Result := BuildImpSecValuesForChannels(AWorkTable, AEnabledEtalonChannels,
+    ATargetFlow, 0, True, False);
+end;
+
+procedure UpdateEtalonChannelSignals(const AWorkTable: TWorkTable;
+  const AEnabledEtalonChannels: TObjectList<TChannel>; const ATargetImpSecValues: TArray<Double>;
+  const ACurrentTimeMs, ATargetFlow, AOldTargetFlow: Double);
+var
+  I: Integer;
+  Channel: TChannel;
+  ChannelCoef: Double;
+  ChannelFlowLS: Double;
+  CoefRaw: Double;
+  CoefDimension: string;
+begin
+  for I := 0 to AEnabledEtalonChannels.Count - 1 do
+  begin
+    Channel := AEnabledEtalonChannels[I];
+    ChannelCoef := GetChannelFlowCoef(Channel);
+    if ChannelCoef > 0 then
+      ChannelFlowLS := ATargetImpSecValues[I] / ChannelCoef
+    else
+      ChannelFlowLS := 0.0;
+    CoefRaw := 0.0;
+    CoefDimension := '';
+    if (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueCoef <> nil) then
+    begin
+      CoefRaw := Channel.FlowMeter.ValueCoef.GetDoubleValue;
+      CoefDimension := Channel.FlowMeter.ValueCoef.GetDimName;
+    end;
+
+    if (ProtocolManager <> nil) and
+       (not SameValue(Channel.SimulationTargetImpSec, ATargetImpSecValues[I], 1E-6)) then
+      ProtocolManager.AddMessage(pcState, psWorkTable, 'EtalonTargetDiagnostic',
+        'Etalon target impulse diagnostic',
+        Format('ChannelIndex=%d TargetFlowTotalLS=%.6f ChannelFlowLS=%.6f CoefRaw=%.6f CoefDimension=%s CoefImpPerLiter=%.6f StartImpSec=%.6f TargetImpSec=%.6f ExpectedFlowFromTargetImpSec=%.6f',
+          [AWorkTable.EtalonChannels.IndexOf(Channel), ATargetFlow,
+           ChannelFlowLS, CoefRaw, CoefDimension, ChannelCoef, Channel.ImpSec,
+           ATargetImpSecValues[I], ChannelFlowLS]));
+    UpdateChannelRamp(Channel, 'Etalon', AWorkTable.EtalonChannels.IndexOf(Channel),
+      ATargetImpSecValues[I], ACurrentTimeMs,
+      Format('Reason=WorkTableTargetChanged TargetSource=WorkTableSetFlow TargetFlowBaseLS=%.6f OldTargetFlowBaseLS=%.6f PointUUID= DeviceReady=%s',
+        [ATargetFlow, AOldTargetFlow, IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
+    ApplySimpleSimulationNoise(Channel, 'Etalon', AWorkTable.EtalonChannels.IndexOf(Channel),
+      ACurrentTimeMs, 1.0, AWorkTable.DeviceReady);
+    UpdateChannelCurSec(Channel, 0.03);
+  end;
+end;
+
+function CalculateActualEtalonFlow(const AWorkTable: TWorkTable): Double;
+var
+  I, ActiveEtalonIndex: Integer;
+  GroupKey: Integer;
+  ChannelCoef: Double;
+begin
+  Result := 0;
   GroupKey := 0;
   ActiveEtalonIndex := -1;
   for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
-    if (AWorkTable.EtalonChannels[I] <> nil) and AWorkTable.EtalonChannels[I].Enabled then
+    if IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I]) then
     begin
       GroupKey := AWorkTable.EtalonChannels[I].Group;
       ActiveEtalonIndex := I;
       Break;
     end;
+
   for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
-    if (AWorkTable.EtalonChannels[I] <> nil) and AWorkTable.EtalonChannels[I].Enabled and
+    if IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I]) and
        (((GroupKey > 0) and (AWorkTable.EtalonChannels[I].Group = GroupKey)) or
         ((GroupKey <= 0) and (I = ActiveEtalonIndex))) then
     begin
-      ChannelCoef := GetSignalChannelFlowCoef(AWorkTable.EtalonChannels[I]);
+      ChannelCoef := GetChannelFlowCoef(AWorkTable.EtalonChannels[I]);
       if ChannelCoef > 0 then
-        EtalonFlowActual := EtalonFlowActual + AWorkTable.EtalonChannels[I].ImpSec / ChannelCoef;
+        Result := Result + AWorkTable.EtalonChannels[I].ImpSec / ChannelCoef;
     end;
-  if EtalonFlowActual <= 0 then
-    EtalonFlowActual := EtalonFlowSet;
+end;
 
+
+function GetChannelCurrentFlowLS(const AChannel: TChannel): Double;
+begin
+  Result := 0;
+  if (AChannel <> nil) and (AChannel.FlowMeter <> nil) and
+     (AChannel.FlowMeter.ValueFlow <> nil) then
+    Result := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
+end;
+
+function GetChannelDeviceNameForLog(const AChannel: TChannel): string;
+begin
+  Result := '';
+  if AChannel <> nil then
+    Result := AChannel.DeviceName;
+end;
+
+procedure LogDeviceReadinessBaseCaptured(const AWorkTable: TWorkTable; const AChannel: TChannel;
+  const AChannelIndex: Integer; const ACurrentFlowLS: Double);
+begin
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcState, psWorkTable, 'DeviceReadinessBaseCaptured',
+      'Device readiness base captured',
+      Format('ChannelIndex=%d DeviceUUID=%s DeviceName=%s CurrentFlowLps=%.6f ReadinessBaseFlowLps=%.6f',
+        [AChannelIndex, AChannel.DeviceUUID, GetChannelDeviceNameForLog(AChannel),
+         ACurrentFlowLS, AChannel.ReadinessBaseFlow]));
+end;
+
+procedure LogDeviceReadinessBaseReleased(const AWorkTable: TWorkTable; const AChannel: TChannel;
+  const AChannelIndex: Integer; const ANextTargetFlowLS: Double);
+var
+  NextTargetSource: string;
+begin
+  if ProtocolManager = nil then
+    Exit;
+
+  if (AWorkTable <> nil) and AWorkTable.HasDeviceSimulationFlowRate then
+    NextTargetSource := 'SeparateDeviceFlow'
+  else
+    NextTargetSource := 'EtalonFlow';
+
+  ProtocolManager.AddMessage(pcState, psWorkTable, 'DeviceReadinessBaseReleased',
+    'Device readiness base released',
+    Format('ChannelIndex=%d DeviceUUID=%s DeviceName=%s PreviousReadinessBaseFlowLps=%.6f NextTargetSource=%s NextTargetFlowLps=%.6f',
+      [AChannelIndex, AChannel.DeviceUUID, GetChannelDeviceNameForLog(AChannel),
+       AChannel.ReadinessBaseFlow, NextTargetSource, ANextTargetFlowLS]));
+end;
+
+procedure CaptureDeviceReadinessBase(const AWorkTable: TWorkTable; const AChannel: TChannel;
+  const AChannelIndex: Integer);
+var
+  CurrentFlowLS: Double;
+begin
+  if (AChannel = nil) or (not AChannel.Enabled) or
+     (AChannel.FlowMeter = nil) or (AChannel.FlowMeter.Device = nil) or
+     AChannel.HasReadinessBaseFlow then
+    Exit;
+
+  CurrentFlowLS := GetChannelCurrentFlowLS(AChannel);
+  AChannel.ReadinessBaseFlow := CurrentFlowLS;
+  AChannel.HasReadinessBaseFlow := True;
+  LogDeviceReadinessBaseCaptured(AWorkTable, AChannel, AChannelIndex, CurrentFlowLS);
+end;
+
+procedure ReleaseDeviceReadinessBases(const AWorkTable: TWorkTable; const ATargetEtalonFlow: Double);
+var
+  I: Integer;
+  Channel: TChannel;
+  NextTargetFlowLS: Double;
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  if AWorkTable.HasDeviceSimulationFlowRate then
+    NextTargetFlowLS := AWorkTable.DeviceSimulationFlowRate
+  else
+    NextTargetFlowLS := ATargetEtalonFlow;
 
   for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
   begin
     Channel := AWorkTable.DeviceChannels[I];
-    if Channel = nil then
-      Continue;
-
-    CurDelta := (Random * 0.6) - 0.3;
-    if Channel.Enabled then
+    if (Channel <> nil) and Channel.HasReadinessBaseFlow then
     begin
-      Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
-
-      if DeviceReady and (Channel.ImpSec > 0) then
-      begin
-        MaxImpDelta := EnsureRange(Abs(Channel.ImpSec) * 0.01, 0.1, 1000.0);
-        ImpDelta := (Random * 2.0 - 1.0) * MaxImpDelta;
-        MinImpSec := Max(0.0, Channel.ImpSec * 0.99);
-        MaxImpSec := Channel.ImpSec * 1.01;
-        Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, MinImpSec, MaxImpSec);
-      end
-      else if not DeviceReady then
-      begin
-        ChannelCoef := GetSignalChannelFlowCoef(Channel);
-        GroupChannelCount := 0;
-        for J := 0 to AWorkTable.DeviceChannels.Count - 1 do
-          if (AWorkTable.DeviceChannels[J] <> nil) and AWorkTable.DeviceChannels[J].Enabled and
-             (((Channel.Group > 0) and (AWorkTable.DeviceChannels[J].Group = Channel.Group)) or
-              ((Channel.Group <= 0) and (J = I))) then
-            Inc(GroupChannelCount);
-        GroupFlowMax := GetEnabledGroupFlowMax(AWorkTable.DeviceChannels, Channel.Group, I);
-        if (Channel.FlowMeter <> nil) and (Channel.FlowMeter.Device <> nil) then
-          ChannelFlowMax := AWorkTable.ValueFlowRate.GetDoubleBaseNum(Channel.QMaxWork, 4)
-        else
-          ChannelFlowMax := 0;
-        if (GroupFlowMax > 0) and (ChannelFlowMax > 0) then
-          DeviceFlow := EtalonFlowActual * ChannelFlowMax / GroupFlowMax
-        else
-          DeviceFlow := 0;
-        if ProtocolManager <> nil then
-          ProtocolManager.AddMessage(pcState, psWorkTable, 'DeviceFlowSimulation',
-            'Device flow distribution',
-            Format('Device=%d Group=%d EnabledCount=%d LineFlow=%.3f DeviceFlow=%.3f',
-              [I, Channel.Group, GroupChannelCount, EtalonFlowSet, DeviceFlow]));
-        TargetImpSec := DeviceFlow * ChannelCoef;
-        if TargetImpSec > 0 then
-        begin
-          MaxImpDelta := EnsureRange(Abs(Max(Channel.ImpSec, TargetImpSec)) * 0.01, 0.1, 10.0);
-          if Abs(Channel.ImpSec - TargetImpSec) > MaxImpDelta then
-          begin
-            ImpDelta := EnsureRange(TargetImpSec - Channel.ImpSec, -MaxImpDelta, MaxImpDelta);
-            MinImpSec := 0.0;
-            MaxImpSec := Max(Channel.ImpSec, TargetImpSec);
-          end
-          else
-          begin
-            MaxImpDelta := EnsureRange(Abs(TargetImpSec) * 0.01, 0.1, 30.0);
-            ImpDelta := (Random * 2.0 - 1.0) * MaxImpDelta;
-            MinImpSec := Max(0.0, TargetImpSec * 0.99);
-            MaxImpSec := TargetImpSec * 1.01;
-          end;
-          Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, MinImpSec, MaxImpSec);
-        end;
-      end;
-
-      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
-    end
-    else
-    begin
-      Channel.CurSec :=0;
-      Channel.ImpSec := 0;
-      Channel.ImpResult := 0;
+      LogDeviceReadinessBaseReleased(AWorkTable, Channel, I, NextTargetFlowLS);
+      Channel.HasReadinessBaseFlow := False;
     end;
   end;
+end;
+
+procedure UpdateDeviceChannelSignals(const AWorkTable: TWorkTable; const ATargetEtalonFlow, AOldTargetFlow: Double;
+  const ACurrentTimeMs: Double);
+var
+  I: Integer;
+  Channel: TChannel;
+  EnabledDeviceChannels: TObjectList<TChannel>;
+  TargetImpSec: Double;
+  TargetDeviceFlow: Double;
+  ChannelCoef: Double;
+begin
+  EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
+  try
+    for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
+    begin
+      Channel := AWorkTable.DeviceChannels[I];
+      if IsSimulationChannelEnabled(Channel) then
+        EnabledDeviceChannels.Add(Channel)
+      else if Channel <> nil then
+      begin
+        Channel.HasReadinessBaseFlow := False;
+        ResetChannelSimulation(Channel, True);
+      end;
+    end;
+
+    if not AWorkTable.DeviceReady then
+      ReleaseDeviceReadinessBases(AWorkTable, ATargetEtalonFlow);
+
+    for I := 0 to EnabledDeviceChannels.Count - 1 do
+    begin
+      Channel := EnabledDeviceChannels[I];
+
+      if (AWorkTable.DeviceReady) and (not Channel.HasReadinessBaseFlow) then
+        CaptureDeviceReadinessBase(AWorkTable, Channel,
+          AWorkTable.DeviceChannels.IndexOf(Channel));
+
+      if (AWorkTable.DeviceReady) and (Channel.HasReadinessBaseFlow) then
+        TargetDeviceFlow := Channel.ReadinessBaseFlow
+      else if AWorkTable.HasDeviceSimulationFlowRate then
+        TargetDeviceFlow := AWorkTable.DeviceSimulationFlowRate
+      else
+        TargetDeviceFlow := ATargetEtalonFlow;
+
+      ChannelCoef := GetChannelFlowCoef(Channel);
+      if ChannelCoef > 0 then
+        TargetImpSec := TargetDeviceFlow * ChannelCoef
+      else
+        TargetImpSec := 0;
+
+      UpdateChannelRamp(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
+        TargetImpSec, ACurrentTimeMs,
+        Format('Reason=WorkTableTargetChanged TargetSource=WorkTableSetFlow TargetFlowBaseLS=%.6f OldTargetFlowBaseLS=%.6f PointUUID= DeviceReady=%s',
+          [TargetDeviceFlow, AOldTargetFlow, IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
+      ApplySimpleSimulationNoise(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
+        ACurrentTimeMs, 1.0, AWorkTable.DeviceReady);
+      UpdateChannelCurSec(Channel, 0.3);
+    end;
+  finally
+    EnabledDeviceChannels.Free;
+  end;
+end;
+
+procedure ResetDisabledSimulationChannels(const AWorkTable: TWorkTable);
+var
+  I: Integer;
+begin
+  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+    if (AWorkTable.EtalonChannels[I] <> nil) and
+       (not IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I])) then
+      ResetChannelSimulation(AWorkTable.EtalonChannels[I], True);
+end;
+
+procedure AccumulateSimulationChannelImpResult(const AChannels: TObjectList<TChannel>; const ADeltaTimeSec: Double);
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  if AChannels = nil then
+    Exit;
+
+  for I := 0 to AChannels.Count - 1 do
+  begin
+    Channel := AChannels[I];
+    if IsSimulationChannelEnabled(Channel) then
+      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec * ADeltaTimeSec, 0.0, 1.0E12);
+  end;
+end;
+
+procedure LogSimulationFlowUnitsDiagnostic(const AWorkTable: TWorkTable; const ABaseTargetFlowLS: Double);
+const
+  TARGET_EPSILON = 1E-6;
+var
+  UnitName: string;
+  DisplayedSetValue: Double;
+  EtalonValueFlowLS: Double;
+  DeviceValueFlowLS: Double;
+  DisplayedEtalonFlow: Double;
+  DisplayedDeviceFlow: Double;
+begin
+  if (AWorkTable = nil) or (AWorkTable.ValueFlowRate = nil) or (ProtocolManager = nil) then
+    Exit;
+
+  if SameValue(AWorkTable.SimulationLastFlowUnitsLogTarget, ABaseTargetFlowLS, TARGET_EPSILON) then
+    Exit;
+
+  AWorkTable.SimulationLastFlowUnitsLogTarget := ABaseTargetFlowLS;
+  UnitName := AWorkTable.ValueFlowRate.GetDimName;
+  DisplayedSetValue := AWorkTable.ValueFlowRate.GetDoubleNum(ABaseTargetFlowLS,
+    AWorkTable.ValueFlowRate.CurrentDimIndex);
+
+  EtalonValueFlowLS := 0;
+  if (AWorkTable.EtalonChannels.Count > 0) and (AWorkTable.EtalonChannels[0] <> nil) and
+     (AWorkTable.EtalonChannels[0].FlowMeter <> nil) and
+     (AWorkTable.EtalonChannels[0].FlowMeter.ValueFlow <> nil) then
+    EtalonValueFlowLS := AWorkTable.EtalonChannels[0].FlowMeter.ValueFlow.GetDoubleValue;
+
+  DeviceValueFlowLS := 0;
+  if (AWorkTable.DeviceChannels.Count > 0) and (AWorkTable.DeviceChannels[0] <> nil) and
+     (AWorkTable.DeviceChannels[0].FlowMeter <> nil) and
+     (AWorkTable.DeviceChannels[0].FlowMeter.ValueFlow <> nil) then
+    DeviceValueFlowLS := AWorkTable.DeviceChannels[0].FlowMeter.ValueFlow.GetDoubleValue;
+
+  DisplayedEtalonFlow := AWorkTable.ValueFlowRate.GetDoubleNum(EtalonValueFlowLS,
+    AWorkTable.ValueFlowRate.CurrentDimIndex);
+  DisplayedDeviceFlow := AWorkTable.ValueFlowRate.GetDoubleNum(DeviceValueFlowLS,
+    AWorkTable.ValueFlowRate.CurrentDimIndex);
+
+  ProtocolManager.AddMessage(pcState, psWorkTable, 'FlowUnitsDiagnostic',
+    'Flow unit conversion diagnostic',
+    Format('DisplayedSetValue=%.6f SelectedUnit=%s BaseTargetFlowLS=%.6f EtalonValueFlowLS=%.6f DisplayedEtalonFlow=%.6f DeviceValueFlowLS=%.6f DisplayedDeviceFlow=%.6f',
+      [DisplayedSetValue, UnitName, ABaseTargetFlowLS, EtalonValueFlowLS,
+       DisplayedEtalonFlow, DeviceValueFlowLS, DisplayedDeviceFlow]));
+end;
+
+procedure RunChannelSimulationCycle(const AWorkTable: TWorkTable);
+const
+  MAX_DELTA_TIME_SEC = 1.0;
+var
+  I: Integer;
+  CurrentTimeMs: Double;
+  DeltaTimeSec: Double;
+  TargetFlow: Double;
+  OldTargetFlow: Double;
+  EnabledEtalonChannels: TObjectList<TChannel>;
+  EtalonTargetImpSecValues: TArray<Double>;
+begin
+  if (AWorkTable = nil) or (AWorkTable.FlowRate = nil) or (not AWorkTable.FlowRate.IsRunning) then
+    Exit;
+
+  CurrentTimeMs := GetCurrentTimeMs;
+  if AWorkTable.SimulationLastUpdateTimeMs > 0 then
+    DeltaTimeSec := EnsureRange((CurrentTimeMs - AWorkTable.SimulationLastUpdateTimeMs) / 1000.0,
+      0.0, MAX_DELTA_TIME_SEC)
+  else
+    DeltaTimeSec := 1.0;
+  AWorkTable.SimulationLastUpdateTimeMs := CurrentTimeMs;
+  AWorkTable.Time := AWorkTable.Time + DeltaTimeSec;
+
+  TargetFlow := AWorkTable.FlowRate.ValueSet.Value;
+  OldTargetFlow := AWorkTable.SimulationTargetFlowBase;
+  LogSimulationFlowUnitsDiagnostic(AWorkTable, TargetFlow);
+  EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
+  try
+    for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+      if IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I]) then
+        EnabledEtalonChannels.Add(AWorkTable.EtalonChannels[I]);
+
+    EtalonTargetImpSecValues := CalculateEtalonTargetImpSecValues(AWorkTable,
+      EnabledEtalonChannels, TargetFlow);
+    UpdateEtalonChannelSignals(AWorkTable, EnabledEtalonChannels,
+      EtalonTargetImpSecValues, CurrentTimeMs, TargetFlow, OldTargetFlow);
+  finally
+    EnabledEtalonChannels.Free;
+  end;
+
+  UpdateDeviceChannelSignals(AWorkTable, TargetFlow, OldTargetFlow, CurrentTimeMs);
+  AWorkTable.SimulationTargetFlowBase := TargetFlow;
+  AccumulateSimulationChannelImpResult(AWorkTable.EtalonChannels, DeltaTimeSec);
+  AccumulateSimulationChannelImpResult(AWorkTable.DeviceChannels, DeltaTimeSec);
+  ResetDisabledSimulationChannels(AWorkTable);
+end;
+
+procedure ResetDisabledChannelSignals(const AWorkTable: TWorkTable);
+var
+  I: Integer;
+begin
+  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+    if (AWorkTable.EtalonChannels[I] <> nil) and
+       (not IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I])) then
+      ResetChannelSimulation(AWorkTable.EtalonChannels[I], True);
+end;
+
+procedure AccumulateChannelImpResult(const AChannels: TObjectList<TChannel>; const ADeltaTimeSec: Double);
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  if AChannels = nil then
+    Exit;
+
+  for I := 0 to AChannels.Count - 1 do
+  begin
+    Channel := AChannels[I];
+    if IsSimulationChannelEnabled(Channel) then
+      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec * ADeltaTimeSec, 0.0, 1.0E12);
+  end;
+end;
+
+procedure LogFlowUnitsDiagnostic(const AWorkTable: TWorkTable; const ABaseTargetFlowLS: Double);
+const
+  TARGET_EPSILON = 1E-6;
+var
+  UnitName: string;
+  DisplayedSetValue: Double;
+  EtalonValueFlowLS: Double;
+  DeviceValueFlowLS: Double;
+  DisplayedEtalonFlow: Double;
+  DisplayedDeviceFlow: Double;
+begin
+  if (AWorkTable = nil) or (AWorkTable.ValueFlowRate = nil) or (ProtocolManager = nil) then
+    Exit;
+
+  if SameValue(AWorkTable.SimulationLastFlowUnitsLogTarget, ABaseTargetFlowLS, TARGET_EPSILON) then
+    Exit;
+
+  AWorkTable.SimulationLastFlowUnitsLogTarget := ABaseTargetFlowLS;
+  UnitName := AWorkTable.ValueFlowRate.GetDimName;
+  DisplayedSetValue := AWorkTable.ValueFlowRate.GetDoubleNum(ABaseTargetFlowLS,
+    AWorkTable.ValueFlowRate.CurrentDimIndex);
+
+  EtalonValueFlowLS := 0;
+  if (AWorkTable.EtalonChannels.Count > 0) and (AWorkTable.EtalonChannels[0] <> nil) and
+     (AWorkTable.EtalonChannels[0].FlowMeter <> nil) and
+     (AWorkTable.EtalonChannels[0].FlowMeter.ValueFlow <> nil) then
+    EtalonValueFlowLS := AWorkTable.EtalonChannels[0].FlowMeter.ValueFlow.GetDoubleValue;
+
+  DeviceValueFlowLS := 0;
+  if (AWorkTable.DeviceChannels.Count > 0) and (AWorkTable.DeviceChannels[0] <> nil) and
+     (AWorkTable.DeviceChannels[0].FlowMeter <> nil) and
+     (AWorkTable.DeviceChannels[0].FlowMeter.ValueFlow <> nil) then
+    DeviceValueFlowLS := AWorkTable.DeviceChannels[0].FlowMeter.ValueFlow.GetDoubleValue;
+
+  DisplayedEtalonFlow := AWorkTable.ValueFlowRate.GetDoubleNum(EtalonValueFlowLS,
+    AWorkTable.ValueFlowRate.CurrentDimIndex);
+  DisplayedDeviceFlow := AWorkTable.ValueFlowRate.GetDoubleNum(DeviceValueFlowLS,
+    AWorkTable.ValueFlowRate.CurrentDimIndex);
+
+  ProtocolManager.AddMessage(pcState, psWorkTable, 'FlowUnitsDiagnostic',
+    'Flow unit conversion diagnostic',
+    Format('DisplayedSetValue=%.6f SelectedUnit=%s BaseTargetFlowLS=%.6f EtalonValueFlowLS=%.6f DisplayedEtalonFlow=%.6f DeviceValueFlowLS=%.6f DisplayedDeviceFlow=%.6f',
+      [DisplayedSetValue, UnitName, ABaseTargetFlowLS, EtalonValueFlowLS,
+       DisplayedEtalonFlow, DeviceValueFlowLS, DisplayedDeviceFlow]));
+end;
+
+
+procedure UpdateChannelSimulation(const AWorkTable: TWorkTable);
+const
+  MAX_DELTA_TIME_SEC = 1.0;
+var
+  I: Integer;
+  CurrentTimeMs: Double;
+  DeltaTimeSec: Double;
+  TargetFlow: Double;
+  OldTargetFlow: Double;
+  EnabledEtalonChannels: TObjectList<TChannel>;
+  EtalonTargetImpSecValues: TArray<Double>;
+begin
+  if (AWorkTable = nil) or (AWorkTable.FlowRate = nil) or (not AWorkTable.FlowRate.IsRunning) then
+    Exit;
+
+  CurrentTimeMs := GetCurrentTimeMs;
+  if AWorkTable.SimulationLastUpdateTimeMs > 0 then
+    DeltaTimeSec := EnsureRange((CurrentTimeMs - AWorkTable.SimulationLastUpdateTimeMs) / 1000.0,
+      0.0, MAX_DELTA_TIME_SEC)
+  else
+    DeltaTimeSec := 1.0;
+  AWorkTable.SimulationLastUpdateTimeMs := CurrentTimeMs;
+  AWorkTable.Time := AWorkTable.Time + DeltaTimeSec;
+
+  TargetFlow := AWorkTable.FlowRate.ValueSet.Value;
+  OldTargetFlow := AWorkTable.SimulationTargetFlowBase;
+  LogFlowUnitsDiagnostic(AWorkTable, TargetFlow);
+  EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
+  try
+    for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+      if IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I]) then
+        EnabledEtalonChannels.Add(AWorkTable.EtalonChannels[I]);
+
+    EtalonTargetImpSecValues := CalculateEtalonTargetImpSecValues(AWorkTable,
+      EnabledEtalonChannels, TargetFlow);
+    UpdateEtalonChannelSignals(AWorkTable, EnabledEtalonChannels,
+      EtalonTargetImpSecValues, CurrentTimeMs, TargetFlow, OldTargetFlow);
+  finally
+    EnabledEtalonChannels.Free;
+  end;
+
+  UpdateDeviceChannelSignals(AWorkTable, TargetFlow, OldTargetFlow, CurrentTimeMs);
+  AWorkTable.SimulationTargetFlowBase := TargetFlow;
+  AccumulateChannelImpResult(AWorkTable.EtalonChannels, DeltaTimeSec);
+  AccumulateChannelImpResult(AWorkTable.DeviceChannels, DeltaTimeSec);
+  ResetDisabledChannelSignals(AWorkTable);
 end;
 
 begin
@@ -6932,14 +7414,14 @@ begin
   // Обновление частоты насоса (имитация работы)
   UpdateRandomFreq(WorkTable);
 
-  // Обновление текущего расхода  (имитация работы)
-  UpdateRandomFlowRate(WorkTable);
-
   // Обновление климатических параметров (температура и др.)
   UpdateRandomTemp(WorkTable);
 
   // Обновление давления
   UpdateRandomPress(WorkTable);
+
+  // Перенос runtime-значений климата в TMeterValue до UI/сохранения.
+  SyncEnvironmentMeterValues(WorkTable);
 
 
   // ============================================================
@@ -6980,7 +7462,7 @@ begin
     // Мониторинг (наблюдение без измерения)
     // ------------------------------------------------------------
     swtMONITOR:
-      UpdateRandomSignals(WorkTable); // обновление показаний
+      RunChannelSimulationCycle(WorkTable); // обновление показаний
 
 
     // ------------------------------------------------------------
@@ -7012,7 +7494,7 @@ begin
     swtEXECUTE:
     begin
       // Обновление сигналов (имитация работы датчиков)
-      UpdateRandomSignals(WorkTable);
+      RunChannelSimulationCycle(WorkTable);
 
 
       // ----------------------------------------------------------

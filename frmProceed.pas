@@ -1555,10 +1555,10 @@ end;
 function TFrameProceed.GetStatusColor(const AStatus: Integer): TAlphaColor;
 begin
   case AStatus of
-    2: Result := $FFF0F0F0;
-    3: Result := $FFFFE6E6;
-    4: Result := $FFFFE6E6;
-    5: Result := $FFE6F4E6;
+    2: Result := COLOR_NONE;
+    3: Result := COLOR_INVALID;
+    4: Result := COLOR_INVALID;
+    5: Result := COLOR_COMPLETED;
   else
     Result := TAlphaColors.Null;
   end;
@@ -3490,7 +3490,7 @@ begin
         end;
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageSpillTime then
-    Value := FloatToStr(P.SpillTime)
+    Value := IntToStr(Trunc(P.SpillTime))
 
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQavgEtalon then
   begin

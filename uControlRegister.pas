@@ -8,6 +8,7 @@ uses
   System.UITypes,
   System.TypInfo,
   System.Rtti,
+  uBaseProcedures,
   uObservable;
 
 type
@@ -226,17 +227,17 @@ class function TControlRegister<T>.StateToColor(
 begin
   case AState of
     crsActual:
-      Result := TAlphaColorRec.Limegreen;  // зелёный
+      Result := COLOR_COMPLETED;
     crsMismatch:
-      Result := TAlphaColorRec.Gold;       // жёлтый
+      Result := COLOR_WARNING;
     crsPending:
-      Result := TAlphaColorRec.Gray;       // серый
+      Result := COLOR_RUNNING;
     crsError:
-      Result := TAlphaColorRec.Red;        // красный
+      Result := COLOR_INVALID;
     crsUnknown:
-      Result := TAlphaColorRec.Lightgray;  // светлый
+      Result := COLOR_NONE;
   else
-    Result := TAlphaColorRec.Lightgray;
+    Result := COLOR_NONE;
   end;
 end;
 

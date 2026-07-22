@@ -106,6 +106,34 @@ implementation
 
 {$R *.fmx}
 
+function PressureRandomAroundBase(const ABaseValue: Double;
+  const ARelativeDeviation: Double): Double;
+var
+  RandomUnit: Double;
+  MinValue: Double;
+  MaxValue: Double;
+begin
+  if ABaseValue = 0 then
+    Exit(0);
+
+  RandomUnit := Random;
+  Result := ABaseValue *
+    (1 - ARelativeDeviation + RandomUnit * 2 * ARelativeDeviation);
+
+  MinValue := Min(ABaseValue * (1 - ARelativeDeviation),
+    ABaseValue * (1 + ARelativeDeviation));
+  MaxValue := Max(ABaseValue * (1 - ARelativeDeviation),
+    ABaseValue * (1 + ARelativeDeviation));
+  Result := EnsureRange(Result, MinValue, MaxValue);
+end;
+
+procedure EnsureEnvironmentSimulationBase(const AWorkTable: TWorkTable);
+begin
+  if (AWorkTable <> nil) and
+     (not AWorkTable.EnvironmentSimulationBaseInitialized) then
+    AWorkTable.CaptureEnvironmentSimulationBase;
+end;
+
 procedure TFormMain.ButtonApplyDeviceValuesClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
@@ -460,57 +488,23 @@ end;
 
 
 procedure TFormMain.UpdateRandomPress(const AWorkTable: TWorkTable);
-var
-  TempDelta, PressDelta: Double;
+const
+  RelativeDeviation = 0.05;
 begin
-  if AWorkTable = nil then
+  if (AWorkTable = nil) or (AWorkTable.FluidPress = nil) then
     Exit;
 
-  IF AWorkTable.FluidPress.Action = apStart THEN
-    AWorkTable.FluidPress.State:=spStarted
-  else  if (AWorkTable.FluidPress.Action = apStop) then
-    AWorkTable.FluidPress.State:=spStopped;
-
-   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextPressChangeAt = 0) or (Now >= FNextPressChangeAt) then
   begin
+    EnsureEnvironmentSimulationBase(AWorkTable);
 
-    TempDelta :=  (Random * 0.30) - 0.15;
-    PressDelta :=  (Random * 0.06) - 0.03;
-    if (AWorkTable.FluidPress.IsRunning) then
-    begin
-      if  (AWorkTable.FluidPress.Value.value<AWorkTable.FluidPress.ValueSet.value) then
-      begin
-        AWorkTable.FluidPress.BeforeValue:=(AWorkTable.FluidPress.BeforeValue+1);
-        AWorkTable.FluidPress.AfterValue:=(AWorkTable.FluidPress.AfterValue+1);
-      end
-      else if  (AWorkTable.FluidPress.Value.value>AWorkTable.FluidPress.ValueSet.value)  then
-      begin
-        AWorkTable.FluidPress.BeforeValue:=(AWorkTable.FluidPress.BeforeValue-0.3);
-        AWorkTable.FluidPress.AfterValue:=(AWorkTable.FluidPress.AfterValue-0.3);
-      end;
+    AWorkTable.FluidPress.BeforeValue :=
+      PressureRandomAroundBase(AWorkTable.SimulationBasePressBefore, RelativeDeviation);
+    AWorkTable.FluidPress.AfterValue :=
+      PressureRandomAroundBase(AWorkTable.SimulationBasePressAfter, RelativeDeviation);
 
-
-    end;
-      if  (AWorkTable.FluidPress.Value.value<AWorkTable.FluidPress.ValueSet.value)  then
-      begin
-        AWorkTable.FluidPress.BeforeValue:=(EnsureRange(AWorkTable.FluidPress.BeforeValue + 0.1, -50.0, 150.0));
-        AWorkTable.FluidPress.AfterValue:=(EnsureRange(AWorkTable.FluidPress.AfterValue + 0.1, -50.0, 150.0));
-      end;
-      if AWorkTable.FluidPress.ValueSet.value<>0 then
-      begin
-        AWorkTable.FluidPress.BeforeValue:=(EnsureRange(AWorkTable.FluidPress.BeforeValue + PressDelta, -50.0, 150.0));
-        AWorkTable.FluidPress.AfterValue:=(EnsureRange(AWorkTable.FluidPress.AfterValue + PressDelta, -50.0, 150.0));
-      end;
-
-
-
-
-      //AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
-      //AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
-
-      FNextPressChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
-   end;
+    FNextPressChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
+  end;
 end;
 
 procedure TFormMain.UpdateRandomFreq(const APump: TPump);
