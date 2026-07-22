@@ -1,4 +1,4 @@
-# Main2: краткие комментарии по изменениям после merge с MAIN
+﻿# Main2: краткие комментарии по изменениям после merge с MAIN
 
 База: `ead28a5` — merge `MAIN` в `Main2` от 2026-06-02.
 
@@ -55,3 +55,10 @@
 - В свойства рабочего стола добавлен заголовок колонок `Свойство` / `Значение` и разделительная линия, чтобы форма выглядела как остальные инспекторы свойств.
 - Вызов `WorkTableManager.ActiveWorkTable.InitChannels` перенесён из UI-обработчиков `frmMainTable` в `TDeviceRepository.Load` после проверки схемы БД; прямые дублирующие вызовы при выборе/редактировании прибора удалены.
 - Инициализация каналов при загрузке репозитория выполняется только при наличии `WorkTableManager` и активного рабочего стола.
+
+## 2026-07-22 — диагностика графиков расхода
+- FlowGraphRunState: RunActive определяется по активному `TMeasurementRun` и `Stage` не в `msNone/msDone`; NewRunStarted фиксируется по переходу `FLastGraphRunActive=False -> True`, а не только по смене ссылки объекта.
+- FlowGraphReadiness: `FGraphChannelsReady=True`, когда созданы `FFlowGraphHistory`, логические серии текущего WorkTable и синхронизированные `TLineSeries`; при первом запуске MeasurementRun readiness принудительно доводится через `RefreshFlowGraphChannels` до добавления первого Sample.
+- FlowGraphSample: сбор начинается сразу после определения `CurrentPoint` и готовности каналов; значения `0` сохраняются как валидные Samples, отбрасываются только отсутствующие каналы/приборы/значения и NaN/Infinity на рендере.
+- FlowGraphRender: визуальные `TLineSeries` очищаются только внутри рендера и заполняются Samples текущего сегмента/окна; история предыдущих точек остаётся в runtime `Samples`.
+- FlowGraphLimits: ErrorSource=TDevicePoint.Error; TargetLS=CurrentPoint.Q; PointErrorPercent=Abs(CurrentPoint.Error); LowerLS/UpperLS считаются как TargetLS ± Abs(TargetLS)*PointErrorPercent/100.0; `Point.FlowAccuracy` используется MeasurementRun для стабилизации, но не графическими линиями допуска.
