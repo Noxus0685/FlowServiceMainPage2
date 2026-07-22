@@ -37,6 +37,7 @@ uses
   FMXTee.Chart,
   FMXTee.Engine,
   FMXTee.Procs,
+  FMXTee.Series,
   frmCalibrCoefs,
   frmChannelProperties,
   frmFlowMeterProperties,
@@ -107,6 +108,47 @@ type
 
   TWorkTableCommandEvent = procedure(AWorkTable: TWorkTable;
     AAction: EActionWorkTable) of object;
+
+  TFlowGraphSample = record
+    TimeStampMs: Int64;
+    Value: Double;
+  end;
+
+  TFlowGraphSeries = class
+  private
+    FKey: string;
+    FCaption: string;
+    FVisible: Boolean;
+    FColor: TAlphaColor;
+    FSamples: TList<TFlowGraphSample>;
+  public
+    constructor Create(const AKey, ACaption: string; AColor: TAlphaColor; AVisible: Boolean);
+    destructor Destroy; override;
+    property Key: string read FKey;
+    property Caption: string read FCaption write FCaption;
+    property Visible: Boolean read FVisible write FVisible;
+    property Color: TAlphaColor read FColor;
+    property Samples: TList<TFlowGraphSample> read FSamples;
+  end;
+
+  TFlowGraphLimits = record
+    Valid: Boolean;
+    TargetLS: Double;
+    LowerLS: Double;
+    UpperLS: Double;
+  end;
+
+  TFlowGraphHistory = class
+  private
+    FEtalonSeries: TObjectDictionary<string, TFlowGraphSeries>;
+    FDeviceSeries: TObjectDictionary<string, TFlowGraphSeries>;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Clear;
+    property EtalonSeries: TObjectDictionary<string, TFlowGraphSeries> read FEtalonSeries;
+    property DeviceSeries: TObjectDictionary<string, TFlowGraphSeries> read FDeviceSeries;
+  end;
 
   TFrameMainTable = class(TFrame, IEventObserver)
     TabControlWorkTables: TTabControl;
@@ -478,6 +520,26 @@ type
     MenuItemDeleteScale: TMenuItem;
     StyleBook1: TStyleBook;
     PanelControlWorkTables: TPanel;
+    TabItemWorkTable1: TTabItem;
+    TabItemGraphs: TTabItem;
+    LayoutGraphsClient: TLayout;
+    LayoutEtalonGraphSection: TLayout;
+    LayoutEtalonChart: TLayout;
+    ChartEtalonFlow: TChart;
+    LayoutEtalonSelection: TLayout;
+    LabelEtalonSelection: TLabel;
+    HorzScrollBoxEtalonSelection: THorzScrollBox;
+    FlowLayoutEtalonChecks: TFlowLayout;
+    SplitterFlowGraphs: TSplitter;
+    LayoutDeviceGraphSection: TLayout;
+    LayoutDeviceChart: TLayout;
+    ChartDeviceFlow: TChart;
+    LayoutDeviceSelection: TLayout;
+    LabelDeviceSelection: TLabel;
+    HorzScrollBoxDeviceSelection: THorzScrollBox;
+    FlowLayoutDeviceChecks: TFlowLayout;
+    LayoutGraphCommands: TLayout;
+    ButtonClearFlowGraphs: TButton;
     Label3: TLabel;
     SpeedButton7: TSpeedButton;
     LabelScaleTotalWeight: TLabel;
@@ -614,6 +676,20 @@ type
 
     FActiveWorkTable: TWorkTable;
     FNewInstrumentName: string;
+
+    FFlowGraphHistory: TFlowGraphHistory;
+    FLastFlowGraphSampleMs: UInt64;
+    FFlowGraphWorkTable: TWorkTable;
+    FFlowGraphXMin: Int64;
+    FFlowGraphXMax: Int64;
+    FEtalonChartSeries: TObjectDictionary<string, TLineSeries>;
+    FDeviceChartSeries: TObjectDictionary<string, TLineSeries>;
+    FEtalonLowerToleranceSeries: TLineSeries;
+    FEtalonUpperToleranceSeries: TLineSeries;
+    FEtalonTargetSeries: TLineSeries;
+    FDeviceLowerToleranceSeries: TLineSeries;
+    FDeviceUpperToleranceSeries: TLineSeries;
+    FDeviceTargetSeries: TLineSeries;
   FFrameMeasurementRun: TFrameMeasurementRun;
   FFrameMRResults: TFrameMRResults;
   FFrameProtocol: TFrameProtocol;
@@ -662,6 +738,25 @@ type
     function GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
     function GetDeviceGroupColor(const AGroup: Integer): TAlphaColor;
     function GetDisplayFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
+
+    procedure RefreshFlowGraphChannels;
+    procedure AddFlowGraphSamples(const ATimeStampMs: UInt64);
+    procedure RenderFlowGraphs;
+    procedure RenderFlowChart(AChart: TChart; ASeries: TObjectDictionary<string, TFlowGraphSeries>; AChartSeries: TObjectDictionary<string, TLineSeries>; const AXMin, AXMax: Int64);
+    procedure SyncFlowChartSeries(AChart: TChart; AGraphSeries: TObjectDictionary<string, TFlowGraphSeries>; AChartSeries: TObjectDictionary<string, TLineSeries>);
+    procedure ClearFlowChartSeries(AChart: TChart; AChartSeries: TObjectDictionary<string, TLineSeries>);
+    procedure EnsureFlowGraphDictionaries;
+    procedure EnsureToleranceSeries;
+    procedure FreeToleranceSeries;
+    procedure UpdateToleranceSeries(AChart: TChart; ALowerSeries, AUpperSeries, ATargetSeries: TLineSeries; const ALimits: TFlowGraphLimits; const AXMin, AXMax: Int64);
+    function TryGetFlowGraphLimits(out ALimits: TFlowGraphLimits): Boolean;
+    function IsFlowGraphSamplingActive(AWorkTable: TWorkTable): Boolean;
+    function BuildFlowGraphSeriesKey(const AKind: string; AWorkTable: TWorkTable; AChannel: TChannel; AChannelIndex: Integer): string;
+    function BuildFlowGraphCaption(AChannel: TChannel; AChannelIndex: Integer; const AFallbackPrefix: string): string;
+    function IsValidFlowGraphChannel(AChannel: TChannel): Boolean;
+    function FlowGraphDisplayValue(AWorkTable: TWorkTable; const ABaseFlowLS: Double): Double;
+    procedure ButtonClearFlowGraphsClick(Sender: TObject);
+    procedure FlowGraphCheckBoxChange(Sender: TObject);
 
     procedure UpdateUIFromValues;
     procedure SetValues;
@@ -790,15 +885,13 @@ type
 
 implementation
 
-
-
-{$R *.fmx}
-
 uses
   fuTable_Main;
 
-
 const
+  GraphSampleIntervalMs = 1000;
+  MaxGraphSampleCountPerSeries = 3600;
+
   CVolumeFlowUnits: array[0..4] of string = (
     'л/с',
     'л/мин',
@@ -840,6 +933,50 @@ const
   CProcessingDevicesCountKey = 'Count';
   CProcessingDevicesItemKeyPrefix = 'Item';
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
+
+{$R *.fmx}
+
+{ TFlowGraphSeries }
+
+constructor TFlowGraphSeries.Create(const AKey, ACaption: string; AColor: TAlphaColor; AVisible: Boolean);
+begin
+  inherited Create;
+  FKey := AKey;
+  FCaption := ACaption;
+  FColor := AColor;
+  FVisible := AVisible;
+  FSamples := TList<TFlowGraphSample>.Create;
+end;
+
+destructor TFlowGraphSeries.Destroy;
+begin
+  FSamples.Free;
+  inherited;
+end;
+
+{ TFlowGraphHistory }
+
+constructor TFlowGraphHistory.Create;
+begin
+  inherited Create;
+  FEtalonSeries := TObjectDictionary<string, TFlowGraphSeries>.Create([doOwnsValues]);
+  FDeviceSeries := TObjectDictionary<string, TFlowGraphSeries>.Create([doOwnsValues]);
+end;
+
+destructor TFlowGraphHistory.Destroy;
+begin
+  FEtalonSeries.Free;
+  FDeviceSeries.Free;
+  inherited;
+end;
+
+procedure TFlowGraphHistory.Clear;
+begin
+  FEtalonSeries.Clear;
+  FDeviceSeries.Clear;
+end;
+
+
 
 function IsVolumeFlowUnit(const AUnit: string): Boolean;
 var
@@ -937,6 +1074,12 @@ end;
 
 destructor TFrameMainTable.Destroy;
 begin
+  FreeToleranceSeries;
+  ClearFlowChartSeries(ChartEtalonFlow, FEtalonChartSeries);
+  ClearFlowChartSeries(ChartDeviceFlow, FDeviceChartSeries);
+  FreeAndNil(FEtalonChartSeries);
+  FreeAndNil(FDeviceChartSeries);
+  FreeAndNil(FFlowGraphHistory);
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
@@ -1885,6 +2028,16 @@ var
   LayoutOrder: string;
 
 begin
+  EnsureFlowGraphDictionaries;
+  if ButtonClearFlowGraphs <> nil then
+    ButtonClearFlowGraphs.OnClick := ButtonClearFlowGraphsClick;
+  if (PanelControlWorkTables <> nil) and (TabItemWorkTable1 <> nil) and
+     (PanelControlWorkTables.Parent <> TabItemWorkTable1) then
+  begin
+    PanelControlWorkTables.Parent := TabItemWorkTable1;
+    PanelControlWorkTables.Align := TAlignLayout.Client;
+  end;
+
   if FInitialized then
     Exit;
 
@@ -1948,6 +2101,8 @@ begin
     FFrameProtocol.Parent := LayoutProtocolHost;
     FFrameProtocol.Align := TAlignLayout.Client;
   end;
+
+  RefreshFlowGraphChannels;
 
   if FFrameFlowMeterProperties = nil then
   begin
@@ -3318,6 +3473,8 @@ begin
     FFrameProtocol.Parent := LayoutProtocolHost;
     FFrameProtocol.Align := TAlignLayout.Client;
   end;
+
+  RefreshFlowGraphChannels;
 
   Tab := FindComponent('TabItemWorkTable2') as TTabItem;
   if Assigned(Tab) then
@@ -4886,6 +5043,8 @@ begin
   end;
 
   SetValues;
+  if IsFlowGraphSamplingActive(WorkTable) then
+    AddFlowGraphSamples(TThread.GetTickCount64);
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
@@ -4917,6 +5076,613 @@ begin
    IsUpdating := False;
   end;
 
+end;
+
+
+function TFrameMainTable.IsValidFlowGraphChannel(AChannel: TChannel): Boolean;
+begin
+  Result := (AChannel <> nil) and (AChannel.State <> osDeleted) and
+    (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.ValueFlow <> nil) and
+    ((AChannel.FlowMeter.Device = nil) or (AChannel.FlowMeter.Device.State <> osDeleted));
+end;
+
+function TFrameMainTable.BuildFlowGraphSeriesKey(const AKind: string; AWorkTable: TWorkTable; AChannel: TChannel; AChannelIndex: Integer): string;
+var
+  MeterUUID: string;
+begin
+  MeterUUID := '';
+  if (AChannel <> nil) and (AChannel.FlowMeter <> nil) then
+    MeterUUID := Trim(AChannel.FlowMeter.UUID);
+  if MeterUUID = '' then
+    MeterUUID := Trim(AChannel.DeviceUUID);
+  Result := Format('%s:%s:%s:%d', [AKind, AWorkTable.UUID, MeterUUID, AChannelIndex + 1]);
+end;
+
+function TFrameMainTable.BuildFlowGraphCaption(AChannel: TChannel; AChannelIndex: Integer; const AFallbackPrefix: string): string;
+  procedure AppendUnique(const APart: string);
+  var
+    Part: string;
+  begin
+    Part := Trim(APart);
+    if Part = '' then
+      Exit;
+    if (Result <> '') and (Pos(UpperCase(Part), UpperCase(Result)) > 0) then
+      Exit;
+    if (Result <> '') and (Pos(UpperCase(Result), UpperCase(Part)) > 0) then
+      Result := Part
+    else
+    begin
+      if Result <> '' then
+        Result := Result + ' ';
+      Result := Result + Part;
+    end;
+  end;
+var
+  S, DN: string;
+begin
+  Result := '';
+  if AChannel <> nil then
+  begin
+    AppendUnique(AChannel.DeviceName);
+    AppendUnique(AChannel.TypeName);
+    DN := '';
+    if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) then
+      DN := Trim(AChannel.FlowMeter.Device.DN);
+    if (DN <> '') and (Pos('DN', UpperCase(DN)) <> 1) then
+      DN := 'DN' + DN;
+    AppendUnique(DN);
+    S := Trim(AChannel.Serial);
+    if S <> '' then
+      if Result <> '' then
+        Result := Result + ' — №' + S
+      else
+        Result := '№' + S;
+  end;
+  if Result = '' then
+    Result := Format('%s %d', [AFallbackPrefix, AChannelIndex + 1]);
+end;
+
+function TFrameMainTable.FlowGraphDisplayValue(AWorkTable: TWorkTable; const ABaseFlowLS: Double): Double;
+begin
+  Result := ABaseFlowLS;
+  if (AWorkTable <> nil) and (AWorkTable.ValueFlowRate <> nil) then
+    Result := AWorkTable.ValueFlowRate.GetDoubleNum(ABaseFlowLS, AWorkTable.ValueFlowRate.CurrentDimIndex);
+end;
+
+function TFrameMainTable.IsFlowGraphSamplingActive(AWorkTable: TWorkTable): Boolean;
+var
+  Run: TMeasurementRun;
+begin
+  Result := (AWorkTable <> nil) and (AWorkTable.State in [swtMONITOR, swtSTARTTEST, swtSTARTWAIT, swtEXECUTE, swtSTOPTEST, swtSTOPWAIT, swtFINALREAD]);
+  if (not Result) and (AWorkTable <> nil) and (AWorkTable.MeasurementRun is TMeasurementRun) then
+  begin
+    Run := TMeasurementRun(AWorkTable.MeasurementRun);
+    Result := not (Run.Stage in [msNone, msDone]);
+  end;
+end;
+
+procedure TFrameMainTable.EnsureFlowGraphDictionaries;
+begin
+  if FFlowGraphHistory = nil then
+    FFlowGraphHistory := TFlowGraphHistory.Create;
+  if FEtalonChartSeries = nil then
+    FEtalonChartSeries := TObjectDictionary<string, TLineSeries>.Create;
+  if FDeviceChartSeries = nil then
+    FDeviceChartSeries := TObjectDictionary<string, TLineSeries>.Create;
+  EnsureToleranceSeries;
+end;
+
+procedure TFrameMainTable.ClearFlowChartSeries(AChart: TChart; AChartSeries: TObjectDictionary<string, TLineSeries>);
+var
+  Pair: TPair<string, TLineSeries>;
+begin
+  if AChartSeries = nil then
+    Exit;
+  for Pair in AChartSeries do
+  begin
+    if (AChart <> nil) and (Pair.Value <> nil) then
+      AChart.RemoveSeries(Pair.Value);
+    Pair.Value.Free;
+  end;
+  AChartSeries.Clear;
+end;
+
+procedure TFrameMainTable.EnsureToleranceSeries;
+  function EnsureLine(AChart: TChart; var ALine: TLineSeries; const ATitle: string; AColor: TAlphaColor; ADashed: Boolean): TLineSeries;
+  begin
+    if (AChart = nil) or (ALine <> nil) then
+      Exit(ALine);
+    ALine := TLineSeries.Create(AChart);
+    ALine.ParentChart := AChart;
+    ALine.Title := ATitle;
+    ALine.SeriesColor := AColor;
+    ALine.Color := AColor;
+    ALine.ShowInLegend := False;
+    ALine.Active := False;
+    ALine.LinePen.Width := 1;
+    ALine.Pointer.Visible := False;
+    Result := ALine;
+  end;
+begin
+  EnsureLine(ChartEtalonFlow, FEtalonLowerToleranceSeries, 'Нижний допуск', TAlphaColors.Red, True);
+  EnsureLine(ChartEtalonFlow, FEtalonUpperToleranceSeries, 'Верхний допуск', TAlphaColors.Red, True);
+  EnsureLine(ChartEtalonFlow, FEtalonTargetSeries, 'Заданный расход', TAlphaColors.Green, False);
+  EnsureLine(ChartDeviceFlow, FDeviceLowerToleranceSeries, 'Нижний допуск', TAlphaColors.Red, True);
+  EnsureLine(ChartDeviceFlow, FDeviceUpperToleranceSeries, 'Верхний допуск', TAlphaColors.Red, True);
+  EnsureLine(ChartDeviceFlow, FDeviceTargetSeries, 'Заданный расход', TAlphaColors.Green, False);
+end;
+
+
+procedure TFrameMainTable.FreeToleranceSeries;
+  procedure FreeLine(AChart: TChart; var ALine: TLineSeries);
+  begin
+    if ALine = nil then
+      Exit;
+    if AChart <> nil then
+      AChart.RemoveSeries(ALine);
+    FreeAndNil(ALine);
+  end;
+begin
+  FreeLine(ChartEtalonFlow, FEtalonLowerToleranceSeries);
+  FreeLine(ChartEtalonFlow, FEtalonUpperToleranceSeries);
+  FreeLine(ChartEtalonFlow, FEtalonTargetSeries);
+  FreeLine(ChartDeviceFlow, FDeviceLowerToleranceSeries);
+  FreeLine(ChartDeviceFlow, FDeviceUpperToleranceSeries);
+  FreeLine(ChartDeviceFlow, FDeviceTargetSeries);
+end;
+
+function TFrameMainTable.TryGetFlowGraphLimits(out ALimits: TFlowGraphLimits): Boolean;
+var
+  Run: TMeasurementRun;
+  Point: TDevicePoint;
+  StableValue: TMeterValue;
+  Settings: TMeterValueStabilitySettings;
+  MinPercent, MaxPercent: Double;
+  AllowedMinus, AllowedPlus: Double;
+  Accuracy: string;
+  V: Double;
+begin
+  ALimits := Default(TFlowGraphLimits);
+  Result := False;
+  if (FActiveWorkTable = nil) or not (FActiveWorkTable.MeasurementRun is TMeasurementRun) then
+    Exit;
+
+  Run := TMeasurementRun(FActiveWorkTable.MeasurementRun);
+  if Run.Stage in [msNone, msDone] then
+    Exit;
+  Point := Run.CurrentPoint;
+  if (Point = nil) or IsNan(Point.Q) or IsInfinite(Point.Q) then
+    Exit;
+
+  ALimits.TargetLS := Point.Q;
+  Accuracy := NormalizeAccuracyInput(Point.FlowAccuracy);
+  if Accuracy <> '' then
+  begin
+    if (Accuracy[1] = '+') or (Accuracy[1] = '-') then
+      V := Abs(NormalizeFloatInput(Copy(Accuracy, 2, MaxInt)))
+    else
+      V := Abs(NormalizeFloatInput(Accuracy));
+    if Accuracy[1] = '+' then
+    begin
+      MinPercent := 0;
+      MaxPercent := V;
+    end
+    else if Accuracy[1] = '-' then
+    begin
+      MinPercent := -V;
+      MaxPercent := 0;
+    end
+    else
+    begin
+      MinPercent := -V;
+      MaxPercent := V;
+    end;
+    AllowedMinus := Abs(ALimits.TargetLS) * Abs(MinPercent) / 100.0;
+    AllowedPlus := Abs(ALimits.TargetLS) * Abs(MaxPercent) / 100.0;
+  end
+  else
+  begin
+    StableValue := nil;
+    if (FActiveWorkTable.FlowRate <> nil) then
+      StableValue := FActiveWorkTable.FlowRate.Value;
+    if StableValue = nil then
+      Exit;
+    Settings := StableValue.StabilitySettings;
+    AllowedMinus := Max(Abs(ALimits.TargetLS) * Abs(Settings.TargetAccuracyMinusPercent) / 100.0,
+      Settings.TargetToleranceAbsolute);
+    AllowedPlus := Max(Abs(ALimits.TargetLS) * Abs(Settings.TargetAccuracyPlusPercent) / 100.0,
+      Settings.TargetToleranceAbsolute);
+    if SameValue(AllowedMinus, 0) and SameValue(AllowedPlus, 0) then
+    begin
+      AllowedMinus := Abs(ALimits.TargetLS) * 10.0 / 100.0;
+      AllowedPlus := AllowedMinus;
+    end;
+  end;
+
+  ALimits.LowerLS := ALimits.TargetLS - AllowedMinus;
+  ALimits.UpperLS := ALimits.TargetLS + AllowedPlus;
+  Result := (not IsNan(ALimits.LowerLS)) and (not IsInfinite(ALimits.LowerLS)) and
+    (not IsNan(ALimits.UpperLS)) and (not IsInfinite(ALimits.UpperLS));
+  ALimits.Valid := Result;
+end;
+
+procedure TFrameMainTable.SyncFlowChartSeries(AChart: TChart; AGraphSeries: TObjectDictionary<string, TFlowGraphSeries>; AChartSeries: TObjectDictionary<string, TLineSeries>);
+var
+  Pair: TPair<string, TFlowGraphSeries>;
+  Line: TLineSeries;
+  RemoveKeys: TList<string>;
+  Key: string;
+begin
+  if (AChart = nil) or (AGraphSeries = nil) or (AChartSeries = nil) then
+    Exit;
+
+  for Pair in AGraphSeries do
+  begin
+    if not AChartSeries.TryGetValue(Pair.Key, Line) then
+    begin
+      Line := TLineSeries.Create(AChart);
+      Line.ParentChart := AChart;
+      Line.ShowInLegend := True;
+      Line.LinePen.Width := 2;
+      Line.Pointer.Visible := False;
+      AChartSeries.Add(Pair.Key, Line);
+    end;
+    Line.Title := Pair.Value.Caption;
+    Line.SeriesColor := Pair.Value.Color;
+    Line.Color := Pair.Value.Color;
+    Line.Active := Pair.Value.Visible;
+  end;
+
+  RemoveKeys := TList<string>.Create;
+  try
+    for Key in AChartSeries.Keys do
+      if not AGraphSeries.ContainsKey(Key) then
+        RemoveKeys.Add(Key);
+    for Key in RemoveKeys do
+      if AChartSeries.TryGetValue(Key, Line) then
+      begin
+        AChart.RemoveSeries(Line);
+        AChartSeries.Remove(Key);
+        Line.Free;
+      end;
+  finally
+    RemoveKeys.Free;
+  end;
+end;
+
+procedure TFrameMainTable.RefreshFlowGraphChannels;
+  procedure ClearChecks(AParent: TFlowLayout);
+  begin
+    if AParent <> nil then
+      AParent.DeleteChildren;
+  end;
+
+  procedure RemoveMissing(ADict: TObjectDictionary<string,TFlowGraphSeries>; AKeys: TDictionary<string, Boolean>);
+  var
+    RemoveKeys: TList<string>;
+    Key: string;
+  begin
+    RemoveKeys := TList<string>.Create;
+    try
+      for Key in ADict.Keys do
+        if not AKeys.ContainsKey(Key) then
+          RemoveKeys.Add(Key);
+      for Key in RemoveKeys do
+        ADict.Remove(Key);
+    finally
+      RemoveKeys.Free;
+    end;
+  end;
+
+  procedure BuildChecks(AList: TObjectList<TChannel>; ADict: TObjectDictionary<string,TFlowGraphSeries>; AVisual: TObjectDictionary<string,TLineSeries>; AParent: TFlowLayout; const AKind, AFallback: string);
+  var
+    I: Integer;
+    C: TChannel;
+    Key, Caption: string;
+    S: TFlowGraphSeries;
+    Existing: TFlowGraphSeries;
+    Check: TCheckBox;
+    Keys: TDictionary<string, Boolean>;
+    UsedCaptions: TDictionary<string, Integer>;
+    Count: Integer;
+  begin
+    Keys := TDictionary<string, Boolean>.Create;
+    UsedCaptions := TDictionary<string, Integer>.Create;
+    try
+      if AList <> nil then
+        for I := 0 to AList.Count - 1 do
+        begin
+          C := AList[I];
+          if not IsValidFlowGraphChannel(C) then
+            Continue;
+          Key := BuildFlowGraphSeriesKey(AKind, FActiveWorkTable, C, I);
+          Caption := BuildFlowGraphCaption(C, I, AFallback);
+          if UsedCaptions.TryGetValue(Caption, Count) then
+          begin
+            if Count = 1 then
+              for Existing in ADict.Values do
+                if SameText(Existing.Caption, Caption) then
+                  Existing.Caption := Format('%s (канал %s)', [Caption,
+                    Copy(Existing.Key, LastDelimiter(':', Existing.Key) + 1, MaxInt)]);
+            Inc(Count);
+            UsedCaptions[Caption] := Count;
+            Caption := Format('%s (канал %d)', [Caption, I + 1]);
+          end
+          else
+            UsedCaptions.Add(Caption, 1);
+          Keys.AddOrSetValue(Key, True);
+          if not ADict.TryGetValue(Key, S) then
+          begin
+            S := TFlowGraphSeries.Create(Key, Caption,
+              TAlphaColor($FF1F77B4 + Cardinal((I mod 10) * $00111111)), C.Enabled);
+            ADict.Add(Key, S);
+          end
+          else
+            S.Caption := Caption;
+        end;
+      RemoveMissing(ADict, Keys);
+    finally
+      UsedCaptions.Free;
+      Keys.Free;
+    end;
+
+    if AKind = 'Etalon' then
+      SyncFlowChartSeries(ChartEtalonFlow, ADict, AVisual)
+    else
+      SyncFlowChartSeries(ChartDeviceFlow, ADict, AVisual);
+    if AParent = nil then
+      Exit;
+    for S in ADict.Values do
+    begin
+      Check := TCheckBox.Create(AParent);
+      Check.Parent := AParent;
+      Check.Width := 220;
+      Check.Height := 34;
+      Check.Text := S.Caption;
+      Check.TagString := S.Key;
+      Check.IsChecked := S.Visible;
+      Check.OnChange := FlowGraphCheckBoxChange;
+    end;
+  end;
+begin
+  EnsureFlowGraphDictionaries;
+  if FFlowGraphWorkTable <> FActiveWorkTable then
+  begin
+    FFlowGraphHistory.Clear;
+    FreeToleranceSeries;
+  ClearFlowChartSeries(ChartEtalonFlow, FEtalonChartSeries);
+    ClearFlowChartSeries(ChartDeviceFlow, FDeviceChartSeries);
+    EnsureToleranceSeries;
+    FFlowGraphWorkTable := FActiveWorkTable;
+    FFlowGraphXMin := 0;
+    FFlowGraphXMax := 0;
+  end;
+  ClearChecks(FlowLayoutEtalonChecks);
+  ClearChecks(FlowLayoutDeviceChecks);
+  if FActiveWorkTable <> nil then
+  begin
+    BuildChecks(FActiveWorkTable.EtalonChannels, FFlowGraphHistory.EtalonSeries, FEtalonChartSeries, FlowLayoutEtalonChecks, 'Etalon', 'Эталонный канал');
+    BuildChecks(FActiveWorkTable.DeviceChannels, FFlowGraphHistory.DeviceSeries, FDeviceChartSeries, FlowLayoutDeviceChecks, 'Device', 'Приборный канал');
+  end;
+  RenderFlowGraphs;
+end;
+
+procedure TFrameMainTable.AddFlowGraphSamples(const ATimeStampMs: UInt64);
+  procedure AddList(AList: TObjectList<TChannel>; ADict: TObjectDictionary<string,TFlowGraphSeries>; const AKind, AFallback: string);
+  var
+    I: Integer;
+    C: TChannel;
+    Key: string;
+    S: TFlowGraphSeries;
+    Sample: TFlowGraphSample;
+  begin
+    if AList = nil then
+      Exit;
+    for I := 0 to AList.Count - 1 do
+    begin
+      C := AList[I];
+      if not IsValidFlowGraphChannel(C) then
+        Continue;
+      Key := BuildFlowGraphSeriesKey(AKind, FActiveWorkTable, C, I);
+      if not ADict.TryGetValue(Key, S) then
+        Continue;
+      Sample.TimeStampMs := ATimeStampMs;
+      Sample.Value := C.FlowMeter.ValueFlow.GetDoubleValue;
+      S.Samples.Add(Sample);
+      while S.Samples.Count > MaxGraphSampleCountPerSeries do
+        S.Samples.Delete(0);
+    end;
+  end;
+begin
+  EnsureFlowGraphDictionaries;
+  if (ATimeStampMs - FLastFlowGraphSampleMs) < GraphSampleIntervalMs then
+    Exit;
+  FLastFlowGraphSampleMs := ATimeStampMs;
+  AddList(FActiveWorkTable.EtalonChannels, FFlowGraphHistory.EtalonSeries, 'Etalon', 'Эталонный канал');
+  AddList(FActiveWorkTable.DeviceChannels, FFlowGraphHistory.DeviceSeries, 'Device', 'Приборный канал');
+  FFlowGraphXMax := ATimeStampMs;
+  if FFlowGraphXMin = 0 then
+    FFlowGraphXMin := ATimeStampMs;
+  RenderFlowGraphs;
+end;
+
+procedure TFrameMainTable.UpdateToleranceSeries(AChart: TChart; ALowerSeries, AUpperSeries, ATargetSeries: TLineSeries; const ALimits: TFlowGraphLimits; const AXMin, AXMax: Int64);
+var
+  X0, X1: Double;
+  TargetValue, LowerValue, UpperValue: Double;
+begin
+  if (ALowerSeries = nil) or (AUpperSeries = nil) or (ATargetSeries = nil) then
+    Exit;
+  ALowerSeries.Clear;
+  AUpperSeries.Clear;
+  ATargetSeries.Clear;
+  if not ALimits.Valid then
+  begin
+    ALowerSeries.Active := False;
+    AUpperSeries.Active := False;
+    ATargetSeries.Active := False;
+    Exit;
+  end;
+
+  X0 := 0;
+  X1 := Max(1.0, (AXMax - AXMin) / 1000.0);
+  TargetValue := FlowGraphDisplayValue(FActiveWorkTable, ALimits.TargetLS);
+  LowerValue := FlowGraphDisplayValue(FActiveWorkTable, ALimits.LowerLS);
+  UpperValue := FlowGraphDisplayValue(FActiveWorkTable, ALimits.UpperLS);
+  ALowerSeries.AddXY(X0, LowerValue);
+  ALowerSeries.AddXY(X1, LowerValue);
+  AUpperSeries.AddXY(X0, UpperValue);
+  AUpperSeries.AddXY(X1, UpperValue);
+  ATargetSeries.AddXY(X0, TargetValue);
+  ATargetSeries.AddXY(X1, TargetValue);
+  ALowerSeries.Active := True;
+  AUpperSeries.Active := True;
+  ATargetSeries.Active := True;
+end;
+
+procedure TFrameMainTable.RenderFlowChart(AChart: TChart; ASeries: TObjectDictionary<string, TFlowGraphSeries>; AChartSeries: TObjectDictionary<string, TLineSeries>; const AXMin, AXMax: Int64);
+var
+  Pair: TPair<string,TFlowGraphSeries>;
+  Line: TLineSeries;
+  Sample: TFlowGraphSample;
+  Limits: TFlowGraphLimits;
+  MinValue, MaxValue, V, Range, Padding, TargetDisplay: Double;
+  HasValue: Boolean;
+  UnitName: string;
+begin
+  if (AChart = nil) or (ASeries = nil) or (AChartSeries = nil) then
+    Exit;
+  EnsureFlowGraphDictionaries;
+  HasValue := False;
+  MinValue := 0;
+  MaxValue := 0;
+  for Pair in ASeries do
+    if AChartSeries.TryGetValue(Pair.Key, Line) then
+    begin
+      Line.Clear;
+      Line.Title := Pair.Value.Caption;
+      Line.SeriesColor := Pair.Value.Color;
+      Line.Color := Pair.Value.Color;
+      Line.Active := Pair.Value.Visible;
+      Line.ShowInLegend := Pair.Value.Visible;
+      if Pair.Value.Visible then
+        for Sample in Pair.Value.Samples do
+        begin
+          V := FlowGraphDisplayValue(FActiveWorkTable, Sample.Value);
+          if IsNan(V) or IsInfinite(V) then
+            Continue;
+          Line.AddXY((Sample.TimeStampMs - AXMin) / 1000.0, V);
+          if not HasValue then
+          begin
+            MinValue := V;
+            MaxValue := V;
+            HasValue := True;
+          end
+          else
+          begin
+            MinValue := Min(MinValue, V);
+            MaxValue := Max(MaxValue, V);
+          end;
+        end;
+    end;
+
+  if TryGetFlowGraphLimits(Limits) then
+  begin
+    TargetDisplay := FlowGraphDisplayValue(FActiveWorkTable, Limits.TargetLS);
+    V := FlowGraphDisplayValue(FActiveWorkTable, Limits.LowerLS);
+    if not HasValue then
+    begin
+      MinValue := V;
+      MaxValue := V;
+      HasValue := True;
+    end
+    else
+    begin
+      MinValue := Min(MinValue, V);
+      MaxValue := Max(MaxValue, V);
+    end;
+    V := FlowGraphDisplayValue(FActiveWorkTable, Limits.UpperLS);
+    MinValue := Min(MinValue, V);
+    MaxValue := Max(MaxValue, V);
+    MinValue := Min(MinValue, TargetDisplay);
+    MaxValue := Max(MaxValue, TargetDisplay);
+  end;
+
+  if AChart = ChartEtalonFlow then
+    UpdateToleranceSeries(AChart, FEtalonLowerToleranceSeries, FEtalonUpperToleranceSeries, FEtalonTargetSeries, Limits, AXMin, AXMax)
+  else
+    UpdateToleranceSeries(AChart, FDeviceLowerToleranceSeries, FDeviceUpperToleranceSeries, FDeviceTargetSeries, Limits, AXMin, AXMax);
+
+  UnitName := '';
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
+    UnitName := FActiveWorkTable.ValueFlowRate.GetDimName;
+  AChart.BottomAxis.Title.Caption := 'Время, с';
+  AChart.LeftAxis.Title.Caption := 'Расход, ' + UnitName;
+  AChart.BottomAxis.Automatic := False;
+  AChart.BottomAxis.SetMinMax(0, Max(1.0, (AXMax - AXMin) / 1000.0));
+  if HasValue then
+  begin
+    Range := MaxValue - MinValue;
+    if SameValue(Range, 0) then
+      Padding := Max(Abs(MinValue) * 0.01, 0.01)
+    else
+      Padding := Max(Range * 0.10, Max(Abs(MinValue), Abs(MaxValue)) * 0.002);
+    AChart.LeftAxis.Automatic := False;
+    AChart.LeftAxis.SetMinMax(MinValue - Padding, MaxValue + Padding);
+  end
+  else
+    AChart.LeftAxis.Automatic := True;
+end;
+
+procedure TFrameMainTable.RenderFlowGraphs;
+begin
+  if FFlowGraphHistory = nil then
+    Exit;
+  RenderFlowChart(ChartEtalonFlow, FFlowGraphHistory.EtalonSeries, FEtalonChartSeries, FFlowGraphXMin, FFlowGraphXMax);
+  RenderFlowChart(ChartDeviceFlow, FFlowGraphHistory.DeviceSeries, FDeviceChartSeries, FFlowGraphXMin, FFlowGraphXMax);
+end;
+
+procedure TFrameMainTable.ButtonClearFlowGraphsClick(Sender: TObject);
+var
+  Pair: TPair<string,TFlowGraphSeries>;
+  Line: TLineSeries;
+begin
+  EnsureFlowGraphDictionaries;
+  if FFlowGraphHistory <> nil then
+  begin
+    for Pair in FFlowGraphHistory.EtalonSeries do Pair.Value.Samples.Clear;
+    for Pair in FFlowGraphHistory.DeviceSeries do Pair.Value.Samples.Clear;
+  end;
+  for Line in FEtalonChartSeries.Values do
+    Line.Clear;
+  for Line in FDeviceChartSeries.Values do
+    Line.Clear;
+  FFlowGraphXMin := 0;
+  FFlowGraphXMax := 0;
+  RenderFlowGraphs;
+end;
+
+procedure TFrameMainTable.FlowGraphCheckBoxChange(Sender: TObject);
+var
+  Check: TCheckBox;
+  S: TFlowGraphSeries;
+  Line: TLineSeries;
+begin
+  if not (Sender is TCheckBox) or (FFlowGraphHistory = nil) then
+    Exit;
+  Check := TCheckBox(Sender);
+  if FFlowGraphHistory.EtalonSeries.TryGetValue(Check.TagString, S) or
+     FFlowGraphHistory.DeviceSeries.TryGetValue(Check.TagString, S) then
+  begin
+    S.Visible := Check.IsChecked;
+    if FEtalonChartSeries.TryGetValue(Check.TagString, Line) or
+       FDeviceChartSeries.TryGetValue(Check.TagString, Line) then
+    begin
+      Line.Active := S.Visible;
+      Line.ShowInLegend := S.Visible;
+    end;
+    RenderFlowGraphs;
+  end;
 end;
 
 procedure TFrameMainTable.UpdateUIFromValues;
