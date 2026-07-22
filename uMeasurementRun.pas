@@ -291,6 +291,7 @@ type
     FLastSetStageTransitionRequested: Boolean;
     FLastScenarioStabilityLogText: string;
     FLastScenarioStabilityLogSecond: Int64;
+    FScenarioSampleTimes: TDictionary<NativeUInt, Int64>;
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
     function SetStage(const ANewStage: EMeasurementState): Boolean;
@@ -739,6 +740,8 @@ begin
   FDeviceStableSinceMs := 0;
   FLastDeviceStableStateKnown := False;
   FStableTimerResetReason := '';
+  if FScenarioSampleTimes <> nil then
+    FScenarioSampleTimes.Clear;
   if FPoints <> nil then
     for I := 0 to FPoints.Count - 1 do
       if FPoints[I] <> nil then
@@ -856,13 +859,23 @@ var
     if AValue = nil then
       Exit;
     Samples := AValue.GetSamples;
-    if (Length(Samples) > 0) and (Samples[High(Samples)].TimeStampMs = ATimeMs) then
+    if (Length(Samples) > 0) and (Samples[High(Samples)].TimeStampMs > ATimeMs) then
+    begin
+      AddScenarioLog(Format('AddScenarioSamples: clear mixed runtime history; %s; ValueFlow=%x; Hash=%s; LastTimeStampMs=%d; ScenarioTimeMs=%d',
+        [ALabel, NativeUInt(AValue), AValue.Hash, Samples[High(Samples)].TimeStampMs, ATimeMs]));
+      AValue.ClearStabilitySamples;
+      Samples := AValue.GetSamples;
+    end;
+    if (FScenarioSampleTimes <> nil) and FScenarioSampleTimes.ContainsKey(NativeUInt(AValue)) and
+       (FScenarioSampleTimes[NativeUInt(AValue)] = ATimeMs) then
     begin
       AddScenarioLog(Format('AddScenarioSamples: skip duplicate; %s; ValueFlow=%x; Hash=%s; TimeStampMs=%d; SampleCount=%d',
         [ALabel, NativeUInt(AValue), AValue.Hash, ATimeMs, Length(Samples)]));
       Exit;
     end;
     AValue.AddStabilitySampleManual(ATimeMs, AValue.GetDoubleValue);
+    if FScenarioSampleTimes <> nil then
+      FScenarioSampleTimes.AddOrSetValue(NativeUInt(AValue), ATimeMs);
     Samples := AValue.GetSamples;
     AddScenarioLog(Format('AddScenarioSamples: added; %s; ValueFlow=%x; Hash=%s; TimeStampMs=%d; SampleCount=%d',
       [ALabel, NativeUInt(AValue), AValue.Hash, ATimeMs, Length(Samples)]));
@@ -990,99 +1003,9 @@ begin
   end;
   FScenarioRunning := False;
   FIsScenarioRun := False;
+  if FScenarioSampleTimes <> nil then
+    FScenarioSampleTimes.Clear;
   FScenarioStepBusy := False;
-end;
-
-procedure TMeasurementRun.AddScenarioLog(const AText: string);
-var
-  Line: string;
-begin
-  Line := FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now) + ' ' + AText + sLineBreak;
-  try
-    TFile.AppendAllText('MAIN2_UPDATE_COMMENTS.md', Line, TEncoding.UTF8);
-  except
-    // Ошибка записи лога не должна прерывать сценарий.
-  end;
-end;
-
-function TMeasurementRun.BuildScenarioProgressSignature(const AStepResult: string): string;
-var
-  Point: TDevicePoint;
-  WorkTableStateText: string;
-  PointUuid: string;
-begin
-  WorkTableStateText := ScenarioWorkTableStateText;
-
-  Point := GetCurrentPoint;
-  if Point <> nil then
-    PointUuid := Point.UUID
-  else
-    PointUuid := 'nil';
-
-  Result := Format('%s|%s|%d|%s|%s|%s|%s', [
-    MeasurementStateToString(FCurrentStage), WorkTableStateText,
-    FCurrentPointIndex, PointUuid, BoolToStr(IsStopRequested, True),
-    AStepResult, BoolToStr(FLastSetStageResult, True)]);
-end;
-
-function TMeasurementRun.IsScenarioRegularWait: Boolean;
-begin
-  Result := FCurrentStage in [msWaitStable, msWaitMeasureStart, msMeasure, msWaitMeasureStop, msResultsRead];
-end;
-
-
-function TMeasurementRun.ScenarioWorkTableStateText: string;
-begin
-  if FWorkTable <> nil then
-    Result := GetEnumName(TypeInfo(EStateWorkTable), Ord(FWorkTable.State))
-  else
-    Result := 'nil';
-end;
-
-function TMeasurementRun.ScenarioPointUuid(APoint: TDevicePoint): string;
-begin
-  if APoint <> nil then
-    Result := APoint.UUID
-  else
-    Result := 'nil';
-end;
-
-function TMeasurementRun.GetStabilityAnalysisTimeMs: Int64;
-begin
-  if FScenarioRunning then
-    Result := FScenarioCurrentTimeMs
-  else
-    Result := Int64(NowTickMs);
-end;
-
-procedure TMeasurementRun.LogScenarioStability(const APrefix: string; const AInfo: TMeterValueStabilityInfo;
-  const AStableInfo: RStableInfo; const ASettings: TMeterValueStabilitySettings;
-  const AActualValue, ATargetValue, ALowerLimit, AUpperLimit, AStableDurationSec: Double);
-var
-  LogSecond: Int64;
-  Text: string;
-begin
-  if FCurrentStage <> msWaitStable then
-    Exit;
-
-  LogSecond := FScenarioCurrentTimeMs div 1000;
-  Text := Format('%s: AnalysisTimeSource=%s; AnalysisTimeMs=%d; FScenarioCurrentTimeMs=%d; RuntimeNowTickMs=%d; SampleCount=%d; UsedSampleCount=%d; MinSampleCount=%d; WindowDurationSec=%.3f; LastSampleAgeSec=%.3f; IsSignalStable=%s; IsStabilityConfirmed=%s; IsCurrentValueInRange=%s; IsMeanValueInRange=%s; IsForecastInRange=%s; IsSuitableForMeasurement=%s; Status=%s; Reason=%s; Flow=%.6f; Target=%.6f; Lower=%.6f; Upper=%.6f; StableDurationSec=%.3f; RequiredStabilizationSec=%.3f',
-    [APrefix, IfThen(FScenarioRunning, 'Scenario', 'Runtime'), GetStabilityAnalysisTimeMs,
-     FScenarioCurrentTimeMs, Int64(NowTickMs), AInfo.SampleCount, AInfo.UsedSampleCount,
-     ASettings.MinSampleCount, AInfo.WindowDurationSec, AInfo.LastSampleAgeSec,
-     BoolToStr(AInfo.IsSignalStable, True), BoolToStr(AInfo.IsStabilityConfirmed, True),
-     BoolToStr(AInfo.IsCurrentValueInRange, True), BoolToStr(AInfo.IsMeanValueInRange, True),
-     BoolToStr(AInfo.IsForecastInRange, True), BoolToStr(AInfo.IsSuitableForMeasurement, True),
-     GetEnumName(TypeInfo(TMeterValueStabilityStatus), Ord(AInfo.Status)), AInfo.StatusText,
-     AActualValue, ATargetValue, ALowerLimit, AUpperLimit, AStableDurationSec,
-     FRequiredStabilizationSec]);
-
-  if (Text <> FLastScenarioStabilityLogText) or (LogSecond <> FLastScenarioStabilityLogSecond) then
-  begin
-    FLastScenarioStabilityLogText := Text;
-    FLastScenarioStabilityLogSecond := LogSecond;
-    AddScenarioLog(Text);
-  end;
 end;
 
 
@@ -1195,6 +1118,8 @@ begin
         AddScenarioLog(Format('Переход к следующей точке: %d -> %d', [PrevIndex, FCurrentPointIndex]));
         FScenarioPointStartTimeMs := FScenarioCurrentTimeMs;
         FLastProcessedPointIndex := FCurrentPointIndex;
+        if FScenarioSampleTimes <> nil then
+          FScenarioSampleTimes.Clear;
         if FWorkTable <> nil then
         begin
           if FWorkTable.ValueFlowRate <> nil then
@@ -1369,6 +1294,7 @@ begin
   FActualStopEventFired := False;
   FNextStageAfterSave := msNone;
   FMeasurementDiagnosticEvents := TList<string>.Create;
+  FScenarioSampleTimes := TDictionary<NativeUInt, Int64>.Create;
   FMeasurementDiagnosticCS := TCriticalSection.Create;
   FLastDiagnosticWorkTableState := swtNONE;
   FLastSaveMeasurementResultsResult := 'not called';
@@ -1453,6 +1379,7 @@ begin
   StopWorkerThread;
   if FCurrentStage <> msNone then
     SetStage(msNone);
+  FreeAndNil(FScenarioSampleTimes);
   FreeAndNil(FMeasurementDiagnosticCS);
   FreeAndNil(FMeasurementDiagnosticEvents);
   FreeAndNil(FCriticalSection);
@@ -1506,15 +1433,18 @@ var
   TransitionText: string;
 begin
   Result := False;
-  FLastSetStageRequested := ANewStage;
-  FLastSetStageResult := False;
-  FLastSetStageTransitionRequested := True;
 
   if FCurrentStage = ANewStage then
   begin
+    FLastSetStageRequested := msNone;
     FLastSetStageResult := True;
+    FLastSetStageTransitionRequested := False;
     Exit(True);
   end;
+
+  FLastSetStageRequested := ANewStage;
+  FLastSetStageResult := False;
+  FLastSetStageTransitionRequested := True;
 
   FWaitStartedTick := UInt64(GetStabilityAnalysisTimeMs);
 
@@ -2240,7 +2170,6 @@ var
   SignalInfo: TMeterValueStabilityInfo;
   ActualValue: Double;
   ParticipatingDeviceCount: Integer;
-   Settings: TMeterValueStabilitySettings;
   AnalysisTimeMs: Int64;
 begin
   StableInfo := Default(RStableInfo);
@@ -2283,6 +2212,10 @@ begin
       SignalInfo.IsSignalStable := True;
       SignalInfo.IsStabilityConfirmed := True;
     end;
+
+    AddScenarioLog(Format('DeviceStabilityResult[%d]: RuntimeWindowDurationSec=%.3f; AnalysisInputWindowDurationSec=%.3f; AnalysisResultWindowDurationSec=%.3f; RuntimeSampleCount=%d; AnalysisInputSampleCount=%d; UsedSampleCount=%d',
+      [I, Settings.WindowDurationSec, Settings.WindowDurationSec, SignalInfo.WindowDurationSec,
+       Length(StableValue.GetSamples), Length(StableValue.GetStabilitySamples), SignalInfo.UsedSampleCount]));
 
     if not SignalInfo.IsSignalStable then
     begin
@@ -2331,7 +2264,6 @@ var
   ToleranceSource: string;
   FlowReached: Boolean;
   HistoryStable: Boolean;
-   Settings: TMeterValueStabilitySettings;
   AnalysisTimeMs: Int64;
 begin
   StableInfo := Default(RStableInfo);
@@ -2401,13 +2333,29 @@ begin
 
   HistoryStable := True;
   SignalInfo := Default(TMeterValueStabilityInfo);
+  AddScenarioLog(Format('CheckFlowStableInput: ValueFlow=%x; Hash=%s; RuntimeWindowDurationSec=%.3f; AnalysisInputWindowDurationSec=%.3f; RuntimeSampleCount=%d; AnalysisInputSampleCount=%d',
+    [NativeUInt(StableValue), StableValue.Hash, Settings.WindowDurationSec, Settings.WindowDurationSec,
+     Length(StableValue.GetSamples), Length(StableValue.GetStabilitySamples)]));
   if Settings.Enabled then
   begin
     if not FScenarioRunning then
       StableValue.AddStabilitySampleManual(AnalysisTimeMs, ActualValue);
     HistoryStable := StableValue.AnalyzeStabilityAt(AnalysisTimeMs, SignalInfo);
     StableInfo.SignalInfo := SignalInfo;
+  end
+  else
+  begin
+    SignalInfo.Status := mvssDisabled;
+    SignalInfo.StatusText := 'StabilityDisabledSkipped';
+    SignalInfo.IsSignalStable := True;
+    SignalInfo.IsStabilityConfirmed := True;
+    SignalInfo.IsSuitableForMeasurement := True;
+    StableInfo.SignalInfo := SignalInfo;
+    AddScenarioLog('EtalonStability: StabilityDisabledSkipped; Blocking=False');
   end;
+  AddScenarioLog(Format('CheckFlowStableResult: RuntimeWindowDurationSec=%.3f; AnalysisInputWindowDurationSec=%.3f; AnalysisResultWindowDurationSec=%.3f; RuntimeSampleCount=%d; AnalysisInputSampleCount=%d; UsedSampleCount=%d',
+    [Settings.WindowDurationSec, Settings.WindowDurationSec, SignalInfo.WindowDurationSec,
+     Length(StableValue.GetSamples), Length(StableValue.GetStabilitySamples), SignalInfo.UsedSampleCount]));
 
   StableInfo.IsSignalStable := HistoryStable;
   StableInfo.IsTargetConditionPassed := FlowReached;
