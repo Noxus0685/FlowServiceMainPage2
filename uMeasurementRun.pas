@@ -1008,6 +1008,111 @@ begin
   FScenarioStepBusy := False;
 end;
 
+
+function TMeasurementRun.ValidateScenarioStabilityConfiguration(out AErrorText: string): Boolean;
+var
+  I: Integer;
+  Channel: TChannel;
+  ValueFlow: TMeterValue;
+  Settings: TMeterValueStabilitySettings;
+  LookupMode, LookupKey, MatchedSection, MatchedHash, MatchedHashOwner, MatchedValueKind: string;
+
+  function CheckValue(const ALabel: string; AValue: TMeterValue): Boolean;
+  begin
+    Result := True;
+    if AValue = nil then
+      Exit;
+    if TMeterValue.LoadStabilitySettingsByPersistentKey(AValue, LookupMode, LookupKey,
+      MatchedSection, MatchedHash, MatchedHashOwner, MatchedValueKind) then
+      AddScenarioLog(Format('ScenarioStabilitySettingsReload: %s; ValueFlow=%x; Hash=%s; Section=%s; Mode=%s; WindowDurationSec=%.3f',
+        [ALabel, NativeUInt(AValue), AValue.Hash, MatchedSection, LookupMode,
+         AValue.StabilitySettings.WindowDurationSec]));
+
+    Settings := AValue.StabilitySettings;
+    if Settings.Enabled and (Settings.WindowDurationSec <= 0) then
+    begin
+      AErrorText := Format('Сценарий не запущен: некорректные настройки стабильности %s, Hash=%s, Name=%s, WindowDurationSec=%.12g.',
+        [ALabel, AValue.Hash, AValue.Name, Settings.WindowDurationSec]);
+      AddScenarioLog(AErrorText);
+      Exit(False);
+    end;
+  end;
+
+begin
+  Result := False;
+  AErrorText := '';
+  if FWorkTable = nil then
+    Exit(True);
+
+  if not CheckValue('Etalon.ValueFlowRate', FWorkTable.ValueFlowRate) then
+    Exit;
+
+  if FWorkTable.DeviceChannels <> nil then
+    for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.DeviceChannels[I];
+      if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
+        Continue;
+      ValueFlow := Channel.FlowMeter.ValueFlow;
+      if not CheckValue(Format('Device[%d].ValueFlow', [I]), ValueFlow) then
+        Exit;
+    end;
+  Result := True;
+end;
+
+function TMeasurementRun.BuildScenarioStabilityFailureText: string;
+var
+  I: Integer;
+  Channel: TChannel;
+  ValueFlow: TMeterValue;
+  Settings: TMeterValueStabilitySettings;
+  Info: TMeterValueStabilityInfo;
+begin
+  Result := FLastDiagnosticIsStableText;
+  if (FWorkTable = nil) or (FWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.DeviceChannels[I];
+    if (Channel = nil) or (not Channel.Enabled) or
+       (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) then
+      Continue;
+    ValueFlow := Channel.FlowMeter.ValueFlow;
+    Settings := ValueFlow.StabilitySettings;
+    Info := ValueFlow.LastStabilityInfo;
+    if Settings.Enabled and (Settings.WindowDurationSec <= 0) then
+      Exit(Format('Стабилизация невозможна: Device[%d].WindowDurationSec=%.12g; SampleCount=%d; UsedSampleCount=%d; MinSampleCount=%d.',
+        [I, Settings.WindowDurationSec, Info.SampleCount, Info.UsedSampleCount, Settings.MinSampleCount]));
+    if Info.Status = mvssInvalidSettings then
+      Exit(Format('Стабилизация невозможна: Device[%d].%s; SampleCount=%d; UsedSampleCount=%d; MinSampleCount=%d.',
+        [I, Info.StatusText, Info.SampleCount, Info.UsedSampleCount, Settings.MinSampleCount]));
+  end;
+end;
+
+procedure TMeasurementRun.FinishScenario(const AStatus, AText: string; AStopWorkTable: Boolean);
+begin
+  AddScenarioLog('RunScenario: завершение; результат=' + AStatus + '; ' + AText);
+  if AStopWorkTable and (FWorkTable <> nil) then
+  begin
+    try
+      if WorkTableNeedsPhysicalStop then
+        FWorkTable.StopTest;
+    except
+      on E: Exception do
+        AddScenarioLog('Исключение при остановке WorkTable: ' + E.ClassName + ': ' + E.Message);
+    end;
+  end;
+  FScenarioRunning := False;
+  FIsScenarioRun := False;
+  if FScenarioSampleTimes <> nil then
+    FScenarioSampleTimes.Clear;
+  FScenarioStepBusy := False;
+end;
+
+
+
+
 function TMeasurementRun.RunScenario(AScenario: EMeasurementScenario; out AResultText: string): Boolean;
 const
   MaxNoProgressSteps = 20;
@@ -2164,7 +2269,6 @@ var
   I: Integer;
   Channel: TChannel;
   StableValue: TMeterValue;
-  Settings: TMeterValueStabilitySettings;
   SignalInfo: TMeterValueStabilityInfo;
   ActualValue: Double;
   ParticipatingDeviceCount: Integer;
@@ -2251,7 +2355,6 @@ var
   I: Integer;
   Channel: TChannel;
   StableValue: TMeterValue;
-  Settings: TMeterValueStabilitySettings;
   SignalInfo: TMeterValueStabilityInfo;
   Point: TDevicePoint;
   TargetValue: Double;
