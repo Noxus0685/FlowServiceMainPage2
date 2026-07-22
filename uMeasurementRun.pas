@@ -114,6 +114,7 @@ uses
   System.Classes,
   System.Generics.Collections,
   System.IniFiles,
+  System.IOUtils,
   System.Math,
   System.StrUtils,
   System.SyncObjs,
@@ -282,9 +283,14 @@ type
     FScenarioStepMs: Int64;
     FScenarioPointStartTimeMs: Int64;
     FIsScenarioRun: Boolean;
+    FScenarioNoProgressCount: Integer;
+    FScenarioLastProgressSignature: string;
+    FScenarioStepBusy: Boolean;
+    FLastSetStageRequested: EMeasurementState;
+    FLastSetStageResult: Boolean;
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
-    procedure SetStage(const ANewStage: EMeasurementState);
+    function SetStage(const ANewStage: EMeasurementState): Boolean;
     function CanChangeStage(AOldStage, ANewStage: EMeasurementState): Boolean;
     procedure DoExitStage(AOldStage, ANewStage: EMeasurementState);
     procedure DoEnterStage(AOldStage, ANewStage: EMeasurementState);
@@ -363,6 +369,12 @@ type
     procedure ResetRuntimeForScenario;
     procedure GenerateScenarioValues(AScenario: EMeasurementScenario; const ATimeMs: Int64);
     procedure AddScenarioSamples(const ATimeMs: Int64);
+    procedure AddScenarioLog(const AText: string);
+    function BuildScenarioProgressSignature(const AStepResult: string): string;
+    procedure FinishScenario(const AStatus, AText: string; AStopWorkTable: Boolean);
+    function IsScenarioRegularWait: Boolean;
+    function ScenarioWorkTableStateText: string;
+    function ScenarioPointUuid(APoint: TDevicePoint): string;
     function AreDeviceSignalsStable(out StableInfo: RStableInfo): Boolean;
     function GetScenarioAllowedError(APoint: TDevicePoint; ADeviceIndex: Integer): Double;
     function GetScenarioDeviceValue(AScenario: EMeasurementScenario; APoint: TDevicePoint; ADeviceIndex: Integer; const AReferenceValue: Double): Double;
@@ -854,43 +866,175 @@ begin
     end;
 end;
 
+procedure TMeasurementRun.AddScenarioLog(const AText: string);
+var
+  Line: string;
+begin
+  Line := FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now) + ' ' + AText + sLineBreak;
+  try
+    TFile.AppendAllText('MAIN2_UPDATE_COMMENTS.md', Line, TEncoding.UTF8);
+  except
+    // Ошибка записи лога не должна прерывать сценарий.
+  end;
+end;
+
+function TMeasurementRun.BuildScenarioProgressSignature(const AStepResult: string): string;
+var
+  Point: TDevicePoint;
+  WorkTableStateText: string;
+  PointUuid: string;
+begin
+  WorkTableStateText := ScenarioWorkTableStateText;
+
+  Point := GetCurrentPoint;
+  if Point <> nil then
+    PointUuid := Point.UUID
+  else
+    PointUuid := 'nil';
+
+  Result := Format('%s|%s|%d|%s|%s|%s|%s', [
+    MeasurementStateToString(FCurrentStage), WorkTableStateText,
+    FCurrentPointIndex, PointUuid, BoolToStr(IsStopRequested, True),
+    AStepResult, BoolToStr(FLastSetStageResult, True)]);
+end;
+
+function TMeasurementRun.IsScenarioRegularWait: Boolean;
+begin
+  Result := FCurrentStage in [msWaitStable, msWaitMeasureStart, msMeasure, msWaitMeasureStop, msResultsRead];
+end;
+
+
+function TMeasurementRun.ScenarioWorkTableStateText: string;
+begin
+  if FWorkTable <> nil then
+    Result := GetEnumName(TypeInfo(EStateWorkTable), Ord(FWorkTable.State))
+  else
+    Result := 'nil';
+end;
+
+function TMeasurementRun.ScenarioPointUuid(APoint: TDevicePoint): string;
+begin
+  if APoint <> nil then
+    Result := APoint.UUID
+  else
+    Result := 'nil';
+end;
+
+procedure TMeasurementRun.FinishScenario(const AStatus, AText: string; AStopWorkTable: Boolean);
+begin
+  AddScenarioLog('RunScenario: завершение; результат=' + AStatus + '; ' + AText);
+  if AStopWorkTable and (FWorkTable <> nil) then
+  begin
+    try
+      if WorkTableNeedsPhysicalStop then
+        FWorkTable.StopTest;
+    except
+      on E: Exception do
+        AddScenarioLog('Исключение при остановке WorkTable: ' + E.ClassName + ': ' + E.Message);
+    end;
+  end;
+  FScenarioRunning := False;
+  FIsScenarioRun := False;
+  FScenarioStepBusy := False;
+end;
+
 function TMeasurementRun.RunScenario(AScenario: EMeasurementScenario; out AResultText: string): Boolean;
 const
-  MaxScenarioSteps = 1000000;
+  MaxNoProgressSteps = 20;
 var
-  Step: Integer;
   PrevIndex: Integer;
+  OldStage: EMeasurementState;
+  OldWorkTableState: EStateWorkTable;
+  OldPointIndex: Integer;
+  OldStopRequested: Boolean;
+  OldSignature: string;
+  NewSignature: string;
   Point: TDevicePoint;
+  PointUuid: string;
   I: Integer;
   HasEnabledEtalon: Boolean;
   HasEnabledDevice: Boolean;
+  StepResult: string;
 begin
   Result := False;
   AResultText := '';
-  if FScenarioRunning or IsThreadRunning then begin AResultText := 'Измерение уже выполняется'; Exit; end;
-  if (FWorkTable = nil) or (FPoints = nil) or (FindNextEnabledPointIndex(0) < 0) then begin AResultText := 'Нет включённых точек'; Exit; end;
-  HasEnabledEtalon := False;
-  if FWorkTable.EtalonChannels <> nil then
-    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
-      HasEnabledEtalon := HasEnabledEtalon or ((FWorkTable.EtalonChannels[I] <> nil) and FWorkTable.EtalonChannels[I].Enabled);
-  if not HasEnabledEtalon then begin AResultText := 'Нет участвующего эталона'; Exit; end;
-  HasEnabledDevice := False;
-  if FWorkTable.DeviceChannels <> nil then
-    for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
-      HasEnabledDevice := HasEnabledDevice or ((FWorkTable.DeviceChannels[I] <> nil) and FWorkTable.DeviceChannels[I].Enabled);
-  if not HasEnabledDevice then begin AResultText := 'Нет участвующих поверяемых приборов'; Exit; end;
-  FScenarioRunning := True; FIsScenarioRun := True; FScenarioStartTimeMs := 0; FScenarioCurrentTimeMs := 0; FScenarioStepMs := 1000;
-  ResetRuntimeForScenario;
-  FMode := mrmAutomatic;
-  PrevIndex := -2;
-  SetStage(msSelectPoint);
+
+  if FScenarioStepBusy then
+  begin
+    AddScenarioLog('RunScenario: повторный вход пропущен');
+    Exit;
+  end;
+
+  FScenarioStepBusy := True;
   try
-    for Step := 1 to MaxScenarioSteps do
+    if (not FScenarioRunning) and IsThreadRunning then
     begin
+      AResultText := 'Измерение уже выполняется';
+      FinishScenario('ошибка', AResultText, False);
+      Exit;
+    end;
+
+    if not FScenarioRunning then
+    begin
+      if (FWorkTable = nil) or (FPoints = nil) or (FindNextEnabledPointIndex(0) < 0) then
+      begin
+        AResultText := 'Нет включённых точек';
+        FinishScenario('ошибка', AResultText, False);
+        Exit;
+      end;
+
+      HasEnabledEtalon := False;
+      if FWorkTable.EtalonChannels <> nil then
+        for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+          HasEnabledEtalon := HasEnabledEtalon or ((FWorkTable.EtalonChannels[I] <> nil) and FWorkTable.EtalonChannels[I].Enabled);
+      if not HasEnabledEtalon then
+      begin
+        AResultText := 'Нет участвующего эталона';
+        FinishScenario('ошибка', AResultText, False);
+        Exit;
+      end;
+
+      HasEnabledDevice := False;
+      if FWorkTable.DeviceChannels <> nil then
+        for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+          HasEnabledDevice := HasEnabledDevice or ((FWorkTable.DeviceChannels[I] <> nil) and FWorkTable.DeviceChannels[I].Enabled);
+      if not HasEnabledDevice then
+      begin
+        AResultText := 'Нет участвующих поверяемых приборов';
+        FinishScenario('ошибка', AResultText, False);
+        Exit;
+      end;
+
+      FScenarioRunning := True;
+      FIsScenarioRun := True;
+      FScenarioStartTimeMs := 0;
+      FScenarioCurrentTimeMs := 0;
+      FScenarioStepMs := 1000;
+      FScenarioPointStartTimeMs := 0;
+      FScenarioNoProgressCount := 0;
+      FScenarioLastProgressSignature := '';
+      FLastSetStageRequested := FCurrentStage;
+      FLastSetStageResult := True;
+      ResetRuntimeForScenario;
+      FMode := mrmAutomatic;
+      AddScenarioLog('RunScenario: начало; WorkTable=' + GetEnumName(TypeInfo(EStateWorkTable), Ord(FWorkTable.State)));
+      if not SetStage(msSelectPoint) then
+      begin
+        AResultText := Format('Запрещён переход %s -> %s; WorkTable=%s', [
+          MeasurementStateToString(FCurrentStage), MeasurementStateToString(msSelectPoint),
+          GetEnumName(TypeInfo(EStateWorkTable), Ord(FWorkTable.State))]);
+        FinishScenario('ошибка', AResultText, True);
+        Exit;
+      end;
+    end;
+
+    try
+      PrevIndex := FLastProcessedPointIndex;
       if FCurrentPointIndex <> PrevIndex then
       begin
+        AddScenarioLog(Format('Переход к следующей точке: %d -> %d', [PrevIndex, FCurrentPointIndex]));
         FScenarioPointStartTimeMs := FScenarioCurrentTimeMs;
-        PrevIndex := FCurrentPointIndex;
+        FLastProcessedPointIndex := FCurrentPointIndex;
         if FWorkTable <> nil then
         begin
           if FWorkTable.ValueFlowRate <> nil then
@@ -907,31 +1051,111 @@ begin
                 FWorkTable.DeviceChannels[I].FlowMeter.ValueFlow.ClearStabilitySamples;
         end;
       end;
+
+      OldStage := FCurrentStage;
+      OldPointIndex := FCurrentPointIndex;
+      OldStopRequested := IsStopRequested;
+      if FWorkTable <> nil then OldWorkTableState := FWorkTable.State else OldWorkTableState := swtNONE;
+      Point := GetCurrentPoint;
+      if Point <> nil then PointUuid := Point.UUID else PointUuid := 'nil';
+      OldSignature := BuildScenarioProgressSignature('before');
+      FLastSetStageRequested := FCurrentStage;
+      FLastSetStageResult := True;
+
+      if IsScenarioRegularWait then
+        AddScenarioLog('Вход в штатное ожидание: Stage=' + MeasurementStateToString(FCurrentStage));
+
       GenerateScenarioValues(AScenario, FScenarioCurrentTimeMs);
       AddScenarioSamples(FScenarioCurrentTimeMs);
+      StepResult := 'ProcessStage';
+      ProcessStage;
+
+      if IsScenarioRegularWait then
+        AddScenarioLog('Выход из штатного ожидания: Stage=' + MeasurementStateToString(FCurrentStage));
+
       Point := GetCurrentPoint;
       if (Point <> nil) and (Point.Q > 0.000001) and (FWorkTable <> nil) and
          (FWorkTable.ValueFlowRate <> nil) and SameValue(FWorkTable.ValueFlowRate.GetDoubleValue, 0.0) and
          (((FScenarioCurrentTimeMs - FScenarioPointStartTimeMs) / 1000.0) > 10.0) then
       begin
         AResultText := 'Сценарий не обновляет runtime-расход эталона';
+        StepResult := AResultText;
         AddDiagnosticEvent(AResultText);
-        Break;
       end;
-      ProcessStage;
-      Point := GetCurrentPoint;
-      if (AScenario in [mrsFlowPassesPoint, mrsHighVariation]) and (Point <> nil) and
+
+      if (AResultText = '') and (AScenario in [mrsFlowPassesPoint, mrsHighVariation]) and (Point <> nil) and
          (((FScenarioCurrentTimeMs - FScenarioPointStartTimeMs) / 1000.0) > GetScenarioVirtualPointTimeoutSec(Point)) and
          (FCurrentStage = msWaitStable) then
+      begin
         ContinueAfterPointError(mptsSetupError, meStableTimeout, BuildError(1901, 'Сценарный таймаут стабильности'));
-      if FCurrentStage = msDone then begin Result := True; Break; end;
+        StepResult := 'StableTimeout';
+      end;
+
+      AddScenarioLog(Format('RunScenario: step; Stage %s -> %s; RequestedStage=%s; SetStageResult=%s; WorkTable %s -> %s; Point %d/%s; Stop %s -> %s; Result=%s', [
+        MeasurementStateToString(OldStage), MeasurementStateToString(FCurrentStage),
+        MeasurementStateToString(FLastSetStageRequested), BoolToStr(FLastSetStageResult, True),
+        GetEnumName(TypeInfo(EStateWorkTable), Ord(OldWorkTableState)),
+        ScenarioWorkTableStateText,
+        OldPointIndex, PointUuid, BoolToStr(OldStopRequested, True), BoolToStr(IsStopRequested, True), StepResult]));
+
+      if not FLastSetStageResult then
+      begin
+        AResultText := Format('Запрещён переход %s -> %s; WorkTable=%s; Point=%d/%s', [
+          MeasurementStateToString(OldStage), MeasurementStateToString(FLastSetStageRequested),
+          ScenarioWorkTableStateText,
+          OldPointIndex, PointUuid]);
+      end;
+
+      NewSignature := BuildScenarioProgressSignature(StepResult);
+      if IsScenarioRegularWait then
+        FScenarioNoProgressCount := 0
+      else if (NewSignature = OldSignature) or (NewSignature = FScenarioLastProgressSignature) then
+        Inc(FScenarioNoProgressCount)
+      else
+      begin
+        FScenarioLastProgressSignature := NewSignature;
+        FScenarioNoProgressCount := 0;
+      end;
+
+      if (AResultText = '') and (FScenarioNoProgressCount >= MaxNoProgressSteps) then
+      begin
+        AResultText := Format('Сценарий остановлен: нет прогресса на этапе %s; WorkTable=%s; Point=%d/%s', [
+          MeasurementStateToString(FCurrentStage),
+          ScenarioWorkTableStateText,
+          FCurrentPointIndex, ScenarioPointUuid(Point)]);
+        AddScenarioLog('Остановка по защите от отсутствия прогресса: ' + AResultText);
+      end;
+
+      if (AResultText = '') and (FCurrentStage = msDone) then
+      begin
+        Result := True;
+        AResultText := 'Сценарий завершён';
+      end;
+
+      if (AResultText <> '') and (not Result) then
+      begin
+        SetStage(msDone);
+        FinishScenario('ошибка', AResultText, True);
+      end
+      else if Result then
+        FinishScenario('успешно', AResultText, False);
+
       FScenarioCurrentTimeMs := FScenarioCurrentTimeMs + FScenarioStepMs;
+    except
+      on E: Exception do
+      begin
+        Point := GetCurrentPoint;
+        AResultText := Format('Исключение сценария: %s: %s', [E.ClassName, E.Message]);
+        AddScenarioLog(Format('Исключение: %s: %s; Stage=%s; WorkTable=%s; Point=%d/%s', [
+          E.ClassName, E.Message, MeasurementStateToString(FCurrentStage),
+          ScenarioWorkTableStateText,
+          FCurrentPointIndex, ScenarioPointUuid(Point)]));
+        SetStage(msDone);
+        FinishScenario('ошибка', AResultText, True);
+      end;
     end;
-    if not Result then begin if AResultText = '' then AResultText := 'ScenarioStepLimitExceeded'; SetStage(msDone); end
-    else AResultText := 'Сценарий завершён';
   finally
-    FScenarioRunning := False;
-    FIsScenarioRun := False;
+    FScenarioStepBusy := False;
   end;
 end;
 
@@ -1093,14 +1317,20 @@ begin
   end;
 end;
 
-procedure TMeasurementRun.SetStage(const ANewStage: EMeasurementState);
+function TMeasurementRun.SetStage(const ANewStage: EMeasurementState): Boolean;
 var
   OldStage: EMeasurementState;
   TransitionText: string;
 begin
+  Result := False;
+  FLastSetStageRequested := ANewStage;
+  FLastSetStageResult := False;
 
   if FCurrentStage = ANewStage then
-    Exit;
+  begin
+    FLastSetStageResult := True;
+    Exit(True);
+  end;
 
   FWaitStartedTick := NowTickMs;
 
@@ -1112,9 +1342,11 @@ begin
   begin
     ProtocolManager.AddMessage(pcWarning, psMeasurement, 'SetStage',
       'Недопустимый переход этапа измерения', TransitionText);
-    FireEvent(meMeasureWarning, BuildError(9001,
-      'Invalid measurement stage transition: ' + TransitionText));
-    Exit;
+    AddScenarioLog('CanChangeStage отказ: ' + TransitionText +
+      '; WorkTable=' + ScenarioWorkTableStateText);
+    FireEvent(meMeasureError, BuildError(9001,
+      'Недопустимый переход этапа измерения: ' + TransitionText));
+    Exit(False);
   end;
 
   DoExitStage(OldStage, ANewStage);
@@ -1123,10 +1355,14 @@ begin
   ProtocolManager.AddMessage(pcState, psMeasurement, 'SetStage',
     'Переход этапа измерения, тайм аут: ' +inttostr(NowTickMs - FWaitStartedTick)+'; ', TransitionText);
   AddDiagnosticEvent('Stage ' + MeasurementStateToString(OldStage) + ' -> ' + MeasurementStateToString(ANewStage));
+  AddScenarioLog('Stage ' + MeasurementStateToString(OldStage) + ' -> ' + MeasurementStateToString(ANewStage) +
+    '; WorkTable=' + ScenarioWorkTableStateText);
   if FWorkTable <> nil then
     FWorkTable.MeasurementRunStateChanged(Self, ANewStage);
   Notify(Integer(meStateChanged));
   DoEnterStage(OldStage, ANewStage);
+  FLastSetStageResult := True;
+  Result := True;
 end;
 
 procedure TMeasurementRun.DoExitStage(AOldStage, ANewStage: EMeasurementState);
@@ -3751,7 +3987,8 @@ begin
             MeasurementStopReasonToString(GetStopReason));
           MarkInterruptedPointIfNeeded;
         end;
-        SetStage(msSave);
+        AddScenarioLog('Штатное ожидание завершено: msWaitMeasureStop; WorkTable=swtCOMPLETE');
+        SetStage(msResultsRead);
         Exit;
       end;
 
