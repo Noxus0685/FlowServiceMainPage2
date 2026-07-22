@@ -5494,6 +5494,37 @@ begin
 end;
 
 procedure TFrameMainTable.AddFlowGraphSamples(const ATimeStampMs: Int64);
+  function CurrentGraphPointName: string;
+  var
+    Run: TMeasurementRun;
+    Point: TDevicePoint;
+  begin
+    Result := '';
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.MeasurementRun is TMeasurementRun) then
+    begin
+      Run := TMeasurementRun(FActiveWorkTable.MeasurementRun);
+      Point := Run.CurrentPoint;
+      if Point <> nil then
+        Result := Point.Name;
+    end;
+  end;
+
+  procedure LogAddSample(const AKey: string; const ARawValue: Double; ASamplesCount: Integer);
+  begin
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcAction, psForm, 'FlowGraphAddSample',
+        Format('PointIndex=%d; PointName=%s; SeriesKey=%s; RawValueLS=%g; Accepted=True; SamplesCount=%d',
+          [FCurrentGraphPointIndex, CurrentGraphPointName(), AKey, ARawValue, ASamplesCount]), '');
+  end;
+
+  procedure LogSkipSample(const AKey: string; const ARawValue: Double; const AReason: string);
+  begin
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcWarning, psForm, 'FlowGraphSkipSample',
+        Format('PointIndex=%d; SeriesKey=%s; RawValueLS=%g; Reason=%s',
+          [FCurrentGraphPointIndex, AKey, ARawValue, AReason]), '');
+  end;
+
   procedure AddList(AList: TObjectList<TChannel>; ADict: TObjectDictionary<string,TFlowGraphSeries>; const AKind, AFallback: string);
   var
     I: Integer;
@@ -5501,22 +5532,54 @@ procedure TFrameMainTable.AddFlowGraphSamples(const ATimeStampMs: Int64);
     Key: string;
     S: TFlowGraphSeries;
     Sample: TFlowGraphSample;
+    RawValue: Double;
   begin
     if AList = nil then
       Exit;
     for I := 0 to AList.Count - 1 do
     begin
       C := AList[I];
-      if not IsValidFlowGraphChannel(C) then
+      Key := '';
+      RawValue := 0;
+      if FActiveWorkTable <> nil then
+        Key := BuildFlowGraphSeriesKey(AKind, FActiveWorkTable, C, I);
+      if C = nil then
+      begin
+        LogSkipSample(Key, RawValue, 'ChannelNil');
         Continue;
-      Key := BuildFlowGraphSeriesKey(AKind, FActiveWorkTable, C, I);
+      end;
+      if C.FlowMeter = nil then
+      begin
+        LogSkipSample(Key, RawValue, 'FlowMeterNil');
+        Continue;
+      end;
+      if C.FlowMeter.ValueFlow = nil then
+      begin
+        LogSkipSample(Key, RawValue, 'ValueFlowNil');
+        Continue;
+      end;
+      if (C.State = osDeleted) or ((C.FlowMeter.Device <> nil) and (C.FlowMeter.Device.State = osDeleted)) then
+      begin
+        LogSkipSample(Key, RawValue, 'Deleted');
+        Continue;
+      end;
       if not ADict.TryGetValue(Key, S) then
+      begin
+        LogSkipSample(Key, RawValue, 'SeriesKeyNotFound');
         Continue;
+      end;
+      RawValue := C.FlowMeter.ValueFlow.GetDoubleValue;
+      if IsNan(RawValue) or IsInfinite(RawValue) then
+      begin
+        LogSkipSample(Key, RawValue, 'InvalidValue');
+        Continue;
+      end;
       Sample.TimeStampMs := ATimeStampMs;
-      Sample.Value := C.FlowMeter.ValueFlow.GetDoubleValue;
+      Sample.Value := RawValue;
       S.Samples.Add(Sample);
       while S.Samples.Count > MaxGraphSampleCountPerSeries do
         S.Samples.Delete(0);
+      LogAddSample(Key, RawValue, S.Samples.Count);
     end;
   end;
 begin
@@ -5646,6 +5709,14 @@ begin
       end;
       Line.LinePen.Visible := Pair.Value.Visible and (VisibleCount >= 2);
       Line.LinePen.Width := 2;
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcAction, psForm, 'FlowGraphRender',
+          Format('PointIndex=%d; SeriesKey=%s; VisibleSamples=%d; LineSeriesCount=%d; AxisMin=%g; AxisMax=%g',
+            [FCurrentGraphPointIndex, Pair.Key, VisibleCount, Line.Count, AAxisMinSec, AAxisMaxSec]), '');
+      if Pair.Value.Visible and (VisibleCount > 0) and (Line.Count = 0) and Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcWarning, psForm, 'FlowGraphRender',
+          Format('PointIndex=%d; SeriesKey=%s; VisibleSamples=%d; LineSeriesCount=%d; Reason=SegmentFilterMismatch',
+            [FCurrentGraphPointIndex, Pair.Key, VisibleCount, Line.Count]), '');
 
     end;
 
@@ -5712,7 +5783,7 @@ var
   Point: TDevicePoint;
   PointUUID, PointKey: string;
   PointIndex: Integer;
-  MeasurementSegment, RunActive, NewRunStarted, PointChanged: Boolean;
+  MeasurementSegment, RunActive, NewRunStarted, PointChanged, SampleAdded: Boolean;
 begin
   if FFlowGraphHistory = nil then
     Exit;
@@ -5722,6 +5793,7 @@ begin
   RunActive := False;
   NewRunStarted := False;
   PointChanged := False;
+  SampleAdded := False;
   if (not FGraphChannelsReady) and (FActiveWorkTable <> nil) then
     RefreshFlowGraphChannels;
   Run := nil;
@@ -5780,6 +5852,12 @@ begin
       FCurrentGraphPointStartMs := CurrentTimeMs;
       FLastFlowGraphSampleMs := 0;
       FGraphSamplingActive := True;
+      if FGraphChannelsReady then
+      begin
+        AddFlowGraphSamples(CurrentTimeMs);
+        FLastFlowGraphSampleMs := CurrentTimeMs;
+        SampleAdded := True;
+      end;
     end;
     MeasurementSegment := RunActive and (FCurrentGraphPointStartMs > 0);
   end;
@@ -5790,7 +5868,7 @@ begin
     FLastFlowGraphSampleMs := 0;
   end;
 
-  if (FGraphChannelsReady or (FActiveWorkTable <> nil)) and IsFlowGraphSamplingActive(FActiveWorkTable) and
+  if (not SampleAdded) and (FGraphChannelsReady or (FActiveWorkTable <> nil)) and IsFlowGraphSamplingActive(FActiveWorkTable) and
      ((FLastFlowGraphSampleMs = 0) or (CurrentTimeMs < FLastFlowGraphSampleMs) or
       (CurrentTimeMs - FLastFlowGraphSampleMs >= GraphSampleIntervalMs)) then
   begin
