@@ -18,13 +18,24 @@ var
 
 procedure InitDebugLog;
 var
-  LogDir: string;
+  Header: string;
 begin
   try
-    LogDir := TPath.Combine(ExtractFilePath(ParamStr(0)), 'Logs');
-    ForceDirectories(LogDir);
-    GDebugLogFile := TPath.Combine(LogDir, 'debug.log');
-    TFile.WriteAllText(GDebugLogFile, '', TEncoding.UTF8);
+    GDebugLogFile := TPath.Combine(
+      ExtractFilePath(ParamStr(0)),
+      'MAIN2_UPDATE_COMMENTS.md');
+
+    if not TFile.Exists(GDebugLogFile) then
+    begin
+      Header := '# MAIN2 runtime logs' + sLineBreak + sLineBreak;
+      TFile.WriteAllText(GDebugLogFile, Header, TEncoding.UTF8);
+    end;
+
+    TFile.AppendAllText(
+      GDebugLogFile,
+      '## Запуск ' + FormatDateTime('dd.mm.yyyy hh:nn:ss.zzz', Now) +
+        sLineBreak + sLineBreak,
+      TEncoding.UTF8);
   except
     GDebugLogFile := '';
   end;
@@ -37,14 +48,15 @@ begin
   if GDebugLogFile = '' then
     Exit;
 
-  Line := FormatDateTime('dd.mm.yyyy hh:nn:ss.zzz', Now) + ' ' +
+  Line := '- ' + FormatDateTime('dd.mm.yyyy hh:nn:ss.zzz', Now) + ' — ' +
     StringReplace(AText, #13#10, ' | ', [rfReplaceAll]) + sLineBreak;
+
   TMonitor.Enter(GDebugLogLock);
   try
     try
       TFile.AppendAllText(GDebugLogFile, Line, TEncoding.UTF8);
     except
-      { Диагностика не должна мешать работе программы. }
+      { Запись лога не должна мешать работе программы. }
     end;
   finally
     TMonitor.Exit(GDebugLogLock);
