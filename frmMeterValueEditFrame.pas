@@ -1324,7 +1324,8 @@ begin
   end;
   GridSamples.Repaint;
   UpdateSampleSourceControls;
-  UpdateStabilityChart;
+  if not FLoading then
+    UpdateStabilityChart;
 end;
 
 procedure TFrameMeterValueEdit.SortSamples;
@@ -2399,7 +2400,6 @@ begin
 
   Assert(Length(FDisplayedSamples) = OldSampleCount);
   Assert(GridSamples.RowCount = OldRowCount);
-  UpdateStabilityChart;
 end;
 
 function TFrameMeterValueEdit.FormatInfoFloat(const AValue: Double;
@@ -2525,7 +2525,7 @@ var
   ChartSettings: TMeterValueStabilitySettings;
 
 begin
-  if ChartStability = nil then
+  if FLoading or (ChartStability = nil) then
     Exit;
 
   ChartSettings := FTestSettings;
