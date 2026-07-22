@@ -993,6 +993,147 @@ begin
   FScenarioStepBusy := False;
 end;
 
+procedure TMeasurementRun.AddScenarioLog(const AText: string);
+var
+  Line: string;
+begin
+  Line := FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now) + ' ' + AText + sLineBreak;
+  try
+    TFile.AppendAllText('MAIN2_UPDATE_COMMENTS.md', Line, TEncoding.UTF8);
+  except
+    // Ошибка записи лога не должна прерывать сценарий.
+  end;
+end;
+
+function TMeasurementRun.BuildScenarioProgressSignature(const AStepResult: string): string;
+var
+  Point: TDevicePoint;
+  WorkTableStateText: string;
+  PointUuid: string;
+begin
+  WorkTableStateText := ScenarioWorkTableStateText;
+
+  Point := GetCurrentPoint;
+  if Point <> nil then
+    PointUuid := Point.UUID
+  else
+    PointUuid := 'nil';
+
+  Result := Format('%s|%s|%d|%s|%s|%s|%s', [
+    MeasurementStateToString(FCurrentStage), WorkTableStateText,
+    FCurrentPointIndex, PointUuid, BoolToStr(IsStopRequested, True),
+    AStepResult, BoolToStr(FLastSetStageResult, True)]);
+end;
+
+function TMeasurementRun.IsScenarioRegularWait: Boolean;
+begin
+  Result := FCurrentStage in [msWaitStable, msWaitMeasureStart, msMeasure, msWaitMeasureStop, msResultsRead];
+end;
+
+
+function TMeasurementRun.ScenarioWorkTableStateText: string;
+begin
+  if FWorkTable <> nil then
+    Result := GetEnumName(TypeInfo(EStateWorkTable), Ord(FWorkTable.State))
+  else
+    Result := 'nil';
+end;
+
+function TMeasurementRun.ScenarioPointUuid(APoint: TDevicePoint): string;
+begin
+  if APoint <> nil then
+    Result := APoint.UUID
+  else
+    Result := 'nil';
+end;
+
+function TMeasurementRun.GetStabilityAnalysisTimeMs: Int64;
+begin
+  if FScenarioRunning then
+    Result := FScenarioCurrentTimeMs
+  else
+    Result := Int64(NowTickMs);
+end;
+
+procedure TMeasurementRun.LogScenarioStability(const APrefix: string; const AInfo: TMeterValueStabilityInfo;
+  const AStableInfo: RStableInfo; const ASettings: TMeterValueStabilitySettings;
+  const AActualValue, ATargetValue, ALowerLimit, AUpperLimit, AStableDurationSec: Double);
+var
+  LogSecond: Int64;
+  Text: string;
+begin
+  if FCurrentStage <> msWaitStable then
+    Exit;
+
+  LogSecond := FScenarioCurrentTimeMs div 1000;
+  Text := Format('%s: AnalysisTimeSource=%s; AnalysisTimeMs=%d; FScenarioCurrentTimeMs=%d; RuntimeNowTickMs=%d; SampleCount=%d; UsedSampleCount=%d; MinSampleCount=%d; WindowDurationSec=%.3f; LastSampleAgeSec=%.3f; IsSignalStable=%s; IsStabilityConfirmed=%s; IsCurrentValueInRange=%s; IsMeanValueInRange=%s; IsForecastInRange=%s; IsSuitableForMeasurement=%s; Status=%s; Reason=%s; Flow=%.6f; Target=%.6f; Lower=%.6f; Upper=%.6f; StableDurationSec=%.3f; RequiredStabilizationSec=%.3f',
+    [APrefix, IfThen(FScenarioRunning, 'Scenario', 'Runtime'), GetStabilityAnalysisTimeMs,
+     FScenarioCurrentTimeMs, Int64(NowTickMs), AInfo.SampleCount, AInfo.UsedSampleCount,
+     ASettings.MinSampleCount, AInfo.WindowDurationSec, AInfo.LastSampleAgeSec,
+     BoolToStr(AInfo.IsSignalStable, True), BoolToStr(AInfo.IsStabilityConfirmed, True),
+     BoolToStr(AInfo.IsCurrentValueInRange, True), BoolToStr(AInfo.IsMeanValueInRange, True),
+     BoolToStr(AInfo.IsForecastInRange, True), BoolToStr(AInfo.IsSuitableForMeasurement, True),
+     GetEnumName(TypeInfo(TMeterValueStabilityStatus), Ord(AInfo.Status)), AInfo.StatusText,
+     AActualValue, ATargetValue, ALowerLimit, AUpperLimit, AStableDurationSec,
+     FRequiredStabilizationSec]);
+
+  if (Text <> FLastScenarioStabilityLogText) or (LogSecond <> FLastScenarioStabilityLogSecond) then
+  begin
+    FLastScenarioStabilityLogText := Text;
+    FLastScenarioStabilityLogSecond := LogSecond;
+    AddScenarioLog(Text);
+  end;
+end;
+
+
+function TMeasurementRun.BuildScenarioStabilityFailureText: string;
+var
+  I: Integer;
+  Channel: TChannel;
+  ValueFlow: TMeterValue;
+  Settings: TMeterValueStabilitySettings;
+  Info: TMeterValueStabilityInfo;
+begin
+  Result := FLastDiagnosticIsStableText;
+  if (FWorkTable = nil) or (FWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.DeviceChannels[I];
+    if (Channel = nil) or (not Channel.Enabled) or
+       (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) then
+      Continue;
+    ValueFlow := Channel.FlowMeter.ValueFlow;
+    Settings := ValueFlow.StabilitySettings;
+    Info := ValueFlow.LastStabilityInfo;
+    if Settings.Enabled and (Settings.WindowDurationSec <= 0) then
+      Exit(Format('Стабилизация невозможна: Device[%d].WindowDurationSec=%.12g; SampleCount=%d; UsedSampleCount=%d; MinSampleCount=%d.',
+        [I, Settings.WindowDurationSec, Info.SampleCount, Info.UsedSampleCount, Settings.MinSampleCount]));
+    if Info.Status = mvssInvalidSettings then
+      Exit(Format('Стабилизация невозможна: Device[%d].%s; SampleCount=%d; UsedSampleCount=%d; MinSampleCount=%d.',
+        [I, Info.StatusText, Info.SampleCount, Info.UsedSampleCount, Settings.MinSampleCount]));
+  end;
+end;
+
+procedure TMeasurementRun.FinishScenario(const AStatus, AText: string; AStopWorkTable: Boolean);
+begin
+  AddScenarioLog('RunScenario: завершение; результат=' + AStatus + '; ' + AText);
+  if AStopWorkTable and (FWorkTable <> nil) then
+  begin
+    try
+      if WorkTableNeedsPhysicalStop then
+        FWorkTable.StopTest;
+    except
+      on E: Exception do
+        AddScenarioLog('Исключение при остановке WorkTable: ' + E.ClassName + ': ' + E.Message);
+    end;
+  end;
+  FScenarioRunning := False;
+  FIsScenarioRun := False;
+  FScenarioStepBusy := False;
+end;
+
 function TMeasurementRun.RunScenario(AScenario: EMeasurementScenario; out AResultText: string): Boolean;
 const
   MaxNoProgressSteps = 20;
@@ -2142,7 +2283,6 @@ var
   I: Integer;
   Channel: TChannel;
   StableValue: TMeterValue;
-  Settings: TMeterValueStabilitySettings;
   SignalInfo: TMeterValueStabilityInfo;
   ActualValue: Double;
   ParticipatingDeviceCount: Integer;
@@ -2225,7 +2365,6 @@ var
   I: Integer;
   Channel: TChannel;
   StableValue: TMeterValue;
-  Settings: TMeterValueStabilitySettings;
   SignalInfo: TMeterValueStabilityInfo;
   Point: TDevicePoint;
   TargetValue: Double;
