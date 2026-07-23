@@ -1868,7 +1868,9 @@ var
   ScenarioPointCount: Integer;
   TimeStepSec: Double;
   I, Count, MidIndex, OutlierCount, StepMs, SettlingStart: Integer;
-  BaseValue, Span: Double;
+  BaseValue, Span, BaseLowerLimit, BaseUpperLimit, RangeWidth, ScenarioValue: Double;
+  EntrySettings: TMeterValueStabilitySettings;
+  EntryTargetValue: Double;
   IsStaleScenario: Boolean;
 
   procedure AddSamplePoint(const AIndex: Integer; const AValue: Double);
@@ -1882,29 +1884,44 @@ var
 
   procedure SetBaseSettings;
   begin
-    FillChar(FTestSettings, SizeOf(FTestSettings), 0);
-    FTestSettings.Enabled := True;
-    FTestSettings.MinSampleCount := 10;
-    FTestSettings.WindowDurationSec := 10;
-    FTestSettings.MaxSampleAgeSec := 3;
-    FTestSettings.ConfirmationTimeSec := 3;
-    FTestSettings.ExitThresholdFactor := 1.2;
-    FTestSettings.MaxVariation := DisplayDeltaToBase('0.5');
-    FTestSettings.MaxStdDeviation := DisplayDeltaToBase('0.1');
-    FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.05');
-    FTestSettings.MaxOutlierFraction := 0.10;
-    FTestSettings.OutlierFactor := 3.5;
-    FTestSettings.ForecastHorizonSec := 10;
-    FTestSettings.TargetAccuracyPlusPercent := 1;
-    FTestSettings.TargetAccuracyMinusPercent := 1;
-    FTestSettings.TargetToleranceAbsolute := 0;
+    FTestSettings := EntrySettings;
+    FTestTargetValue := EntryTargetValue;
+    if not FTestSettings.Enabled then
+      FTestSettings.Enabled := True;
+    if FTestSettings.MinSampleCount < 2 then
+      FTestSettings.MinSampleCount := 10;
+    if FTestSettings.WindowDurationSec <= 0 then
+      FTestSettings.WindowDurationSec := 10;
+    if FTestSettings.MaxSampleAgeSec <= 0 then
+      FTestSettings.MaxSampleAgeSec := 3;
+    if FTestSettings.ConfirmationTimeSec < 0 then
+      FTestSettings.ConfirmationTimeSec := 3;
+    if FTestSettings.ExitThresholdFactor < 1 then
+      FTestSettings.ExitThresholdFactor := 1.2;
+    if FTestSettings.OutlierFactor <= 0 then
+      FTestSettings.OutlierFactor := 3.5;
+    if FTestSettings.ForecastHorizonSec < 0 then
+      FTestSettings.ForecastHorizonSec := 10;
+    if FTestSettings.TargetAccuracyPlusPercent < 0 then
+      FTestSettings.TargetAccuracyPlusPercent := 1;
+    if FTestSettings.TargetAccuracyMinusPercent < 0 then
+      FTestSettings.TargetAccuracyMinusPercent := 1;
+    if FTestSettings.MaxVariation <= 0 then
+      FTestSettings.MaxVariation := DisplayDeltaToBase('0.5');
+    if FTestSettings.MaxStdDeviation <= 0 then
+      FTestSettings.MaxStdDeviation := DisplayDeltaToBase('0.1');
+    if FTestSettings.MaxTrendRate <= 0 then
+      FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.05');
+    if (FTestSettings.MaxOutlierFraction < 0) or (FTestSettings.MaxOutlierFraction > 1) then
+      FTestSettings.MaxOutlierFraction := 0.10;
     FTestSettings.RequireCurrentValueInRange := True;
     FTestSettings.RequireMeanValueInRange := True;
     FTestSettings.RequireForecastInRange := True;
-    FTestTargetValue := DisplayToBase('10');
   end;
 
 begin
+  EntrySettings := FTestSettings;
+  EntryTargetValue := FTestTargetValue;
   if not TryGetScenarioPointCount(ScenarioPointCount, True) then
     Exit;
   TimeStepSec := SafeFloat(EditGeneratorTimeStep.Text);
@@ -1921,6 +1938,12 @@ begin
     FTestStableCandidateSinceMs := 0;
     FTestStabilityConfirmed := False;
     SetBaseSettings;
+    FTestSettings.TargetValue := FTestTargetValue;
+    CalculateTargetLimits(FTestTargetValue, FTestSettings.TargetAccuracyPlusPercent,
+      FTestSettings.TargetAccuracyMinusPercent, FTestSettings.TargetToleranceAbsolute,
+      BaseLowerLimit, BaseUpperLimit);
+    BaseValue := ValueToCurrentDimension(FTestTargetValue);
+    RangeWidth := Abs(ValueToCurrentDimension(BaseUpperLimit) - ValueToCurrentDimension(BaseLowerLimit));
 
     Count := ScenarioPointCount;
     case AScenario of
@@ -1938,7 +1961,7 @@ begin
 
       mtsSlowIncrease:
         begin
-          FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.01');
+          FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.001');
           Span := 0.20;
           for I := 0 to Count - 1 do
             AddSamplePoint(I, BaseValue + Span * I / Max(1, Count - 1));
@@ -1946,7 +1969,7 @@ begin
 
       mtsSlowDecrease:
         begin
-          FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.01');
+          FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.001');
           Span := 0.20;
           for I := 0 to Count - 1 do
             AddSamplePoint(I, BaseValue + Span - Span * I / Max(1, Count - 1));
@@ -1965,26 +1988,22 @@ begin
 
       mtsSingleOutlier:
         begin
-          FTestTargetValue := DisplayToBase('29');
-          BaseValue := 29.0;
           FTestSettings.MaxOutlierFraction := 0.11;
           MidIndex := Count div 2;
           for I := 0 to Count - 1 do
             if I = MidIndex then
-              AddSamplePoint(I, BaseValue + 10.0)
+              AddSamplePoint(I, BaseValue + Max(Abs(BaseValue), 1.0))
             else
               AddSamplePoint(I, BaseValue + ((I mod 3) - 1) * 0.01);
         end;
 
       mtsManyOutliers:
         begin
-          FTestTargetValue := DisplayToBase('29');
-          BaseValue := 29.0;
           FTestSettings.MaxOutlierFraction := 0.10;
           OutlierCount := EnsureRange(Ceil(Count * (FTestSettings.MaxOutlierFraction + 0.05)), 2, Count);
           for I := 0 to Count - 1 do
             if (I > 0) and (I < Count - 1) and ((I mod Max(1, Count div OutlierCount)) = 0) then
-              AddSamplePoint(I, BaseValue + 10.0)
+              AddSamplePoint(I, BaseValue + Max(Abs(BaseValue), 1.0))
             else
               AddSamplePoint(I, BaseValue);
         end;
@@ -2011,7 +2030,7 @@ begin
           FTestSettings.TargetAccuracyPlusPercent := 2;
           FTestSettings.TargetAccuracyMinusPercent := 2;
           for I := 0 to Count - 1 do
-            AddSamplePoint(I, 9.80 + 0.20 * I / Max(1, Count - 1));
+            AddSamplePoint(I, BaseValue - 0.20 + 0.25 * I / Max(1, Count - 1));
         end;
 
       mtsForecastBelowRange:
@@ -2021,12 +2040,17 @@ begin
           FTestSettings.TargetAccuracyPlusPercent := 2;
           FTestSettings.TargetAccuracyMinusPercent := 2;
           for I := 0 to Count - 1 do
-            AddSamplePoint(I, 10.20 - 0.20 * I / Max(1, Count - 1));
+            AddSamplePoint(I, BaseValue + 0.20 - 0.25 * I / Max(1, Count - 1));
         end;
 
       mtsStableOutOfRange:
-        for I := 0 to Count - 1 do
-          AddSamplePoint(I, 0.0);
+        begin
+          ScenarioValue := ValueToCurrentDimension(BaseUpperLimit) + Max(Abs(BaseValue) * 0.2, RangeWidth);
+          if SameValue(ScenarioValue, ValueToCurrentDimension(BaseUpperLimit), 1E-9) then
+            ScenarioValue := ScenarioValue + 1.0;
+          for I := 0 to Count - 1 do
+            AddSamplePoint(I, ScenarioValue);
+        end;
 
       mtsAllConditionsPassed:
         begin
@@ -2065,9 +2089,9 @@ var
   SavedSamples: TArray<TMeterValueSample>;
   SavedScenarioIndex, SavedRow: Integer;
   SavedCurrentTimeMs, SavedCandidateMs: Int64;
-  SavedSettings: TMeterValueStabilitySettings;
+  SavedSettings, BaseSettings: TMeterValueStabilitySettings;
   SavedInfo, SavedLastAnalysis: TMeterValueStabilityInfo;
-  SavedTarget: Double;
+  SavedTarget, BaseTargetValue: Double;
   SavedConfirmed, SavedDataModified, SavedSettingsModified, SavedModified: Boolean;
   LowerLimit, UpperLimit: Double;
   I, ScenarioNo, PointCount: Integer;
@@ -2190,6 +2214,8 @@ begin
     SavedDataModified := FTestDataModified;
     SavedSettingsModified := FSettingsModified;
     SavedModified := FModified;
+    BaseSettings := FTestSettings;
+    BaseTargetValue := FTestTargetValue;
     SavedDisplayedSamples := Copy(FDisplayedSamples);
     SetLength(SavedSamples, FTestSamples.Count);
     for I := 0 to FTestSamples.Count - 1 do
@@ -2240,6 +2266,11 @@ begin
       Report.Add('');
       try
         ComboBoxStabilityScenario.ItemIndex := Ord(Scenario);
+        FTestSettings := BaseSettings;
+        FTestTargetValue := BaseTargetValue;
+        FTestStableCandidateSinceMs := 0;
+        FTestStabilityConfirmed := False;
+        FTestSamples.Clear;
         ApplyScenario(Scenario);
         Samples := FDisplayedSamples;
         TryGetTestTargetLimits(LowerLimit, UpperLimit);
@@ -2257,6 +2288,24 @@ begin
           Report.Add('LastTimeSec=' + Fmt(Samples[High(Samples)].TimeStampMs / 1000.0, 3));
         end;
         Report.Add('TimeStepSec=' + Fmt(ReportTimeStepSec, 3));
+        Report.Add('');
+        Report.Add('НАСТРОЙКИ СЦЕНАРИЯ:');
+        Report.Add('Enabled=' + B(FTestSettings.Enabled));
+        Report.Add('MinSampleCount=' + IntToStr(FTestSettings.MinSampleCount));
+        Report.Add('WindowDurationSec=' + Fmt(FTestSettings.WindowDurationSec));
+        Report.Add('MaxSampleAgeSec=' + Fmt(FTestSettings.MaxSampleAgeSec));
+        Report.Add('ConfirmationTimeSec=' + Fmt(FTestSettings.ConfirmationTimeSec));
+        Report.Add('MaxVariation=' + Fmt(FTestSettings.MaxVariation));
+        Report.Add('MaxStdDeviation=' + Fmt(FTestSettings.MaxStdDeviation));
+        Report.Add('MaxTrendRate=' + Fmt(FTestSettings.MaxTrendRate));
+        Report.Add('MaxOutlierFraction=' + Fmt(FTestSettings.MaxOutlierFraction));
+        Report.Add('ForecastHorizonSec=' + Fmt(FTestSettings.ForecastHorizonSec));
+        Report.Add('TargetValue=' + Fmt(FTestTargetValue));
+        Report.Add('LowerLimit=' + Fmt(LowerLimit));
+        Report.Add('UpperLimit=' + Fmt(UpperLimit));
+        Report.Add('RequireCurrentValueInRange=' + B(FTestSettings.RequireCurrentValueInRange));
+        Report.Add('RequireMeanValueInRange=' + B(FTestSettings.RequireMeanValueInRange));
+        Report.Add('RequireForecastInRange=' + B(FTestSettings.RequireForecastInRange));
         Report.Add('');
         Report.Add('ДАННЫЕ:');
         Report.Add('№ | TimeSec | TimeStampMs | ValueBase | ValueDisplay | InWindow | IsOutlier | IsInRange | IsInConfirmationPeriod');

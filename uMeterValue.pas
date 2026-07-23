@@ -1488,7 +1488,7 @@ type
 var
   Window: TArray<TIndexedSample>;
   Used: TArray<TIndexedSample>;
-  CutoffMs, FirstMs, LastMs: Int64;
+  CutoffMs, FirstMs, LastMs, LastSampleTimeMs: Int64;
   I, N: Integer;
   Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept: Double;
   Msg: string;
@@ -1546,6 +1546,17 @@ begin
     Exit(False);
   end;
 
+  LastSampleTimeMs := Low(Int64);
+  for I := 0 to High(ASamples) do
+    if (ASamples[I].TimeStampMs <= ACurrentMs) and
+       ((LastSampleTimeMs = Low(Int64)) or (ASamples[I].TimeStampMs > LastSampleTimeMs)) then
+      LastSampleTimeMs := ASamples[I].TimeStampMs;
+  if LastSampleTimeMs <> Low(Int64) then
+  begin
+    AInfo.HasLastSampleAge := True;
+    AInfo.LastSampleAgeSec := Max(0.0, (ACurrentMs - LastSampleTimeMs) / 1000.0);
+  end;
+
   CutoffMs := ACurrentMs - Round(ASettings.WindowDurationSec * 1000.0);
   SetLength(Window, 0);
   for I := 0 to High(ASamples) do
@@ -1564,18 +1575,16 @@ begin
     FirstMs := Window[0].Sample.TimeStampMs;
     LastMs := Window[N - 1].Sample.TimeStampMs;
     AInfo.CurrentValue := Window[N - 1].Sample.Value;
-    AInfo.LastSampleAgeSec := (ACurrentMs - LastMs) / 1000.0;
     AInfo.WindowDurationSec := (LastMs - FirstMs) / 1000.0;
     AInfo.HasCurrentValue := True;
-    AInfo.HasLastSampleAge := True;
   end;
 
   AInfo.HasEnoughSamples := N >= ASettings.MinSampleCount;
   AInfo.HasEnoughWindow := (N > 0) and (AInfo.WindowDurationSec + EPS >= ASettings.WindowDurationSec);
-  AInfo.IsDataActual := (N > 0) and (AInfo.LastSampleAgeSec <= ASettings.MaxSampleAgeSec);
+  AInfo.IsDataActual := AInfo.HasLastSampleAge and (AInfo.LastSampleAgeSec <= ASettings.MaxSampleAgeSec);
   if not AInfo.HasEnoughSamples then Include(AInfo.FailReasons, mvsfrNotEnoughSamples);
   if not AInfo.HasEnoughWindow then Include(AInfo.FailReasons, mvsfrInsufficientWindow);
-  if not AInfo.IsDataActual then Include(AInfo.FailReasons, mvsfrStaleData);
+  if AInfo.HasLastSampleAge and not AInfo.IsDataActual then Include(AInfo.FailReasons, mvsfrStaleData);
 
   Used := Window;
   if N > 0 then
@@ -1712,7 +1721,8 @@ begin
 
   Msg := '';
   if mvsfrNotEnoughSamples in AInfo.FailReasons then Msg := Msg + Format('Недостаточно данных: в окне %d точек, требуется минимум %d. ', [AInfo.UsedSampleCount, ASettings.MinSampleCount]);
-  if (mvsfrInsufficientWindow in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then Msg := Msg + 'Недостаточный временной интервал между точками для расчёта тренда. ';
+  if mvsfrInsufficientWindow in AInfo.FailReasons then Msg := Msg + 'Недостаточная длительность окна анализа. ';
+  if mvsfrInsufficientTimeSpread in AInfo.FailReasons then Msg := Msg + 'Недостаточный временной интервал между точками для расчёта тренда. ';
   if mvsfrStaleData in AInfo.FailReasons then Msg := Msg + Format('Данные устарели: последнее значение получено %.1f с назад. ', [AInfo.LastSampleAgeSec]);
   if mvsfrVariationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Размах %.4f превышает допустимые %.4f. ', [AInfo.Variation, ASettings.MaxVariation]);
   if mvsfrDeviationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Стандартное отклонение %.4f превышает допустимые %.4f. ', [AInfo.StdDeviation, ASettings.MaxStdDeviation]);
@@ -1745,13 +1755,6 @@ var
   WindowTimeMs, FirstStableMs: Int64;
   WindowInfo: TMeterValueStabilityInfo;
   StableTimes: TArray<Int64>;
-
-  function MandatoryRangeChecksPassed(const AWindowInfo: TMeterValueStabilityInfo): Boolean;
-  begin
-    Result := ((not ASettings.RequireCurrentValueInRange) or AWindowInfo.IsCurrentValueInRange) and
-      ((not ASettings.RequireMeanValueInRange) or AWindowInfo.IsMeanValueInRange) and
-      ((not ASettings.RequireForecastInRange) or AWindowInfo.IsForecastInRange);
-  end;
 
   procedure FinalizeSequenceInfo;
   begin
@@ -1820,7 +1823,7 @@ begin
       WindowTimeMs := ASamples[I].TimeStampMs;
       AnalyzeSingleStabilityWindow(ASamples, ASettings, WindowTimeMs,
         ATargetValue, ALowerLimit, AUpperLimit, WindowInfo);
-      if WindowInfo.IsSignalStable and MandatoryRangeChecksPassed(WindowInfo) then
+      if WindowInfo.IsSignalStable then
       begin
         if FirstStableMs = 0 then
           FirstStableMs := WindowTimeMs;
