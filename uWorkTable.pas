@@ -492,6 +492,7 @@ type
     FSimulationTargetFlowBase: Double;
     FDeviceSimulationFlowRate: Double;
     FHasDeviceSimulationFlowRate: Boolean;
+    FLastStabilityCaptureMs: Int64;
 
     FHashValueTempertureBefore: string;
     FHashValueTempertureAfter: string;
@@ -798,6 +799,7 @@ type
     function CalcEtalonFlowRateMax: Double;
     function CalcEtalonFlowRateMin: Double;
     procedure UpdateFlowRateLimitsByEtalons;
+    procedure CaptureStabilityHistory;
 
     procedure InitMeterValues;
     // Собирает Hash и удаляет из глобального списка сохранения MeterValues значения этого рабочего стола.
@@ -2049,6 +2051,7 @@ begin
   FState := swtNONE;
   FAction := awtNone;
   FMode := mrmAutomatic;
+  FLastStabilityCaptureMs := -1;
   FTableClamped := False;
   FText := 'Рабочий стол 1';
   FFlowUnitName := 'м3/ч';
@@ -3679,6 +3682,111 @@ begin
       (not SameValue(OldValueSet, FlowRate.ValueSet.Value))) then
 
   //  Notify(notifyEvent, FlowRate);
+end;
+
+procedure TWorkTable.CaptureStabilityHistory;
+var
+  SampleTimeMs: Int64;
+  Captured: TObjectList<TMeterValue>;
+
+  procedure CaptureMeterValue(const AMeterValue: TMeterValue);
+  begin
+    if (AMeterValue = nil) or (not AMeterValue.StabilitySettings.Enabled) or
+       (Captured.IndexOf(AMeterValue) >= 0) then
+      Exit;
+
+    Captured.Add(AMeterValue);
+    AMeterValue.CaptureStabilitySample(SampleTimeMs);
+  end;
+
+  procedure CaptureFlowMeter(const AFlowMeter: TFlowMeter);
+  begin
+    if AFlowMeter = nil then
+      Exit;
+
+    CaptureMeterValue(AFlowMeter.ValueImp);
+    CaptureMeterValue(AFlowMeter.ValueImpTotal);
+    CaptureMeterValue(AFlowMeter.ValueCoef);
+    CaptureMeterValue(AFlowMeter.ValueMassCoef);
+    CaptureMeterValue(AFlowMeter.ValueVolumeCoef);
+    CaptureMeterValue(AFlowMeter.ValueQuantity);
+    CaptureMeterValue(AFlowMeter.ValueVolume);
+    CaptureMeterValue(AFlowMeter.ValueMass);
+    CaptureMeterValue(AFlowMeter.ValueVolumeMeter);
+    CaptureMeterValue(AFlowMeter.ValueMassMeter);
+    CaptureMeterValue(AFlowMeter.ValueFlow);
+    CaptureMeterValue(AFlowMeter.ValueMassFlow);
+    CaptureMeterValue(AFlowMeter.ValueVolumeFlow);
+    CaptureMeterValue(AFlowMeter.ValueError);
+    CaptureMeterValue(AFlowMeter.ValueVolumeError);
+    CaptureMeterValue(AFlowMeter.ValueMassError);
+    CaptureMeterValue(AFlowMeter.ValueDensity);
+    CaptureMeterValue(AFlowMeter.ValueTempertureBefore);
+    CaptureMeterValue(AFlowMeter.ValueTempertureAfter);
+    CaptureMeterValue(AFlowMeter.ValueTempertureDelta);
+    CaptureMeterValue(AFlowMeter.ValuePressureBefore);
+    CaptureMeterValue(AFlowMeter.ValuePressureAfter);
+    CaptureMeterValue(AFlowMeter.ValuePressureDelta);
+    CaptureMeterValue(AFlowMeter.ValueFlowRate);
+    CaptureMeterValue(AFlowMeter.ValuePressure);
+    CaptureMeterValue(AFlowMeter.ValueTemperture);
+    CaptureMeterValue(AFlowMeter.ValueAirPressure);
+    CaptureMeterValue(AFlowMeter.ValueAirTemperture);
+    CaptureMeterValue(AFlowMeter.ValueHumidity);
+    CaptureMeterValue(AFlowMeter.ValueCurrent);
+    CaptureMeterValue(AFlowMeter.ValueTime);
+  end;
+
+  procedure CaptureChannels(const AChannels: TObjectList<TChannel>);
+  var
+    Channel: TChannel;
+  begin
+    if AChannels = nil then
+      Exit;
+
+    for Channel in AChannels do
+    begin
+      if (Channel = nil) or (not Channel.Enabled) or (Channel.State = osDeleted) then
+        Continue;
+
+      CaptureMeterValue(Channel.ValueImp);
+      CaptureMeterValue(Channel.ValueImpTotal);
+      CaptureMeterValue(Channel.ValueCurrent);
+      CaptureMeterValue(Channel.ValueInterface);
+      CaptureFlowMeter(Channel.FlowMeter);
+    end;
+  end;
+
+begin
+  SampleTimeMs := TMeterValue.GetMonotonicTimeMs;
+  if (FLastStabilityCaptureMs >= 0) and
+     (SampleTimeMs - FLastStabilityCaptureMs < 900) then
+    Exit;
+
+  FLastStabilityCaptureMs := SampleTimeMs;
+  Captured := TObjectList<TMeterValue>.Create(False);
+  try
+    CaptureMeterValue(ValueTempertureBefore);
+    CaptureMeterValue(ValueTempertureAfter);
+    CaptureMeterValue(ValueTempertureDelta);
+    CaptureMeterValue(ValueTemperture);
+    CaptureMeterValue(ValuePressureBefore);
+    CaptureMeterValue(ValuePressureAfter);
+    CaptureMeterValue(ValuePressureDelta);
+    CaptureMeterValue(ValuePressure);
+    CaptureMeterValue(ValueDensity);
+    CaptureMeterValue(ValueAirPressure);
+    CaptureMeterValue(ValueAirTemperture);
+    CaptureMeterValue(ValueHumidity);
+    CaptureMeterValue(ValueTime);
+    CaptureMeterValue(ValueQuantity);
+    CaptureMeterValue(ValueFlowRate);
+    CaptureFlowMeter(TableFlow);
+    CaptureChannels(EtalonChannels);
+    CaptureChannels(DeviceChannels);
+  finally
+    Captured.Free;
+  end;
 end;
 
 { Frees channel collections owned by the work table. }

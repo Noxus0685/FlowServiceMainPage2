@@ -210,6 +210,10 @@ type
     class function GetMonotonicTimeMs: Int64; static;
     /// <summary>Adds a physical-value sample using the current monotonic timestamp.</summary>
     procedure AddSample(const AValue: Double); overload;
+    /// <summary>Captures the current value into stability history using the current monotonic timestamp.</summary>
+    procedure CaptureStabilitySample; overload;
+    /// <summary>Captures the current value into stability history using the provided monotonic timestamp.</summary>
+    procedure CaptureStabilitySample(const ATimeStampMs: Int64); overload;
     /// <summary>Clears stability samples and runtime confirmation state while preserving all settings.</summary>
     procedure ClearSamplesHistory;
     /// <summary>Returns a thread-safe immutable copy of chronological stability samples.</summary>
@@ -1246,6 +1250,16 @@ begin
   finally
     FSampleLock.Leave;
   end;
+end;
+
+procedure TMeterValue.CaptureStabilitySample;
+begin
+  CaptureStabilitySample(GetMonotonicTimeMs);
+end;
+
+procedure TMeterValue.CaptureStabilitySample(const ATimeStampMs: Int64);
+begin
+  AddSample(Value, ATimeStampMs);
 end;
 
 procedure TMeterValue.ClearSamplesHistory;
@@ -2539,7 +2553,6 @@ var
 begin
   //InputValue := EnsureRange(AValue, MinValue, MaxValue);
   InputValue :=   AValue;
-  AddSample(InputValue);
 
 
   if ARRAY_SIZE > 0 then
