@@ -265,6 +265,8 @@ type
     FRequiredDeviceStabilizationSec: Double;
     FLastStableProgressSecond: Int64;
     FStableTimerResetReason: string;
+    FLastDeviceStabilityLogText: string;
+    FLastDeviceStabilityLogTick: UInt64;
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
     procedure SetStage(const ANewStage: EMeasurementState);
@@ -679,6 +681,8 @@ begin
   FRequiredDeviceStabilizationSec := 0;
   FLastStableProgressSecond := -1;
   FStableTimerResetReason := '';
+  FLastDeviceStabilityLogText := '';
+  FLastDeviceStabilityLogTick := 0;
 end;
 
 function TMeasurementRun.BuildPointSelectionLog(APoint: TDevicePoint): string;
@@ -1513,8 +1517,10 @@ begin
 end;
 
 function TMeasurementRun.IsDevicesStable(out StableInfo: RStableInfo): Boolean;
+const
+  PointMatchToleranceLS = 1E-6;
 var
-  I: Integer;
+  I, J: Integer;
   Channel: TChannel;
   ValueFlow: TMeterValue;
   Settings: TMeterValueStabilitySettings;
@@ -1522,20 +1528,52 @@ var
   CurrentStable: Boolean;
   CheckedCount: Integer;
   ActualValue: Double;
+  TargetValue: Double;
+  TargetSource: string;
+  CurrentPoint: TDevicePoint;
+  DevicePoint: TDevicePoint;
+  BestPoint: TDevicePoint;
+  BestDistance, Distance: Double;
+  ErrorPercent, AllowedDeviation: Double;
+  CurrentInRange, HistoryStable, MeanInRange, ForecastInRange: Boolean;
+  Reason, LogText, CurrentPointName, DeviceUUID, MatchedPointName: string;
+  CurrentPointQ, MatchedPointQ, MatchedDistance: Double;
+  CurrentTick: UInt64;
+
+  function IsValidFlowValue(const AValue: Double): Boolean;
+  begin
+    Result := (not IsNan(AValue)) and (not IsInfinite(AValue));
+  end;
+
+  function M3H(const ALS: Double): Double;
+  begin
+    Result := ALS * 3.6;
+  end;
+
+  procedure PublishDeviceLog(const AText: string);
+  begin
+    CurrentTick := TThread.GetTickCount64;
+    if (AText <> FLastDeviceStabilityLogText) or
+       (FLastDeviceStabilityLogTick = 0) or
+       (CurrentTick - FLastDeviceStabilityLogTick >= 1000) then
+    begin
+      AddDiagnosticEvent(AText);
+      FLastDeviceStabilityLogText := AText;
+      FLastDeviceStabilityLogTick := CurrentTick;
+    end;
+  end;
+
 begin
   StableInfo := Default(RStableInfo);
   Result := True;
-
-  if FRequireAutoStabilization then
-  begin
-    StableInfo.Status := sOk;
-    StableInfo.StatusText := 'DevicesStable=True; AutoDeviceStabilization=True; ForcedTrue=True';
-    AddDiagnosticEvent(StableInfo.StatusText);
-    Exit(True);
-  end;
+  CurrentPoint := GetCurrentPoint;
 
   if (FWorkTable = nil) or (FWorkTable.DeviceChannels = nil) then
-    Exit(True);
+  begin
+    StableInfo.Status := sRun_NN;
+    StableInfo.StatusText := 'NoSelectedDeviceChannels';
+    Exit(False);
+  end;
 
   CheckedCount := 0;
   for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
@@ -1550,52 +1588,141 @@ begin
     Settings := ValueFlow.StabilitySettings;
     Inc(CheckedCount);
 
-    CurrentStable := True;
-    StableInfo.CurrentValue := ActualValue;
-    StableInfo.TargetValue := Settings.TargetValue;
-    if SameValue(StableInfo.TargetValue, 0) then
-      StableInfo.TargetValue := ActualValue;
-    StableInfo.LowerLimit := StableInfo.TargetValue - Max(Abs(StableInfo.TargetValue) * Abs(Settings.TargetAccuracyMinusPercent) / 100.0, Settings.TargetToleranceAbsolute);
-    StableInfo.UpperLimit := StableInfo.TargetValue + Max(Abs(StableInfo.TargetValue) * Abs(Settings.TargetAccuracyPlusPercent) / 100.0, Settings.TargetToleranceAbsolute);
-    StableInfo.IsCurrentInRange := (not Settings.RequireCurrentValueInRange) or ((ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit));
-    StableInfo.IsMeanInRange := True;
-    StableInfo.IsForecastInRange := True;
-    StableInfo.IsSignalStable := True;
-
-    if Settings.Enabled then
+    TargetValue := 0;
+    TargetSource := '';
+    Reason := '';
+    BestPoint := nil;
+    BestDistance := MaxDouble;
+    ErrorPercent := 0;
+    AllowedDeviation := 0;
+    CurrentInRange := False;
+    HistoryStable := True;
+    MeanInRange := True;
+    ForecastInRange := True;
+    CurrentStable := False;
+    DeviceUUID := Channel.DeviceUUID;
+    if DeviceUUID = '' then
+      DeviceUUID := Channel.FlowMeter.DeviceUUID;
+    CurrentPointQ := 0;
+    if CurrentPoint <> nil then
     begin
-      ValueFlow.AddSample(ActualValue);
-      CurrentStable := ValueFlow.AnalyzeStability(SignalInfo);
-      StableInfo.SignalInfo := SignalInfo;
-      StableInfo.IsSignalStable := CurrentStable;
-      StableInfo.MeanValue := SignalInfo.MeanValue;
-      StableInfo.ForecastValue := SignalInfo.ForecastValue;
-      StableInfo.IsMeanInRange := (not Settings.RequireMeanValueInRange) or
-        ((SignalInfo.MeanValue >= StableInfo.LowerLimit) and (SignalInfo.MeanValue <= StableInfo.UpperLimit));
-      StableInfo.IsForecastInRange := (not Settings.RequireForecastInRange) or
-        ((SignalInfo.ForecastValue >= StableInfo.LowerLimit) and (SignalInfo.ForecastValue <= StableInfo.UpperLimit));
-      CurrentStable := CurrentStable and StableInfo.IsCurrentInRange and StableInfo.IsMeanInRange and StableInfo.IsForecastInRange;
+      CurrentPointName := CurrentPoint.Name;
+      CurrentPointQ := CurrentPoint.Q;
     end
     else
-      StableInfo.SignalInfo.Status := mvssDisabled;
+      CurrentPointName := '<none>';
+    MatchedPointName := '<none>';
+    MatchedPointQ := 0;
+    MatchedDistance := 0;
 
-    AddDiagnosticEvent(Format('DeviceChannelStable=%s; UUID=%s; Name=%s; Group=%d; Actual=%.6f; Target=%.6f; Lower=%.6f; Upper=%.6f',
-      [BoolToStr(CurrentStable, True), Channel.UUID, Channel.Name, Channel.Group,
-       ActualValue, StableInfo.TargetValue, StableInfo.LowerLimit, StableInfo.UpperLimit]));
+    if Assigned(CurrentPoint) and IsValidFlowValue(CurrentPoint.Q) and (CurrentPoint.Q > 0) then
+    begin
+      TargetValue := CurrentPoint.Q;
+      TargetSource := 'CurrentPoint.Q';
+    end
+    else
+      Reason := 'TargetNotAssigned';
+
+    if Reason = '' then
+    begin
+      if (Channel.FlowMeter.Device <> nil) and (Channel.FlowMeter.Device.Points <> nil) then
+      begin
+        for J := 0 to Channel.FlowMeter.Device.Points.Count - 1 do
+        begin
+          DevicePoint := Channel.FlowMeter.Device.Points[J];
+          if (DevicePoint = nil) or (DevicePoint.State = osDeleted) or (not DevicePoint.Enabled) or
+             (not IsValidFlowValue(DevicePoint.Q)) or (DevicePoint.Q <= 0) then
+            Continue;
+
+          Distance := Abs(DevicePoint.Q - TargetValue);
+          if Distance < BestDistance then
+          begin
+            BestDistance := Distance;
+            BestPoint := DevicePoint;
+          end;
+        end;
+      end;
+
+      if BestPoint = nil then
+        Reason := 'DevicePointNotFound'
+      else if BestDistance > PointMatchToleranceLS then
+        Reason := 'DevicePointTargetMismatch';
+    end;
+
+    if Reason = '' then
+    begin
+      if IsNan(BestPoint.Error) or IsInfinite(BestPoint.Error) or (BestPoint.Error < 0) then
+        Reason := 'InvalidDevicePointError'
+      else
+      begin
+        ErrorPercent := Abs(BestPoint.Error);
+        AllowedDeviation := Abs(TargetValue) * ErrorPercent / 100.0;
+        StableInfo.LowerLimit := TargetValue - AllowedDeviation;
+        StableInfo.UpperLimit := TargetValue + AllowedDeviation;
+        CurrentInRange := (ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit);
+        CurrentStable := CurrentInRange;
+
+        if Settings.Enabled then
+        begin
+          ValueFlow.AddSample(ActualValue);
+          HistoryStable := ValueFlow.AnalyzeStability(SignalInfo);
+          StableInfo.SignalInfo := SignalInfo;
+          StableInfo.MeanValue := SignalInfo.MeanValue;
+          StableInfo.ForecastValue := SignalInfo.ForecastValue;
+          MeanInRange := (not Settings.RequireMeanValueInRange) or
+            ((SignalInfo.MeanValue >= StableInfo.LowerLimit) and (SignalInfo.MeanValue <= StableInfo.UpperLimit));
+          ForecastInRange := (not Settings.RequireForecastInRange) or
+            ((SignalInfo.ForecastValue >= StableInfo.LowerLimit) and (SignalInfo.ForecastValue <= StableInfo.UpperLimit));
+          CurrentStable := CurrentInRange and HistoryStable and MeanInRange and ForecastInRange;
+        end
+        else
+          StableInfo.SignalInfo.Status := mvssDisabled;
+      end;
+    end;
+
+    StableInfo.CurrentValue := ActualValue;
+    StableInfo.TargetValue := TargetValue;
+    StableInfo.IsCurrentInRange := CurrentInRange;
+    StableInfo.IsSignalStable := HistoryStable;
+    StableInfo.IsMeanInRange := MeanInRange;
+    StableInfo.IsForecastInRange := ForecastInRange;
+    StableInfo.IsTargetConditionPassed := CurrentInRange and MeanInRange and ForecastInRange;
+    StableInfo.IsReadyForMeasurement := CurrentStable;
+
+    if Reason = '' then
+      Reason := IfThen(CurrentStable, 'Stable', 'OutOfRangeOrHistory');
+
+    if BestPoint <> nil then
+    begin
+      MatchedPointName := BestPoint.Name;
+      MatchedPointQ := BestPoint.Q;
+      MatchedDistance := BestDistance;
+    end;
+
+    LogText := Format('DeviceChannelStability: ChannelIndex=%d; ChannelUUID=%s; ChannelName=%s; DeviceUUID=%s; CurrentPointName=%s; CurrentPointQLS=%.6f; CurrentPointQM3H=%.6f; AssignedTargetLS=%.6f; TargetSource=%s; MatchedPointName=%s; MatchedPointQLS=%.6f; MatchedPointQM3H=%.6f; MatchedPointErrorPercent=%.6f; PointDistanceLS=%.6f; ActualLS=%.6f; ActualM3H=%.6f; LowerLS=%.6f; UpperLS=%.6f; CurrentInRange=%s; HistoryStable=%s; MeanInRange=%s; ForecastInRange=%s; DeviceChannelStable=%s; Reason=%s',
+      [I, Channel.UUID, Channel.Name, DeviceUUID, CurrentPointName,
+       CurrentPointQ, M3H(CurrentPointQ),
+       TargetValue, TargetSource,
+       MatchedPointName, MatchedPointQ, M3H(MatchedPointQ),
+       ErrorPercent, MatchedDistance, ActualValue, M3H(ActualValue),
+       StableInfo.LowerLimit, StableInfo.UpperLimit, BoolToStr(CurrentInRange, True),
+       BoolToStr(HistoryStable, True), BoolToStr(MeanInRange, True), BoolToStr(ForecastInRange, True),
+       BoolToStr(CurrentStable, True), Reason]);
+    PublishDeviceLog(LogText);
 
     if not CurrentStable then
     begin
       Result := False;
       StableInfo.Status := sRun_NN;
-      StableInfo.StatusText := Format('Device channel is not stable: UUID=%s; Name=%s', [Channel.UUID, Channel.Name]);
+      StableInfo.StatusText := Format('Device channel is not stable: UUID=%s; Name=%s; Reason=%s', [Channel.UUID, Channel.Name, Reason]);
     end;
   end;
 
   if CheckedCount = 0 then
   begin
-    StableInfo.Status := sOk;
-    StableInfo.StatusText := 'DevicesStable=True; NoSelectedDeviceChannels=True';
-    Exit(True);
+    StableInfo.Status := sRun_NN;
+    StableInfo.StatusText := 'NoSelectedDeviceChannels';
+    Exit(False);
   end;
 
   if Result then
@@ -3192,6 +3319,26 @@ begin
       FStableTimerResetReason := StableInfo.StatusText;
       FLastDeviceStableStateKnown := True;
       FLastDeviceStableState := False;
+      if (((CurrentTick - FWaitStartedTick) / 1000) > DEFAULT_STABLE_TIMEOUT_S) then
+      begin
+        Inc(FAttempt);
+        if FAttempt < FMaxAttemptCount then
+        begin
+          ProtocolManager.AddMessage(pcWarning, psMeasurement, 'StableTimeout',
+            'Таймаут стабилизации приборов',
+            Format('Причина: %s; попытка: %d из %d', [StableInfo.StatusText, FAttempt, FMaxAttemptCount]));
+          FireEvent(meStableRetry);
+          SetStage(msSetupPoint);
+          Exit;
+        end;
+
+        ProtocolManager.AddMessage(pcError, psMeasurement, 'StableFailed',
+          'Не удалось стабилизировать приборы', StableInfo.StatusText);
+        if FMode = mrmAutomatic then
+          ContinueAfterPointError(mptsSetupError, meStableTimeout, BuildError(1301, 'Стабилизация приборов не достигнута: ' + StableInfo.StatusText))
+        else
+          SetStage(msDone);
+      end;
       Exit;
     end;
 
@@ -3208,9 +3355,11 @@ begin
     FLastDeviceStableStateKnown := True;
     FLastDeviceStableState := True;
 
-    if FRequiredDeviceStabilizationSec > 0 then
-      DeviceElapsedSec := (CurrentTick - FDevicesStableSinceMs) / 1000;
-    ReadyToMeasure := DeviceElapsedSec >= FRequiredDeviceStabilizationSec;
+    DeviceElapsedSec := (CurrentTick - FDevicesStableSinceMs) / 1000;
+    if FRequireAutoStabilization then
+      ReadyToMeasure := DevicesStable
+    else
+      ReadyToMeasure := DevicesStable and (DeviceElapsedSec >= FRequiredDeviceStabilizationSec);
     DeviceElapsedSecond := Trunc(DeviceElapsedSec);
 
     if (FRequiredDeviceStabilizationSec > 0) and (DeviceElapsedSecond <> FLastStableProgressSecond) then
