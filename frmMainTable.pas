@@ -764,6 +764,7 @@ type
     function FlowToCurrentDimension(const AFlowLS: Double): Double;
     function FlowGraphDisplayValue(AWorkTable: TWorkTable; const ABaseFlowLS: Double): Double;
     function FlowGraphSamplesCount(ADict: TObjectDictionary<string, TFlowGraphSeries>): Integer;
+    procedure SetFlowChartYAxis(AChart: TSimpleChart; const AYMin, AYMax: Double);
     procedure LogFlowGraphClear(const AMethod, AReason: string; const APointIndex: Integer; const ASeriesKey: string; const ASamplesBefore, ASamplesAfter, ALineSeriesBefore, ALineSeriesAfter: Integer);
     procedure ButtonClearFlowGraphsClick(Sender: TObject);
 
@@ -5248,8 +5249,8 @@ var
   TargetLS: Double;
   Run: TMeasurementRun;
   Point: TDevicePoint;
-  PointErrorPercent: Double;
-  AllowedDeviationLS: Double;
+  MinPercent, MaxPercent: Double;
+  AllowedMinusLS, AllowedPlusLS: Double;
 begin
   ALowerLS := 0;
   AUpperLS := 0;
@@ -5258,12 +5259,12 @@ begin
     Exit;
   Run := TMeasurementRun(FActiveWorkTable.MeasurementRun);
   Point := Run.CurrentPoint;
-  PointErrorPercent := Abs(Point.Error);
-  if IsNan(PointErrorPercent) or IsInfinite(PointErrorPercent) or (PointErrorPercent <= 0) then
+  if (Point = nil) or (not AccuracyToRange(Point.FlowAccuracy, MinPercent, MaxPercent)) then
     Exit;
-  AllowedDeviationLS := Abs(TargetLS) * PointErrorPercent / 100.0;
-  ALowerLS := TargetLS - AllowedDeviationLS;
-  AUpperLS := TargetLS + AllowedDeviationLS;
+  AllowedMinusLS := Abs(TargetLS) * Abs(MinPercent) / 100.0;
+  AllowedPlusLS := Abs(TargetLS) * Abs(MaxPercent) / 100.0;
+  ALowerLS := TargetLS - AllowedMinusLS;
+  AUpperLS := TargetLS + AllowedPlusLS;
   Result := (not IsNan(ALowerLS)) and (not IsInfinite(ALowerLS)) and
     (not IsNan(AUpperLS)) and (not IsInfinite(AUpperLS));
 end;
@@ -5515,6 +5516,16 @@ begin
   ASeries.ShowMarkers := AShowMarkers;
 end;
 
+
+procedure TFrameMainTable.SetFlowChartYAxis(AChart: TSimpleChart; const AYMin, AYMax: Double);
+begin
+  if (AChart = nil) or IsNan(AYMin) or IsInfinite(AYMin) or
+     IsNan(AYMax) or IsInfinite(AYMax) or (AYMax <= AYMin) then
+    Exit;
+  AChart.YMin := AYMin;
+  AChart.YMax := AYMax;
+end;
+
 procedure TFrameMainTable.AddFlowLimitSeries(AChart: TSimpleChart; const ALimits: TFlowGraphLimits; const AAxisMinSec, AAxisMaxSec: Double);
 var
   TargetSeries, LowerSeries, UpperSeries: TChartSeries;
@@ -5555,6 +5566,9 @@ var
   XSec, V: Double;
   UnitName: string;
   Limits: TFlowGraphLimits;
+  HasData: Boolean;
+  DataMinLS, DataMaxLS, YDataMin, YDataMax, RangeLS, PaddingLS: Double;
+  AxisMinDisplay, AxisMaxDisplay: Double;
 begin
   if (AChart = nil) or (AGraphSeries = nil) then
     Exit;
@@ -5569,6 +5583,11 @@ begin
     AChart.Title := ATitle;
     AChart.XTitle := 'Время, с';
     AChart.YTitle := 'Расход, ' + UnitName;
+
+    HasData := False;
+    DataMinLS := 0;
+    DataMaxLS := 0;
+    TryGetFlowGraphLimits(Limits);
 
     for Pair in AGraphSeries do
     begin
@@ -5595,14 +5614,55 @@ begin
         end;
         if (XSec < AAxisMinSec) or (XSec > AAxisMaxSec) then
           Continue;
-        V := FlowToCurrentDimension(Sample.Value);
+        V := Sample.Value;
         if IsNan(V) or IsInfinite(V) then
           Continue;
-        Series.AddPoint(XSec, V);
+        if not HasData then
+        begin
+          DataMinLS := V;
+          DataMaxLS := V;
+          HasData := True;
+        end
+        else
+        begin
+          DataMinLS := Min(DataMinLS, V);
+          DataMaxLS := Max(DataMaxLS, V);
+        end;
+        Series.AddPoint(XSec, FlowToCurrentDimension(V));
       end;
     end;
 
-    TryGetFlowGraphLimits(Limits);
+    if Limits.TargetValid then
+    begin
+      if HasData then
+      begin
+        YDataMin := Min(DataMinLS, Limits.TargetLS);
+        YDataMax := Max(DataMaxLS, Limits.TargetLS);
+      end
+      else
+      begin
+        YDataMin := Limits.TargetLS;
+        YDataMax := Limits.TargetLS;
+      end;
+      if Limits.ToleranceValid then
+      begin
+        YDataMin := Min(YDataMin, Min(Limits.LowerLS, Limits.UpperLS));
+        YDataMax := Max(YDataMax, Max(Limits.LowerLS, Limits.UpperLS));
+      end;
+      RangeLS := YDataMax - YDataMin;
+      if RangeLS > 0 then
+        PaddingLS := Max(RangeLS * 0.10, Max(Abs(Limits.TargetLS) * 0.001, 0.000001))
+      else
+        PaddingLS := Max(Abs(YDataMin) * 0.01, 0.001);
+      AxisMinDisplay := FlowToCurrentDimension(YDataMin - PaddingLS);
+      AxisMaxDisplay := FlowToCurrentDimension(YDataMax + PaddingLS);
+      SetFlowChartYAxis(AChart, AxisMinDisplay, AxisMaxDisplay);
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcAction, psForm, 'FlowChartLimits',
+          Format('PointName=%s; PointQ_LS=%.12g; PointQ_Display=%.12g; FlowAccuracy=%s; LowerLS=%.12g; UpperLS=%.12g; LowerDisplay=%.12g; UpperDisplay=%.12g; ActualMinLS=%.12g; ActualMaxLS=%.12g; ActualMinDisplay=%.12g; ActualMaxDisplay=%.12g; YAxisMin=%.12g; YAxisMax=%.12g; DisplayUnit=%s',
+            [FCurrentGraphPointKey, Limits.TargetLS, FlowToCurrentDimension(Limits.TargetLS), TMeasurementRun(FActiveWorkTable.MeasurementRun).CurrentPoint.FlowAccuracy, Limits.LowerLS, Limits.UpperLS, FlowToCurrentDimension(Limits.LowerLS), FlowToCurrentDimension(Limits.UpperLS), DataMinLS, DataMaxLS, FlowToCurrentDimension(DataMinLS), FlowToCurrentDimension(DataMaxLS), AxisMinDisplay, AxisMaxDisplay, UnitName]), '');
+    end;
+
     AddFlowLimitSeries(AChart, Limits, AAxisMinSec, AAxisMaxSec);
   finally
     AChart.EndUpdate;
