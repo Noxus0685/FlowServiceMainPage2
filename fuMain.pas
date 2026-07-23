@@ -482,6 +482,7 @@ begin
     // Следующее обновление через 3–4 секунды
     FNextClimateChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
   end;
+
 end;
 
 

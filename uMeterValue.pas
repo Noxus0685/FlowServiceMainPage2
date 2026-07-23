@@ -72,6 +72,10 @@ type
     FStabilitySettings: TMeterValueStabilitySettings;
     /// <summary>Chronological history of physical-value samples used only by stability analysis.</summary>
     FSamples: TList<TMeterValueSample>;
+    /// <summary>Second bucket of the latest automatic stability sample.</summary>
+    FAutomaticSampleBucket: Int64;
+    /// <summary>Index of the latest automatic stability sample; always validated before reuse.</summary>
+    FAutomaticSampleIndex: Integer;
     /// <summary>Last calculated stability-analysis snapshot for consumers that should not recalculate immediately.</summary>
     FLastStabilityInfo: TMeterValueStabilityInfo;
     /// <summary>Monotonic timestamp when all mathematical stability criteria first became true.</summary>
@@ -86,6 +90,8 @@ type
     procedure ResetStabilityInfo;
     /// <summary>Adds a physical-value sample with an externally provided monotonic timestamp.</summary>
     procedure AddSample(const AValue: Double; const ATimeStampMs: Int64); overload;
+    /// <summary>Captures automatic SetValue history by merging updates inside one monotonic second bucket.</summary>
+    procedure CaptureAutomaticStabilitySample(const AValue: Double; const ATimeStampMs: Int64);
     function FindDimIndex(const AName: string): Integer;
     function FormatDisplayValue(const AValue: Double): string;
     class constructor CreateClass;
@@ -474,6 +480,8 @@ begin
   Coefs := TList<TCoef>.Create;
   FAggregateMeterValues := TObjectList<TMeterValue>.Create(False);
   FSamples := TList<TMeterValueSample>.Create;
+  FAutomaticSampleBucket := -1;
+  FAutomaticSampleIndex := -1;
   FSampleLock := TCriticalSection.Create;
   InitStabilitySettings;
   ResetStabilityInfo;
@@ -1219,6 +1227,9 @@ begin
   Sample.Value := AValue;
   FSampleLock.Enter;
   try
+    FAutomaticSampleBucket := -1;
+    FAutomaticSampleIndex := -1;
+
     if FSamples.Count > 0 then
     begin
       LastIndex := FSamples.Count - 1;
@@ -1248,11 +1259,79 @@ begin
   end;
 end;
 
+procedure TMeterValue.CaptureAutomaticStabilitySample(const AValue: Double;
+  const ATimeStampMs: Int64);
+var
+  CurrentBucket: Int64;
+  Sample: TMeterValueSample;
+  LastIndex: Integer;
+  InsertIndex: Integer;
+  CutoffMs: Int64;
+begin
+  CurrentBucket := ATimeStampMs div 1000;
+  FSampleLock.Enter;
+  try
+    if (FAutomaticSampleBucket >= 0) and
+       (CurrentBucket < FAutomaticSampleBucket) then
+    begin
+      FAutomaticSampleBucket := -1;
+      FAutomaticSampleIndex := -1;
+    end;
+
+    if (FAutomaticSampleBucket = CurrentBucket) and
+       (FAutomaticSampleIndex >= 0) and
+       (FAutomaticSampleIndex < FSamples.Count) and
+       (FSamples[FAutomaticSampleIndex].TimeStampMs div 1000 = CurrentBucket) then
+    begin
+      Sample := FSamples[FAutomaticSampleIndex];
+      Sample.TimeStampMs := ATimeStampMs;
+      Sample.Value := AValue;
+      FSamples[FAutomaticSampleIndex] := Sample;
+      Exit;
+    end;
+
+    LastIndex := FSamples.Count - 1;
+    if (FAutomaticSampleBucket = CurrentBucket) and
+       (LastIndex >= 0) and
+       (FSamples[LastIndex].TimeStampMs div 1000 = CurrentBucket) then
+    begin
+      Sample := FSamples[LastIndex];
+      Sample.TimeStampMs := ATimeStampMs;
+      Sample.Value := AValue;
+      FSamples[LastIndex] := Sample;
+      FAutomaticSampleIndex := LastIndex;
+      Exit;
+    end;
+
+    Sample.TimeStampMs := ATimeStampMs;
+    Sample.Value := AValue;
+    InsertIndex := 0;
+    while (InsertIndex < FSamples.Count) and
+      (FSamples[InsertIndex].TimeStampMs < ATimeStampMs) do
+      Inc(InsertIndex);
+    FSamples.Insert(InsertIndex, Sample);
+    CutoffMs := ATimeStampMs - Round(Max(1.0, FStabilitySettings.WindowDurationSec * 2.0) * 1000.0);
+    while (FSamples.Count > 0) and
+      ((FSamples.Count > ARRAY_SIZE) or (FSamples[0].TimeStampMs < CutoffMs)) do
+    begin
+      FSamples.Delete(0);
+      Dec(InsertIndex);
+    end;
+
+    FAutomaticSampleBucket := CurrentBucket;
+    FAutomaticSampleIndex := InsertIndex;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
+
 procedure TMeterValue.ClearSamplesHistory;
 begin
   FSampleLock.Enter;
   try
     FSamples.Clear;
+    FAutomaticSampleBucket := -1;
+    FAutomaticSampleIndex := -1;
     ResetStabilityInfo;
   finally
     FSampleLock.Leave;
@@ -1291,6 +1370,8 @@ begin
       if FSamples[I].TimeStampMs = ATimeStampMs then
       begin
         FSamples[I] := Sample;
+        FAutomaticSampleBucket := -1;
+        FAutomaticSampleIndex := -1;
         ResetStabilityInfo;
         Exit(True);
       end;
@@ -1299,6 +1380,8 @@ begin
     while (I < FSamples.Count) and (FSamples[I].TimeStampMs < ATimeStampMs) do
       Inc(I);
     FSamples.Insert(I, Sample);
+    FAutomaticSampleBucket := -1;
+    FAutomaticSampleIndex := -1;
     ResetStabilityInfo;
     Result := True;
   finally
@@ -1319,6 +1402,8 @@ begin
     Sample := FSamples[AIndex];
     Sample.Value := AValue;
     FSamples[AIndex] := Sample;
+    FAutomaticSampleBucket := -1;
+    FAutomaticSampleIndex := -1;
     ResetStabilityInfo;
     Result := True;
   finally
@@ -1334,6 +1419,8 @@ begin
     if (AIndex < 0) or (AIndex >= FSamples.Count) then
       Exit;
     FSamples.Delete(AIndex);
+    FAutomaticSampleBucket := -1;
+    FAutomaticSampleIndex := -1;
     ResetStabilityInfo;
     Result := True;
   finally
@@ -1346,6 +1433,8 @@ begin
   FSampleLock.Enter;
   try
     FSamples.Clear;
+    FAutomaticSampleBucket := -1;
+    FAutomaticSampleIndex := -1;
     ResetStabilityInfo;
   finally
     FSampleLock.Leave;
@@ -2539,7 +2628,6 @@ var
 begin
   //InputValue := EnsureRange(AValue, MinValue, MaxValue);
   InputValue :=   AValue;
-  AddSample(InputValue);
 
 
   if ARRAY_SIZE > 0 then
@@ -2555,6 +2643,8 @@ begin
   end
   else
     Value := InputValue;
+
+  CaptureAutomaticStabilitySample(Value, GetMonotonicTimeMs);
 end;
 
 { Assigns value, applies range limits, and updates history/mean buffers. }
