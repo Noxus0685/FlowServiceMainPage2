@@ -233,7 +233,9 @@ type
     /// <summary>Analyzes the current time window and returns True only when stability is confirmed.</summary>
     function AnalyzeStability(out AInfo: TMeterValueStabilityInfo): Boolean;
     /// <summary>Analyzes stability for automatic measurement, ignoring only the UI Enabled flag.</summary>
-    function AnalyzeStabilityForMeasurement(out AInfo: TMeterValueStabilityInfo): Boolean;
+    function AnalyzeStabilityForMeasurement(out AInfo: TMeterValueStabilityInfo): Boolean; overload;
+    /// <summary>Analyzes only samples captured at or after the provided monotonic timestamp.</summary>
+    function AnalyzeStabilityForMeasurement(const AMinTimeStampMs: Int64; out AInfo: TMeterValueStabilityInfo): Boolean; overload;
     /// <summary>Clears runtime confirmation state without touching settings or sample history.</summary>
     procedure ResetStabilityRuntimeState;
     /// <summary>Calculates a forecast for a custom horizon using the same regression-based analyzer.</summary>
@@ -1600,6 +1602,50 @@ begin
     FSampleLock.Leave;
   end;
 end;
+
+function TMeterValue.AnalyzeStabilityForMeasurement(const AMinTimeStampMs: Int64;
+  out AInfo: TMeterValueStabilityInfo): Boolean;
+var
+  SourceSamples: TArray<TMeterValueSample>;
+  Samples: TArray<TMeterValueSample>;
+  Settings: TMeterValueStabilitySettings;
+  CurrentMs: Int64;
+  LowerLimit, UpperLimit: Double;
+  I, Count: Integer;
+begin
+  CurrentMs := GetMonotonicTimeMs;
+  SourceSamples := GetSamples;
+  SetLength(Samples, Length(SourceSamples));
+  Count := 0;
+  for I := 0 to High(SourceSamples) do
+    if SourceSamples[I].TimeStampMs >= AMinTimeStampMs then
+    begin
+      Samples[Count] := SourceSamples[I];
+      Inc(Count);
+    end;
+  SetLength(Samples, Count);
+
+  Settings := FStabilitySettings;
+  Settings.Enabled := True;
+  CalculateTargetLimits(Settings.TargetValue,
+    Settings.TargetAccuracyPlusPercent,
+    Settings.TargetAccuracyMinusPercent,
+    Settings.TargetToleranceAbsolute, LowerLimit, UpperLimit);
+  Result := AnalyzeStabilitySequence(Samples, Settings, CurrentMs,
+    Settings.TargetValue, LowerLimit, UpperLimit, AInfo);
+  FSampleLock.Enter;
+  try
+    if AInfo.IsSignalStable then
+      FStableCandidateSinceMs := CurrentMs - Round(AInfo.StableCandidateDurationSec * 1000.0)
+    else
+      FStableCandidateSinceMs := 0;
+    FStabilityConfirmed := AInfo.IsStabilityConfirmed;
+    FLastStabilityInfo := AInfo;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
+
 
 
 class function TMeterValue.AnalyzeSingleStabilityWindow(
