@@ -1261,7 +1261,7 @@ begin
     mvsfrAnalysisDisabled: Result := 'анализ стабильности отключён';
     mvsfrNoData: Result := 'нет доступных данных';
     mvsfrNotEnoughSamples: Result := 'недостаточно отсчётов';
-    mvsfrInsufficientWindow: Result := 'недостаточный временной интервал между точками для расчёта тренда';
+    mvsfrInsufficientWindow: Result := 'Недостаточная длительность окна анализа.';
     mvsfrInsufficientTimeSpread: Result := 'недостаточный временной интервал между точками для расчёта тренда';
     mvsfrStaleData: Result := 'последнее значение устарело';
     mvsfrVariationTooHigh: Result := 'размах превышает допустимое значение';
