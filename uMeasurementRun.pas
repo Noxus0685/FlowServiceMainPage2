@@ -269,6 +269,12 @@ type
     FLastDeviceStabilityLogTick: UInt64;
     FLastStabilityCheckSecond: Int64;
     FWaitStableStartedMs: Int64;
+    FPointSetupCommandSent: Boolean;
+    FSetupPointUUID: string;
+    FSetupPointIndex: Integer;
+    FSetupTargetFlowLS: Double;
+    FSetupStartedMs: Int64;
+    FStabilityDataStartMs: Int64;
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
     procedure SetStage(const ANewStage: EMeasurementState);
@@ -278,6 +284,7 @@ type
     procedure EnterSelectPoint;
     procedure EnterSelectEtalon;
     procedure EnterSetupPoint;
+    procedure EnterWaitPointSetup;
     procedure EnterWaitStable;
     procedure LoadRequiredStabilization(APoint: TDevicePoint);
     procedure EnterWaitMeasureStart;
@@ -305,6 +312,7 @@ type
     procedure ProcessSelectPoint;
     procedure ProcessSelectEtalon;
     procedure ProcessSetupPoint;
+    procedure ProcessWaitPointSetup;
     procedure ProcessWaitStable;
     procedure ProcessWaitMeasureStart;
     procedure ProcessMeasure;
@@ -336,6 +344,12 @@ type
     function ShouldWaitStable: Boolean;
     function ShouldSelectEtalon: Boolean;
     function CreateSingleSessionPoint(AWithConditions: Boolean): TDevicePoint;
+    function GetRuntimeTargetFlowLS: Double;
+    function GetSelectedEtalonUUID: string;
+    function IsSetupPointSynchronized(out AReason: string): Boolean;
+    function HasNewStabilityDataSince(const ATimeStampMs: Int64; out AFirstSampleTimeMs: Int64): Boolean;
+    procedure ResetPointSetupState;
+    procedure StartNewStabilityAttempt;
 
     procedure RunThreadProc;
     function IsThreadRunning: Boolean;
@@ -687,6 +701,12 @@ begin
   FLastDeviceStabilityLogTick := 0;
   FLastStabilityCheckSecond := -1;
   FWaitStableStartedMs := 0;
+  FPointSetupCommandSent := False;
+  FSetupPointUUID := '';
+  FSetupPointIndex := -1;
+  FSetupTargetFlowLS := 0;
+  FSetupStartedMs := 0;
+  FStabilityDataStartMs := 0;
 end;
 
 function TMeasurementRun.BuildPointSelectionLog(APoint: TDevicePoint): string;
@@ -781,7 +801,9 @@ begin
     msSelectEtalon:
       Result := ANewStage in [msSetupPoint, msSelectPoint, msDone, msNone];
     msSetupPoint:
-      Result := ANewStage in [msWaitStable, msWaitMeasureStart, msSelectPoint, msDone, msNone];
+      Result := ANewStage in [msWaitPointSetup, msWaitStable, msWaitMeasureStart, msSelectPoint, msDone, msNone];
+    msWaitPointSetup:
+      Result := ANewStage in [msWaitStable, msWaitMeasureStart, msSetupPoint, msSelectPoint, msDone, msNone];
     msWaitStable:
       Result := ANewStage in [msWaitMeasureStart, msSetupPoint, msSelectPoint, msDone, msNone];
     msWaitMeasureStart:
@@ -857,6 +879,7 @@ begin
     msSelectPoint: EnterSelectPoint;
     msSelectEtalon: EnterSelectEtalon;
     msSetupPoint: EnterSetupPoint;
+    msWaitPointSetup: EnterWaitPointSetup;
     msWaitStable: EnterWaitStable;
     msWaitMeasureStart: EnterWaitMeasureStart;
     msMeasure: EnterMeasure;
@@ -932,6 +955,8 @@ var
   // выбрать, проверить или применить указанную точку измерения.
   Error: TErrorInfo;
 begin
+  ResetPointSetupState;
+
   // Начинаем обработку новой точки с нулевого номера попытки.
   //
   // FAttempt обычно используется стадиями ожидания или выполнения команд
@@ -1141,9 +1166,22 @@ begin
 
   FireEvent(mePointSet);
   if ShouldWaitStable then
-    SetStage(msWaitStable)
+    SetStage(msWaitPointSetup)
   else
     SetStage(msWaitMeasureStart);
+end;
+
+procedure TMeasurementRun.EnterWaitPointSetup;
+begin
+  SetCurrentPointStatus(mptsSetupPoint);
+  if FWorkTable = nil then
+    Exit;
+  AddDiagnosticEvent(Format(
+    'PointSetupWaitStarted: PointIndex=%d; PointUUID=%s; TargetFlowLS=%.6f; SelectedEtalonUUID=%s; WorkTableState=%s; Attempt=%d; CommandSent=%s',
+    [FSetupPointIndex, FSetupPointUUID, FSetupTargetFlowLS, GetSelectedEtalonUUID,
+     TWorkTable.WorkTableStateToString(FWorkTable.State), FAttempt, BoolToStr(FPointSetupCommandSent, True)]));
+  if (FWorkTable <> nil) and (FWorkTable.State <> swtMONITOR) then
+    FWorkTable.StartMonitor;
 end;
 
 
@@ -1180,6 +1218,8 @@ begin
   FLastStableProgressSecond := -1;
   FLastStabilityCheckSecond := -1;
   FWaitStableStartedMs := TMeterValue.GetMonotonicTimeMs;
+  if FStabilityDataStartMs <= 0 then
+    FStabilityDataStartMs := FWaitStableStartedMs;
 
   if (FWorkTable <> nil) and (FWorkTable.EtalonChannels <> nil) then
     for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
@@ -1208,11 +1248,6 @@ begin
     SetStage(msWaitMeasureStart);
     Exit;
   end;
-
-  if ShouldWaitStable and
-     (FWorkTable <> nil) and
-     not (FWorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE]) then
-    FWorkTable.StartMonitor;
 end;
 
 procedure TMeasurementRun.EnterWaitMeasureStart;
@@ -1721,7 +1756,7 @@ begin
         StableInfo.LowerLimit := TargetValue - AllowedDeviation;
         StableInfo.UpperLimit := TargetValue + AllowedDeviation;
 
-        ValueFlow.AnalyzeStabilityForMeasurement(SignalInfo);
+        ValueFlow.AnalyzeStabilityForMeasurement(FStabilityDataStartMs, SignalInfo);
         CurrentInRange := (ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit);
         MeanInRange := (SignalInfo.MeanValue >= StableInfo.LowerLimit) and (SignalInfo.MeanValue <= StableInfo.UpperLimit);
         ForecastInRange := (SignalInfo.ForecastValue >= StableInfo.LowerLimit) and (SignalInfo.ForecastValue <= StableInfo.UpperLimit);
@@ -1881,7 +1916,7 @@ begin
           GroupFlows.Add(GroupKey, ActualValue);
 
         Settings := StableValue.StabilitySettings;
-        StableValue.AnalyzeStabilityForMeasurement(SignalInfo);
+        StableValue.AnalyzeStabilityForMeasurement(FStabilityDataStartMs, SignalInfo);
         SignalInfo.IsCurrentValueInRange := (ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit);
         SignalInfo.IsMeanValueInRange := (SignalInfo.MeanValue >= StableInfo.LowerLimit) and (SignalInfo.MeanValue <= StableInfo.UpperLimit);
         SignalInfo.IsForecastInRange := (SignalInfo.ForecastValue >= StableInfo.LowerLimit) and (SignalInfo.ForecastValue <= StableInfo.UpperLimit);
@@ -2830,6 +2865,7 @@ begin
     begin
       Duplicate := False;
       FStopRequested := True;
+      ResetPointSetupState;
       FIsPaused := False;
       if FStopReason in [msrNone, msrNormalComplete] then
         FStopReason := msrUserStop;
@@ -2909,6 +2945,7 @@ begin
     mcReset:
       begin
         RequestStop;
+        ResetPointSetupState;
         FCurrentPointIndex := -1;
         Start;
       end;
@@ -3107,6 +3144,8 @@ begin
   begin
 
     FCurrentRepeat := Point.RepeatsCompleted;
+    if FWorkTable <> nil then
+      FWorkTable.MeasurementRunPointChanged(Self, Point, FCurrentPointIndex);
     AddDiagnosticEvent('SetPoint success: ' + BuildPointSelectionLog(Point));
 
   end else
@@ -3191,6 +3230,23 @@ begin
     Exit;
   end;
 
+  if FPointSetupCommandSent then
+  begin
+    AddDiagnosticEvent(Format('SetupPoint skipped: command already sent; PointIndex=%d; PointUUID=%s; TargetFlowLS=%.6f',
+      [FSetupPointIndex, FSetupPointUUID, FSetupTargetFlowLS]));
+    Exit(True);
+  end;
+
+  FSetupPointUUID := APoint.UUID;
+  FSetupPointIndex := FCurrentPointIndex;
+  FSetupTargetFlowLS := APoint.Q;
+  FSetupStartedMs := TMeterValue.GetMonotonicTimeMs;
+  FPointSetupCommandSent := True;
+  AddDiagnosticEvent(Format(
+    'SetupPoint command: PointIndex=%d; PointUUID=%s; PointName=%s; TargetFlowLS=%.6f; SelectedEtalonUUID=%s; WorkTableState=%s; Attempt=%d; CommandSent=%s',
+    [FSetupPointIndex, FSetupPointUUID, APoint.Name, FSetupTargetFlowLS, GetSelectedEtalonUUID,
+     TWorkTable.WorkTableStateToString(FWorkTable.State), FAttempt, BoolToStr(FPointSetupCommandSent, True)]));
+
   if (APoint.Q >= 0) and (FWorkTable.FlowRate <> nil) then
   begin
     FWorkTable.FlowRate.DoFlowRateSet(APoint.Q);
@@ -3254,6 +3310,127 @@ begin
 
 end;
 
+
+function TMeasurementRun.GetRuntimeTargetFlowLS: Double;
+begin
+  Result := 0;
+  if (FWorkTable <> nil) and (FWorkTable.FlowRate <> nil) and
+     (FWorkTable.FlowRate.ValueSet <> nil) then
+    Result := FWorkTable.FlowRate.ValueSet.Value;
+end;
+
+function TMeasurementRun.GetSelectedEtalonUUID: string;
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  Result := '';
+  if (FWorkTable = nil) or (FWorkTable.EtalonChannels = nil) then
+    Exit;
+  for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.EtalonChannels[I];
+    if (Channel <> nil) and Channel.Enabled and (Channel.State <> osDeleted) then
+      Exit(Channel.UUID);
+  end;
+end;
+
+function TMeasurementRun.IsSetupPointSynchronized(out AReason: string): Boolean;
+var
+  Point: TDevicePoint;
+  RuntimeUUID: string;
+  RuntimeTarget: Double;
+begin
+  Result := False;
+  AReason := '';
+  Point := GetCurrentPoint;
+  if Point = nil then
+    AReason := 'CurrentPoint=nil'
+  else if not FPointSetupCommandSent then
+    AReason := 'PointSetupCommandNotSent'
+  else if FCurrentPointIndex <> FSetupPointIndex then
+    AReason := Format('CurrentPointIndex=%d; SetupPointIndex=%d', [FCurrentPointIndex, FSetupPointIndex])
+  else if Point.UUID <> FSetupPointUUID then
+    AReason := Format('CurrentPointUUID=%s; SetupPointUUID=%s', [Point.UUID, FSetupPointUUID])
+  else begin
+    RuntimeUUID := '';
+    if (FWorkTable <> nil) and (FWorkTable.CurrentPoint <> nil) then
+      RuntimeUUID := FWorkTable.CurrentPoint.UUID;
+    RuntimeTarget := GetRuntimeTargetFlowLS;
+    if RuntimeUUID <> FSetupPointUUID then
+      AReason := Format('RuntimePointUUID=%s; SetupPointUUID=%s', [RuntimeUUID, FSetupPointUUID])
+    else if not SameValue(RuntimeTarget, FSetupTargetFlowLS, 1E-6) then
+      AReason := Format('RuntimeTargetFlowLS=%.6f; SetupTargetFlowLS=%.6f', [RuntimeTarget, FSetupTargetFlowLS])
+    else
+      Result := True;
+  end;
+end;
+
+function TMeasurementRun.HasNewStabilityDataSince(const ATimeStampMs: Int64;
+  out AFirstSampleTimeMs: Int64): Boolean;
+var
+  I, J: Integer;
+  Channel: TChannel;
+  Samples: TArray<TMeterValueSample>;
+begin
+  Result := False;
+  AFirstSampleTimeMs := 0;
+  if (FWorkTable = nil) or (FWorkTable.EtalonChannels = nil) then
+    Exit;
+  for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.EtalonChannels[I];
+    if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) or
+       (Channel.FlowMeter.ValueFlow = nil) then
+      Continue;
+    Samples := Channel.FlowMeter.ValueFlow.GetStabilitySamples;
+    for J := 0 to High(Samples) do
+      if Samples[J].TimeStampMs >= ATimeStampMs then
+      begin
+        AFirstSampleTimeMs := Samples[J].TimeStampMs;
+        Exit(True);
+      end;
+  end;
+end;
+
+procedure TMeasurementRun.ResetPointSetupState;
+begin
+  FPointSetupCommandSent := False;
+  FSetupPointUUID := '';
+  FSetupPointIndex := -1;
+  FSetupTargetFlowLS := 0;
+  FSetupStartedMs := 0;
+  FStabilityDataStartMs := 0;
+end;
+
+procedure TMeasurementRun.StartNewStabilityAttempt;
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  FStabilityDataStartMs := TMeterValue.GetMonotonicTimeMs;
+  FLastStabilityCheckSecond := -1;
+  FStableSinceMs := 0;
+  FDevicesStableSinceMs := 0;
+  FLastDeviceStableStateKnown := False;
+  FLastDeviceStableState := False;
+  FLastStableProgressSecond := -1;
+  if (FWorkTable <> nil) and (FWorkTable.EtalonChannels <> nil) then
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.EtalonChannels[I];
+      if (Channel <> nil) and (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+        Channel.FlowMeter.ValueFlow.ResetStabilityRuntimeState;
+    end;
+  if (FWorkTable <> nil) and (FWorkTable.DeviceChannels <> nil) then
+    for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.DeviceChannels[I];
+      if (Channel <> nil) and (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+        Channel.FlowMeter.ValueFlow.ResetStabilityRuntimeState;
+    end;
+end;
+
 procedure TMeasurementRun.ProcessStage;
 begin
   AddWorkTableStateDiagnosticEvent;
@@ -3261,6 +3438,7 @@ begin
     msSelectPoint: ProcessSelectPoint;
     msSelectEtalon: ProcessSelectEtalon;
     msSetupPoint: ProcessSetupPoint;
+    msWaitPointSetup: ProcessWaitPointSetup;
     msWaitStable: ProcessWaitStable;
     msWaitMeasureStart: ProcessWaitMeasureStart;
     msMeasure: ProcessMeasure;
@@ -3284,6 +3462,61 @@ end;
 procedure TMeasurementRun.ProcessSetupPoint;
 begin
   // Point and measurement setup are performed once in EnterSetupPoint.
+end;
+
+
+procedure TMeasurementRun.ProcessWaitPointSetup;
+const
+  SETUP_TIMEOUT_S = 30;
+var
+  Reason: string;
+  FirstSampleTimeMs: Int64;
+  CurrentMs: Int64;
+begin
+  if FMode = mrmManual then
+  begin
+    SetStage(msWaitMeasureStart);
+    Exit;
+  end;
+
+  if FWorkTable = nil then
+  begin
+    ContinueAfterPointError(mptsSetupError, mePointNotSet, BuildError(1210, 'Рабочий стол не назначен'));
+    Exit;
+  end;
+
+  if FWorkTable.State <> swtMONITOR then
+  begin
+    CurrentMs := TMeterValue.GetMonotonicTimeMs;
+    if (FSetupStartedMs > 0) and (CurrentMs - FSetupStartedMs > SETUP_TIMEOUT_S * 1000) then
+      ContinueAfterPointError(mptsSetupError, mePointNotSet, BuildError(1211,
+        'Мониторинг не запустился после установки точки'))
+    else
+      AddDiagnosticEvent('WaitPointSetup: waiting swtMONITOR; WorkTableState=' +
+        TWorkTable.WorkTableStateToString(FWorkTable.State));
+    Exit;
+  end;
+
+  if not IsSetupPointSynchronized(Reason) then
+  begin
+    AddDiagnosticEvent('PointSetup desync: ' + Reason);
+    ContinueAfterPointError(mptsSetupError, mePointNotSet, BuildError(1212,
+      'Рассинхронизация установленной точки: ' + Reason));
+    Exit;
+  end;
+
+  if not HasNewStabilityDataSince(FSetupStartedMs, FirstSampleTimeMs) then
+  begin
+    AddDiagnosticEvent('WaitPointSetup: history is not updated yet');
+    Exit;
+  end;
+
+  StartNewStabilityAttempt;
+  AddDiagnosticEvent(Format(
+    'PointSetupConfirmed: WaitMs=%d; ActualFlowLS=%.6f; WorkTableState=%s; FirstSampleTimeMs=%d; StabilityDataStartMs=%d',
+    [TMeterValue.GetMonotonicTimeMs - FSetupStartedMs, GetRuntimeTargetFlowLS,
+     TWorkTable.WorkTableStateToString(FWorkTable.State), FirstSampleTimeMs, FStabilityDataStartMs]));
+  SetStage(msWaitStable);
 end;
 
 procedure TMeasurementRun.ProcessWaitStable;
@@ -3323,6 +3556,14 @@ begin
     Exit;
   end;
 
+  if not IsSetupPointSynchronized(StableStatus) then
+  begin
+    AddDiagnosticEvent('WaitStable desync: ' + StableStatus);
+    ContinueAfterPointError(mptsSetupError, meMeasureError, BuildError(1302,
+      'Рассинхронизация установленной точки: ' + StableStatus));
+    Exit;
+  end;
+
   CurrentSecond := TMeterValue.GetMonotonicTimeMs div 1000;
   if CurrentSecond = FLastStabilityCheckSecond then
     Exit;
@@ -3352,7 +3593,8 @@ begin
             'Таймаут установки параметров измерения',
             Format('Попытка выхода на параметры: %d из %d', [FAttempt, FMaxAttemptCount]));
           FireEvent(meStableRetry);
-          SetStage(msSetupPoint);
+          StartNewStabilityAttempt;
+          FWaitStartedTick := TThread.GetTickCount64;
           Exit;
         end;
 
@@ -3418,7 +3660,8 @@ begin
             'Таймаут стабилизации приборов',
             Format('Причина: %s; попытка: %d из %d', [StableInfo.StatusText, FAttempt, FMaxAttemptCount]));
           FireEvent(meStableRetry);
-          SetStage(msSetupPoint);
+          StartNewStabilityAttempt;
+          FWaitStartedTick := TThread.GetTickCount64;
           Exit;
         end;
 
@@ -3966,6 +4209,9 @@ begin
   if (S = 'установка точки') or (S = 'mssetuppoint') then
     Exit(msSetupPoint);
 
+  if (S = 'ожидание установки точки') or (S = 'mswaitpointsetup') then
+    Exit(msWaitPointSetup);
+
   if (S = 'стабилизация') or (S = 'ожидание стабилизации') or (S = 'mswaitstable') then
     Exit(msWaitStable);
 
@@ -4000,6 +4246,7 @@ begin
     msSelectPoint:      Result := 'Выбор точки';
     msSelectEtalon:     Result := 'Выбор эталона';
     msSetupPoint:       Result := 'Установка точки';
+    msWaitPointSetup:   Result := 'Ожидание установки точки';
     msWaitStable:       Result := 'Стабилизация';
     msWaitMeasureStart: Result := 'Ожидание запуска измерения';
     msMeasure:          Result := 'Измерение';
