@@ -336,6 +336,24 @@ type
     property MeterValues: TObjectList<TMeterValue> read FAggregateMeterValues;
     class function GetMeterValues: TObjectList<TMeterValue>; static;
     class procedure RebindReferences(const AOldValue, ANewValue: TMeterValue); static;
+    class function AnalyzeSingleStabilityWindow(
+      const ASamples: TArray<TMeterValueSample>;
+      const ASettings: TMeterValueStabilitySettings;
+      const ACurrentMs: Int64;
+      const ATargetValue: Double;
+      const ALowerLimit: Double;
+      const AUpperLimit: Double;
+      out AInfo: TMeterValueStabilityInfo
+    ): Boolean; static;
+    class function AnalyzeStabilitySequence(
+      const ASamples: TArray<TMeterValueSample>;
+      const ASettings: TMeterValueStabilitySettings;
+      const ACurrentMs: Int64;
+      const ATargetValue: Double;
+      const ALowerLimit: Double;
+      const AUpperLimit: Double;
+      out AInfo: TMeterValueStabilityInfo
+    ): Boolean; static;
     class function AnalyzeStabilitySamples(
       const ASamples: TArray<TMeterValueSample>;
       const ASettings: TMeterValueStabilitySettings;
@@ -1428,207 +1446,39 @@ end;
 
 function TMeterValue.AnalyzeStability(out AInfo: TMeterValueStabilityInfo): Boolean;
 var
-  Samples, Window, Used: TArray<TMeterValueSample>;
-  CurrentMs, CutoffMs, FirstMs, LastMs: Int64;
-  I, N: Integer;
-  Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept: Double;
-  ErrorText, Msg: string;
-  OutlierValues: TArray<Double>;
-  Outliers: TArray<Boolean>;
-  LimitsFactor: Double;
-  MathStable: Boolean;
+  Samples: TArray<TMeterValueSample>;
+  CurrentMs: Int64;
+  LowerLimit, UpperLimit: Double;
 begin
-  AInfo := Default(TMeterValueStabilityInfo);
-  AInfo.Status := mvssUnknown;
-  if not FStabilitySettings.Enabled then
-  begin
-    AInfo.Status := mvssDisabled;
-    Include(AInfo.FailReasons, mvsfrAnalysisDisabled);
-    AInfo.StatusText := 'Анализ стабильности отключён.';
-    FLastStabilityInfo := AInfo;
-    Exit(False);
-  end;
-  if not ValidateStabilitySettings(ErrorText) then
-  begin
-    AInfo.Status := mvssUnstable;
-    Include(AInfo.FailReasons, mvsfrInvalidSettings);
-    AInfo.StatusText := ErrorText;
-    FLastStabilityInfo := AInfo;
-    Exit(False);
-  end;
-
   CurrentMs := GetMonotonicTimeMs;
   Samples := GetSamples;
-  AInfo.SampleCount := Length(Samples);
-  CutoffMs := CurrentMs - Round(FStabilitySettings.WindowDurationSec * 1000.0);
-  SetLength(Window, 0);
-  for I := 0 to High(Samples) do
-    if (Samples[I].TimeStampMs >= CutoffMs) and
-       (Samples[I].TimeStampMs <= CurrentMs) then
-    begin
-      SetLength(Window, Length(Window) + 1);
-      Window[High(Window)] := Samples[I];
-    end;
-
-  N := Length(Window);
-  AInfo.UsedSampleCount := N;
-  if N = 0 then Include(AInfo.FailReasons, mvsfrNoData);
-  if N > 0 then
-  begin
-    FirstMs := Window[0].TimeStampMs;
-    LastMs := Window[N - 1].TimeStampMs;
-    AInfo.CurrentValue := Window[N - 1].Value;
-    AInfo.LastSampleAgeSec := (CurrentMs - LastMs) / 1000.0;
-    AInfo.WindowDurationSec := (LastMs - FirstMs) / 1000.0;
-    AInfo.HasCurrentValue := True;
-    AInfo.HasLastSampleAge := True;
-  end;
-  AInfo.HasEnoughSamples := N >= FStabilitySettings.MinSampleCount;
-  AInfo.HasEnoughWindow := N > 0;
-  AInfo.IsDataActual := (N > 0) and (AInfo.LastSampleAgeSec <= FStabilitySettings.MaxSampleAgeSec);
-  if not AInfo.HasEnoughSamples then Include(AInfo.FailReasons, mvsfrNotEnoughSamples);
-  if not AInfo.IsDataActual then Include(AInfo.FailReasons, mvsfrStaleData);
-
-  Used := Window;
-  if N > 0 then
-  begin
-    SetLength(OutlierValues, N);
-    for I := 0 to N - 1 do
-      OutlierValues[I] := Window[I].Value;
-    DetectStabilityOutliers(OutlierValues, FStabilitySettings.OutlierFactor,
-      Outliers, AInfo.OutlierCount);
-    SetLength(Used, 0);
-    for I := 0 to N - 1 do
-      if not Outliers[I] then
-      begin
-        SetLength(Used, Length(Used) + 1);
-        Used[High(Used)] := Window[I];
-      end;
-    if Length(Used) = 0 then
-      Used := Window;
-
-    AInfo.MinValue := Used[0].Value; AInfo.MaxValue := Used[0].Value; Sum := 0;
-    for I := 0 to High(Used) do begin Sum := Sum + Used[I].Value; AInfo.MinValue := Min(AInfo.MinValue, Used[I].Value); AInfo.MaxValue := Max(AInfo.MaxValue, Used[I].Value); end;
-    AInfo.MeanValue := Sum / Length(Used);
-    SumSq := 0; for I := 0 to High(Used) do SumSq := SumSq + Sqr(Used[I].Value - AInfo.MeanValue);
-    AInfo.StdDeviation := Sqrt(SumSq / Length(Used));
-    AInfo.Variation := AInfo.MaxValue - AInfo.MinValue;
-    AInfo.HasStatistics := True;
-  end;
-if N > 0 then   //!!!
-  AInfo.OutlierFraction := AInfo.OutlierCount / Double(N)
-else
-  AInfo.OutlierFraction := 0.0;
-
-  AInfo.IsOutlierLevelAcceptable := AInfo.OutlierFraction <= FStabilitySettings.MaxOutlierFraction;
-  if not AInfo.IsOutlierLevelAcceptable then Include(AInfo.FailReasons, mvsfrTooManyOutliers);
-
-  N := Length(Used);
-  if N >= 2 then
-  begin
-    Sum := 0; AInfo.MinValue := Used[0].Value; AInfo.MaxValue := Used[0].Value;
-    for I := 0 to N - 1 do begin Sum := Sum + Used[I].Value; AInfo.MinValue := Min(AInfo.MinValue, Used[I].Value); AInfo.MaxValue := Max(AInfo.MaxValue, Used[I].Value); end;
-    AInfo.MeanValue := Sum / N;
-    AInfo.Variation := AInfo.MaxValue - AInfo.MinValue;
-    SumSq := 0; for I := 0 to N - 1 do SumSq := SumSq + Sqr(Used[I].Value - AInfo.MeanValue);
-    AInfo.StdDeviation := Sqrt(SumSq / N);
-
-    // Linear regression uses all non-outlier samples and their real timestamps.
-    // The slope is a physical rate per second and is less noise-sensitive than
-    // comparing only the first and last samples.
-    FirstMs := Used[0].TimeStampMs; SumT := 0;
-    for I := 0 to N - 1 do SumT := SumT + (Used[I].TimeStampMs - FirstMs) / 1000.0;
-    MeanT := SumT / N; Num := 0; Den := 0;
-    for I := 0 to N - 1 do begin T := (Used[I].TimeStampMs - FirstMs) / 1000.0; Num := Num + (T - MeanT) * (Used[I].Value - AInfo.MeanValue); Den := Den + Sqr(T - MeanT); end;
-    if Den > EPS then
-    begin
-      AInfo.TrendRate := Num / Den;
-      AInfo.HasTrend := True;
-      if AInfo.TrendRate > EPS then
-        AInfo.TrendDirection := tdIncreasing
-      else if AInfo.TrendRate < -EPS then
-        AInfo.TrendDirection := tdDecreasing
-      else
-        AInfo.TrendDirection := tdNone;
-    end
-    else Include(AInfo.FailReasons, mvsfrInsufficientTimeSpread);
-    T := (Used[N-1].TimeStampMs - FirstMs) / 1000.0;
-    Intercept := AInfo.MeanValue - AInfo.TrendRate * MeanT;
-    AInfo.ForecastValue := Intercept + AInfo.TrendRate * (T + FStabilitySettings.ForecastHorizonSec);
-    AInfo.HasForecast := AInfo.HasTrend;
-  end;
-
-if FStabilityConfirmed then
-  LimitsFactor := FStabilitySettings.ExitThresholdFactor
-else
-  LimitsFactor := 1.0;
-
-  AInfo.IsVariationStable := AInfo.Variation <= FStabilitySettings.MaxVariation * LimitsFactor;
-  AInfo.IsDeviationStable := AInfo.StdDeviation <= FStabilitySettings.MaxStdDeviation * LimitsFactor;
-  AInfo.IsTrendStable := Abs(AInfo.TrendRate) <= FStabilitySettings.MaxTrendRate * LimitsFactor;
-  if not AInfo.IsVariationStable then Include(AInfo.FailReasons, mvsfrVariationTooHigh);
-  if not AInfo.IsDeviationStable then Include(AInfo.FailReasons, mvsfrDeviationTooHigh);
-  if not AInfo.IsTrendStable then Include(AInfo.FailReasons, mvsfrTrendTooHigh);
-
-  MathStable := AInfo.HasEnoughSamples and AInfo.IsDataActual and AInfo.HasStatistics and AInfo.HasTrend and
-    AInfo.IsVariationStable and AInfo.IsDeviationStable and AInfo.IsTrendStable and AInfo.IsOutlierLevelAcceptable and
-    not (mvsfrInvalidSettings in AInfo.FailReasons);
-  AInfo.IsSignalStable := MathStable;
-
+  CalculateTargetLimits(FStabilitySettings.TargetValue,
+    FStabilitySettings.TargetAccuracyPlusPercent,
+    FStabilitySettings.TargetAccuracyMinusPercent,
+    FStabilitySettings.TargetToleranceAbsolute, LowerLimit, UpperLimit);
+  Result := AnalyzeStabilitySequence(Samples, FStabilitySettings, CurrentMs,
+    FStabilitySettings.TargetValue, LowerLimit, UpperLimit, AInfo);
   FSampleLock.Enter;
   try
-    if MathStable then
-    begin
-      if FStableCandidateSinceMs = 0 then FStableCandidateSinceMs := CurrentMs;
-      AInfo.StableCandidateDurationSec := (CurrentMs - FStableCandidateSinceMs) / 1000.0;
-      FStabilityConfirmed := AInfo.StableCandidateDurationSec >= FStabilitySettings.ConfirmationTimeSec;
-    end
-    else begin FStableCandidateSinceMs := 0; FStabilityConfirmed := False; end;
-    AInfo.IsConfirmed := FStabilityConfirmed;
-    AInfo.IsStabilityConfirmed := FStabilityConfirmed;
+    if AInfo.IsSignalStable then
+      FStableCandidateSinceMs := CurrentMs - Round(AInfo.StableCandidateDurationSec * 1000.0)
+    else
+      FStableCandidateSinceMs := 0;
+    FStabilityConfirmed := AInfo.IsStabilityConfirmed;
+    FLastStabilityInfo := AInfo;
   finally
     FSampleLock.Leave;
   end;
-
-  if MathStable and not AInfo.IsConfirmed then Include(AInfo.FailReasons, mvsfrWaitingForConfirmation);
-  AInfo.IsSuitableForMeasurement := MathStable and AInfo.IsConfirmed;
-
-  if mvsfrStaleData in AInfo.FailReasons then AInfo.Status := mvssStaleData
-  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.Status := mvssNotEnoughData
-  else if MathStable and AInfo.IsConfirmed then AInfo.Status := mvssStable
-  else AInfo.Status := mvssUnstable;
-
-  Msg := '';
-  if mvsfrNotEnoughSamples in AInfo.FailReasons then Msg := Msg + Format('Недостаточно данных: в окне %d точек, требуется минимум %d. ', [AInfo.UsedSampleCount, FStabilitySettings.MinSampleCount]);
-  if (mvsfrInsufficientWindow in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then Msg := Msg + 'Недостаточный временной интервал между точками для расчёта тренда. ';
-  if mvsfrStaleData in AInfo.FailReasons then Msg := Msg + Format('Данные устарели: последнее значение получено %.1f с назад. ', [AInfo.LastSampleAgeSec]);
-  if mvsfrVariationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Размах %.4f превышает допустимые %.4f. ', [AInfo.Variation, FStabilitySettings.MaxVariation]);
-  if mvsfrDeviationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Стандартное отклонение %.4f превышает допустимые %.4f. ', [AInfo.StdDeviation, FStabilitySettings.MaxStdDeviation]);
-  if mvsfrTrendTooHigh in AInfo.FailReasons then Msg := Msg + Format('Тренд %.6f ед./с превышает допустимые %.6f ед./с. ', [AInfo.TrendRate, FStabilitySettings.MaxTrendRate]);
-  if mvsfrTooManyOutliers in AInfo.FailReasons then Msg := Msg + Format('Доля выбросов %.2f превышает допустимые %.2f. ', [AInfo.OutlierFraction, FStabilitySettings.MaxOutlierFraction]);
-  if MathStable and not AInfo.IsConfirmed then Msg := Format('Предварительная стабильность достигнута, ожидается подтверждение: %.1f из %.1f с.', [AInfo.StableCandidateDurationSec, FStabilitySettings.ConfirmationTimeSec]);
-  if AInfo.Status = mvssStable then Msg := Format('Сигнал стабилен: среднее %.4f; размах %.4f; стандартное отклонение %.4f; тренд %.6f ед./с.', [AInfo.MeanValue, AInfo.Variation, AInfo.StdDeviation, AInfo.TrendRate]);
-  if AInfo.IsSuitableForMeasurement then AInfo.StatusText := 'Значение пригодно для измерения.'
-  else if mvsfrAnalysisDisabled in AInfo.FailReasons then AInfo.StatusText := 'Анализ стабильности отключён.'
-  else if mvsfrNoData in AInfo.FailReasons then AInfo.StatusText := 'Нет доступных данных.'
-  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.StatusText := 'Недостаточно данных.'
-  else if AInfo.IsSignalStable and not AInfo.IsConfirmed then AInfo.StatusText := 'Предварительная стабильность достигнута, ожидается подтверждение.'
-  else if AInfo.IsSignalStable and AInfo.IsConfirmed then AInfo.StatusText := 'Стабильность подтверждена, но значение вне диапазона.'
-  else AInfo.StatusText := 'Сигнал нестабилен.';
-  FLastStabilityInfo := AInfo;
-  Result := AInfo.Status = mvssStable;
 end;
 
 
-class function TMeterValue.AnalyzeStabilitySamples(
+class function TMeterValue.AnalyzeSingleStabilityWindow(
   const ASamples: TArray<TMeterValueSample>;
   const ASettings: TMeterValueStabilitySettings;
   const ACurrentMs: Int64;
   const ATargetValue: Double;
   const ALowerLimit: Double;
   const AUpperLimit: Double;
-  var AStableCandidateSinceMs: Int64;
-  var AStabilityConfirmed: Boolean;
   out AInfo: TMeterValueStabilityInfo): Boolean;
 type
   TIndexedSample = record
@@ -1638,13 +1488,12 @@ type
 var
   Window: TArray<TIndexedSample>;
   Used: TArray<TIndexedSample>;
-  CutoffMs, FirstMs, LastMs, EffectiveConfirmationStartMs: Int64;
+  CutoffMs, FirstMs, LastMs: Int64;
   I, N: Integer;
   Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept: Double;
   Msg: string;
   OutlierValues: TArray<Double>;
   Outliers: TArray<Boolean>;
-  LimitsFactor: Double;
   MathStable: Boolean;
 
   procedure AddWindowSample(const ASourceIndex: Integer; const ASample: TMeterValueSample);
@@ -1722,9 +1571,10 @@ begin
   end;
 
   AInfo.HasEnoughSamples := N >= ASettings.MinSampleCount;
-  AInfo.HasEnoughWindow := N > 0;
+  AInfo.HasEnoughWindow := (N > 0) and (AInfo.WindowDurationSec + EPS >= ASettings.WindowDurationSec);
   AInfo.IsDataActual := (N > 0) and (AInfo.LastSampleAgeSec <= ASettings.MaxSampleAgeSec);
   if not AInfo.HasEnoughSamples then Include(AInfo.FailReasons, mvsfrNotEnoughSamples);
+  if not AInfo.HasEnoughWindow then Include(AInfo.FailReasons, mvsfrInsufficientWindow);
   if not AInfo.IsDataActual then Include(AInfo.FailReasons, mvsfrStaleData);
 
   Used := Window;
@@ -1823,19 +1673,15 @@ begin
       (AInfo.ForecastValue <= AUpperLimit);
   end;
 
-  if AStabilityConfirmed then
-    LimitsFactor := ASettings.ExitThresholdFactor
-  else
-    LimitsFactor := 1.0;
-
-  AInfo.IsVariationStable := AInfo.Variation <= ASettings.MaxVariation * LimitsFactor;
-  AInfo.IsDeviationStable := AInfo.StdDeviation <= ASettings.MaxStdDeviation * LimitsFactor;
-  AInfo.IsTrendStable := Abs(AInfo.TrendRate) <= ASettings.MaxTrendRate * LimitsFactor;
+  AInfo.IsVariationStable := AInfo.Variation <= ASettings.MaxVariation;
+  AInfo.IsDeviationStable := AInfo.StdDeviation <= ASettings.MaxStdDeviation;
+  AInfo.IsTrendStable := Abs(AInfo.TrendRate) <= ASettings.MaxTrendRate;
   if not AInfo.IsVariationStable then Include(AInfo.FailReasons, mvsfrVariationTooHigh);
   if not AInfo.IsDeviationStable then Include(AInfo.FailReasons, mvsfrDeviationTooHigh);
   if not AInfo.IsTrendStable then Include(AInfo.FailReasons, mvsfrTrendTooHigh);
 
-  MathStable := AInfo.HasEnoughSamples and AInfo.IsDataActual and AInfo.HasStatistics and AInfo.HasTrend and
+  MathStable := AInfo.HasEnoughSamples and AInfo.HasEnoughWindow and AInfo.IsDataActual and
+    AInfo.HasStatistics and AInfo.HasTrend and
     AInfo.IsVariationStable and AInfo.IsDeviationStable and AInfo.IsTrendStable and
     AInfo.IsOutlierLevelAcceptable and not (mvsfrInvalidSettings in AInfo.FailReasons);
   AInfo.IsSignalStable := MathStable;
@@ -1851,33 +1697,9 @@ begin
   if ASettings.RequireForecastInRange and AInfo.HasForecast and not AInfo.IsForecastInRange then
     Include(AInfo.FailReasons, mvsfrForecastOutOfRange);
 
-  if MathStable then
-  begin
-    if AStableCandidateSinceMs = 0 then
-      AStableCandidateSinceMs := ACurrentMs;
-    AInfo.StableCandidateDurationSec := (ACurrentMs - AStableCandidateSinceMs) / 1000.0;
-    AStabilityConfirmed := AInfo.StableCandidateDurationSec >= ASettings.ConfirmationTimeSec;
-  end
-  else
-  begin
-    AStableCandidateSinceMs := 0;
-    AStabilityConfirmed := False;
-  end;
-  AInfo.IsConfirmed := AStabilityConfirmed;
-  AInfo.IsStabilityConfirmed := AStabilityConfirmed;
-  if MathStable and (AStableCandidateSinceMs > 0) then
-  begin
-    EffectiveConfirmationStartMs := ACurrentMs - Round(ASettings.ConfirmationTimeSec * 1000.0);
-    if EffectiveConfirmationStartMs < AStableCandidateSinceMs then
-      EffectiveConfirmationStartMs := AStableCandidateSinceMs;
-    for I := 0 to High(AInfo.SampleResults) do
-      AInfo.SampleResults[I].IsInConfirmationPeriod :=
-        AInfo.SampleResults[I].InWindow and
-        (AInfo.SampleResults[I].TimeStampMs >= EffectiveConfirmationStartMs) and
-        (AInfo.SampleResults[I].TimeStampMs <= ACurrentMs);
-  end;
-  if MathStable and not AInfo.IsConfirmed then Include(AInfo.FailReasons, mvsfrWaitingForConfirmation);
-
+  AInfo.StableCandidateDurationSec := 0.0;
+  AInfo.IsConfirmed := MathStable and (ASettings.ConfirmationTimeSec <= 0);
+  AInfo.IsStabilityConfirmed := AInfo.IsConfirmed;
   AInfo.IsSuitableForMeasurement := MathStable and AInfo.IsConfirmed and
     ((not ASettings.RequireCurrentValueInRange) or AInfo.IsCurrentValueInRange) and
     ((not ASettings.RequireMeanValueInRange) or AInfo.IsMeanValueInRange) and
@@ -1907,6 +1729,145 @@ begin
   else AInfo.StatusText := 'Сигнал нестабилен.';
 
   Result := AInfo.Status = mvssStable;
+end;
+
+
+class function TMeterValue.AnalyzeStabilitySequence(
+  const ASamples: TArray<TMeterValueSample>;
+  const ASettings: TMeterValueStabilitySettings;
+  const ACurrentMs: Int64;
+  const ATargetValue: Double;
+  const ALowerLimit: Double;
+  const AUpperLimit: Double;
+  out AInfo: TMeterValueStabilityInfo): Boolean;
+var
+  I, J: Integer;
+  WindowTimeMs, FirstStableMs: Int64;
+  WindowInfo: TMeterValueStabilityInfo;
+  StableTimes: TArray<Int64>;
+
+  function MandatoryRangeChecksPassed(const AWindowInfo: TMeterValueStabilityInfo): Boolean;
+  begin
+    Result := ((not ASettings.RequireCurrentValueInRange) or AWindowInfo.IsCurrentValueInRange) and
+      ((not ASettings.RequireMeanValueInRange) or AWindowInfo.IsMeanValueInRange) and
+      ((not ASettings.RequireForecastInRange) or AWindowInfo.IsForecastInRange);
+  end;
+
+  procedure FinalizeSequenceInfo;
+  begin
+    if AInfo.IsSignalStable and (FirstStableMs > 0) then
+      AInfo.StableCandidateDurationSec := (ACurrentMs - FirstStableMs) / 1000.0
+    else
+      AInfo.StableCandidateDurationSec := 0.0;
+
+    AInfo.IsConfirmed := AInfo.IsSignalStable and
+      ((ASettings.ConfirmationTimeSec <= 0) or
+       (AInfo.StableCandidateDurationSec >= ASettings.ConfirmationTimeSec));
+    AInfo.IsStabilityConfirmed := AInfo.IsConfirmed;
+
+    if AInfo.IsSignalStable and not AInfo.IsStabilityConfirmed then
+      Include(AInfo.FailReasons, mvsfrWaitingForConfirmation)
+    else
+      Exclude(AInfo.FailReasons, mvsfrWaitingForConfirmation);
+
+    AInfo.IsSuitableForMeasurement := AInfo.IsSignalStable and AInfo.IsStabilityConfirmed and
+      ((not ASettings.RequireCurrentValueInRange) or AInfo.IsCurrentValueInRange) and
+      ((not ASettings.RequireMeanValueInRange) or AInfo.IsMeanValueInRange) and
+      ((not ASettings.RequireForecastInRange) or AInfo.IsForecastInRange);
+
+    if not ASettings.Enabled then
+      AInfo.Status := mvssDisabled
+    else if mvsfrStaleData in AInfo.FailReasons then
+      AInfo.Status := mvssStaleData
+    else if (mvsfrNoData in AInfo.FailReasons) or
+            (mvsfrNotEnoughSamples in AInfo.FailReasons) or
+            (mvsfrInsufficientWindow in AInfo.FailReasons) or
+            (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then
+      AInfo.Status := mvssNotEnoughData
+    else if AInfo.IsSignalStable and AInfo.IsStabilityConfirmed then
+      AInfo.Status := mvssStable
+    else
+      AInfo.Status := mvssUnstable;
+
+    if not ASettings.Enabled then
+      AInfo.StatusText := 'Анализ стабильности отключён.'
+    else if mvsfrNoData in AInfo.FailReasons then
+      AInfo.StatusText := 'Нет доступных данных.'
+    else if mvsfrStaleData in AInfo.FailReasons then
+      AInfo.StatusText := 'Данные устарели.'
+    else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or
+            (mvsfrInsufficientWindow in AInfo.FailReasons) or
+            (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then
+      AInfo.StatusText := 'Недостаточно данных.'
+    else if AInfo.IsSuitableForMeasurement then
+      AInfo.StatusText := 'Значение пригодно для измерения.'
+    else if AInfo.IsSignalStable and AInfo.IsStabilityConfirmed then
+      AInfo.StatusText := 'Стабильность подтверждена, но значение вне целевого диапазона.'
+    else if AInfo.IsSignalStable then
+      AInfo.StatusText := 'Предварительная стабильность достигнута, ожидается подтверждение.'
+    else
+      AInfo.StatusText := 'Сигнал нестабилен.';
+  end;
+
+begin
+  AnalyzeSingleStabilityWindow(ASamples, ASettings, ACurrentMs,
+    ATargetValue, ALowerLimit, AUpperLimit, AInfo);
+  FirstStableMs := 0;
+  SetLength(StableTimes, 0);
+  for I := 0 to High(ASamples) do
+    if ASamples[I].TimeStampMs <= ACurrentMs then
+    begin
+      WindowTimeMs := ASamples[I].TimeStampMs;
+      AnalyzeSingleStabilityWindow(ASamples, ASettings, WindowTimeMs,
+        ATargetValue, ALowerLimit, AUpperLimit, WindowInfo);
+      if WindowInfo.IsSignalStable and MandatoryRangeChecksPassed(WindowInfo) then
+      begin
+        if FirstStableMs = 0 then
+          FirstStableMs := WindowTimeMs;
+        SetLength(StableTimes, Length(StableTimes) + 1);
+        StableTimes[High(StableTimes)] := WindowTimeMs;
+      end
+      else
+      begin
+        FirstStableMs := 0;
+        SetLength(StableTimes, 0);
+      end;
+    end;
+
+  for I := 0 to High(AInfo.SampleResults) do
+    AInfo.SampleResults[I].IsInConfirmationPeriod := False;
+  if AInfo.IsSignalStable then
+    for I := 0 to High(AInfo.SampleResults) do
+      for J := 0 to High(StableTimes) do
+        if (AInfo.SampleResults[I].TimeStampMs = StableTimes[J]) and
+           (AInfo.SampleResults[I].TimeStampMs <= ACurrentMs) then
+        begin
+          AInfo.SampleResults[I].IsInConfirmationPeriod := True;
+          Break;
+        end;
+
+  FinalizeSequenceInfo;
+  Result := AInfo.Status = mvssStable;
+end;
+
+class function TMeterValue.AnalyzeStabilitySamples(
+  const ASamples: TArray<TMeterValueSample>;
+  const ASettings: TMeterValueStabilitySettings;
+  const ACurrentMs: Int64;
+  const ATargetValue: Double;
+  const ALowerLimit: Double;
+  const AUpperLimit: Double;
+  var AStableCandidateSinceMs: Int64;
+  var AStabilityConfirmed: Boolean;
+  out AInfo: TMeterValueStabilityInfo): Boolean;
+begin
+  Result := AnalyzeStabilitySequence(ASamples, ASettings, ACurrentMs,
+    ATargetValue, ALowerLimit, AUpperLimit, AInfo);
+  if AInfo.IsSignalStable then
+    AStableCandidateSinceMs := ACurrentMs - Round(AInfo.StableCandidateDurationSec * 1000.0)
+  else
+    AStableCandidateSinceMs := 0;
+  AStabilityConfirmed := AInfo.IsStabilityConfirmed;
 end;
 
 function TMeterValue.GetForecastValue(const AHorizonSec: Double; out AValue: Double): Boolean;
