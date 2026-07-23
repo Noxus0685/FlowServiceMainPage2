@@ -214,12 +214,6 @@ type
     function IsStable(lim: Integer): Boolean;
     /// <summary>Returns process-monotonic time in milliseconds for interval analysis immune to system clock changes.</summary>
     class function GetMonotonicTimeMs: Int64; static;
-    /// <summary>Adds a physical-value sample using the current monotonic timestamp.</summary>
-    procedure AddSample(const AValue: Double); overload;
-    /// <summary>Captures the current value into stability history using the current monotonic timestamp.</summary>
-    procedure CaptureStabilitySample; overload;
-    /// <summary>Captures the current value into stability history using the provided monotonic timestamp.</summary>
-    procedure CaptureStabilitySample(const ATimeStampMs: Int64); overload;
     /// <summary>Clears stability samples and runtime confirmation state while preserving all settings.</summary>
     procedure ClearSamplesHistory;
     /// <summary>Returns a thread-safe immutable copy of chronological stability samples.</summary>
@@ -1219,21 +1213,6 @@ begin
   Result := Round(TStopwatch.GetTimeStamp * 1000.0 / TStopwatch.Frequency);
 end;
 
-procedure TMeterValue.AddSample(const AValue: Double);
-begin
-  AddSample(AValue, GetMonotonicTimeMs);
-end;
-
-procedure TMeterValue.CaptureStabilitySample;
-begin
-  CaptureStabilitySample(GetMonotonicTimeMs);
-end;
-
-procedure TMeterValue.CaptureStabilitySample(const ATimeStampMs: Int64);
-begin
-  AddSample(GetDoubleValue, ATimeStampMs);
-end;
-
 procedure TMeterValue.AddSample(const AValue: Double; const ATimeStampMs: Int64);
 var
   Sample: TMeterValueSample;
@@ -1334,7 +1313,14 @@ begin
     end;
 
     FAutomaticSampleBucket := CurrentBucket;
-    FAutomaticSampleIndex := InsertIndex;
+    if (InsertIndex >= 0) and (InsertIndex < FSamples.Count) and
+       (FSamples[InsertIndex].TimeStampMs div 1000 = CurrentBucket) then
+      FAutomaticSampleIndex := InsertIndex
+    else
+    begin
+      FAutomaticSampleBucket := -1;
+      FAutomaticSampleIndex := -1;
+    end;
   finally
     FSampleLock.Leave;
   end;
