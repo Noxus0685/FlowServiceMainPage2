@@ -1034,8 +1034,7 @@ begin
   Result := (not FLoading) and
     (not (csDestroying in ComponentState)) and
     (FMeterValue <> nil) and
-    (CheckBoxAutoAnalyze <> nil) and CheckBoxAutoAnalyze.IsChecked and
-    (CheckBoxStabilityEnabled <> nil) and CheckBoxStabilityEnabled.IsChecked;
+    (CheckBoxAutoAnalyze <> nil) and CheckBoxAutoAnalyze.IsChecked;
 end;
 
 procedure TFrameMeterValueEdit.UpdateStabilityAutoRefreshTimer;
@@ -1093,7 +1092,7 @@ begin
 
   RefreshDisplayedSamples;
   if FSampleSource = mssWorkHistory then
-    FTestCurrentTimeMs := TThread.GetTickCount64;
+    FTestCurrentTimeMs := TMeterValue.GetMonotonicTimeMs;
   RefreshSamplesGrid(False);
 
   if WasLastRow and (GridSamples.RowCount > 0) then
@@ -1107,7 +1106,7 @@ begin
       end;
   GridSamples.Selected := GridSamples.Row;
 
-  AnalyzeDisplayedSamples(False, False, False);
+  AnalyzeDisplayedSamples(FSampleSource = mssWorkHistory, False, False);
   UpdateStabilityChart;
 end;
 
@@ -1246,7 +1245,7 @@ begin
     MemoConclusion.Lines.Text := 'В рабочей истории нет данных';
   end
   else if CheckBoxAutoAnalyze.IsChecked then
-    AnalyzeDisplayedSamples(False, True)
+    AnalyzeDisplayedSamples(True, True)
   else
   begin
     ClearTestAnalysis;
@@ -1269,7 +1268,7 @@ begin
   if Length(FDisplayedSamples) = 0 then
     Exit;
   SetAnalysisTimeByLastDisplayedSample;
-  AnalyzeIfNeeded;
+  AnalyzeDisplayedSamples(FSampleSource = mssWorkHistory, True, False);
 end;
 
 function TFrameMeterValueEdit.SampleSecondsToMs(const ASeconds: Double): Int64;
@@ -2301,7 +2300,7 @@ begin
     Exit;
 
   if CheckBoxAutoAnalyze.IsChecked then
-    AnalyzeDisplayedSamples(False, True, False)
+    AnalyzeDisplayedSamples(FSampleSource = mssWorkHistory, True, False)
   else
     ClearTestAnalysis;
 end;

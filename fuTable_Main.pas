@@ -1572,8 +1572,6 @@ begin
   UpdateInstrumentNameEdit;
 
   FWorkTableManager.UpdateSimulation;
-  if FWorkTableManager.ActiveWorkTable <> nil then
-    FWorkTableManager.ActiveWorkTable.CaptureStabilityHistory;
 end;
 
 
