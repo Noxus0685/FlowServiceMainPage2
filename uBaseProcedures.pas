@@ -153,6 +153,7 @@ type
     SourceIndex: Integer;
     TimeStampMs: Int64;
     InWindow: Boolean;
+    IsInDisplayAnalysisWindow: Boolean;
     IsInConfirmationPeriod: Boolean;
     IsOutlier: Boolean;
     IsInRange: Boolean;
