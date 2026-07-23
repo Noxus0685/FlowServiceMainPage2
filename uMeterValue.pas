@@ -1488,7 +1488,7 @@ type
 var
   Window: TArray<TIndexedSample>;
   Used: TArray<TIndexedSample>;
-  CutoffMs, FirstMs, LastMs, LastSampleTimeMs: Int64;
+  CutoffMs, FirstMs, LastMs, LastSampleTimeMs, StepMs: Int64;
   I, N: Integer;
   Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept: Double;
   Msg: string;
@@ -1507,6 +1507,22 @@ var
   begin
     SetLength(Used, Length(Used) + 1);
     Used[High(Used)] := AItem;
+  end;
+
+  function DetectStepMs: Int64;
+  var
+    K: Integer;
+    Delta: Int64;
+  begin
+    Result := 0;
+    for K := 1 to High(ASamples) do
+      if (ASamples[K].TimeStampMs <= ACurrentMs) and
+         (ASamples[K - 1].TimeStampMs <= ACurrentMs) then
+      begin
+        Delta := ASamples[K].TimeStampMs - ASamples[K - 1].TimeStampMs;
+        if (Delta > 0) and ((Result = 0) or (Delta < Result)) then
+          Result := Delta;
+      end;
   end;
 
 begin
@@ -1557,7 +1573,10 @@ begin
     AInfo.LastSampleAgeSec := Max(0.0, (ACurrentMs - LastSampleTimeMs) / 1000.0);
   end;
 
+  StepMs := DetectStepMs;
   CutoffMs := ACurrentMs - Round(ASettings.WindowDurationSec * 1000.0);
+  if StepMs > 0 then
+    CutoffMs := CutoffMs + StepMs;
   SetLength(Window, 0);
   for I := 0 to High(ASamples) do
     if (ASamples[I].TimeStampMs >= CutoffMs) and
@@ -1580,7 +1599,8 @@ begin
   end;
 
   AInfo.HasEnoughSamples := N >= ASettings.MinSampleCount;
-  AInfo.HasEnoughWindow := (N > 0) and (AInfo.WindowDurationSec + EPS >= ASettings.WindowDurationSec);
+  AInfo.HasEnoughWindow := (N > 0) and
+    (AInfo.WindowDurationSec + (StepMs / 1000.0) + EPS >= ASettings.WindowDurationSec);
   AInfo.IsDataActual := AInfo.HasLastSampleAge and (AInfo.LastSampleAgeSec <= ASettings.MaxSampleAgeSec);
   if not AInfo.HasEnoughSamples then Include(AInfo.FailReasons, mvsfrNotEnoughSamples);
   if not AInfo.HasEnoughWindow then Include(AInfo.FailReasons, mvsfrInsufficientWindow);
@@ -1751,15 +1771,15 @@ class function TMeterValue.AnalyzeStabilitySequence(
   const AUpperLimit: Double;
   out AInfo: TMeterValueStabilityInfo): Boolean;
 var
-  I, J: Integer;
-  WindowTimeMs, FirstStableMs: Int64;
-  WindowInfo: TMeterValueStabilityInfo;
-  StableTimes: TArray<Int64>;
+  I: Integer;
+  WindowTimeMs, FirstStableMs, ConfirmationDurationMs, ConfirmationStartMs: Int64;
+  WindowInfo, DisplayWindowInfo: TMeterValueStabilityInfo;
 
   procedure FinalizeSequenceInfo;
   begin
     if AInfo.IsSignalStable and (FirstStableMs > 0) then
-      AInfo.StableCandidateDurationSec := (ACurrentMs - FirstStableMs) / 1000.0
+      AInfo.StableCandidateDurationSec := Min(ASettings.ConfirmationTimeSec,
+        (ACurrentMs - FirstStableMs) / 1000.0)
     else
       AInfo.StableCandidateDurationSec := 0.0;
 
@@ -1816,7 +1836,6 @@ begin
   AnalyzeSingleStabilityWindow(ASamples, ASettings, ACurrentMs,
     ATargetValue, ALowerLimit, AUpperLimit, AInfo);
   FirstStableMs := 0;
-  SetLength(StableTimes, 0);
   for I := 0 to High(ASamples) do
     if ASamples[I].TimeStampMs <= ACurrentMs then
     begin
@@ -1827,27 +1846,43 @@ begin
       begin
         if FirstStableMs = 0 then
           FirstStableMs := WindowTimeMs;
-        SetLength(StableTimes, Length(StableTimes) + 1);
-        StableTimes[High(StableTimes)] := WindowTimeMs;
       end
       else
       begin
         FirstStableMs := 0;
-        SetLength(StableTimes, 0);
       end;
     end;
 
   for I := 0 to High(AInfo.SampleResults) do
+  begin
+    AInfo.SampleResults[I].IsInDisplayAnalysisWindow := False;
     AInfo.SampleResults[I].IsInConfirmationPeriod := False;
-  if AInfo.IsSignalStable then
+  end;
+
+  if AInfo.IsSignalStable and (FirstStableMs > 0) then
+  begin
+    ConfirmationDurationMs := Round(ASettings.ConfirmationTimeSec * 1000.0);
+    ConfirmationStartMs := FirstStableMs;
+    if (ConfirmationDurationMs > 0) and (ACurrentMs - ConfirmationStartMs > ConfirmationDurationMs) then
+      ConfirmationStartMs := ACurrentMs - ConfirmationDurationMs;
+
+    AnalyzeSingleStabilityWindow(ASamples, ASettings, ConfirmationStartMs,
+      ATargetValue, ALowerLimit, AUpperLimit, DisplayWindowInfo);
     for I := 0 to High(AInfo.SampleResults) do
-      for J := 0 to High(StableTimes) do
-        if (AInfo.SampleResults[I].TimeStampMs = StableTimes[J]) and
-           (AInfo.SampleResults[I].TimeStampMs <= ACurrentMs) then
-        begin
-          AInfo.SampleResults[I].IsInConfirmationPeriod := True;
-          Break;
-        end;
+    begin
+      if I <= High(DisplayWindowInfo.SampleResults) then
+        AInfo.SampleResults[I].IsInDisplayAnalysisWindow :=
+          DisplayWindowInfo.SampleResults[I].InWindow;
+      AInfo.SampleResults[I].IsInConfirmationPeriod :=
+        (AInfo.SampleResults[I].TimeStampMs > ConfirmationStartMs) and
+        (AInfo.SampleResults[I].TimeStampMs <= ACurrentMs);
+      if AInfo.SampleResults[I].IsInConfirmationPeriod then
+        AInfo.SampleResults[I].IsInDisplayAnalysisWindow := False;
+    end;
+  end
+  else
+    for I := 0 to High(AInfo.SampleResults) do
+      AInfo.SampleResults[I].IsInDisplayAnalysisWindow := AInfo.SampleResults[I].InWindow;
 
   FinalizeSequenceInfo;
   Result := AInfo.Status = mvssStable;

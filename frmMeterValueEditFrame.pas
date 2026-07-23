@@ -2259,12 +2259,12 @@ end;
 
 function TFrameMeterValueEdit.InWindowText(const AResult: TMeterValueSampleAnalysis): string;
 begin
-  if not AResult.InWindow then
-    Result := 'Нет'
-  else if AResult.IsInConfirmationPeriod then
+  if AResult.IsInConfirmationPeriod then
     Result := 'Стаб'
+  else if AResult.IsInDisplayAnalysisWindow then
+    Result := 'Да'
   else
-    Result := 'Да';
+    Result := 'Нет';
 end;
 
 function TFrameMeterValueEdit.FindSampleAnalysis(const ARow: Integer;
