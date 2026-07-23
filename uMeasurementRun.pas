@@ -1525,8 +1525,7 @@ var
   ValueFlow: TMeterValue;
   Settings: TMeterValueStabilitySettings;
   SignalInfo: TMeterValueStabilityInfo;
-  CurrentStable: Boolean;
-  CheckedCount: Integer;
+  CheckedCount, ReadySecCount, TotalSecCount, ReadyAutoCount, TotalAutoCount: Integer;
   ActualValue: Double;
   TargetValue: Double;
   TargetSource: string;
@@ -1535,8 +1534,9 @@ var
   BestPoint: TDevicePoint;
   BestDistance, Distance: Double;
   ErrorPercent, AllowedDeviation: Double;
-  CurrentInRange, HistoryStable, MeanInRange, ForecastInRange: Boolean;
-  Reason, LogText, CurrentPointName, DeviceUUID, MatchedPointName: string;
+  StableReady, RangeReady, Ready, RequireRange: Boolean;
+  CurrentInRange, MeanInRange, ForecastInRange: Boolean;
+  Reason, LogText, CurrentPointName, DeviceUUID, MatchedPointName, ModeText: string;
   CurrentPointQ, MatchedPointQ, MatchedDistance: Double;
   CurrentTick: UInt64;
 
@@ -1548,6 +1548,23 @@ var
   function M3H(const ALS: Double): Double;
   begin
     Result := ALS * 3.6;
+  end;
+
+  function IsAutomaticDeviceMode: Boolean;
+  begin
+    Result := Assigned(CurrentPoint) and (CurrentPoint.SpillageType = Ord(stWithStop));
+  end;
+
+  function CheckRangeRequirements(const ASettings: TMeterValueStabilitySettings;
+    const AInfo: TMeterValueStabilityInfo): Boolean;
+  begin
+    Result := True;
+    if ASettings.RequireCurrentValueInRange then
+      Result := Result and AInfo.IsCurrentValueInRange;
+    if ASettings.RequireMeanValueInRange then
+      Result := Result and AInfo.IsMeanValueInRange;
+    if ASettings.RequireForecastInRange then
+      Result := Result and AInfo.IsForecastInRange;
   end;
 
   procedure PublishDeviceLog(const AText: string);
@@ -1576,6 +1593,10 @@ begin
   end;
 
   CheckedCount := 0;
+  ReadySecCount := 0;
+  TotalSecCount := 0;
+  ReadyAutoCount := 0;
+  TotalAutoCount := 0;
   for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
   begin
     Channel := FWorkTable.DeviceChannels[I];
@@ -1588,6 +1609,18 @@ begin
     Settings := ValueFlow.StabilitySettings;
     Inc(CheckedCount);
 
+    RequireRange := not IsAutomaticDeviceMode;
+    if RequireRange then
+    begin
+      Inc(TotalSecCount);
+      ModeText := 'секундный'
+    end
+    else
+    begin
+      Inc(TotalAutoCount);
+      ModeText := 'автоматический';
+    end;
+
     TargetValue := 0;
     TargetSource := '';
     Reason := '';
@@ -1596,10 +1629,12 @@ begin
     ErrorPercent := 0;
     AllowedDeviation := 0;
     CurrentInRange := False;
-    HistoryStable := True;
     MeanInRange := True;
     ForecastInRange := True;
-    CurrentStable := False;
+    StableReady := False;
+    RangeReady := True;
+    Ready := False;
+    SignalInfo := Default(TMeterValueStabilityInfo);
     DeviceUUID := Channel.DeviceUUID;
     if DeviceUUID = '' then
       DeviceUUID := Channel.FlowMeter.DeviceUUID;
@@ -1659,38 +1694,46 @@ begin
         AllowedDeviation := Abs(TargetValue) * ErrorPercent / 100.0;
         StableInfo.LowerLimit := TargetValue - AllowedDeviation;
         StableInfo.UpperLimit := TargetValue + AllowedDeviation;
-        CurrentInRange := (ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit);
-        CurrentStable := CurrentInRange;
 
-        if Settings.Enabled then
-        begin
-          ValueFlow.AddSample(ActualValue);
-          HistoryStable := ValueFlow.AnalyzeStability(SignalInfo);
-          StableInfo.SignalInfo := SignalInfo;
-          StableInfo.MeanValue := SignalInfo.MeanValue;
-          StableInfo.ForecastValue := SignalInfo.ForecastValue;
-          MeanInRange := (not Settings.RequireMeanValueInRange) or
-            ((SignalInfo.MeanValue >= StableInfo.LowerLimit) and (SignalInfo.MeanValue <= StableInfo.UpperLimit));
-          ForecastInRange := (not Settings.RequireForecastInRange) or
-            ((SignalInfo.ForecastValue >= StableInfo.LowerLimit) and (SignalInfo.ForecastValue <= StableInfo.UpperLimit));
-          CurrentStable := CurrentInRange and HistoryStable and MeanInRange and ForecastInRange;
-        end
-        else
-          StableInfo.SignalInfo.Status := mvssDisabled;
+        ValueFlow.AddSample(ActualValue);
+        ValueFlow.AnalyzeStability(SignalInfo);
+        CurrentInRange := (ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit);
+        MeanInRange := (SignalInfo.MeanValue >= StableInfo.LowerLimit) and (SignalInfo.MeanValue <= StableInfo.UpperLimit);
+        ForecastInRange := (SignalInfo.ForecastValue >= StableInfo.LowerLimit) and (SignalInfo.ForecastValue <= StableInfo.UpperLimit);
+        SignalInfo.IsCurrentValueInRange := CurrentInRange;
+        SignalInfo.IsMeanValueInRange := MeanInRange;
+        SignalInfo.IsForecastInRange := ForecastInRange;
+        StableReady := Settings.Enabled and SignalInfo.IsSignalStable and SignalInfo.IsStabilityConfirmed;
+        RangeReady := CheckRangeRequirements(Settings, SignalInfo);
+        Ready := StableReady;
+        if RequireRange then
+          Ready := Ready and RangeReady;
       end;
     end;
 
     StableInfo.CurrentValue := ActualValue;
     StableInfo.TargetValue := TargetValue;
+    StableInfo.SignalInfo := SignalInfo;
+    StableInfo.MeanValue := SignalInfo.MeanValue;
+    StableInfo.ForecastValue := SignalInfo.ForecastValue;
     StableInfo.IsCurrentInRange := CurrentInRange;
-    StableInfo.IsSignalStable := HistoryStable;
+    StableInfo.IsSignalStable := StableReady;
     StableInfo.IsMeanInRange := MeanInRange;
     StableInfo.IsForecastInRange := ForecastInRange;
-    StableInfo.IsTargetConditionPassed := CurrentInRange and MeanInRange and ForecastInRange;
-    StableInfo.IsReadyForMeasurement := CurrentStable;
+    StableInfo.IsTargetConditionPassed := RangeReady;
+    StableInfo.IsReadyForMeasurement := Ready;
 
     if Reason = '' then
-      Reason := IfThen(CurrentStable, 'Stable', 'OutOfRangeOrHistory');
+    begin
+      if Ready then
+        Reason := 'Ready'
+      else if not StableReady then
+        Reason := SignalInfo.StatusText
+      else if RequireRange and not RangeReady then
+        Reason := 'StableButOutOfRequiredRange'
+      else
+        Reason := 'Stable; RangeDiagnosticOnly';
+    end;
 
     if BestPoint <> nil then
     begin
@@ -1699,24 +1742,32 @@ begin
       MatchedDistance := BestDistance;
     end;
 
-    LogText := Format('DeviceChannelStability: ChannelIndex=%d; ChannelUUID=%s; ChannelName=%s; DeviceUUID=%s; CurrentPointName=%s; CurrentPointQLS=%.6f; CurrentPointQM3H=%.6f; AssignedTargetLS=%.6f; TargetSource=%s; MatchedPointName=%s; MatchedPointQLS=%.6f; MatchedPointQM3H=%.6f; MatchedPointErrorPercent=%.6f; PointDistanceLS=%.6f; ActualLS=%.6f; ActualM3H=%.6f; LowerLS=%.6f; UpperLS=%.6f; CurrentInRange=%s; HistoryStable=%s; MeanInRange=%s; ForecastInRange=%s; DeviceChannelStable=%s; Reason=%s',
-      [I, Channel.UUID, Channel.Name, DeviceUUID, CurrentPointName,
-       CurrentPointQ, M3H(CurrentPointQ),
-       TargetValue, TargetSource,
-       MatchedPointName, MatchedPointQ, M3H(MatchedPointQ),
-       ErrorPercent, MatchedDistance, ActualValue, M3H(ActualValue),
-       StableInfo.LowerLimit, StableInfo.UpperLimit, BoolToStr(CurrentInRange, True),
-       BoolToStr(HistoryStable, True), BoolToStr(MeanInRange, True), BoolToStr(ForecastInRange, True),
-       BoolToStr(CurrentStable, True), Reason]);
+    LogText := Format('DeviceChannelReadiness: ChannelIndex=%d; ChannelUUID=%s; ChannelName=%s; DeviceUUID=%s; MeasurementMode=%s; RequireStability=True; RequireRange=%s; CurrentPointName=%s; CurrentPointQLS=%.6f; CurrentPointQM3H=%.6f; AssignedTargetLS=%.6f; TargetSource=%s; MatchedPointName=%s; MatchedPointQLS=%.6f; MatchedPointQM3H=%.6f; MatchedPointErrorPercent=%.6f; PointDistanceLS=%.6f; ActualLS=%.6f; ActualM3H=%.6f; LowerLS=%.6f; UpperLS=%.6f; StableReady=%s; RangeReady=%s; CurrentInRange=%s; MeanInRange=%s; ForecastInRange=%s; Ready=%s; Reason=%s',
+      [I, Channel.UUID, Channel.Name, DeviceUUID, ModeText, BoolToStr(RequireRange, True), CurrentPointName,
+       CurrentPointQ, M3H(CurrentPointQ), TargetValue, TargetSource,
+       MatchedPointName, MatchedPointQ, M3H(MatchedPointQ), ErrorPercent, MatchedDistance,
+       ActualValue, M3H(ActualValue), StableInfo.LowerLimit, StableInfo.UpperLimit,
+       BoolToStr(StableReady, True), BoolToStr(RangeReady, True), BoolToStr(CurrentInRange, True),
+       BoolToStr(MeanInRange, True), BoolToStr(ForecastInRange, True), BoolToStr(Ready, True), Reason]);
     PublishDeviceLog(LogText);
 
-    if not CurrentStable then
+    if Ready then
+    begin
+      if RequireRange then
+        Inc(ReadySecCount)
+      else
+        Inc(ReadyAutoCount);
+    end
+    else
     begin
       Result := False;
       StableInfo.Status := sRun_NN;
-      StableInfo.StatusText := Format('Device channel is not stable: UUID=%s; Name=%s; Reason=%s', [Channel.UUID, Channel.Name, Reason]);
+      StableInfo.StatusText := Format('Device channel is not ready: UUID=%s; Name=%s; Mode=%s; Reason=%s', [Channel.UUID, Channel.Name, ModeText, Reason]);
     end;
   end;
+
+  AddDiagnosticEvent(Format('Приборы секундного режима готовы: %d из %d; Приборы автоматического режима стабильны: %d из %d',
+    [ReadySecCount, TotalSecCount, ReadyAutoCount, TotalAutoCount]));
 
   if CheckedCount = 0 then
   begin
@@ -1728,7 +1779,7 @@ begin
   if Result then
   begin
     StableInfo.Status := sOk;
-    StableInfo.StatusText := 'DevicesStable=True';
+    StableInfo.StatusText := 'DevicesReady=True';
   end;
 end;
 
@@ -1805,21 +1856,24 @@ begin
           GroupFlows.Add(GroupKey, ActualValue);
 
         Settings := StableValue.StabilitySettings;
-        ChannelStable := True;
-        if Settings.Enabled then
-        begin
-          StableValue.AddSample(ActualValue);
-          ChannelStable := StableValue.AnalyzeStability(SignalInfo);
-          ChannelStable := ChannelStable and
-            ((not Settings.RequireMeanValueInRange) or ((SignalInfo.MeanValue >= StableInfo.LowerLimit) and (SignalInfo.MeanValue <= StableInfo.UpperLimit))) and
-            ((not Settings.RequireForecastInRange) or ((SignalInfo.ForecastValue >= StableInfo.LowerLimit) and (SignalInfo.ForecastValue <= StableInfo.UpperLimit)));
-        end
-        else
-          SignalInfo.Status := mvssDisabled;
+        StableValue.AddSample(ActualValue);
+        StableValue.AnalyzeStability(SignalInfo);
+        SignalInfo.IsCurrentValueInRange := (ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit);
+        SignalInfo.IsMeanValueInRange := (SignalInfo.MeanValue >= StableInfo.LowerLimit) and (SignalInfo.MeanValue <= StableInfo.UpperLimit);
+        SignalInfo.IsForecastInRange := (SignalInfo.ForecastValue >= StableInfo.LowerLimit) and (SignalInfo.ForecastValue <= StableInfo.UpperLimit);
+        ChannelStable := Settings.Enabled and SignalInfo.IsSignalStable and SignalInfo.IsStabilityConfirmed;
+        ChannelStable := ChannelStable and
+          ((not Settings.RequireCurrentValueInRange) or SignalInfo.IsCurrentValueInRange) and
+          ((not Settings.RequireMeanValueInRange) or SignalInfo.IsMeanValueInRange) and
+          ((not Settings.RequireForecastInRange) or SignalInfo.IsForecastInRange);
 
         AllChannelsStable := AllChannelsStable and ChannelStable;
-        AddDiagnosticEvent(Format('EtalonChannelStable=%s; UUID=%s; Name=%s; Group=%d; Actual=%.6f; Target=%.6f',
-          [BoolToStr(ChannelStable, True), Channel.UUID, Channel.Name, Channel.Group, ActualValue, TargetValue]));
+        AddDiagnosticEvent(Format('EtalonChannelReady=%s; UUID=%s; Name=%s; Group=%d; Actual=%.6f; Target=%.6f; StableReady=%s; RangeReady=%s',
+          [BoolToStr(ChannelStable, True), Channel.UUID, Channel.Name, Channel.Group, ActualValue, TargetValue,
+           BoolToStr(Settings.Enabled and SignalInfo.IsSignalStable and SignalInfo.IsStabilityConfirmed, True),
+           BoolToStr(((not Settings.RequireCurrentValueInRange) or SignalInfo.IsCurrentValueInRange) and
+             ((not Settings.RequireMeanValueInRange) or SignalInfo.IsMeanValueInRange) and
+             ((not Settings.RequireForecastInRange) or SignalInfo.IsForecastInRange), True)]));
       end;
 
     if HasEtalonValue then
