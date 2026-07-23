@@ -1680,7 +1680,8 @@ begin
   if not AInfo.IsDeviationStable then Include(AInfo.FailReasons, mvsfrDeviationTooHigh);
   if not AInfo.IsTrendStable then Include(AInfo.FailReasons, mvsfrTrendTooHigh);
 
-  MathStable := AInfo.HasEnoughSamples and AInfo.IsDataActual and AInfo.HasStatistics and AInfo.HasTrend and
+  MathStable := AInfo.HasEnoughSamples and AInfo.HasEnoughWindow and AInfo.IsDataActual and
+    AInfo.HasStatistics and AInfo.HasTrend and
     AInfo.IsVariationStable and AInfo.IsDeviationStable and AInfo.IsTrendStable and
     AInfo.IsOutlierLevelAcceptable and not (mvsfrInvalidSettings in AInfo.FailReasons);
   AInfo.IsSignalStable := MathStable;
@@ -1744,8 +1745,72 @@ var
   WindowTimeMs, FirstStableMs: Int64;
   WindowInfo: TMeterValueStabilityInfo;
   StableTimes: TArray<Int64>;
+
+  function MandatoryRangeChecksPassed(const AWindowInfo: TMeterValueStabilityInfo): Boolean;
+  begin
+    Result := ((not ASettings.RequireCurrentValueInRange) or AWindowInfo.IsCurrentValueInRange) and
+      ((not ASettings.RequireMeanValueInRange) or AWindowInfo.IsMeanValueInRange) and
+      ((not ASettings.RequireForecastInRange) or AWindowInfo.IsForecastInRange);
+  end;
+
+  procedure FinalizeSequenceInfo;
+  begin
+    if AInfo.IsSignalStable and (FirstStableMs > 0) then
+      AInfo.StableCandidateDurationSec := (ACurrentMs - FirstStableMs) / 1000.0
+    else
+      AInfo.StableCandidateDurationSec := 0.0;
+
+    AInfo.IsConfirmed := AInfo.IsSignalStable and
+      ((ASettings.ConfirmationTimeSec <= 0) or
+       (AInfo.StableCandidateDurationSec >= ASettings.ConfirmationTimeSec));
+    AInfo.IsStabilityConfirmed := AInfo.IsConfirmed;
+
+    if AInfo.IsSignalStable and not AInfo.IsStabilityConfirmed then
+      Include(AInfo.FailReasons, mvsfrWaitingForConfirmation)
+    else
+      Exclude(AInfo.FailReasons, mvsfrWaitingForConfirmation);
+
+    AInfo.IsSuitableForMeasurement := AInfo.IsSignalStable and AInfo.IsStabilityConfirmed and
+      ((not ASettings.RequireCurrentValueInRange) or AInfo.IsCurrentValueInRange) and
+      ((not ASettings.RequireMeanValueInRange) or AInfo.IsMeanValueInRange) and
+      ((not ASettings.RequireForecastInRange) or AInfo.IsForecastInRange);
+
+    if not ASettings.Enabled then
+      AInfo.Status := mvssDisabled
+    else if mvsfrStaleData in AInfo.FailReasons then
+      AInfo.Status := mvssStaleData
+    else if (mvsfrNoData in AInfo.FailReasons) or
+            (mvsfrNotEnoughSamples in AInfo.FailReasons) or
+            (mvsfrInsufficientWindow in AInfo.FailReasons) or
+            (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then
+      AInfo.Status := mvssNotEnoughData
+    else if AInfo.IsSignalStable and AInfo.IsStabilityConfirmed then
+      AInfo.Status := mvssStable
+    else
+      AInfo.Status := mvssUnstable;
+
+    if not ASettings.Enabled then
+      AInfo.StatusText := 'Анализ стабильности отключён.'
+    else if mvsfrNoData in AInfo.FailReasons then
+      AInfo.StatusText := 'Нет доступных данных.'
+    else if mvsfrStaleData in AInfo.FailReasons then
+      AInfo.StatusText := 'Данные устарели.'
+    else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or
+            (mvsfrInsufficientWindow in AInfo.FailReasons) or
+            (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then
+      AInfo.StatusText := 'Недостаточно данных.'
+    else if AInfo.IsSuitableForMeasurement then
+      AInfo.StatusText := 'Значение пригодно для измерения.'
+    else if AInfo.IsSignalStable and AInfo.IsStabilityConfirmed then
+      AInfo.StatusText := 'Стабильность подтверждена, но значение вне целевого диапазона.'
+    else if AInfo.IsSignalStable then
+      AInfo.StatusText := 'Предварительная стабильность достигнута, ожидается подтверждение.'
+    else
+      AInfo.StatusText := 'Сигнал нестабилен.';
+  end;
+
 begin
-  Result := AnalyzeSingleStabilityWindow(ASamples, ASettings, ACurrentMs,
+  AnalyzeSingleStabilityWindow(ASamples, ASettings, ACurrentMs,
     ATargetValue, ALowerLimit, AUpperLimit, AInfo);
   FirstStableMs := 0;
   SetLength(StableTimes, 0);
@@ -1755,7 +1820,7 @@ begin
       WindowTimeMs := ASamples[I].TimeStampMs;
       AnalyzeSingleStabilityWindow(ASamples, ASettings, WindowTimeMs,
         ATargetValue, ALowerLimit, AUpperLimit, WindowInfo);
-      if WindowInfo.IsSignalStable then
+      if WindowInfo.IsSignalStable and MandatoryRangeChecksPassed(WindowInfo) then
       begin
         if FirstStableMs = 0 then
           FirstStableMs := WindowTimeMs;
@@ -1769,30 +1834,19 @@ begin
       end;
     end;
 
-  if AInfo.IsSignalStable and (FirstStableMs > 0) then
-    AInfo.StableCandidateDurationSec := (ACurrentMs - FirstStableMs) / 1000.0
-  else
-    AInfo.StableCandidateDurationSec := 0.0;
-  AInfo.IsConfirmed := AInfo.IsSignalStable and
-    ((ASettings.ConfirmationTimeSec <= 0) or
-     (AInfo.StableCandidateDurationSec >= ASettings.ConfirmationTimeSec));
-  AInfo.IsStabilityConfirmed := AInfo.IsConfirmed;
-  if AInfo.IsSignalStable and not AInfo.IsConfirmed then
-    Include(AInfo.FailReasons, mvsfrWaitingForConfirmation);
-  AInfo.IsSuitableForMeasurement := AInfo.IsSignalStable and AInfo.IsConfirmed and
-    ((not ASettings.RequireCurrentValueInRange) or AInfo.IsCurrentValueInRange) and
-    ((not ASettings.RequireMeanValueInRange) or AInfo.IsMeanValueInRange) and
-    ((not ASettings.RequireForecastInRange) or AInfo.IsForecastInRange);
-  if AInfo.IsSuitableForMeasurement then AInfo.Status := mvssStable
-  else if AInfo.IsSignalStable then AInfo.Status := mvssUnstable;
+  for I := 0 to High(AInfo.SampleResults) do
+    AInfo.SampleResults[I].IsInConfirmationPeriod := False;
   if AInfo.IsSignalStable then
     for I := 0 to High(AInfo.SampleResults) do
       for J := 0 to High(StableTimes) do
-        if AInfo.SampleResults[I].TimeStampMs = StableTimes[J] then
+        if (AInfo.SampleResults[I].TimeStampMs = StableTimes[J]) and
+           (AInfo.SampleResults[I].TimeStampMs <= ACurrentMs) then
         begin
           AInfo.SampleResults[I].IsInConfirmationPeriod := True;
           Break;
         end;
+
+  FinalizeSequenceInfo;
   Result := AInfo.Status = mvssStable;
 end;
 
