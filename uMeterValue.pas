@@ -1220,6 +1220,16 @@ begin
   AddSample(AValue, GetMonotonicTimeMs);
 end;
 
+procedure TMeterValue.CaptureStabilitySample;
+begin
+  CaptureStabilitySample(GetMonotonicTimeMs);
+end;
+
+procedure TMeterValue.CaptureStabilitySample(const ATimeStampMs: Int64);
+begin
+  AddSample(GetDoubleValue, ATimeStampMs);
+end;
+
 procedure TMeterValue.AddSample(const AValue: Double; const ATimeStampMs: Int64);
 var
   Sample: TMeterValueSample;
