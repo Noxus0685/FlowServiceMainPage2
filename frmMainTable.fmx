@@ -5414,16 +5414,29 @@
                 Size.Width = 1059.000000000000000000
                 Size.Height = 140.000000000000000000
                 Size.PlatformDefault = False
-                object ChartEtalonFlow: TChart
+                object ChartEtalonFlow: TSimpleChart
                   Align = Client
                   Size.Width = 1059.000000000000000000
                   Size.Height = 140.000000000000000000
                   Size.PlatformDefault = False
-                  Legend.Visible = True
-                  Legend.LegendStyle = lsSeries
-                  Title.Text.Strings = (
-                    #1056#1072#1089#1093#1086#1076' '#1101#1090#1072#1083#1086#1085#1086#1074)
-                  View3D = False
+                  XMax = 60.000000000000000000
+                  YMax = 100.000000000000000000
+                  LineColor = claBlue
+                  LineThickness = 2.000000000000000000
+                  ShowMarkers = True
+                  MarkerRadius = 3.000000000000000000
+                  GridColor = xFFCCCCCC
+                  AxisColor = claBlack
+                  BackgroundColor = claWhite
+                  MarginLeft = 40.000000000000000000
+                  MarginRight = 20.000000000000000000
+                  MarginTop = 40.000000000000000000
+                  MarginBottom = 40.000000000000000000
+                  Title = #1056#1072#1089#1093#1086#1076' '#1101#1090#1072#1083#1086#1085#1086#1074
+                  XTitle = #1042#1088#1077#1084#1103', '#1089
+                  YTitle = #1056#1072#1089#1093#1086#1076
+                  XTitleOffset = 5.000000000000000000
+                  YTitleOffset = 30.000000000000000000
                 end
               end
               object LayoutEtalonSelection: TLayout
@@ -5472,16 +5485,29 @@
                 Size.Width = 1059.000000000000000000
                 Size.Height = 124.000000000000000000
                 Size.PlatformDefault = False
-                object ChartDeviceFlow: TChart
+                object ChartDeviceFlow: TSimpleChart
                   Align = Client
                   Size.Width = 1059.000000000000000000
                   Size.Height = 124.000000000000000000
                   Size.PlatformDefault = False
-                  Legend.Visible = True
-                  Legend.LegendStyle = lsSeries
-                  Title.Text.Strings = (
-                    #1056#1072#1089#1093#1086#1076' '#1087#1088#1080#1073#1086#1088#1086#1074)
-                  View3D = False
+                  XMax = 60.000000000000000000
+                  YMax = 100.000000000000000000
+                  LineColor = claBlue
+                  LineThickness = 2.000000000000000000
+                  ShowMarkers = True
+                  MarkerRadius = 3.000000000000000000
+                  GridColor = xFFCCCCCC
+                  AxisColor = claBlack
+                  BackgroundColor = claWhite
+                  MarginLeft = 40.000000000000000000
+                  MarginRight = 20.000000000000000000
+                  MarginTop = 40.000000000000000000
+                  MarginBottom = 40.000000000000000000
+                  Title = #1056#1072#1089#1093#1086#1076' '#1087#1088#1080#1073#1086#1088#1086#1074
+                  XTitle = #1042#1088#1077#1084#1103', '#1089
+                  YTitle = #1056#1072#1089#1093#1086#1076
+                  XTitleOffset = 5.000000000000000000
+                  YTitleOffset = 30.000000000000000000
                 end
               end
               object LayoutDeviceSelection: TLayout
