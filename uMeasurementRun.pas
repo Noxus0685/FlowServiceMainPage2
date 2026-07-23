@@ -1439,6 +1439,14 @@ begin
   else
     StableInfo.Status := sOk;
 
+
+    { TODO -oAndrey -cВажно, не срочно :
+При неуспехе раз в 2 секунды пишет диагностику WaitEtalonStable;
+после 30 секунд выполняет повтор настройки точки до FMaxAttemptCount, затем фиксирует
+ошибку стабилизации
+сделать настройку для общего времени стабилизации }
+
+
   DiagnosticSecond := Trunc((TThread.GetTickCount64 - FWaitStartedTick) / 1000);
   DiagnosticText := Format('IsStable=%s; EtalonStable=%s; ConditionsStable=%s; DevicesStable=%s; ReadyToMeasure=%s; Reason=%s',
     [BoolToStr(Result, True), BoolToStr(EtalonStable, True), BoolToStr(ConditionsStable, True),

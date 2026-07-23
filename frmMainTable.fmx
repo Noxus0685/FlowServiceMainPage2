@@ -1,4 +1,4 @@
-﻿object FrameMainTable: TFrameMainTable
+object FrameMainTable: TFrameMainTable
   Size.Width = 1940.000000000000000000
   Size.Height = 686.000000000000000000
   Size.PlatformDefault = False
@@ -5387,39 +5387,65 @@
         Align = Client
         Padding.Left = 10.000000000000000000
         PopupMenu = PopupMenuWorkTables
-        Size.Width = 1059.000000000000000000
+        Size.Width = 1255.000000000000000000
         Size.Height = 453.000000000000000000
         Size.PlatformDefault = False
         TabIndex = 0
         TabOrder = 1
         TabPosition = PlatformDefault
-        Visible = True
+        Sizes = (
+          1245s
+          448s
+          1245s
+          448s)
         object TabItemWorkTable1: TTabItem
+          CustomIcon = <
+            item
+            end>
+          TextSettings.Trimming = None
+          IsSelected = True
+          Size.Width = 1.000000000000000000
+          Size.Height = 5.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = ''
+          TabOrder = 0
           Text = #1043#1083#1072#1074#1085#1072#1103
+          ExplicitSize.cx = 50.000000000000000000
+          ExplicitSize.cy = 50.000000000000000000
         end
         object TabItemGraphs: TTabItem
+          CustomIcon = <
+            item
+            end>
+          TextSettings.Trimming = None
+          IsSelected = False
+          Size.Width = 1.000000000000000000
+          Size.Height = 5.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = ''
+          TabOrder = 0
           Text = #1043#1088#1072#1092#1080#1082#1080
+          ExplicitSize.cx = 50.000000000000000000
+          ExplicitSize.cy = 50.000000000000000000
           object LayoutGraphsClient: TLayout
             Align = Client
-            Size.Width = 1059.000000000000000000
-            Size.Height = 420.000000000000000000
+            Size.Width = 1245.000000000000000000
+            Size.Height = 448.000000000000000000
             Size.PlatformDefault = False
+            TabOrder = 0
             object LayoutEtalonGraphSection: TLayout
               Align = Top
-              Size.Width = 1059.000000000000000000
+              Size.Width = 1245.000000000000000000
               Size.Height = 190.000000000000000000
               Size.PlatformDefault = False
               object LayoutEtalonChart: TLayout
                 Align = Client
-                Size.Width = 1059.000000000000000000
+                Size.Width = 1245.000000000000000000
                 Size.Height = 140.000000000000000000
                 Size.PlatformDefault = False
                 object ChartEtalonFlow: TSimpleChart
                   Align = Client
-                  Size.Width = 1059.000000000000000000
-                  Size.Height = 140.000000000000000000
-                  Size.PlatformDefault = False
-                  XMax = 60.000000000000000000
+                  XMax = 100.000000000000000000
                   YMax = 100.000000000000000000
                   LineColor = claBlue
                   LineThickness = 2.000000000000000000
@@ -5441,7 +5467,8 @@
               end
               object LayoutEtalonSelection: TLayout
                 Align = Bottom
-                Size.Width = 1059.000000000000000000
+                Position.Y = 140.000000000000000000
+                Size.Width = 1245.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 object LabelEtalonSelection: TLabel
@@ -5453,15 +5480,20 @@
                 end
                 object HorzScrollBoxEtalonSelection: THorzScrollBox
                   Align = Client
-                  Position.X = 80.000000000000000000
-                  Size.Width = 979.000000000000000000
+                  Size.Width = 1165.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
+                  Viewport.Width = 979.000000000000000000
+                  Viewport.Height = 50.000000000000000000
                   object FlowLayoutEtalonChecks: TFlowLayout
                     Align = Left
                     Size.Width = 979.000000000000000000
                     Size.Height = 50.000000000000000000
                     Size.PlatformDefault = False
+                    TabOrder = 0
+                    Justify = Left
+                    JustifyLastLine = Left
+                    FlowDirection = LeftToRight
                   end
                 end
               end
@@ -5469,28 +5501,25 @@
             object SplitterFlowGraphs: TSplitter
               Align = Top
               Cursor = crVSplit
+              MinSize = 20.000000000000000000
               Position.Y = 190.000000000000000000
-              Size.Width = 1059.000000000000000000
+              Size.Width = 1245.000000000000000000
               Size.Height = 6.000000000000000000
               Size.PlatformDefault = False
             end
             object LayoutDeviceGraphSection: TLayout
               Align = Client
-              Position.Y = 196.000000000000000000
-              Size.Width = 1059.000000000000000000
-              Size.Height = 174.000000000000000000
+              Size.Width = 1245.000000000000000000
+              Size.Height = 202.000000000000000000
               Size.PlatformDefault = False
               object LayoutDeviceChart: TLayout
                 Align = Client
-                Size.Width = 1059.000000000000000000
-                Size.Height = 124.000000000000000000
+                Size.Width = 1245.000000000000000000
+                Size.Height = 152.000000000000000000
                 Size.PlatformDefault = False
                 object ChartDeviceFlow: TSimpleChart
                   Align = Client
-                  Size.Width = 1059.000000000000000000
-                  Size.Height = 124.000000000000000000
-                  Size.PlatformDefault = False
-                  XMax = 60.000000000000000000
+                  XMax = 100.000000000000000000
                   YMax = 100.000000000000000000
                   LineColor = claBlue
                   LineThickness = 2.000000000000000000
@@ -5512,7 +5541,8 @@
               end
               object LayoutDeviceSelection: TLayout
                 Align = Bottom
-                Size.Width = 1059.000000000000000000
+                Position.Y = 152.000000000000000000
+                Size.Width = 1245.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 object LabelDeviceSelection: TLabel
@@ -5524,32 +5554,38 @@
                 end
                 object HorzScrollBoxDeviceSelection: THorzScrollBox
                   Align = Client
-                  Position.X = 80.000000000000000000
-                  Size.Width = 979.000000000000000000
+                  Size.Width = 1165.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
+                  Viewport.Width = 979.000000000000000000
+                  Viewport.Height = 50.000000000000000000
                   object FlowLayoutDeviceChecks: TFlowLayout
                     Align = Left
                     Size.Width = 979.000000000000000000
                     Size.Height = 50.000000000000000000
                     Size.PlatformDefault = False
+                    TabOrder = 0
+                    Justify = Left
+                    JustifyLastLine = Left
+                    FlowDirection = LeftToRight
                   end
                 end
               end
             end
             object LayoutGraphCommands: TLayout
               Align = Bottom
-              Position.Y = 370.000000000000000000
-              Size.Width = 1059.000000000000000000
+              Position.Y = 398.000000000000000000
+              Size.Width = 1245.000000000000000000
               Size.Height = 50.000000000000000000
               Size.PlatformDefault = False
               object ButtonClearFlowGraphs: TButton
                 Align = Right
-                Position.X = 899.000000000000000000
+                Position.X = 1085.000000000000000000
                 Size.Width = 160.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1075#1088#1072#1092#1080#1082#1080
+                TextSettings.Trimming = None
               end
             end
           end
@@ -5576,13 +5612,11 @@
           Size.Width = 674.000000000000000000
           Size.Height = 453.000000000000000000
           Size.PlatformDefault = False
-          TabIndex = 6
+          TabIndex = 5
           TabOrder = 1
           TabPosition = PlatformDefault
           OnChange = TabControl1Change
           Sizes = (
-            674s
-            448s
             674s
             448s
             674s

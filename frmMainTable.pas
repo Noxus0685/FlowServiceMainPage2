@@ -765,8 +765,7 @@ type
     function FlowGraphDisplayValue(AWorkTable: TWorkTable; const ABaseFlowLS: Double): Double;
     function FlowGraphSamplesCount(ADict: TObjectDictionary<string, TFlowGraphSeries>): Integer;
     procedure SetFlowChartYAxis(AChart: TSimpleChart; const AYMin, AYMax: Double);
-    procedure LogFlowGraphClear(const AMethod, AReason: string; const APointIndex: Integer; const ASeriesKey: string; const ASamplesBefore, ASamplesAfter, ALineSeriesBefore, ALineSeriesAfter: Integer);
-    procedure ButtonClearFlowGraphsClick(Sender: TObject);
+   procedure ButtonClearFlowGraphsClick(Sender: TObject);
 
     procedure UpdateUIFromValues;
     procedure SetValues;
