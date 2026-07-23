@@ -396,6 +396,7 @@ type
   end;
 
 function GetMeasurementStopControlMode(APoint: TDevicePoint): TMeasurementStopControlMode;
+function AccuracyToRange(const AAccuracy: string; out AMin, AMax: Double): Boolean;
 
 implementation
 
