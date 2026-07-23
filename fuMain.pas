@@ -1159,7 +1159,6 @@ begin
 
   end;
 
-  WorkTable.CaptureStabilityHistory;
 end;
 
 
