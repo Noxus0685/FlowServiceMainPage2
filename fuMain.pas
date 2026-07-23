@@ -1158,6 +1158,8 @@ begin
       WorkTable.State := swtFINALREAD;
 
   end;
+
+  WorkTable.CaptureStabilityHistory;
 end;
 
 
