@@ -2339,7 +2339,6 @@ var
   PlatformService: IInterface;
   ReportText: string;
   OldApplyEnabled, OldCopyEnabled: Boolean;
-  OldCursor: TCursor;
   PointCount: Integer;
 begin
   if not TryGetScenarioPointCount(PointCount, True) then
@@ -2353,16 +2352,13 @@ begin
 
   OldApplyEnabled := ButtonApplyScenario.Enabled;
   OldCopyEnabled := ButtonCopyAllScenarioLogs.Enabled;
-  OldCursor := Screen.Cursor;
   ButtonApplyScenario.Enabled := False;
   ButtonCopyAllScenarioLogs.Enabled := False;
-  Screen.Cursor := crHourGlass;
   try
     ReportText := BuildAllScenarioReport;
     ClipboardService.SetClipboard(ReportText);
     ShowMessage('Отчёт по всем сценариям скопирован в буфер обмена.');
   finally
-    Screen.Cursor := OldCursor;
     ButtonApplyScenario.Enabled := OldApplyEnabled;
     ButtonCopyAllScenarioLogs.Enabled := OldCopyEnabled;
   end;
