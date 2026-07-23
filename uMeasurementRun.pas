@@ -267,6 +267,8 @@ type
     FStableTimerResetReason: string;
     FLastDeviceStabilityLogText: string;
     FLastDeviceStabilityLogTick: UInt64;
+    FLastStabilityCheckSecond: Int64;
+    FWaitStableStartedMs: Int64;
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
     procedure SetStage(const ANewStage: EMeasurementState);
@@ -683,6 +685,8 @@ begin
   FStableTimerResetReason := '';
   FLastDeviceStabilityLogText := '';
   FLastDeviceStabilityLogTick := 0;
+  FLastStabilityCheckSecond := -1;
+  FWaitStableStartedMs := 0;
 end;
 
 function TMeasurementRun.BuildPointSelectionLog(APoint: TDevicePoint): string;
@@ -1159,6 +1163,9 @@ begin
 end;
 
 procedure TMeasurementRun.EnterWaitStable;
+var
+  I: Integer;
+  Channel: TChannel;
 begin
   SetCurrentPointStatus(mptsWaitStable);
 
@@ -1171,6 +1178,25 @@ begin
   FLastDeviceStableState := False;
   FStableTimerResetReason := '';
   FLastStableProgressSecond := -1;
+  FLastStabilityCheckSecond := -1;
+  FWaitStableStartedMs := TMeterValue.GetMonotonicTimeMs;
+
+  if (FWorkTable <> nil) and (FWorkTable.EtalonChannels <> nil) then
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.EtalonChannels[I];
+      if (Channel <> nil) and (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+        Channel.FlowMeter.ValueFlow.ResetStabilityRuntimeState;
+    end;
+
+  if (FWorkTable <> nil) and (FWorkTable.DeviceChannels <> nil) then
+    for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.DeviceChannels[I];
+      if (Channel <> nil) and (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+        Channel.FlowMeter.ValueFlow.ResetStabilityRuntimeState;
+    end;
+
   LoadRequiredStabilization(GetCurrentPoint);
   AddDiagnosticEvent(Format('RequiredStabilizationSec=%.3f; RequireAutoStabilization=%s; RequiredStabilizationSource=TDevicePoint runtime', [FRequiredDeviceStabilizationSec, BoolToStr(FRequireAutoStabilization, True)]));
 
@@ -1695,15 +1721,14 @@ begin
         StableInfo.LowerLimit := TargetValue - AllowedDeviation;
         StableInfo.UpperLimit := TargetValue + AllowedDeviation;
 
-        ValueFlow.AddSample(ActualValue);
-        ValueFlow.AnalyzeStability(SignalInfo);
+        ValueFlow.AnalyzeStabilityForMeasurement(SignalInfo);
         CurrentInRange := (ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit);
         MeanInRange := (SignalInfo.MeanValue >= StableInfo.LowerLimit) and (SignalInfo.MeanValue <= StableInfo.UpperLimit);
         ForecastInRange := (SignalInfo.ForecastValue >= StableInfo.LowerLimit) and (SignalInfo.ForecastValue <= StableInfo.UpperLimit);
         SignalInfo.IsCurrentValueInRange := CurrentInRange;
         SignalInfo.IsMeanValueInRange := MeanInRange;
         SignalInfo.IsForecastInRange := ForecastInRange;
-        StableReady := Settings.Enabled and SignalInfo.IsSignalStable and SignalInfo.IsStabilityConfirmed;
+        StableReady := SignalInfo.IsSignalStable and SignalInfo.IsStabilityConfirmed;
         RangeReady := CheckRangeRequirements(Settings, SignalInfo);
         Ready := StableReady;
         if RequireRange then
@@ -1856,12 +1881,11 @@ begin
           GroupFlows.Add(GroupKey, ActualValue);
 
         Settings := StableValue.StabilitySettings;
-        StableValue.AddSample(ActualValue);
-        StableValue.AnalyzeStability(SignalInfo);
+        StableValue.AnalyzeStabilityForMeasurement(SignalInfo);
         SignalInfo.IsCurrentValueInRange := (ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit);
         SignalInfo.IsMeanValueInRange := (SignalInfo.MeanValue >= StableInfo.LowerLimit) and (SignalInfo.MeanValue <= StableInfo.UpperLimit);
         SignalInfo.IsForecastInRange := (SignalInfo.ForecastValue >= StableInfo.LowerLimit) and (SignalInfo.ForecastValue <= StableInfo.UpperLimit);
-        ChannelStable := Settings.Enabled and SignalInfo.IsSignalStable and SignalInfo.IsStabilityConfirmed;
+        ChannelStable := SignalInfo.IsSignalStable and SignalInfo.IsStabilityConfirmed;
         ChannelStable := ChannelStable and
           ((not Settings.RequireCurrentValueInRange) or SignalInfo.IsCurrentValueInRange) and
           ((not Settings.RequireMeanValueInRange) or SignalInfo.IsMeanValueInRange) and
@@ -1870,7 +1894,7 @@ begin
         AllChannelsStable := AllChannelsStable and ChannelStable;
         AddDiagnosticEvent(Format('EtalonChannelReady=%s; UUID=%s; Name=%s; Group=%d; Actual=%.6f; Target=%.6f; StableReady=%s; RangeReady=%s',
           [BoolToStr(ChannelStable, True), Channel.UUID, Channel.Name, Channel.Group, ActualValue, TargetValue,
-           BoolToStr(Settings.Enabled and SignalInfo.IsSignalStable and SignalInfo.IsStabilityConfirmed, True),
+           BoolToStr(SignalInfo.IsSignalStable and SignalInfo.IsStabilityConfirmed, True),
            BoolToStr(((not Settings.RequireCurrentValueInRange) or SignalInfo.IsCurrentValueInRange) and
              ((not Settings.RequireMeanValueInRange) or SignalInfo.IsMeanValueInRange) and
              ((not Settings.RequireForecastInRange) or SignalInfo.IsForecastInRange), True)]));
@@ -3275,6 +3299,7 @@ var
   DevicesStable: Boolean;
   ReadyToMeasure: Boolean;
   StableStatus: string;
+  CurrentSecond: Int64;
 begin
   if FMode = mrmManual then
   begin
@@ -3291,6 +3316,17 @@ begin
   end;
 
   CurrentTick := TThread.GetTickCount64;
+
+  if (FWorkTable <> nil) and (FWorkTable.State <> swtMONITOR) then
+  begin
+    AddWorkTableStateDiagnosticEvent;
+    Exit;
+  end;
+
+  CurrentSecond := TMeterValue.GetMonotonicTimeMs div 1000;
+  if CurrentSecond = FLastStabilityCheckSecond then
+    Exit;
+  FLastStabilityCheckSecond := CurrentSecond;
 
   // До первого успешного IsStable ожидаем отдельную стабилизацию эталона.
   if FStableSinceMs = 0 then

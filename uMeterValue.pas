@@ -238,6 +238,10 @@ type
     function FormatBaseDeltaValue(const AValue: Double): string;
     /// <summary>Analyzes the current time window and returns True only when stability is confirmed.</summary>
     function AnalyzeStability(out AInfo: TMeterValueStabilityInfo): Boolean;
+    /// <summary>Analyzes stability for automatic measurement, ignoring only the UI Enabled flag.</summary>
+    function AnalyzeStabilityForMeasurement(out AInfo: TMeterValueStabilityInfo): Boolean;
+    /// <summary>Clears runtime confirmation state without touching settings or sample history.</summary>
+    procedure ResetStabilityRuntimeState;
     /// <summary>Calculates a forecast for a custom horizon using the same regression-based analyzer.</summary>
     function GetForecastValue(const AHorizonSec: Double; out AValue: Double): Boolean;
     /// <summary>Validates stability and target-range settings and returns a Russian diagnostic on failure.</summary>
@@ -1241,9 +1245,6 @@ begin
   Sample.Value := AValue;
   FSampleLock.Enter;
   try
-    FAutomaticSampleBucket := -1;
-    FAutomaticSampleIndex := -1;
-
     if FSamples.Count > 0 then
     begin
       LastIndex := FSamples.Count - 1;
@@ -1547,6 +1548,16 @@ begin
   Result := Sqrt(SumSquares / Values.Count);
 end;
 
+procedure TMeterValue.ResetStabilityRuntimeState;
+begin
+  FSampleLock.Enter;
+  try
+    ResetStabilityInfo;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
+
 function TMeterValue.AnalyzeStability(out AInfo: TMeterValueStabilityInfo): Boolean;
 var
   Samples: TArray<TMeterValueSample>;
@@ -1561,6 +1572,36 @@ begin
     FStabilitySettings.TargetToleranceAbsolute, LowerLimit, UpperLimit);
   Result := AnalyzeStabilitySequence(Samples, FStabilitySettings, CurrentMs,
     FStabilitySettings.TargetValue, LowerLimit, UpperLimit, AInfo);
+  FSampleLock.Enter;
+  try
+    if AInfo.IsSignalStable then
+      FStableCandidateSinceMs := CurrentMs - Round(AInfo.StableCandidateDurationSec * 1000.0)
+    else
+      FStableCandidateSinceMs := 0;
+    FStabilityConfirmed := AInfo.IsStabilityConfirmed;
+    FLastStabilityInfo := AInfo;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
+
+function TMeterValue.AnalyzeStabilityForMeasurement(out AInfo: TMeterValueStabilityInfo): Boolean;
+var
+  Samples: TArray<TMeterValueSample>;
+  Settings: TMeterValueStabilitySettings;
+  CurrentMs: Int64;
+  LowerLimit, UpperLimit: Double;
+begin
+  CurrentMs := GetMonotonicTimeMs;
+  Samples := GetSamples;
+  Settings := FStabilitySettings;
+  Settings.Enabled := True;
+  CalculateTargetLimits(Settings.TargetValue,
+    Settings.TargetAccuracyPlusPercent,
+    Settings.TargetAccuracyMinusPercent,
+    Settings.TargetToleranceAbsolute, LowerLimit, UpperLimit);
+  Result := AnalyzeStabilitySequence(Samples, Settings, CurrentMs,
+    Settings.TargetValue, LowerLimit, UpperLimit, AInfo);
   FSampleLock.Enter;
   try
     if AInfo.IsSignalStable then
