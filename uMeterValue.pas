@@ -51,6 +51,8 @@ type
 
   TMeterValue = class
   private
+    class var FVirtualClockEnabled: Boolean;
+    class var FVirtualClockMs: Int64;
     class var FMeterValues: TObjectList<TMeterValue>;
     class var FMeterValuesSaves: TObjectList<TMeterValue>;
     class var FFinalValue: Boolean;
@@ -215,6 +217,9 @@ type
     function IsStable(lim: Integer): Boolean;
     /// <summary>Returns process-monotonic time in milliseconds for interval analysis immune to system clock changes.</summary>
     class function GetMonotonicTimeMs: Int64; static;
+    class procedure EnableVirtualClock(const AStartMs: Int64); static;
+    class procedure AdvanceVirtualClock(const ADeltaMs: Int64); static;
+    class procedure DisableVirtualClock; static;
     /// <summary>Clears stability samples and runtime confirmation state while preserving all settings.</summary>
     procedure ClearSamplesHistory;
     /// <summary>Returns a thread-safe immutable copy of chronological stability samples.</summary>
@@ -1220,7 +1225,29 @@ end;
 
 class function TMeterValue.GetMonotonicTimeMs: Int64;
 begin
+  if FVirtualClockEnabled then
+    Exit(FVirtualClockMs);
+
   Result := Round(TStopwatch.GetTimeStamp * 1000.0 / TStopwatch.Frequency);
+end;
+
+class procedure TMeterValue.EnableVirtualClock(const AStartMs: Int64);
+begin
+  FVirtualClockEnabled := True;
+  FVirtualClockMs := AStartMs;
+end;
+
+class procedure TMeterValue.AdvanceVirtualClock(const ADeltaMs: Int64);
+begin
+  if not FVirtualClockEnabled then
+    Exit;
+  if ADeltaMs > 0 then
+    FVirtualClockMs := FVirtualClockMs + ADeltaMs;
+end;
+
+class procedure TMeterValue.DisableVirtualClock;
+begin
+  FVirtualClockEnabled := False;
 end;
 
 procedure TMeterValue.AddSample(const AValue: Double; const ATimeStampMs: Int64);
