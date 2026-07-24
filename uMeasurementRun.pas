@@ -2645,7 +2645,8 @@ var
   DeviceSourcePointCount, DeviceAddedParticipantCount, DeviceCreatedPointCount, DeviceMergedParticipantCount: Integer;
   ChannelIndex: Integer;
   IncludedInAutomaticSession: Boolean;
-  SkipReason, DeviceResolveSource: string;
+  QmaxMismatch: Boolean;
+  SkipReason, DeviceResolveSource, FirstQmaxBindingError: string;
   Action, Reason, PointName: string;
   ChannelUUIDText, ChannelDeviceUUIDText, ChannelDeviceNameText: string;
   SelectedDeviceUUIDText, SelectedDeviceNameText, RepoDeviceUUIDText: string;
@@ -2816,6 +2817,7 @@ begin
   TotalDeviceChannelCount := 0;
   EnabledDeviceChannelCount := 0;
   DisabledDeviceChannelCount := 0;
+  FirstQmaxBindingError := '';
 
   if FWorkTable.DeviceChannels.Count = 0 then
     FWorkTable.AddDeviceChannel(True, -1, TWorkTable.BuildChannelDefaultText(1), '', '-', '');
@@ -2831,27 +2833,23 @@ begin
     SkipReason := '';
 
     Device := ChannelDevice(Channel);
+    if Device <> nil then
+      DeviceResolveSource := 'Channel.FlowMeter.Device';
 
     if Channel = nil then
-      SkipReason := 'ChannelDisabled'
+      SkipReason := 'ChannelNil'
     else if not Channel.Enabled then
       SkipReason := 'ChannelDisabled'
     else if Channel.State = osDeleted then
       SkipReason := 'ChannelDeleted'
     else if Channel.FlowMeter = nil then
-      SkipReason := 'NoDeviceAssigned'
+      SkipReason := 'FlowMeterNotAssigned'
     else if Device = nil then
-      SkipReason := 'NoDeviceAssigned'
-    else if not Device.Enabled then
-      SkipReason := 'DeviceDisabled'
+      SkipReason := 'DeviceNotAssigned'
     else if Device.State = osDeleted then
       SkipReason := 'DeviceDeleted';
 
     IncludedInAutomaticSession := SkipReason = '';
-    if IncludedInAutomaticSession then
-      Inc(EnabledDeviceChannelCount)
-    else
-      Inc(DisabledDeviceChannelCount);
 
     if (Device <> nil) and (Trim(Device.UUID) <> '') and (DataManager <> nil) then
       RepoDevice := DataManager.FindDevice(Device.UUID, Repo);
@@ -2860,7 +2858,6 @@ begin
 
     if IncludedInAutomaticSession then
     begin
-      DeviceResolveSource := 'Channel.FlowMeter.Device';
       if ((Device.Points = nil) or (Device.Points.Count = 0)) and
          (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
       begin
@@ -2875,10 +2872,13 @@ begin
       begin
         SkipReason := 'NoEnabledSourcePoints';
         IncludedInAutomaticSession := False;
-        Dec(EnabledDeviceChannelCount);
-        Inc(DisabledDeviceChannelCount);
       end;
     end;
+
+    if IncludedInAutomaticSession then
+      Inc(EnabledDeviceChannelCount)
+    else
+      Inc(DisabledDeviceChannelCount);
 
     ChannelUUIDText := '';
     if Channel <> nil then
@@ -2940,17 +2940,23 @@ begin
       end;
       if IsValidFlowValue(Device.Qmax) and IsValidFlowValue(SourcePoint.FlowRate) then
         CalculatedQLS := Device.Qmax * SourcePoint.FlowRate;
+      QmaxMismatch := False;
+      RelativeQmaxDiff := 0;
       if IsValidFlowValue(DerivedQmaxLS) and IsValidFlowValue(Device.Qmax) then
       begin
         RelativeQmaxDiff := Abs(Device.Qmax - DerivedQmaxLS) / Max(Abs(DerivedQmaxLS), 1E-12);
-        if RelativeQmaxDiff > QmaxMismatchRelativeTolerance then
-        begin
-          PointName := Format('InvalidDeviceQmaxBinding: ChannelUUID=%s; DeviceUUID=%s; DeviceQmaxLS=%.6f; SourcePointUUID=%s; StoredPointQLS=%.6f; SourceFlowRate=%.9f; CalculatedTargetQLS=%.6f; DerivedQmaxLS=%.6f; RelativeQmaxDiff=%.9f',
-            [Channel.UUID, Device.UUID, Device.Qmax, SourcePoint.UUID, StoredQLS, SourcePoint.FlowRate, CalculatedQLS, DerivedQmaxLS, RelativeQmaxDiff]);
-          AddDiagnosticEvent(PointName);
-          ProtocolManager.AddMessage(pcError, psMeasurement, 'InvalidDeviceQmaxBinding', 'Некорректная привязка Qmax прибора', PointName);
-          raise Exception.Create(PointName);
-        end;
+        QmaxMismatch := RelativeQmaxDiff > QmaxMismatchRelativeTolerance;
+      end;
+      AddDiagnosticEvent(Format('SessionSourcePointQmaxValidation: ChannelDeviceUUID=%s; SelectedDeviceUUID=%s; SelectedDeviceQmaxLS=%.6f; SourcePointQLS=%.6f; SourcePointFlowRate=%.9f; DerivedQmaxLS=%.6f; QmaxMismatch=%s',
+        [ChannelDeviceUUIDText, Device.UUID, Device.Qmax, StoredQLS, SourcePoint.FlowRate, DerivedQmaxLS, BoolText(QmaxMismatch)]));
+      if QmaxMismatch then
+      begin
+        PointName := Format('InvalidDeviceQmaxBinding: ChannelUUID=%s; DeviceUUID=%s; StoredQmax=%.6f; DerivedQmax=%.6f; SourcePointUUID=%s; StoredPointQLS=%.6f; SourceFlowRate=%.9f; CalculatedTargetQLS=%.6f; RelativeQmaxDiff=%.9f',
+          [Channel.UUID, Device.UUID, Device.Qmax, DerivedQmaxLS, SourcePoint.UUID, StoredQLS, SourcePoint.FlowRate, CalculatedQLS, RelativeQmaxDiff]);
+        AddDiagnosticEvent(PointName);
+        if FirstQmaxBindingError = '' then
+          FirstQmaxBindingError := PointName;
+        Continue;
       end;
       if not IsValidFlowValue(CalculatedQLS) then
       begin
@@ -3109,6 +3115,19 @@ begin
      ResolvedUniqueDeviceCount, DistinctDeviceQmaxCount, ProcessingDeviceCount,
      ProcessingDevicePointCount, FPoints.Count, ParticipantCount, ParticipantCount,
      DuplicateParticipantCount, LostSourcePointCount]));
+
+  if FirstQmaxBindingError <> '' then
+  begin
+    ProtocolManager.AddMessage(pcError, psMeasurement, 'InvalidDeviceQmaxBinding', 'Некорректная привязка Qmax прибора', FirstQmaxBindingError);
+    raise Exception.Create(FirstQmaxBindingError);
+  end;
+
+  if FPoints.Count = 0 then
+  begin
+    PointName := 'NoAutomaticMeasurementPoints: Points.Count=0';
+    ProtocolManager.AddMessage(pcError, psMeasurement, 'NoAutomaticMeasurementPoints', 'Не сформированы точки автоматической сессии', PointName);
+    raise Exception.Create(PointName);
+  end;
 
   if (LostSourcePointCount > 0) or (ParticipantCount <> ProcessingDevicePointCount) then
   begin
