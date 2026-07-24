@@ -5437,11 +5437,62 @@ var
   MeterValueCoef: TMeterValue;
   MeasuredDim: TMeasuredDimension;
   CurrentCoef: Double;
-  CurrentPointQmax: Double;
   Device: TDevice;
   SourceDevice: TDevice;
   DevicePoint: TDevicePoint;
   MatchedPoint: TDevicePoint;
+  BeforePointCount: Integer;
+  AfterPointCount: Integer;
+  BeforePointUUIDs: string;
+
+
+  function BoolText(const AValue: Boolean): string;
+  begin
+    if AValue then
+      Result := 'True'
+    else
+      Result := 'False';
+  end;
+
+  function DevicePointUUIDList(ADevice: TDevice): string;
+  var
+    P: TDevicePoint;
+  begin
+    Result := '';
+    if (ADevice = nil) or (ADevice.Points = nil) then
+      Exit;
+    for P in ADevice.Points do
+      if P <> nil then
+      begin
+        if Result <> '' then
+          Result := Result + ',';
+        Result := Result + P.UUID;
+      end;
+  end;
+
+  procedure LogDevicePointsForSave(const ACaption: string; ADevice: TDevice);
+  var
+    P: TDevicePoint;
+    PointCount: Integer;
+  begin
+    PointCount := 0;
+    if (ADevice <> nil) and (ADevice.Points <> nil) then
+      PointCount := ADevice.Points.Count;
+    if ADevice = nil then
+    begin
+      LogMKS('DBG SP 1100', ACaption, 'Device=nil; PointCount=0');
+      Exit;
+    end;
+    LogMKS('DBG SP 1100', ACaption,
+      Format('DeviceUUID=%s; DeviceName=%s; PointCount=%d', [ADevice.UUID, ADevice.Name, PointCount]));
+    if ADevice.Points <> nil then
+      for P in ADevice.Points do
+        if P <> nil then
+          LogMKS('DBG SP 1101', ACaption + ' POINT',
+            Format('PointUUID=%s; PointName=%s; FlowRate=%.9f; Q=%.6f; Enabled=%s; State=%s',
+              [P.UUID, P.Name, P.FlowRate, P.Q, BoolText(P.Enabled),
+               GetEnumName(TypeInfo(TObjectState), Ord(P.State))]));
+  end;
 begin
 
   DeviceRepo := nil;
@@ -5478,16 +5529,7 @@ begin
     if Device = nil then
       Continue;
 
-    if (CurrentPoint <> nil) and (CurrentPoint.FlowRate > 0) and
-       (CurrentPoint.Q > 0) then
-    begin
-      CurrentPointQmax := CurrentPoint.Q / CurrentPoint.FlowRate;
-      if CurrentPointQmax > 0 then
-      begin
-        Device.Qmax := CurrentPointQmax;
-        TDeviceCreationService.RecalcDevicePointQ(Device);
-      end;
-    end;
+
 
     Session := Device.GetActiveSessionSpillage;
     if Session = nil then
@@ -5604,7 +5646,6 @@ begin
 
       if Device <> nil then
       begin
-        TDeviceCreationService.RecalcDevicePointQ(Device);
         LogMKS('DBG SP 1001', 'SaveMeasurementResults BEFORE AnalyseDataPoint',
           Format('Device=%s UUID=%s | %s', [Device.Name, Device.UUID, DumpSpillage(Point)]));
         Point.Valid := Device.AnalyseDataPoint(Point);
@@ -5629,7 +5670,22 @@ begin
           [Device.Name, Device.UUID, Device.Spillages.Count, Device.Sessions.Count]));
 
       if Assigned(DeviceRepo) then
-        DeviceRepo.SaveDevice(Device);
+      begin
+        BeforePointCount := 0;
+        if Device.Points <> nil then
+          BeforePointCount := Device.Points.Count;
+        BeforePointUUIDs := DevicePointUUIDList(Device);
+        LogDevicePointsForSave('BeforeSaveDevicePoints', Device);
+        DeviceRepo.SaveDeviceResults(Device);
+        LogDevicePointsForSave('AfterSaveDevicePoints', Device);
+        AfterPointCount := 0;
+        if Device.Points <> nil then
+          AfterPointCount := Device.Points.Count;
+        if BeforePointCount <> AfterPointCount then
+          LogMKS('DBG SP 1102', 'DevicePointsChangedDuringSave',
+            Format('DeviceUUID=%s; OldCount=%d; NewCount=%d; RemovedPointsUUID=%s',
+              [Device.UUID, BeforePointCount, AfterPointCount, BeforePointUUIDs]));
+      end;
     finally
       Point.Free;
     end;
