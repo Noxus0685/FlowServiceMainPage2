@@ -2626,19 +2626,35 @@ end;
 
 procedure TMeasurementRun.CreateSessionPoints;
 const
-  PointQValidationToleranceLS = 1E-6;
+  QmaxMismatchRelativeTolerance = 1E-3;
 var
   Channel: TChannel;
   Device: TDevice;
+  RepoDevice: TDevice;
+  Repo: TDeviceRepository;
   SourcePoint: TDevicePoint;
   SessionPoint: TDevicePoint;
   ExistingPoint: TDevicePoint;
   Participant: TMeasurementPointParticipant;
   StoredQLS, CalculatedQLS, TargetQLS, MergeTolerance: Double;
+  DerivedQmaxLS, PointQValidationToleranceLS, RelativeQmaxDiff: Double;
   ProcessingDeviceCount, ProcessingDevicePointCount, ParticipantCount: Integer;
   I, J, DuplicateParticipantCount, LostSourcePointCount: Integer;
+  TotalDeviceChannelCount, EnabledDeviceChannelCount, DisabledDeviceChannelCount: Integer;
+  ResolvedUniqueDeviceCount, DistinctDeviceQmaxCount: Integer;
   DeviceSourcePointCount, DeviceAddedParticipantCount, DeviceCreatedPointCount, DeviceMergedParticipantCount: Integer;
+  ChannelIndex: Integer;
+  IncludedInAutomaticSession: Boolean;
+  SkipReason, DeviceResolveSource: string;
   Action, Reason, PointName: string;
+  ChannelUUIDText, ChannelDeviceUUIDText, ChannelDeviceNameText: string;
+  SelectedDeviceUUIDText, SelectedDeviceNameText, RepoDeviceUUIDText: string;
+  ChannelDeviceQmax, SelectedDeviceQmax, RepoDeviceQmax: Double;
+  IsDistinctQmax: Boolean;
+  DeviceUUIDs: TArray<string>;
+  DeviceQmaxValues: TArray<Double>;
+  DevicePointers: TArray<NativeUInt>;
+  DerivedQmaxValues: TArray<Double>;
 
   function IsValidFlowValue(const AValue: Double): Boolean;
   begin
@@ -2648,6 +2664,83 @@ var
   function FlowMergeTolerance(const AQ1, AQ2: Double): Double;
   begin
     Result := Max(1E-6, Max(Abs(AQ1), Abs(AQ2)) * 1E-4);
+  end;
+
+  function PtrText(AObject: TObject): string;
+  begin
+    if AObject = nil then
+      Result := 'nil'
+    else
+      Result := '$' + IntToHex(NativeUInt(Pointer(AObject)), SizeOf(Pointer) * 2);
+  end;
+
+
+  function ChannelDevice(AChannel: TChannel): TDevice;
+  begin
+    Result := nil;
+    if (AChannel <> nil) and (AChannel.FlowMeter <> nil) then
+      Result := AChannel.FlowMeter.Device;
+  end;
+
+  function BoolText(const AValue: Boolean): string;
+  begin
+    if AValue then
+      Result := 'True'
+    else
+      Result := 'False';
+  end;
+
+  function DeviceStateText(ADevice: TDevice): string;
+  begin
+    if ADevice = nil then
+      Result := 'nil'
+    else
+      Result := GetEnumName(TypeInfo(TObjectState), Ord(ADevice.State));
+  end;
+
+  procedure AddUniqueDeviceInfo(ADevice: TDevice);
+  var
+    K: Integer;
+  begin
+    if ADevice = nil then
+      Exit;
+    for K := 0 to High(DeviceUUIDs) do
+      if SameText(DeviceUUIDs[K], ADevice.UUID) then
+        Exit;
+    K := Length(DeviceUUIDs);
+    SetLength(DeviceUUIDs, K + 1);
+    SetLength(DeviceQmaxValues, K + 1);
+    SetLength(DevicePointers, K + 1);
+    DeviceUUIDs[K] := ADevice.UUID;
+    DeviceQmaxValues[K] := ADevice.Qmax;
+    DevicePointers[K] := NativeUInt(Pointer(ADevice));
+  end;
+
+  procedure AddDerivedQmax(const AValue: Double);
+  var
+    K: Integer;
+  begin
+    if not IsValidFlowValue(AValue) then
+      Exit;
+    for K := 0 to High(DerivedQmaxValues) do
+      if Abs(DerivedQmaxValues[K] - AValue) <= FlowMergeTolerance(DerivedQmaxValues[K], AValue) then
+        Exit;
+    K := Length(DerivedQmaxValues);
+    SetLength(DerivedQmaxValues, K + 1);
+    DerivedQmaxValues[K] := AValue;
+  end;
+
+
+  function EnabledSourcePointCount(ADevice: TDevice): Integer;
+  var
+    P: TDevicePoint;
+  begin
+    Result := 0;
+    if (ADevice = nil) or (ADevice.Points = nil) then
+      Exit;
+    for P in ADevice.Points do
+      if (P <> nil) and P.Enabled and (P.State <> osDeleted) then
+        Inc(Result);
   end;
 
   function ParticipantExists(APoint: TDevicePoint; const AParticipant: TMeasurementPointParticipant): Boolean;
@@ -2720,24 +2813,111 @@ begin
   ParticipantCount := 0;
   DuplicateParticipantCount := 0;
   LostSourcePointCount := 0;
+  TotalDeviceChannelCount := 0;
+  EnabledDeviceChannelCount := 0;
+  DisabledDeviceChannelCount := 0;
 
   if FWorkTable.DeviceChannels.Count = 0 then
     FWorkTable.AddDeviceChannel(True, -1, TWorkTable.BuildChannelDefaultText(1), '', '-', '');
 
-  for Channel in FWorkTable.DeviceChannels do
+  TotalDeviceChannelCount := FWorkTable.DeviceChannels.Count;
+
+  for ChannelIndex := 0 to FWorkTable.DeviceChannels.Count - 1 do
   begin
-    if (Channel = nil) or (not Channel.Enabled) or (Channel.State = osDeleted) or (Channel.FlowMeter = nil) then
+    Channel := FWorkTable.DeviceChannels[ChannelIndex];
+    Device := nil;
+    RepoDevice := nil;
+    DeviceResolveSource := 'None';
+    SkipReason := '';
+
+    Device := ChannelDevice(Channel);
+
+    if Channel = nil then
+      SkipReason := 'ChannelDisabled'
+    else if not Channel.Enabled then
+      SkipReason := 'ChannelDisabled'
+    else if Channel.State = osDeleted then
+      SkipReason := 'ChannelDeleted'
+    else if Channel.FlowMeter = nil then
+      SkipReason := 'NoDeviceAssigned'
+    else if Device = nil then
+      SkipReason := 'NoDeviceAssigned'
+    else if not Device.Enabled then
+      SkipReason := 'DeviceDisabled'
+    else if Device.State = osDeleted then
+      SkipReason := 'DeviceDeleted';
+
+    IncludedInAutomaticSession := SkipReason = '';
+    if IncludedInAutomaticSession then
+      Inc(EnabledDeviceChannelCount)
+    else
+      Inc(DisabledDeviceChannelCount);
+
+    if (Device <> nil) and (Trim(Device.UUID) <> '') and (DataManager <> nil) then
+      RepoDevice := DataManager.FindDevice(Device.UUID, Repo);
+    if (RepoDevice <> nil) and not SameText(RepoDevice.UUID, Device.UUID) then
+      RepoDevice := nil;
+
+    if IncludedInAutomaticSession then
+    begin
+      DeviceResolveSource := 'Channel.FlowMeter.Device';
+      if ((Device.Points = nil) or (Device.Points.Count = 0)) and
+         (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
+      begin
+        RepoDevice := DataManager.FindDevice(Device.UUID, Repo);
+        if (RepoDevice <> nil) and SameText(RepoDevice.UUID, Device.UUID) then
+        begin
+          Device := RepoDevice;
+          DeviceResolveSource := 'RepositoryByUUID';
+        end;
+      end;
+      if EnabledSourcePointCount(Device) = 0 then
+      begin
+        SkipReason := 'NoEnabledSourcePoints';
+        IncludedInAutomaticSession := False;
+        Dec(EnabledDeviceChannelCount);
+        Inc(DisabledDeviceChannelCount);
+      end;
+    end;
+
+    ChannelUUIDText := '';
+    if Channel <> nil then
+      ChannelUUIDText := Channel.UUID;
+    ChannelDeviceUUIDText := '';
+    ChannelDeviceNameText := '';
+    ChannelDeviceQmax := 0;
+    if ChannelDevice(Channel) <> nil then
+    begin
+      ChannelDeviceUUIDText := ChannelDevice(Channel).UUID;
+      ChannelDeviceNameText := ChannelDevice(Channel).Name;
+      ChannelDeviceQmax := ChannelDevice(Channel).Qmax;
+    end;
+    RepoDeviceUUIDText := '';
+    RepoDeviceQmax := 0;
+    if RepoDevice <> nil then
+    begin
+      RepoDeviceUUIDText := RepoDevice.UUID;
+      RepoDeviceQmax := RepoDevice.Qmax;
+    end;
+    SelectedDeviceUUIDText := '';
+    SelectedDeviceNameText := '';
+    SelectedDeviceQmax := 0;
+    if Device <> nil then
+    begin
+      SelectedDeviceUUIDText := Device.UUID;
+      SelectedDeviceNameText := Device.Name;
+      SelectedDeviceQmax := Device.Qmax;
+    end;
+
+    AddDiagnosticEvent(Format('CreateSessionChannelResolve: ChannelIndex=%d; ChannelUUID=%s; ChannelEnabled=%s; ChannelDevicePointer=%s; ChannelDeviceUUID=%s; ChannelDeviceName=%s; ChannelDeviceQmaxLS=%.6f; RepositoryDevicePointer=%s; RepositoryDeviceUUID=%s; RepositoryDeviceQmaxLS=%.6f; SelectedDevicePointer=%s; SelectedDeviceUUID=%s; SelectedDeviceQmaxLS=%.6f; DeviceResolveSource=%s',
+      [ChannelIndex, ChannelUUIDText, BoolText((Channel <> nil) and Channel.Enabled), PtrText(ChannelDevice(Channel)), ChannelDeviceUUIDText, ChannelDeviceNameText, ChannelDeviceQmax, PtrText(RepoDevice), RepoDeviceUUIDText, RepoDeviceQmax, PtrText(Device), SelectedDeviceUUIDText, SelectedDeviceQmax, DeviceResolveSource]));
+    AddDiagnosticEvent(Format('CreateSessionChannelInclude: ChannelIndex=%d; ChannelUUID=%s; ChannelEnabled=%s; FlowMeterEnabled=%s; DeviceEnabled=%s; DeviceState=%s; IncludedInAutomaticSession=%s; SkipReason=%s',
+      [ChannelIndex, ChannelUUIDText, BoolText((Channel <> nil) and Channel.Enabled), 'n/a', BoolText((Device <> nil) and Device.Enabled), DeviceStateText(Device), BoolText(IncludedInAutomaticSession), SkipReason]));
+
+    if not IncludedInAutomaticSession then
       Continue;
 
-    Device := Channel.FlowMeter.Device;
-    if ((Device = nil) or (Device.Points = nil) or (Device.Points.Count = 0)) and
-       (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
-      Device := TDeviceCreationService.EnsureDeviceForChannel(Channel, FWorkTable,
-        DataManager.ActiveDeviceRepo, dcmMeasurementPromoted, nil, FWorkTable.CurrentPoint);
-
-    if (Device = nil) or (Device.State = osDeleted) or (Device.Points = nil) then
-      Continue;
-
+    AddUniqueDeviceInfo(Device);
     Inc(ProcessingDeviceCount);
     DeviceSourcePointCount := 0;
     DeviceAddedParticipantCount := 0;
@@ -2752,18 +2932,40 @@ begin
 
       StoredQLS := SourcePoint.Q;
       CalculatedQLS := 0;
+      DerivedQmaxLS := 0;
+      if IsValidFlowValue(SourcePoint.FlowRate) and IsValidFlowValue(StoredQLS) then
+      begin
+        DerivedQmaxLS := StoredQLS / SourcePoint.FlowRate;
+        AddDerivedQmax(DerivedQmaxLS);
+      end;
       if IsValidFlowValue(Device.Qmax) and IsValidFlowValue(SourcePoint.FlowRate) then
         CalculatedQLS := Device.Qmax * SourcePoint.FlowRate;
+      if IsValidFlowValue(DerivedQmaxLS) and IsValidFlowValue(Device.Qmax) then
+      begin
+        RelativeQmaxDiff := Abs(Device.Qmax - DerivedQmaxLS) / Max(Abs(DerivedQmaxLS), 1E-12);
+        if RelativeQmaxDiff > QmaxMismatchRelativeTolerance then
+        begin
+          PointName := Format('InvalidDeviceQmaxBinding: ChannelUUID=%s; DeviceUUID=%s; DeviceQmaxLS=%.6f; SourcePointUUID=%s; StoredPointQLS=%.6f; SourceFlowRate=%.9f; CalculatedTargetQLS=%.6f; DerivedQmaxLS=%.6f; RelativeQmaxDiff=%.9f',
+            [Channel.UUID, Device.UUID, Device.Qmax, SourcePoint.UUID, StoredQLS, SourcePoint.FlowRate, CalculatedQLS, DerivedQmaxLS, RelativeQmaxDiff]);
+          AddDiagnosticEvent(PointName);
+          ProtocolManager.AddMessage(pcError, psMeasurement, 'InvalidDeviceQmaxBinding', 'Некорректная привязка Qmax прибора', PointName);
+          raise Exception.Create(PointName);
+        end;
+      end;
       if not IsValidFlowValue(CalculatedQLS) then
       begin
-        AddDiagnosticEvent(Format('SessionSourcePoint: DeviceUUID=%s; DeviceChannelUUID=%s; SourcePointUUID=%s; SourcePointName=%s; SourceFlowRate=%.9f; DeviceQmaxLS=%.6f; StoredPointQLS=%.6f; CalculatedTargetQLS=%.6f; SelectedTargetQLS=0; MatchedSessionPointUUID=; MatchedSessionPointQLS=0; MergeToleranceLS=0; Action=Skipped; Reason=InvalidCalculatedTargetQLS',
-          [Device.UUID, Channel.UUID, SourcePoint.UUID, SourcePoint.Name, SourcePoint.FlowRate, Device.Qmax, StoredQLS, CalculatedQLS]));
+        AddDiagnosticEvent(Format('SessionSourcePoint: DeviceUUID=%s; DeviceChannelUUID=%s; SourcePointUUID=%s; SourcePointName=%s; SourceFlowRate=%.9f; DeviceQmaxLS=%.6f; StoredPointQLS=%.6f; CalculatedTargetQLS=%.6f; DerivedQmaxLS=%.6f; SelectedTargetQLS=0; MatchedSessionPointUUID=; MatchedSessionPointQLS=0; MergeToleranceLS=0; Action=Skipped; Reason=InvalidCalculatedTargetQLS',
+          [Device.UUID, Channel.UUID, SourcePoint.UUID, SourcePoint.Name, SourcePoint.FlowRate, Device.Qmax, StoredQLS, CalculatedQLS, DerivedQmaxLS]));
         Continue;
       end;
 
       TargetQLS := CalculatedQLS;
+      PointQValidationToleranceLS := Max(1E-6, Abs(StoredQLS) * 1E-4);
       if IsValidFlowValue(StoredQLS) and (Abs(StoredQLS - CalculatedQLS) <= PointQValidationToleranceLS) then
-        TargetQLS := StoredQLS;
+        TargetQLS := StoredQLS
+      else if IsValidFlowValue(StoredQLS) then
+        AddDiagnosticEvent(Format('SourcePointQMismatch: CurrentDeviceUUID=%s; CurrentDeviceQmaxLS=%.6f; SourcePointQLS=%.6f; SourcePointFlowRate=%.9f; CalculatedTargetQLS=%.6f; DerivedQmaxLS=%.6f',
+          [Device.UUID, Device.Qmax, StoredQLS, SourcePoint.FlowRate, CalculatedQLS, DerivedQmaxLS]));
 
       Participant := Default(TMeasurementPointParticipant);
       Participant.DeviceUUID := Device.UUID;
@@ -2828,14 +3030,49 @@ begin
         MergeTolerance := FlowMergeTolerance(SessionPoint.Q, TargetQLS);
       end;
 
-      AddDiagnosticEvent(Format('SessionSourcePoint: DeviceUUID=%s; DeviceChannelUUID=%s; SourcePointUUID=%s; SourcePointName=%s; SourceFlowRate=%.9f; DeviceQmaxLS=%.6f; StoredPointQLS=%.6f; CalculatedTargetQLS=%.6f; SelectedTargetQLS=%.6f; MatchedSessionPointUUID=%s; MatchedSessionPointQLS=%.6f; MergeToleranceLS=%.9f; Action=%s; Reason=%s',
+      AddDiagnosticEvent(Format('SessionSourcePoint: DeviceUUID=%s; DeviceChannelUUID=%s; SourcePointUUID=%s; SourcePointName=%s; SourceFlowRate=%.9f; DeviceQmaxLS=%.6f; StoredPointQLS=%.6f; CalculatedTargetQLS=%.6f; DerivedQmaxLS=%.6f; SelectedTargetQLS=%.6f; MatchedSessionPointUUID=%s; MatchedSessionPointQLS=%.6f; MergeToleranceLS=%.9f; Action=%s; Reason=%s',
         [Device.UUID, Channel.UUID, SourcePoint.UUID, SourcePoint.Name, SourcePoint.FlowRate,
-         Device.Qmax, StoredQLS, CalculatedQLS, TargetQLS, SessionPoint.UUID, SessionPoint.Q,
+         Device.Qmax, StoredQLS, CalculatedQLS, DerivedQmaxLS, TargetQLS, SessionPoint.UUID, SessionPoint.Q,
          MergeTolerance, Action, Reason]));
     end;
     AddDiagnosticEvent(Format('CreateSessionDeviceSummary: DeviceUUID=%s; DeviceName=%s; DeviceQmaxLS=%.6f; EnabledSourcePointCount=%d; AddedParticipantCount=%d; CreatedPhysicalPointCount=%d; MergedParticipantCount=%d',
       [Device.UUID, Device.Name, Device.Qmax, DeviceSourcePointCount, DeviceAddedParticipantCount,
        DeviceCreatedPointCount, DeviceMergedParticipantCount]));
+  end;
+
+  ResolvedUniqueDeviceCount := Length(DeviceUUIDs);
+  DistinctDeviceQmaxCount := 0;
+  for I := 0 to High(DeviceQmaxValues) do
+  begin
+    IsDistinctQmax := True;
+    for J := 0 to I - 1 do
+      if Abs(DeviceQmaxValues[I] - DeviceQmaxValues[J]) <= FlowMergeTolerance(DeviceQmaxValues[I], DeviceQmaxValues[J]) then
+      begin
+        IsDistinctQmax := False;
+        Break;
+      end;
+    if IsDistinctQmax then
+      Inc(DistinctDeviceQmaxCount);
+  end;
+
+  if ResolvedUniqueDeviceCount > 1 then
+  begin
+    for I := 0 to High(DevicePointers) do
+      for J := I + 1 to High(DevicePointers) do
+        if DevicePointers[I] = DevicePointers[J] then
+        begin
+          PointName := 'DeviceChannelBindingMismatch: different DeviceUUID values resolve to the same DevicePointer';
+          AddDiagnosticEvent(PointName);
+          ProtocolManager.AddMessage(pcError, psMeasurement, 'DeviceChannelBindingMismatch', 'Некорректная привязка каналов приборов', PointName);
+          raise Exception.Create(PointName);
+        end;
+    if (DistinctDeviceQmaxCount = 1) and (Length(DerivedQmaxValues) > 1) then
+    begin
+      PointName := 'DeviceChannelBindingMismatch: all resolved device Qmax values are equal but source points derive different Qmax values';
+      AddDiagnosticEvent(PointName);
+      ProtocolManager.AddMessage(pcError, psMeasurement, 'DeviceChannelBindingMismatch', 'Некорректная привязка каналов приборов', PointName);
+      raise Exception.Create(PointName);
+    end;
   end;
 
   FPoints.Sort(TComparer<TDevicePoint>.Construct(
@@ -2867,9 +3104,11 @@ begin
          FlowMergeTolerance(FPoints[I].Participants[J].SelectedSourceTargetQLS, FPoints[I].Q) then
         Inc(LostSourcePointCount);
 
-  AddDiagnosticEvent(Format('CreateSessionSummary: ProcessingDeviceCount=%d; ProcessingDevicePointCount=%d; SessionPointCount=%d; ParticipantCount=%d; UniqueParticipantCount=%d; DuplicateParticipantCount=%d; LostSourcePointCount=%d',
-    [ProcessingDeviceCount, ProcessingDevicePointCount, FPoints.Count, ParticipantCount,
-     ParticipantCount, DuplicateParticipantCount, LostSourcePointCount]));
+  AddDiagnosticEvent(Format('CreateSessionSummary: TotalDeviceChannelCount=%d; EnabledDeviceChannelCount=%d; DisabledDeviceChannelCount=%d; ResolvedUniqueDeviceCount=%d; DistinctDeviceQmaxCount=%d; ProcessingDeviceCount=%d; ProcessingDevicePointCount=%d; SessionPointCount=%d; ParticipantCount=%d; UniqueParticipantCount=%d; DuplicateParticipantCount=%d; LostSourcePointCount=%d',
+    [TotalDeviceChannelCount, EnabledDeviceChannelCount, DisabledDeviceChannelCount,
+     ResolvedUniqueDeviceCount, DistinctDeviceQmaxCount, ProcessingDeviceCount,
+     ProcessingDevicePointCount, FPoints.Count, ParticipantCount, ParticipantCount,
+     DuplicateParticipantCount, LostSourcePointCount]));
 
   if (LostSourcePointCount > 0) or (ParticipantCount <> ProcessingDevicePointCount) then
   begin
