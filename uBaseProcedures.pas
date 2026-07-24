@@ -187,6 +187,9 @@ type
     mvsfrCurrentValueOutOfRange,
     mvsfrMeanValueOutOfRange,
     mvsfrForecastOutOfRange,
+    mvsfrSampleBelowStabilityRange,
+    mvsfrSampleAboveStabilityRange,
+    mvsfrInvalidPointError,
     mvsfrInvalidSettings    // Settings failed validation and analysis result is not reliable.
   );
 
@@ -336,6 +339,14 @@ type
     IsTrendStable: Boolean;
     /// <summary>True when OutlierFraction is within MaxOutlierFraction.</summary>
     IsOutlierLevelAcceptable: Boolean;
+    PointErrorPercent: Double;
+    StabilityLowerLimit: Double;
+    StabilityUpperLimit: Double;
+    AllSamplesInRange: Boolean;
+    OutOfRangeSampleCount: Integer;
+    FirstOutOfRangeSampleIndex: Integer;
+    FirstOutOfRangeSampleTimeMs: Int64;
+    FirstOutOfRangeSampleValue: Double;
     /// <summary>Per-source-sample flags for UI grids and diagnostics.</summary>
     SampleResults: TArray<TMeterValueSampleAnalysis>;
     /// <summary>Human-readable Russian diagnostic text containing the main analysis reasons.</summary>
@@ -1274,6 +1285,9 @@ begin
     mvsfrCurrentValueOutOfRange: Result := 'текущее значение вне диапазона';
     mvsfrMeanValueOutOfRange: Result := 'среднее значение вне диапазона';
     mvsfrForecastOutOfRange: Result := 'прогноз вне диапазона';
+    mvsfrSampleBelowStabilityRange: Result := 'отсчёт ниже допуска точки';
+    mvsfrSampleAboveStabilityRange: Result := 'отсчёт выше допуска точки';
+    mvsfrInvalidPointError: Result := 'некорректный допуск точки';
     mvsfrInvalidSettings: Result := 'некорректные настройки';
   else
     Result := 'неизвестная причина';
