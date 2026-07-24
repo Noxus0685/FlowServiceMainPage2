@@ -52,6 +52,18 @@ type
     mtsAllConditionsPassed
   );
 
+  TStabilityStepResult = record
+    TimeMs: Int64;
+    Value: Double;
+    MeanValue: Double;
+    Variation: Double;
+    StdDeviation: Double;
+    TrendRate: Double;
+    ForecastValue: Double;
+    Stable: Boolean;
+    Reason: string;
+  end;
+
   TFrameMeterValueEdit = class(TFrame)
     TabControlMain: TTabControl;
     TabItemMainParameters: TTabItem;
@@ -66,8 +78,6 @@ type
     LabelConclusionTitle: TLabel;
     RectangleSignalStable: TRectangle;
     LabelSignalStableValue: TLabel;
-    RectangleStabilityConfirmed: TRectangle;
-    LabelStabilityConfirmedValue: TLabel;
     RectangleCurrentInRange: TRectangle;
     LabelCurrentInRangeValue: TLabel;
     RectangleMeanInRange: TRectangle;
@@ -88,10 +98,14 @@ type
     ButtonSampleDelete: TButton;
     ButtonSamplesClear: TButton;
     GroupAnalysis: TGroupBox;
+    GroupStabilityScenario: TGroupBox;
+    GroupSamplesGenerator: TGroupBox;
     ButtonAnalyze: TButton;
     CheckBoxAutoAnalyze: TCheckBox;
     ComboBoxStabilityScenario: TComboBox;
     ButtonApplyScenario: TButton;
+    LabelScenarioPointCount: TLabel;
+    EditScenarioPointCount: TEdit;
     EditGeneratorStartValue: TEdit;
     EditGeneratorCount: TEdit;
     EditGeneratorTimeStep: TEdit;
@@ -105,7 +119,6 @@ type
     EditMinSampleCount: TEdit;
     EditWindowDurationSec: TEdit;
     EditMaxSampleAgeSec: TEdit;
-    EditConfirmationTimeSec: TEdit;
     EditExitThresholdFactor: TEdit;
     EditMaxVariation: TEdit;
     EditMaxStdDeviation: TEdit;
@@ -150,11 +163,14 @@ type
     FMeterValue: TMeterValue;
     FLoading: Boolean;
     FTestSamples: TList<TMeterValueSample>;
+    FStepResults: TList<TStabilityStepResult>;
     FDisplayedSamples: TArray<TMeterValueSample>;
     FSampleSource: TMeterValueSampleSource;
     ComboBoxSampleSource: TComboBox;
     ButtonRefreshHistory: TButton;
     ButtonUseLastSampleTime: TButton;
+    ButtonRunStepScenario: TButton;
+    GridStepResults: TGrid;
     FTestCurrentTimeMs: Int64;
     FTestDataModified: Boolean;
     FTestTargetValue: Double;
@@ -252,6 +268,8 @@ type
     function ValidateGeneratorControls(out AErrorText: string): Boolean;
     procedure InitializeScenarioList;
     procedure ApplySelectedScenario;
+    function TryGetScenarioPointCount(out APointCount: Integer; const AShowError: Boolean): Boolean;
+    function ScenarioDisplayName(const AScenario: TMeterValueTestScenario): string;
     procedure ApplyScenario(const AScenario: TMeterValueTestScenario);
     procedure RefreshAllTestControls;
     procedure SortSamples;
@@ -264,6 +282,11 @@ type
     procedure ButtonGenerateNewClick(Sender: TObject);
     procedure ButtonGenerateAppendClick(Sender: TObject);
     procedure ButtonApplyScenarioClick(Sender: TObject);
+    procedure ButtonRunStepScenarioClick(Sender: TObject);
+    procedure GridStepResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
+    procedure RunStepScenario;
+    procedure RefreshStepResultsGrid;
+    function StepReasonText(const AInfo: TMeterValueStabilityInfo): string;
     procedure GridSamplesCellDblClick(const Column: TColumn; const Row: Integer);
     procedure GridSamplesGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridSamplesSetValue(Sender: TObject; const ACol, ARow: Integer; const Value: TValue);
@@ -325,6 +348,7 @@ constructor TFrameMeterValueEdit.Create(AOwner: TComponent);
 begin
   inherited;
   FTestSamples := TList<TMeterValueSample>.Create;
+  FStepResults := TList<TStabilityStepResult>.Create;
   FTestCurrentTimeMs := 0;
   FSampleSource := mssWorkHistory;
   SetLength(FDisplayedSamples, 0);
@@ -353,11 +377,14 @@ destructor TFrameMeterValueEdit.Destroy;
 begin
   if TimerStabilityAutoRefresh <> nil then
     TimerStabilityAutoRefresh.Enabled := False;
+  FStepResults.Free;
   FTestSamples.Free;
   inherited;
 end;
 
 procedure TFrameMeterValueEdit.BuildUI;
+var
+  GroupStepResults: TGroupBox;
 
   procedure SetHintFor(const AName, AHint: string);
   var
@@ -446,6 +473,24 @@ begin
   ButtonAnalyze.OnClick := ButtonAnalyzeClick;
   ButtonGenerateNew.OnClick := ButtonGenerateNewClick;
   ButtonGenerateAppend.OnClick := ButtonGenerateAppendClick;
+  ComboBoxStabilityScenario.Position.X := 12;
+  ComboBoxStabilityScenario.Position.Y := 32;
+  ComboBoxStabilityScenario.Size.Width := 336;
+  ComboBoxStabilityScenario.Size.Height := 28;
+  ButtonApplyScenario.Position.X := 12;
+  ButtonApplyScenario.Position.Y := 68;
+  ButtonApplyScenario.Size.Width := 336;
+  ButtonApplyScenario.Size.Height := 28;
+  LabelScenarioPointCount.Position.X := 12;
+  LabelScenarioPointCount.Position.Y := 104;
+  LabelScenarioPointCount.Size.Width := 336;
+  LabelScenarioPointCount.Size.Height := 22;
+  LabelScenarioPointCount.Text := 'Количество точек';
+  EditScenarioPointCount.Position.X := 12;
+  EditScenarioPointCount.Position.Y := 130;
+  EditScenarioPointCount.Size.Width := 120;
+  EditScenarioPointCount.Size.Height := 24;
+  EditScenarioPointCount.KillFocusByReturn := True;
   ButtonApplyScenario.OnClick := ButtonApplyScenarioClick;
   TabControlStability.OnChange := TabControlStabilityChange;
   FillChartColorComboBox(ComboBoxChartSignalColor);
@@ -466,7 +511,6 @@ begin
   EditMinSampleCount.OnExit := HandleSettingsChange;
   EditWindowDurationSec.OnExit := HandleSettingsChange;
   EditMaxSampleAgeSec.OnExit := HandleSettingsChange;
-  EditConfirmationTimeSec.OnExit := HandleSettingsChange;
   EditExitThresholdFactor.OnExit := HandleSettingsChange;
   EditMaxVariation.OnExit := HandleSettingsChange;
   EditMaxStdDeviation.OnExit := HandleSettingsChange;
@@ -510,13 +554,44 @@ begin
   EditGeneratorNoise.Text := '0';
   EditGeneratorOutlierProbability.Text := '0';
   EditGeneratorOutlierAmplitude.Text := '0';
+
+  ButtonRunStepScenario := TButton.Create(Self);
+  ButtonRunStepScenario.Parent := GroupStabilityScenario;
+  ButtonRunStepScenario.Position.X := 140;
+  ButtonRunStepScenario.Position.Y := 130;
+  ButtonRunStepScenario.Size.Width := 208;
+  ButtonRunStepScenario.Size.Height := 24;
+  ButtonRunStepScenario.Text := 'Прогнать';
+  ButtonRunStepScenario.OnClick := ButtonRunStepScenarioClick;
+
+  GroupStepResults := TGroupBox.Create(Self);
+  GroupStepResults.Parent := GroupStabilityScenario.Parent;
+  GroupStepResults.Align := TAlignLayout.Top;
+  GroupStepResults.Margins.Top := 8;
+  GroupStepResults.Size.Height := 180;
+  GroupStepResults.Text := 'Пошаговый результат';
+  GridStepResults := TGrid.Create(Self);
+  GridStepResults.Parent := GroupStepResults;
+  GridStepResults.Align := TAlignLayout.Client;
+  GridStepResults.Options := [TGridOption.ColumnResize, TGridOption.ColLines, TGridOption.RowLines, TGridOption.Header];
+  GridStepResults.OnGetValue := GridStepResultsGetValue;
+
+  with TStringColumn.Create(Self) do begin Parent := GridStepResults; Header := 'Время'; Size.Width := 70; end;
+  with TStringColumn.Create(Self) do begin Parent := GridStepResults; Header := 'Новое значение'; Size.Width := 110; end;
+  with TStringColumn.Create(Self) do begin Parent := GridStepResults; Header := 'Среднее'; Size.Width := 80; end;
+  with TStringColumn.Create(Self) do begin Parent := GridStepResults; Header := 'Размах'; Size.Width := 80; end;
+  with TStringColumn.Create(Self) do begin Parent := GridStepResults; Header := 'σ'; Size.Width := 70; end;
+  with TStringColumn.Create(Self) do begin Parent := GridStepResults; Header := 'Тренд'; Size.Width := 80; end;
+  with TStringColumn.Create(Self) do begin Parent := GridStepResults; Header := 'Прогноз'; Size.Width := 80; end;
+  with TStringColumn.Create(Self) do begin Parent := GridStepResults; Header := 'Стабильно'; Size.Width := 80; end;
+  with TStringColumn.Create(Self) do begin Parent := GridStepResults; Header := 'Причина'; Size.Width := 180; end;
+
   InitializeScenarioList;
   SetHintFor('LabelStabilityDisplayUnit', 'Единица, выбранная для отображения текущего TMeterValue. Все размерные значения результатов и соответствующие настройки показываются в этой единице. Внутреннее хранение может выполняться в базовой единице.');
   SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения по заданным критериям.');
   SetHintFor('LabelMinSampleCount', 'Минимальное количество отсчётов в окне анализа для достоверного результата.');
-  SetHintFor('LabelWindowDurationSec', 'Длительность временного окна, по которому рассчитываются размах, отклонение и тренд.');
+  SetHintFor('LabelWindowDurationSec', 'Для стабильности одновременно требуется полная длительность окна и не меньше указанного количества отсчётов.');
   SetHintFor('LabelMaxSampleAgeSec', 'Максимально допустимый возраст последнего отсчёта относительно текущего времени анализа.');
-  SetHintFor('LabelConfirmationTimeSec', 'Время, в течение которого условия стабильности должны оставаться выполненными для подтверждения.');
   SetHintFor('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности, задающий гистерезис выхода.');
   SetHintFor('LabelMaxVariation', 'Максимально допустимый размах значений в окне анализа.');
   SetHintFor('LabelMaxStdDeviation', 'Максимально допустимое стандартное отклонение значений в окне анализа.');
@@ -907,9 +982,8 @@ begin
   SetLabelText('LabelGeneratorNoise', 'Шум ±, ' + UnitName);
   SetLabelText('LabelGeneratorOutlierAmplitude', 'Амплитуда выброса, ' + UnitName);
   SetLabelText('LabelMinSampleCount', 'Минимальное количество отсчётов, шт.');
-  SetLabelText('LabelWindowDurationSec', 'Длительность окна, с');
+  SetLabelText('LabelWindowDurationSec', 'Длительность стабилизации, с');
   SetLabelText('LabelMaxSampleAgeSec', 'Максимальный возраст данных, с');
-  SetLabelText('LabelConfirmationTimeSec', 'Время подтверждения, с');
   SetLabelText('LabelMaxVariation', 'Максимальный размах, ' + UnitName);
   SetLabelText('LabelMaxStdDeviation', 'Максимальное стандартное отклонение, ' + UnitName);
   SetLabelText('LabelMaxTrendRate', 'Максимальная скорость тренда, ' + UnitName + ' за с');
@@ -951,10 +1025,9 @@ begin
   SetHintFor('LabelStabilityDisplayUnit', 'Единица, выбранная для отображения текущего TMeterValue. Все размерные значения результатов и соответствующие настройки показываются в этой единице. Внутреннее хранение может выполняться в базовой единице.');
   SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения. При отключении анализ не подтверждает готовность измерения.');
   SetHintFor('ComboBoxSampleSource', 'Выбирает массив для preview-анализа. История TMeterValue использует рабочую историю текущего значения. Тестовый массив не изменяет рабочую историю.');
-  SetLabelHint('LabelMinSampleCount', 'Минимальное число допустимых точек в текущем окне, необходимое для расчёта статистики. Если после исключения выбросов их меньше указанного числа, анализ возвращает недостаточно данных. Единица: шт.');
-  SetLabelHint('LabelWindowDurationSec', 'Длительность интервала истории, используемого для анализа стабильности. Учитываются точки от текущего времени анализа минус указанное число секунд до текущего времени. Более длинное окно сглаживает кратковременные изменения, но медленнее реагирует на смену режима. Единица: с.');
+  SetLabelHint('LabelMinSampleCount', 'Минимальное число отсчётов в текущем окне, необходимое для расчёта статистики; проверяется независимо от длительности окна. Единица: шт.');
+  SetLabelHint('LabelWindowDurationSec', 'Полная длительность непрерывной стабилизации. Для стабильности одновременно требуется заполнить это окно по времени и иметь не меньше минимального количества отсчётов. Единица: с.');
   SetLabelHint('LabelMaxSampleAgeSec', 'Максимально допустимое время с момента последней точки до текущего времени анализа. Если последняя точка старше указанного значения, данные считаются устаревшими. Единица: с.');
-  SetLabelHint('LabelConfirmationTimeSec', 'Минимальное время, в течение которого сигнал должен непрерывно удовлетворять условиям стабильности, прежде чем стабильность будет подтверждена. Точки этого периода отмечаются в таблице как “Стаб”. Единица: с.');
   SetLabelHint('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности. Большее значение создаёт гистерезис и снижает частые переключения, меньшее быстрее снимает подтверждение. Безразмерная величина.');
   SetLabelHint('LabelMaxVariation', 'Максимально допустимый размах между минимумом и максимумом в использованных точках. Единица: ' + UnitName + '. Чем меньше порог, тем строже проверка стабильности.');
   SetLabelHint('LabelMaxStdDeviation', 'Стандартное отклонение характеризует абсолютный разброс значений и имеет ту же физическую единицу, что и измеряемая величина. Это не процент, если отдельно не указано относительное стандартное отклонение. Единица: ' + UnitName + '.');
@@ -1012,8 +1085,7 @@ begin
   Result := (not FLoading) and
     (not (csDestroying in ComponentState)) and
     (FMeterValue <> nil) and
-    (CheckBoxAutoAnalyze <> nil) and CheckBoxAutoAnalyze.IsChecked and
-    (CheckBoxStabilityEnabled <> nil) and CheckBoxStabilityEnabled.IsChecked;
+    (CheckBoxAutoAnalyze <> nil) and CheckBoxAutoAnalyze.IsChecked;
 end;
 
 procedure TFrameMeterValueEdit.UpdateStabilityAutoRefreshTimer;
@@ -1071,7 +1143,7 @@ begin
 
   RefreshDisplayedSamples;
   if FSampleSource = mssWorkHistory then
-    FTestCurrentTimeMs := TThread.GetTickCount64;
+    FTestCurrentTimeMs := TMeterValue.GetMonotonicTimeMs;
   RefreshSamplesGrid(False);
 
   if WasLastRow and (GridSamples.RowCount > 0) then
@@ -1085,7 +1157,7 @@ begin
       end;
   GridSamples.Selected := GridSamples.Row;
 
-  AnalyzeDisplayedSamples(False, False, False);
+  AnalyzeDisplayedSamples(FSampleSource = mssWorkHistory, False, False);
   UpdateStabilityChart;
 end;
 
@@ -1130,6 +1202,8 @@ begin
   ButtonSamplesClear.Enabled := Length(FDisplayedSamples) > 0;
   ComboBoxStabilityScenario.Enabled := IsTestMode;
   ButtonApplyScenario.Enabled := IsTestMode;
+  if ButtonRunStepScenario <> nil then
+    ButtonRunStepScenario.Enabled := IsTestMode;
   EditGeneratorStartValue.Enabled := IsTestMode;
   EditGeneratorCount.Enabled := IsTestMode;
   EditGeneratorTimeStep.Enabled := IsTestMode;
@@ -1224,7 +1298,7 @@ begin
     MemoConclusion.Lines.Text := 'В рабочей истории нет данных';
   end
   else if CheckBoxAutoAnalyze.IsChecked then
-    AnalyzeDisplayedSamples(False, True)
+    AnalyzeDisplayedSamples(True, True)
   else
   begin
     ClearTestAnalysis;
@@ -1247,7 +1321,7 @@ begin
   if Length(FDisplayedSamples) = 0 then
     Exit;
   SetAnalysisTimeByLastDisplayedSample;
-  AnalyzeIfNeeded;
+  AnalyzeDisplayedSamples(FSampleSource = mssWorkHistory, True, False);
 end;
 
 function TFrameMeterValueEdit.SampleSecondsToMs(const ASeconds: Double): Int64;
@@ -1474,7 +1548,6 @@ end;
 procedure TFrameMeterValueEdit.ResetConclusionIndicators;
 begin
   SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, '—', COLOR_NONE);
-  SetConclusionIndicator(RectangleStabilityConfirmed, LabelStabilityConfirmedValue, '—', COLOR_NONE);
   SetConclusionIndicator(RectangleCurrentInRange, LabelCurrentInRangeValue, '—', COLOR_NONE);
   SetConclusionIndicator(RectangleMeanInRange, LabelMeanInRangeValue, '—', COLOR_NONE);
   SetConclusionIndicator(RectangleForecastInRange, LabelForecastInRangeValue, '—', COLOR_NONE);
@@ -1495,7 +1568,6 @@ begin
   if mvsfrNoData in AInfo.FailReasons then
   begin
     SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, '—', COLOR_NONE);
-    SetConclusionIndicator(RectangleStabilityConfirmed, LabelStabilityConfirmedValue, '—', COLOR_NONE);
     SetConclusionIndicator(RectangleCurrentInRange, LabelCurrentInRangeValue, '—', COLOR_NONE);
     SetConclusionIndicator(RectangleMeanInRange, LabelMeanInRangeValue, '—', COLOR_NONE);
     SetConclusionIndicator(RectangleForecastInRange, LabelForecastInRangeValue, '—', COLOR_NONE);
@@ -1509,13 +1581,6 @@ begin
     SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, 'НЕТ', COLOR_WARNING)
   else
     SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, 'НЕТ', COLOR_WARNING);
-
-  if AInfo.IsStabilityConfirmed then
-    SetConclusionIndicator(RectangleStabilityConfirmed, LabelStabilityConfirmedValue, 'ДА', COLOR_COMPLETED)
-  else if AInfo.IsSignalStable and (mvsfrWaitingForConfirmation in AInfo.FailReasons) then
-    SetConclusionIndicator(RectangleStabilityConfirmed, LabelStabilityConfirmedValue, 'НЕТ', COLOR_RUNNING)
-  else
-    SetConclusionIndicator(RectangleStabilityConfirmed, LabelStabilityConfirmedValue, 'НЕТ', COLOR_WARNING);
 
   if AInfo.HasCurrentValue then
   begin
@@ -1552,7 +1617,7 @@ begin
   else if mvsfrInvalidSettings in AInfo.FailReasons then
     SuitableColor := COLOR_INVALID
   else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or
-          (mvsfrInsufficientWindow in AInfo.FailReasons) then
+          (mvsfrWindowNotFilled in AInfo.FailReasons) then
     SuitableColor := COLOR_WARNING
   else if mvsfrStaleData in AInfo.FailReasons then
     SuitableColor := COLOR_INVALID
@@ -1565,8 +1630,6 @@ begin
       (mvsfrForecastOutOfRange in AInfo.FailReasons);
     if RangeFailure then
       SuitableColor := COLOR_INVALID
-    else if mvsfrWaitingForConfirmation in AInfo.FailReasons then
-      SuitableColor := COLOR_RUNNING
     else
       SuitableColor := COLOR_INVALID;
   end;
@@ -1802,186 +1865,139 @@ begin
   ApplyScenario(TMeterValueTestScenario(ComboBoxStabilityScenario.ItemIndex));
 end;
 
+function TFrameMeterValueEdit.TryGetScenarioPointCount(out APointCount: Integer;
+  const AShowError: Boolean): Boolean;
+begin
+  APointCount := 0;
+  Result := (EditScenarioPointCount <> nil) and
+    TryStrToInt(Trim(EditScenarioPointCount.Text), APointCount);
+  Result := Result and (APointCount >= 2) and (APointCount <= 100000);
+  if (not Result) and AShowError then
+    ShowMessage('Количество точек сценария должно быть целым числом от 2 до 100000.');
+end;
+
+function TFrameMeterValueEdit.ScenarioDisplayName(
+  const AScenario: TMeterValueTestScenario): string;
+begin
+  if (ComboBoxStabilityScenario <> nil) and (Ord(AScenario) >= 0) and
+     (Ord(AScenario) < ComboBoxStabilityScenario.Items.Count) then
+    Result := ComboBoxStabilityScenario.Items[Ord(AScenario)]
+  else
+    Result := IntToStr(Ord(AScenario));
+end;
+
 procedure TFrameMeterValueEdit.ApplyScenario(const AScenario: TMeterValueTestScenario);
+var
+  StepMs: Integer;
+  EntrySettings: TMeterValueStabilitySettings;
 
-  procedure AddSamplePoint(const ATimeSec: Integer; const AValue: Double);
-  var
-    Sample: TMeterValueSample;
+  procedure ConfigureScenarioSettings;
   begin
-    Sample.TimeStampMs := ATimeSec * 1000;
-    Sample.Value := DisplayToBase(FloatToStr(AValue));
-    FTestSamples.Add(Sample);
-  end;
-
-  procedure AddValues(const AValues: array of Double; const AStartSec: Integer);
-  var
-    I: Integer;
-  begin
-    for I := Low(AValues) to High(AValues) do
-      AddSamplePoint(AStartSec + I, AValues[I]);
-  end;
-
-  procedure SetBaseSettings;
-  begin
-    FillChar(FTestSettings, SizeOf(FTestSettings), 0);
+    FTestTargetValue := DisplayToBase('100');
+    FTestSettings := EntrySettings;
     FTestSettings.Enabled := True;
-    FTestSettings.MinSampleCount := 10;
-    FTestSettings.WindowDurationSec := 10;
+    FTestSettings.MinSampleCount := 6;
+    FTestSettings.WindowDurationSec := 5;
     FTestSettings.MaxSampleAgeSec := 3;
-    FTestSettings.ConfirmationTimeSec := 3;
     FTestSettings.ExitThresholdFactor := 1.2;
-    FTestSettings.MaxVariation := DisplayDeltaToBase('0.5');
-    FTestSettings.MaxStdDeviation := DisplayDeltaToBase('0.1');
-    FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.05');
-    FTestSettings.MaxOutlierFraction := 0.10;
+    FTestSettings.MaxVariation := DisplayDeltaToBase('0.35');
+    FTestSettings.MaxStdDeviation := DisplayDeltaToBase('0.15');
+    FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.04');
+    FTestSettings.ForecastHorizonSec := 5;
+    FTestSettings.MaxOutlierFraction := 0.15;
     FTestSettings.OutlierFactor := 3.5;
-    FTestSettings.ForecastHorizonSec := 10;
+    FTestSettings.TargetValue := FTestTargetValue;
     FTestSettings.TargetAccuracyPlusPercent := 1;
     FTestSettings.TargetAccuracyMinusPercent := 1;
-    FTestSettings.TargetToleranceAbsolute := 0;
+    FTestSettings.TargetToleranceAbsolute := DisplayDeltaToBase('0.10');
     FTestSettings.RequireCurrentValueInRange := True;
     FTestSettings.RequireMeanValueInRange := True;
     FTestSettings.RequireForecastInRange := True;
-    FTestTargetValue := DisplayToBase('10');
-    FTestCurrentTimeMs := 10000;
+    FTestSettings.AutoAnalyze := CheckBoxAutoAnalyze.IsChecked;
   end;
 
-  procedure AddConstantSamples(const ACount: Integer; const AValue: Double);
+  procedure AddExplicitSamples(const AValues: array of Double);
   var
     I: Integer;
+    Sample: TMeterValueSample;
   begin
-    for I := 0 to ACount - 1 do
-      AddSamplePoint(I, AValue);
-  end;
-
-  function FailReasonsText(const AInfo: TMeterValueStabilityInfo): string;
-  var
-    Reason: TMeterValueStabilityFailReason;
-  begin
-    Result := '';
-    for Reason := Low(TMeterValueStabilityFailReason) to High(TMeterValueStabilityFailReason) do
-      if Reason in AInfo.FailReasons then
-      begin
-        if Result <> '' then
-          Result := Result + ',';
-        Result := Result + StabilityFailReasonToText(Reason);
-      end;
-    if Result = '' then
-      Result := 'none';
-  end;
-
-  procedure LogAllConditionsAnalysis(const AStage: string);
-  begin
-    if AScenario <> mtsAllConditionsPassed then
-      Exit;
-
-    DebugLog(Format('AllConditions %s: SampleCount=%d UsedSampleCount=%d OutlierCount=%d Variation=%.12g StdDeviation=%.12g TrendRate=%.12g MaxVariation=%.12g MaxStdDeviation=%.12g MaxTrendRate=%.12g LastSampleAgeSec=%.12g IsSignalStable=%s IsStabilityConfirmed=%s FailReasons=%s FTestStableCandidateSinceMs=%d FTestCurrentTimeMs=%d',
-      [AStage, FLastTestAnalysis.SampleCount, FLastTestAnalysis.UsedSampleCount,
-       FLastTestAnalysis.OutlierCount, FLastTestAnalysis.Variation,
-       FLastTestAnalysis.StdDeviation, FLastTestAnalysis.TrendRate,
-       FTestSettings.MaxVariation, FTestSettings.MaxStdDeviation,
-       FTestSettings.MaxTrendRate, FLastTestAnalysis.LastSampleAgeSec,
-       BoolToStr(FLastTestAnalysis.IsSignalStable, True),
-       BoolToStr(FLastTestAnalysis.IsStabilityConfirmed, True),
-       FailReasonsText(FLastTestAnalysis), FTestStableCandidateSinceMs,
-       FTestCurrentTimeMs]));
+    for I := Low(AValues) to High(AValues) do
+    begin
+      Sample.TimeStampMs := Int64(I) * StepMs;
+      Sample.Value := DisplayToBase(FloatToStr(AValues[I]));
+      FTestSamples.Add(Sample);
+    end;
   end;
 
 begin
+  EntrySettings := FTestSettings;
+  StepMs := 1000;
+
   FLoading := True;
   try
     ClearTestAnalysis;
     FTestSamples.Clear;
     FTestStableCandidateSinceMs := 0;
     FTestStabilityConfirmed := False;
-    SetBaseSettings;
+    ConfigureScenarioSettings;
 
     case AScenario of
       mtsConstantValue:
-        AddConstantSamples(11, 10);
+        AddExplicitSamples([100.00, 100.00, 100.00, 100.00, 100.00, 100.00, 100.00, 100.00]);
       mtsStableNoise:
-        begin
-          FTestSettings.MaxVariation := DisplayDeltaToBase('0.10');
-          FTestSettings.MaxStdDeviation := DisplayDeltaToBase('0.05');
-          AddValues([10.00, 10.02, 9.99, 10.01, 9.98, 10.00, 10.01, 9.99, 10.02, 10.00, 10.01], 0);
-        end;
+        AddExplicitSamples([100.00, 100.12, 99.94, 100.05, 99.98, 100.08, 99.97, 100.03, 100.01]);
       mtsSlowIncrease:
         begin
-          FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.01');
-          AddValues([10.00, 10.02, 10.04, 10.06, 10.08, 10.10, 10.12, 10.14, 10.16, 10.18, 10.20], 0);
+          FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.015');
+          AddExplicitSamples([99.70, 99.78, 99.86, 99.94, 100.02, 100.10, 100.18, 100.26, 100.34]);
         end;
       mtsSlowDecrease:
         begin
-          FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.01');
-          AddValues([10.20, 10.18, 10.16, 10.14, 10.12, 10.10, 10.08, 10.06, 10.04, 10.02, 10.00], 0);
+          FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.015');
+          AddExplicitSamples([100.34, 100.26, 100.18, 100.10, 100.02, 99.94, 99.86, 99.78, 99.70]);
         end;
       mtsSettlingAfterChange:
-        begin
-          FTestCurrentTimeMs := 20000;
-          FTestSettings.MaxSampleAgeSec := 10;
-          AddValues([5, 5, 5, 5, 5, 7, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10], 0);
-        end;
+        AddExplicitSamples([104.80, 102.40, 101.10, 100.45, 100.18, 100.08, 100.03, 100.01, 100.00]);
       mtsSingleOutlier:
-        begin
-          FTestTargetValue := DisplayToBase('29');
-          FTestSettings.TargetAccuracyPlusPercent := 1;
-          FTestSettings.TargetAccuracyMinusPercent := 1;
-          FTestSettings.MaxOutlierFraction := 0.11;
-          AddValues([29.00, 29.02, 28.98, 29.01, 29.00, 39.00, 28.99, 29.03, 29.00, 28.97, 29.01], 0);
-        end;
+        AddExplicitSamples([100.02, 100.04, 99.98, 100.01, 106.50, 99.99, 100.03, 100.00, 100.02]);
       mtsManyOutliers:
-        begin
-          FTestTargetValue := DisplayToBase('29');
-          FTestSettings.TargetAccuracyPlusPercent := 1;
-          FTestSettings.TargetAccuracyMinusPercent := 1;
-          FTestSettings.MaxOutlierFraction := 0.10;
-          AddValues([29, 29, 29, 29, 39, 29, 29, 19, 29, 29, 29, 39, 29, 29, 29], 0);
-          FTestCurrentTimeMs := 14000;
-        end;
+        AddExplicitSamples([100.00, 105.80, 99.98, 106.10, 100.03, 94.00, 100.01, 105.60, 99.99]);
       mtsNotEnoughData:
-        begin
-          FTestCurrentTimeMs := 4000;
-          AddValues([10.00, 10.01, 9.99, 10.00, 10.01], 0);
-        end;
+        AddExplicitSamples([100.00, 100.02, 99.99]);
       mtsStaleData:
         begin
-          FTestCurrentTimeMs := 30000;
-          FTestSettings.WindowDurationSec := 30;
-          FTestSettings.MaxSampleAgeSec := 5;
-          AddConstantSamples(11, 10);
+          AddExplicitSamples([100.00, 100.01, 100.00, 99.99, 100.02, 100.00]);
+          FTestCurrentTimeMs := FTestSamples[FTestSamples.Count - 1].TimeStampMs + 10000;
         end;
       mtsForecastAboveRange:
         begin
-          FTestSettings.ForecastHorizonSec := 20;
-          FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.05');
-          FTestSettings.TargetAccuracyPlusPercent := 2;
-          FTestSettings.TargetAccuracyMinusPercent := 2;
-          AddValues([9.80, 9.82, 9.84, 9.86, 9.88, 9.90, 9.92, 9.94, 9.96, 9.98, 10.00], 0);
+          FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.20');
+          FTestSettings.ForecastHorizonSec := 10;
+          AddExplicitSamples([99.40, 99.55, 99.70, 99.85, 100.00, 100.15, 100.30, 100.45, 100.60]);
         end;
       mtsForecastBelowRange:
         begin
-          FTestSettings.ForecastHorizonSec := 20;
-          FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.05');
-          FTestSettings.TargetAccuracyPlusPercent := 2;
-          FTestSettings.TargetAccuracyMinusPercent := 2;
-          AddValues([10.20, 10.18, 10.16, 10.14, 10.12, 10.10, 10.08, 10.06, 10.04, 10.02, 10.00], 0);
+          FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.20');
+          FTestSettings.ForecastHorizonSec := 10;
+          AddExplicitSamples([100.60, 100.45, 100.30, 100.15, 100.00, 99.85, 99.70, 99.55, 99.40]);
         end;
       mtsStableOutOfRange:
-        AddConstantSamples(11, 0);
+        AddExplicitSamples([102.20, 102.18, 102.22, 102.19, 102.21, 102.20, 102.18, 102.22]);
       mtsAllConditionsPassed:
         begin
-          FTestSettings.MaxVariation := DisplayDeltaToBase('0.01');
-          FTestSettings.MaxStdDeviation := DisplayDeltaToBase('0.01');
-          FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.001');
-          FTestSettings.MaxSampleAgeSec := 3;
-          FTestSettings.ConfirmationTimeSec := 3;
-          AddConstantSamples(11, 10);
-          FTestCurrentTimeMs := 10000;
+          FTestSettings.MaxVariation := DisplayDeltaToBase('0.20');
+          FTestSettings.MaxStdDeviation := DisplayDeltaToBase('0.08');
+          FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.03');
+          AddExplicitSamples([100.00, 100.04, 99.98, 100.02, 100.01, 99.99, 100.03, 100.00, 100.02]);
         end;
     end;
 
-    FTestSettings.TargetValue := FTestTargetValue;
+    EditScenarioPointCount.Text := IntToStr(FTestSamples.Count);
+    EditGeneratorTimeStep.Text := '1,0';
+    EditTestTargetValue.Text := '100';
     SortSamples;
+    if (FTestSamples.Count > 0) and (AScenario <> mtsStaleData) then
+      FTestCurrentTimeMs := FTestSamples[FTestSamples.Count - 1].TimeStampMs;
     RefreshAllTestControls;
   finally
     FLoading := False;
@@ -1990,22 +2006,7 @@ begin
   FTestDataModified := True;
   FSettingsModified := True;
   FModified := True;
-  if AScenario = mtsAllConditionsPassed then
-  begin
-    Analyze;
-    LogAllConditionsAnalysis('after first analyze');
-    AddSamplePoint(11, 10);
-    AddSamplePoint(12, 10);
-    AddSamplePoint(13, 10);
-    SortSamples;
-    RefreshSamplesGrid;
-    FTestCurrentTimeMs := 13000;
-    EditAnalysisTime.Text := FloatToStr(FTestCurrentTimeMs / 1000.0);
-    Analyze;
-    LogAllConditionsAnalysis('after second analyze');
-  end
-  else
-    Analyze;
+  Analyze;
 end;
 
 procedure TFrameMeterValueEdit.ButtonSampleAddClick(Sender: TObject);
@@ -2059,6 +2060,99 @@ begin
   end;
 end;
 
+
+procedure TFrameMeterValueEdit.ButtonRunStepScenarioClick(Sender: TObject);
+begin
+  RunStepScenario;
+end;
+
+function TFrameMeterValueEdit.StepReasonText(const AInfo: TMeterValueStabilityInfo): string;
+begin
+  if AInfo.Status = mvssNotEnoughData then
+    Exit('Недостаточно данных');
+  if (AInfo.Status in [mvssUnstable, mvssStaleData]) and (not AInfo.HasFullWindow) then
+    Exit('сигнал анализируется');
+  if (AInfo.IsSignalStable) and (not AInfo.IsSuitableForMeasurement) then
+    Exit('кандидат на стабильность: ' + AInfo.StatusText);
+  if AInfo.IsSuitableForMeasurement then
+    Exit('стабильность подтверждена');
+  Result := AInfo.StatusText;
+end;
+
+procedure TFrameMeterValueEdit.RefreshStepResultsGrid;
+begin
+  if GridStepResults <> nil then
+  begin
+    GridStepResults.RowCount := FStepResults.Count;
+    GridStepResults.Repaint;
+  end;
+end;
+
+procedure TFrameMeterValueEdit.RunStepScenario;
+var
+  I, J: Integer;
+  Samples: TArray<TMeterValueSample>;
+  Info: TMeterValueStabilityInfo;
+  StableSinceMs: Int64;
+  Confirmed: Boolean;
+  LowerLimit: Double;
+  UpperLimit: Double;
+  Step: TStabilityStepResult;
+begin
+  ApplySelectedScenario;
+
+  if FTestSamples.Count = 0 then
+    Exit;
+
+  if not TryGetTestTargetLimits(LowerLimit, UpperLimit) then
+    Exit;
+
+  FStepResults.Clear;
+  StableSinceMs := 0;
+  Confirmed := False;
+  for I := 0 to FTestSamples.Count - 1 do
+  begin
+    SetLength(Samples, I + 1);
+    for J := 0 to I do
+      Samples[J] := FTestSamples[J];
+
+    TMeterValue.AnalyzeStabilitySamples(Samples, FTestSettings, FTestSamples[I].TimeStampMs,
+      FTestTargetValue, LowerLimit, UpperLimit, StableSinceMs, Confirmed, Info);
+
+    Step.TimeMs := FTestSamples[I].TimeStampMs;
+    Step.Value := FTestSamples[I].Value;
+    Step.MeanValue := Info.MeanValue;
+    Step.Variation := Info.Variation;
+    Step.StdDeviation := Info.StdDeviation;
+    Step.TrendRate := Info.TrendRate;
+    Step.ForecastValue := Info.ForecastValue;
+    Step.Stable := Info.IsSuitableForMeasurement;
+    Step.Reason := StepReasonText(Info);
+    FStepResults.Add(Step);
+  end;
+  RefreshStepResultsGrid;
+end;
+
+procedure TFrameMeterValueEdit.GridStepResultsGetValue(Sender: TObject; const ACol,
+  ARow: Integer; var Value: TValue);
+var
+  Step: TStabilityStepResult;
+begin
+  if (ARow < 0) or (ARow >= FStepResults.Count) then
+    Exit;
+  Step := FStepResults[ARow];
+  case ACol of
+    0: Value := IntToStr(Step.TimeMs);
+    1: Value := BaseToDisplayText(Step.Value);
+    2: Value := BaseToDisplayText(Step.MeanValue);
+    3: Value := BaseDeltaToDisplayText(Step.Variation);
+    4: Value := BaseDeltaToDisplayText(Step.StdDeviation);
+    5: Value := BaseDeltaToDisplayText(Step.TrendRate);
+    6: Value := BaseToDisplayText(Step.ForecastValue);
+    7: Value := BoolText(Step.Stable);
+    8: Value := Step.Reason;
+  end;
+end;
 
 procedure TFrameMeterValueEdit.GridSamplesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
@@ -2200,18 +2294,19 @@ end;
 
 function TFrameMeterValueEdit.InWindowText(const AResult: TMeterValueSampleAnalysis): string;
 begin
-  if not AResult.InWindow then
-    Result := 'Нет'
-  else if AResult.IsInConfirmationPeriod then
+  if AResult.IsInConfirmationPeriod then
     Result := 'Стаб'
+  else if AResult.IsInDisplayAnalysisWindow then
+    Result := 'Да'
   else
-    Result := 'Да';
+    Result := 'Нет';
 end;
 
 function TFrameMeterValueEdit.FindSampleAnalysis(const ARow: Integer;
   out AResult: TMeterValueSampleAnalysis): Boolean;
 var
   I: Integer;
+  J: Integer;
   SampleIndex: Integer;
 begin
   Result := False;
@@ -2242,7 +2337,7 @@ begin
     Exit;
 
   if CheckBoxAutoAnalyze.IsChecked then
-    AnalyzeDisplayedSamples(False, True, False)
+    AnalyzeDisplayedSamples(FSampleSource = mssWorkHistory, True, False)
   else
     ClearTestAnalysis;
 end;
@@ -2490,9 +2585,13 @@ var
   Indexes: TList<Integer>;
   Series: TChartSeries;
   ForecastSeries: TChartSeries;
+  OutlierSeries: TChartSeries;
+  TrendSeries: TChartSeries;
   LowerSeries: TChartSeries;
   UpperSeries: TChartSeries;
+  StartSeries: TChartSeries;
   I: Integer;
+  J: Integer;
   SampleIndex: Integer;
   Sample: TMeterValueSample;
   HasLimits: Boolean;
@@ -2504,8 +2603,12 @@ var
   ForecastEndTimeSec: Double;
   LowerLimit: Double;
   UpperLimit: Double;
+  MinDisplayValue: Double;
+  MaxDisplayValue: Double;
+  AnalysisStartSec: Double;
   ToleranceColor: TAlphaColor;
   ChartSettings: TMeterValueStabilitySettings;
+  SampleAnalysis: TMeterValueSampleAnalysis;
 
 begin
   if ChartStability = nil then
@@ -2539,11 +2642,21 @@ begin
       MinActualTimeSec := (FDisplayedSamples[Indexes[0]].TimeStampMs - BaseTimeMs) / 1000;
       MaxActualTimeSec := (FDisplayedSamples[Indexes[Indexes.Count - 1]].TimeStampMs - BaseTimeMs) / 1000;
       ForecastEndTimeSec := MaxActualTimeSec;
+      MinDisplayValue := ValueToCurrentDimension(FDisplayedSamples[Indexes[0]].Value);
+      MaxDisplayValue := MinDisplayValue;
+      for SampleIndex in Indexes do
+      begin
+        DisplayValue := ValueToCurrentDimension(FDisplayedSamples[SampleIndex].Value);
+        MinDisplayValue := Min(MinDisplayValue, DisplayValue);
+        MaxDisplayValue := Max(MaxDisplayValue, DisplayValue);
+      end;
       HasLimits := (Indexes.Count > 1) and TryGetTestTargetLimits(LowerLimit, UpperLimit);
       if HasLimits then
       begin
         LowerLimit := ValueToCurrentDimension(LowerLimit);
         UpperLimit := ValueToCurrentDimension(UpperLimit);
+        MinDisplayValue := Min(MinDisplayValue, LowerLimit);
+        MaxDisplayValue := Max(MaxDisplayValue, UpperLimit);
         LowerSeries := ChartStability.AddSeries('Нижняя граница');
         UpperSeries := ChartStability.AddSeries('Верхняя граница');
         ToleranceColor := ChartColorOptionToAlphaColor(ChartSettings.ChartToleranceColor);
@@ -2558,6 +2671,10 @@ begin
       Series := ChartStability.AddSeries('Сигнал');
       ApplyChartSeriesStyle(Series, ChartSettings.ChartSignalColor,
         ChartSettings.ChartSignalLineWidth, True);
+      OutlierSeries := ChartStability.AddSeries('Выбросы');
+      OutlierSeries.Color := TAlphaColors.Red;
+      OutlierSeries.Thickness := ChartSettings.ChartSignalLineWidth;
+      OutlierSeries.ShowMarkers := True;
 
       for SampleIndex in Indexes do
       begin
@@ -2565,10 +2682,31 @@ begin
         X := (Sample.TimeStampMs - BaseTimeMs) / 1000;
         DisplayValue := ValueToCurrentDimension(Sample.Value);
         Series.AddPoint(X, DisplayValue);
+        for J := 0 to High(FTestStabilityInfo.SampleResults) do
+        begin
+          SampleAnalysis := FTestStabilityInfo.SampleResults[J];
+          if (SampleAnalysis.SourceIndex = SampleIndex) and SampleAnalysis.IsOutlier then
+          begin
+            OutlierSeries.AddPoint(X, DisplayValue);
+            Break;
+          end;
+        end;
       end;
 
       if FTestStabilityInfo.HasForecast then
       begin
+        if FTestStabilityInfo.HasTrend then
+        begin
+          TrendSeries := ChartStability.AddSeries('Линия тренда');
+          TrendSeries.Color := TAlphaColors.Purple;
+          TrendSeries.Thickness := 1.5;
+          TrendSeries.ShowMarkers := False;
+          TrendSeries.AddPoint(Max(MinActualTimeSec, MaxActualTimeSec - FTestStabilityInfo.WindowDurationSec),
+            ValueToCurrentDimension(FTestStabilityInfo.ForecastValue - FTestStabilityInfo.TrendRate * FTestSettings.ForecastHorizonSec -
+              FTestStabilityInfo.TrendRate * (MaxActualTimeSec - Max(MinActualTimeSec, MaxActualTimeSec - FTestStabilityInfo.WindowDurationSec))));
+          TrendSeries.AddPoint(MaxActualTimeSec,
+            ValueToCurrentDimension(FTestStabilityInfo.ForecastValue - FTestStabilityInfo.TrendRate * FTestSettings.ForecastHorizonSec));
+        end;
         ForecastSeries := ChartStability.AddSeries('Прогноз');
         ForecastSeries.Thickness := ChartSettings.ChartSignalLineWidth;
         ForecastSeries.ShowMarkers := False;
@@ -2586,6 +2724,17 @@ begin
         LowerSeries.AddPoint(MaxActualTimeSec, LowerLimit);
         UpperSeries.AddPoint(MinActualTimeSec, UpperLimit);
         UpperSeries.AddPoint(MaxActualTimeSec, UpperLimit);
+      end;
+      if (FTestStabilityInfo.WindowStartMs > 0) and
+         (FTestStabilityInfo.WindowStartMs >= BaseTimeMs) then
+      begin
+        AnalysisStartSec := (FTestStabilityInfo.WindowStartMs - BaseTimeMs) / 1000;
+        StartSeries := ChartStability.AddSeries('Начало участка');
+        StartSeries.Color := TAlphaColors.Gray;
+        StartSeries.Thickness := 1;
+        StartSeries.ShowMarkers := False;
+        StartSeries.AddPoint(AnalysisStartSec, MinDisplayValue);
+        StartSeries.AddPoint(AnalysisStartSec, MaxDisplayValue);
       end;
     finally
       Indexes.Free;
@@ -2627,10 +2776,6 @@ begin
     Lines.Add('Скорость тренда: ' + EditResultTrendRate.Text + ' за с.');
     Lines.Add('Направление тренда: ' + TrendDirectionText(AInfo.TrendDirection, AInfo.HasTrend) + '.');
     Lines.Add('Предварительная стабильность: ' + BoolText(AInfo.IsSignalStable) + '.');
-    Lines.Add('Подтверждение стабильности: ' + BoolText(AInfo.IsStabilityConfirmed) + '.');
-    if AInfo.IsSignalStable and not AInfo.IsStabilityConfirmed then
-      Lines.Add('Время подтверждения: ' + FormatInfoFloat(AInfo.StableCandidateDurationSec, True, 2) +
-        ' из ' + FormatInfoFloat(FTestSettings.ConfirmationTimeSec, True, 2) + ' с.');
 
     Lines.Add('');
     Lines.Add('Прогноз через ' + FormatInfoFloat(FTestSettings.ForecastHorizonSec, AInfo.HasForecast, 2) + ' с: ' +
@@ -2706,7 +2851,6 @@ begin
     EditMinSampleCount.Text := IntToStr(FTestSettings.MinSampleCount);
     EditWindowDurationSec.Text := FormatFloat('0.########', FTestSettings.WindowDurationSec);
     EditMaxSampleAgeSec.Text := FormatFloat('0.########', FTestSettings.MaxSampleAgeSec);
-    EditConfirmationTimeSec.Text := FormatFloat('0.########', FTestSettings.ConfirmationTimeSec);
     EditExitThresholdFactor.Text := FormatFloat('0.########', FTestSettings.ExitThresholdFactor);
     EditMaxVariation.Text := BaseDeltaToDisplayText(FTestSettings.MaxVariation);
     EditMaxStdDeviation.Text := BaseDeltaToDisplayText(FTestSettings.MaxStdDeviation);
@@ -2756,7 +2900,6 @@ begin
   TryReadInteger(EditMinSampleCount.Text, ASettings.MinSampleCount);
   TryReadFloat(EditWindowDurationSec.Text, ASettings.WindowDurationSec);
   TryReadFloat(EditMaxSampleAgeSec.Text, ASettings.MaxSampleAgeSec);
-  TryReadFloat(EditConfirmationTimeSec.Text, ASettings.ConfirmationTimeSec);
   TryReadFloat(EditExitThresholdFactor.Text, ASettings.ExitThresholdFactor);
   ASettings.MaxVariation := DisplayDeltaToBase(EditMaxVariation.Text);
   ASettings.MaxStdDeviation := DisplayDeltaToBase(EditMaxStdDeviation.Text);
@@ -2793,7 +2936,6 @@ begin
     SameValue(ALeft.ForecastHorizonSec, ARight.ForecastHorizonSec, 1E-9) and
     SameValue(ALeft.MaxOutlierFraction, ARight.MaxOutlierFraction, 1E-9) and
     SameValue(ALeft.OutlierFactor, ARight.OutlierFactor, 1E-9) and
-    SameValue(ALeft.ConfirmationTimeSec, ARight.ConfirmationTimeSec, 1E-9) and
     SameValue(ALeft.ExitThresholdFactor, ARight.ExitThresholdFactor, 1E-9) and
     SameValue(ALeft.TargetValue, ARight.TargetValue, 1E-9) and
     SameValue(ALeft.TargetAccuracyPlusPercent, ARight.TargetAccuracyPlusPercent, 1E-9) and
@@ -2891,7 +3033,7 @@ begin
   AErrorText := '';
 
   if (EditMinSampleCount = nil) or (EditWindowDurationSec = nil) or
-     (EditMaxSampleAgeSec = nil) or (EditConfirmationTimeSec = nil) or
+     (EditMaxSampleAgeSec = nil) or
      (EditExitThresholdFactor = nil) or (EditMaxVariation = nil) or
      (EditMaxStdDeviation = nil) or (EditMaxTrendRate = nil) or
      (EditMaxOutlierFractionPercent = nil) or (EditOutlierFactor = nil) or
@@ -2908,11 +3050,9 @@ begin
   else if IntValue < 1 then
     AErrorText := 'Минимальное количество отсчётов должно быть не меньше 1.'
   else if (not TryReadFloat(EditWindowDurationSec.Text, DoubleValue)) or (DoubleValue <= 0) then
-    AErrorText := 'Длительность окна должна быть положительным числом.'
+    AErrorText := 'Длительность стабилизации должна быть положительным числом.'
   else if (not TryReadFloat(EditMaxSampleAgeSec.Text, DoubleValue)) or (DoubleValue < 0) then
     AErrorText := 'Максимальный возраст данных не может быть отрицательным.'
-  else if (not TryReadFloat(EditConfirmationTimeSec.Text, DoubleValue)) or (DoubleValue < 0) then
-    AErrorText := 'Время подтверждения не может быть отрицательным.'
   else if (not TryReadFloat(EditExitThresholdFactor.Text, DoubleValue)) or (DoubleValue < 1) then
     AErrorText := 'Коэффициент порога выхода должен быть не меньше 1.'
   else if (not TryReadFloat(EditMaxVariation.Text, DoubleValue)) or (DoubleValue < 0) then

@@ -1,0 +1,115 @@
+object TStyleContainer
+  object TLayout
+    StyleName = 'simplecard'
+    Align = Center
+    Size.Width = 177.000000000000000000
+    Size.Height = 208.222229003906300000
+    Size.PlatformDefault = False
+    Visible = False
+    TabOrder = 0
+    object TImage
+      StyleName = 'device_icon'
+      MultiResBitmap = <
+        item
+        end>
+      Align = Client
+      Size.Width = 177.000000000000000000
+      Size.Height = 107.444458007812500000
+      Size.PlatformDefault = False
+    end
+    object TCalloutPanel
+      StyleName = 'infopanel'
+      Align = Top
+      Padding.Left = 5.000000000000000000
+      Padding.Top = 5.000000000000000000
+      Padding.Right = 5.000000000000000000
+      Padding.Bottom = 11.000000000000000000
+      Position.Y = 23.777770996093750000
+      Size.Width = 177.000000000000000000
+      Size.Height = 77.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      CalloutWidth = 23.000000000000000000
+      CalloutLength = 11.000000000000000000
+      CalloutPosition = Bottom
+      object TLayout
+        StyleName = 'detailinfo'
+        Align = Client
+        Size.Width = 167.000000000000000000
+        Size.Height = 61.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 1
+        object TText
+          StyleName = 'volume'
+          Align = Top
+          HitTest = False
+          Position.Y = 39.000000000000000000
+          Size.Width = 167.000000000000000000
+          Size.Height = 19.000000000000000000
+          Size.PlatformDefault = False
+          Text = 'V = 110.155 '#1083
+          TextSettings.Font.StyleExt = {00070000000000000004000000}
+          TextSettings.FontColor = claForestgreen
+        end
+        object TText
+          StyleName = 'outlay'
+          Align = Top
+          HitTest = False
+          Position.Y = 20.000000000000000000
+          Size.Width = 167.000000000000000000
+          Size.Height = 19.000000000000000000
+          Size.PlatformDefault = False
+          Text = 'Q = 0.155 '#1084'3/'#1095
+          TextSettings.Font.StyleExt = {00070000000000000004000000}
+          TextSettings.FontColor = claForestgreen
+        end
+        object TText
+          StyleName = 'hardware'
+          Align = MostTop
+          HitTest = False
+          Margins.Left = 5.000000000000000000
+          Margins.Right = 5.000000000000000000
+          Position.X = 5.000000000000000000
+          Size.Width = 157.000000000000000000
+          Size.Height = 20.000000000000000000
+          Size.PlatformDefault = False
+          Text = #8470' 17239'
+          TextSettings.Font.Size = 14.000000000000000000
+          TextSettings.Font.StyleExt = {00070000000000000004000000}
+        end
+      end
+    end
+    object TLayout
+      StyleName = 'header'
+      Align = MostTop
+      Size.Width = 177.000000000000000000
+      Size.Height = 23.777770996093750000
+      Size.PlatformDefault = False
+      TabOrder = 1
+      object TText
+        StyleName = 'Place'
+        Align = Center
+        HitTest = False
+        Size.Width = 87.000000000000000000
+        Size.Height = 50.000000000000000000
+        Size.PlatformDefault = False
+        Text = #1052#1077#1089#1090#1086' 15'
+        TextSettings.Font.Size = 14.000000000000000000
+        TextSettings.Font.StyleExt = {00070000000000000004000000}
+      end
+      object TCornerButton
+        StyleName = 'setupbutton'
+        Align = MostRight
+        Position.X = 150.555450439453100000
+        Sides = [Top, Left, Bottom, Right]
+        Size.Width = 26.444549560546880000
+        Size.Height = 23.777770996093750000
+        Size.PlatformDefault = False
+        TabOrder = 0
+        TextSettings.Trimming = None
+        XRadius = 3.000000000000000000
+        YRadius = 3.000000000000000000
+      end
+    end
+  end
+end

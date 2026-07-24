@@ -1,0 +1,46 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>1899.12.30 00:00:00.000.811,=D:\Borland\VCL.D12\fmxfp\Components\FP\FmxFrame.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.490,=D:\Borland\VCL.D12\FmxFp\Components\FP\FMXDeviceEditButtonStyled.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.406,D:\Borland\VCL.D12\fmxfp\Components\FP\Unit1.pas=D:\Borland\VCL.D12\fmxfp\Components\FP\FmxFloatEdit.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.372,=D:\Borland\VCL.D12\fmxfp\Components\FP\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.075,=D:\Borland\VCL.D12\fmxfp\Components\FP\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.963,D:\Borland\VCL.D12\FMXFP\Components\FP\FmxCurrencyEdit.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.774,D:\Borland\VCL.D12\FmxFp\Components\FP\FPCustomControl.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.085,=D:\Borland\VCL.D12\fmxfp\Components\FP\uMyCheckListBox.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.948,=D:\Borland\VCL.D12\fmxfp\Components\FP\FmxModbusReg.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.470,D:\Borland\VCL.D12\fmxfp\Components\FP\FmxModbusReg.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.559,D:\Borland\VCL.D12\fmxfp\Components\FP\Unit1.pas=D:\Borland\VCL.D12\fmxfp\Components\FP\FmxCheckListBox.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.052,D:\Borland\VCL.D12\fmxfp\Components\FP\Unit1.pas=D:\Borland\VCL.D12\fmxfp\Components\FP\FMX.CurrencyEdit.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.996,=D:\Borland\VCL.D12\fmxfp\Components\FP\FmxBitMask.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.775,=D:\Borland\VCL.D12\fmxfp\Components\FP\uCurrencyEditFMX.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.699,D:\Borland\VCL.D12\fmxfp\Components\FP\uCurrencyEditFMX.pas=D:\Borland\VCL.D12\FMXFP\Components\FP\FmxCurrencyEdit.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.325,=D:\Borland\VCL.D12\FMXFP\Components\FP\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.575,=D:\Borland\VCL.D12\fmxfp\Components\FP\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.897,=D:\Borland\VCL.D12\FMXFP\Components\FP\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.926,=D:\Borland\VCL.D12\fmxfp\Components\FP\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.316,=D:\Borland\VCL.D12\FmxFp\Components\FP\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.021,D:\Borland\VCL.D12\FmxFp\Components\FP\FMXDeviceSimpleEdit.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.856,=D:\Borland\VCL.D12\FMXFP\Components\FP\FMXCoilCheckList.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.818,D:\Borland\VCL.D12\fmxfp\Components\FP\FmxCheckListBox.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.105,=D:\Borland\VCL.D12\FMXFP\Components\FP\uCardItem.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.226,=D:\Borland\VCL.D12\fmxfp\Components\FP\FMX.CheckListBox.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.790,D:\Borland\VCL.D12\fmxfp\Components\FP\FMX.CheckListBox.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.241,D:\Borland\VCL.D12\fmxfp\Components\FP\uFloatEdit.pas=D:\Borland\VCL.D12\FMXFP\Components\FP\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.660,=D:\Borland\VCL.D12\fmxfp\Components\FP\uFloatEdit.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.311,D:\Borland\VCL.D12\fmxfp\Components\FP\uFloatEdit.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.039,D:\Borland\VCL.D12\fmxfp\Components\FP\FmxWaterLevel.pas=D:\Borland\VCL.D12\fmxfp\Components\FP\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.453,D:\Borland\VCL.D12\FmxFp\Components\FP\FMXDeviceCustomControl.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.758,D:\Borland\VCL.D12\FMXFP\Components\FP\errorindicator.pas=D:\Borland\VCL.D12\FMXFP\Components\FP\uErrorIndicator.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.397,=D:\Borland\VCL.D12\fmxfp\Components\FP\errorindicator.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.802,D:\Borland\VCL.D12\FMXFP\Components\FP\FMXDeviceSimpleEdit.pas=D:\Borland\VCL.D12\FMXFP\Components\FP\FMXDeviceEditButtonStyled.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.488,=D:\Borland\VCL.D12\FmxFp\Components\FP\FMXDeviceSimpleEdit.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.053,D:\Borland\VCL.D12\FmxFp\Components\FP\FMXDeviceSimpleEdit.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.280,=D:\Borland\VCL.D12\FMXFP\Components\FP\uSimpleChart.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.302,D:\Borland\VCL.D12\FMXFP\Components\FP\FmxSimpleEdit.pas=D:\Borland\VCL.D12\FmxFp\Components\FP\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.029,D:\Borland\VCL.D12\FmxFp\Components\FP\FmxSimpleEdit.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.488,=D:\Borland\VCL.D12\FMXFP\Components\FP\FmxSimpleEdit.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.308,=designide.dcp</Transaction>
+  </Transactions>
+</BorlandProject>

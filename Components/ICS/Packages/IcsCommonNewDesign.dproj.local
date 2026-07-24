@@ -1,0 +1,8 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>1899.12.30 00:00:00.000.651,C:\DelphiComp\ics-work\Source\OverbyteIcsRegMini.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.487,C:\DelphiComp\ics-work\Source\OverbyteIcsRegMini.pas=C:\DelphiComp\ics-work\Source\OverbyteIcsReg.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.656,=C:\DelphiComp\ics-work\Source\OverbyteIcsReg.pas</Transaction>
+  </Transactions>
+</BorlandProject>

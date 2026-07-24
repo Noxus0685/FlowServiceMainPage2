@@ -127,8 +127,8 @@ object FormTypeSelect: TFormTypeSelect
         OnHeaderClick = GridTypesHeaderClick
         OnGetValue = GridTypesGetValue
         OnCellClick = GridTypesCellClick
-        Viewport.Width = 861.000000000000000000
-        Viewport.Height = 637.000000000000000000
+        Viewport.Width = 881.000000000000000000
+        Viewport.Height = 678.000000000000000000
         object CheckColumnTypeEnable: TCheckColumn
           Header = #1042#1082#1083
           HeaderSettings.TextSettings.Trimming = Character
@@ -163,12 +163,6 @@ object FormTypeSelect: TFormTypeSelect
         end
         object StringColumnAccuracyClass: TStringColumn
           Header = #1050#1083#1072#1089#1089' '#1090#1086#1095#1085#1086#1089#1090#1080
-          HeaderSettings.TextSettings.Trimming = Character
-          HeaderSettings.TextSettings.WordWrap = False
-          HeaderSettings.TextSettings.HorzAlign = Center
-        end
-        object StringTemp: TStringColumn
-          Header = #1058#1077#1084#1087#1077#1088#1072#1090#1091#1088#1072
           HeaderSettings.TextSettings.Trimming = Character
           HeaderSettings.TextSettings.WordWrap = False
           HeaderSettings.TextSettings.HorzAlign = Center
@@ -299,14 +293,14 @@ object FormTypeSelect: TFormTypeSelect
           TextSettings.Trimming = None
         end
         object sbFind: TSpeedButton
-          StaysPressed = True
+          Action = actFilterFind
           Align = MostLeft
+          ImageIndex = -1
           Size.Width = 49.000000000000000000
           Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'searcheditbutton'
           TextSettings.Trimming = None
-          OnClick = actFilterFindExecute
         end
         object EditFindType: TEdit
           Touch.InteractiveGestures = [LongTap, DoubleTap]
@@ -319,7 +313,7 @@ object FormTypeSelect: TFormTypeSelect
           Size.Height = 22.000000000000000000
           Size.PlatformDefault = False
           KillFocusByReturn = True
-          OnChange = EditFindTypeChange
+          OnExit = EditFindTypeExit
         end
         object SpeedButtonFindInternet: TSpeedButton
           Action = actTypeFindInternet
@@ -343,7 +337,7 @@ object FormTypeSelect: TFormTypeSelect
         object Label1: TLabel
           Align = Left
           Margins.Left = 10.000000000000000000
-          Position.X = 53.000000000000000000
+          Position.X = 10.000000000000000000
           Size.Width = 46.000000000000000000
           Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
@@ -357,23 +351,12 @@ object FormTypeSelect: TFormTypeSelect
           Align = Left
           Margins.Top = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
-          Position.X = 99.000000000000000000
+          Position.X = 56.000000000000000000
           Position.Y = 5.000000000000000000
           Size.Width = 100.000000000000000000
           Size.Height = 22.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 1
-        end
-        object sbClearDate: TSpeedButton
-          Action = actFilterClear
-          Align = Left
-          ImageIndex = -1
-          Size.Width = 43.000000000000000000
-          Size.Height = 32.000000000000000000
-          Size.PlatformDefault = False
-          StyleLookup = 'stoptoolbutton'
-          TextSettings.Trimming = None
-          OnClick = sbClearDateClick
         end
       end
       object Line1: TLine
@@ -413,7 +396,7 @@ object FormTypeSelect: TFormTypeSelect
     object btnOK: TCornerButton
       Align = Right
       StyledSettings = [Family, Size, Style]
-      ModalResult = 2
+      ModalResult = 1
       Margins.Left = 10.000000000000000000
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
@@ -430,7 +413,6 @@ object FormTypeSelect: TFormTypeSelect
       TextSettings.Trimming = None
       XRadius = 3.000000000000000000
       YRadius = 3.000000000000000000
-      OnClick = btnOKClick
     end
     object CornerButtonSelectType: TCornerButton
       Action = actTypeSelect
@@ -504,9 +486,9 @@ object FormTypeSelect: TFormTypeSelect
       Locked = True
       Text = #1057#1077#1088#1074#1080#1089
       object miRefreshRepository: TMenuItem
-        Action = aRefreshRepository
         Locked = True
-        ImageIndex = -1
+        Text = #1054#1073#1085#1086#1074#1080#1090#1100
+        OnClick = miRefreshRepositoryClick
       end
       object miAddRepository: TMenuItem
         Locked = True
@@ -616,8 +598,7 @@ object FormTypeSelect: TFormTypeSelect
       OnClick = mpCollapseAllClick
     end
     object mpRefresh: TMenuItem
-      Action = aRefreshRepository
-      ImageIndex = -1
+      Text = #1054#1073#1085#1086#1074#1080#1090#1100
     end
     object MenuItem8: TMenuItem
       Action = actTypeCopy
@@ -704,7 +685,6 @@ object FormTypeSelect: TFormTypeSelect
     end
     object aRefreshRepository: TAction
       Text = #1054#1073#1085#1086#1074#1080#1090#1100
-      OnExecute = aRefreshRepositoryExecute
     end
   end
   object NetHTTPClient1: TNetHTTPClient

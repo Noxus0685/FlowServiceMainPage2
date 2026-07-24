@@ -1,0 +1,3341 @@
+unit FmxFPModuleManager;
+
+{ ===== Класс TFmxModuleManager =====
+Класс для общения классов модулей с модулями-устройствами через COM-порт в отдельном потоке. Осуществляет
+постоянный опрос статуса модулей-устройств и обновление статуса модулей. Также принимает запросы на запуск
+метода в потоке работы с COM-портом и позволяет отправлять команды модулей модулям-устройствам с получением
+ответа (только в потоке работы с COM-портом, т.е. предварительно следует запустить метод в этом потоке, а из
+него уже отправлять команду).
+}
+
+interface
+
+uses
+  {$IFDEF MSWINDOWS}
+  Windows,
+  System.Win.ScktComp,
+  {$ENDIF}
+  Classes,
+  System.SyncObjs,
+  Fmx.Forms,
+  FmxFPModule,
+  System.UITypes,
+  DateUtils,
+  FmxHelper,
+  Fmx.Graphics,
+  IdTCPClient,
+  uProcedureOfObject;
+
+const
+  cTimeout='нет ответа...';
+  cSleepBeforeRead=50;
+  cMinSleepBeforeRead=1;
+  cViewIOBufMin=20;
+  cViewIOBufMax=128;
+  cUPPMaxTime=65000;//было 18000
+  cErrorOpenComPortDelay=100;
+  cDelayAfterErrorFirstRequest=10;
+  c_DopTimOut=50;
+  // Размер очереди запросов запуска метода в потоке работы с COM-портом.
+  COM_RUN_QUERY_BUFFER_LENGTH = 10;
+
+  // Номер используемого COM-порта.
+  PORT_NUMBER = 1;
+  cPortHeader='Порт:COM';
+
+//тип Ком порта, Main - основной, через который связываются все платы
+//Flowmeter - расходомеры с интерфейсом
+type
+  TComPortInfo = record
+    PortHandle: Cardinal;
+    PortNumber: integer;
+    BaudRate: integer;
+    Parity:Integer;
+    Timeout: integer;
+    IsOpen: Boolean;
+    LastUsed: TDateTime;
+    TimeOuts: Longint;//Ошибки
+    TotalAttempts: Longint;//Все обменаы
+  end;
+
+  TComPortArray = array of TComPortInfo;
+
+  TPortStatus=(psOpen,psClose,psError);
+  TComPortType = (ctMain, ctFlowmeter);
+
+  TProcedureOfGetPortObject = procedure(var MainPort:integer;var FlowmeterPort:integer) of object;
+
+  TLogViewerAddMessage= procedure (const AText: string; const AColor: TAlphaColor = TAlphaColorRec.Black; const AStyle: TFontStyles = []) of object;
+
+  // Класс потока для работы с COM-портом.
+  TTransferThread = class(TThread)
+
+  public
+
+    // Указатель на метод, осуществляющий передачу информации через COM-порт.
+    TransferProc: procedure of object;
+
+  protected
+
+    procedure Execute; override;
+  end;
+
+//============================================================================================================
+TSendCommandProcs = procedure (module: TFmxModule; const command: String; response_length: integer; var result:boolean) of Object;
+TUpdateNextProcs = procedure (module: TFmxModule) of Object;
+  TFmxModuleManager = class
+
+  private
+    //расчет времени опроса всех модулей
+    FCycleStartTime: Cardinal;
+    FLastCycleTime: Double;
+    FAverageCycleTime: Double;
+    FMinCycleTime: Double;
+    FMaxCycleTime: Double;
+    FCycleCount: Integer;
+    FTotalCycleTime: Double;
+    FCurrentCycleModules: Integer; // Количество модулей в текущем цикле
+    //Пул портов
+    FComPorts: TComPortArray;
+    FComPortsLock: TCriticalSection;
+
+    _ViewIOBuff:array[0..cViewIOBufMax-1] of ShortString;
+    _ViewIOBuffColor:array[0..cViewIOBufMax-1] of TAlphaColor;
+
+    // Очередь запросов запуска метода в потоке работы с COM-портом.
+    COMRunQueriesBuffer: array[1..COM_RUN_QUERY_BUFFER_LENGTH] of TProcedureOfObject;
+    COMRunQueriesBufferExes: array[1..COM_RUN_QUERY_BUFFER_LENGTH] of boolean;
+
+    // Количество запросов запуска метода в потоке работы с COM-портом в очереди.
+    FCOMRunQueriesCount: integer;
+
+    {$IFDEF MSWINDOWS}
+    // Таймауты, использыемые при работе с COM-портом.
+    CTO: COMMTIMEOUTS;
+
+    // Структура DCB, используемая при работе с COM-портом.
+    DCB: DCB;
+    {$ENDIF}
+
+    // Номер модуля, для которого выполнялось последнее обновление статуса.
+    FCurrentModule: integer;
+
+    // Номер модуля, для которого требуетс выполнить команду
+    CurrentCommandModule: integer;
+
+
+    // Файл лога передачи данных через COM-порт.
+    LogFile: Text;
+
+    // Флаг открытия файла лога передачи данных через COM-порт.
+    LogFileIsOpened: Boolean;
+
+    // Количество тиков на момент начала цикла обновления статусов.
+    LoopStartTickCount: Cardinal;
+
+    // Динамический массив указателей на зарегистрированные модули.
+    Modules: array of TFmxModule;
+
+    // Дескриптор используемого COM-порта.
+    Port: Cardinal;
+
+    //Клиент Modbus TCP
+    TCP_Client: TIdTCPClient;
+
+    // Поток, в котором осуществляется вся передача информации через COM-порт.
+    TransferThread: TTransferThread;
+
+    FLogFileName:String;//Имя файла лога
+
+    //Номер используемого порта
+    FComPortNumber: integer;
+    FOnUpdateNext: TUpdateNextProcs;
+    FOnSendCommand: TSendCommandProcs;
+    FOnGetPort: TProcedureOfGetPortObject;
+    dummy:longword;
+    FDebug: boolean;
+    FSENDING_TRIES_COUNT: integer;
+    FChangePort: boolean;
+    CurComPortNumber: integer;
+    CurFlowmeterComPortNumber: integer;
+    FErrorConnection: boolean;
+    FShowPortInLog: boolean;
+    FShowModuleInLog: boolean;
+    FPortState: ShortString;
+    FPortStaus: TPortStatus;
+    FNextSleep: integer;
+    FFormHandle: THandle;
+    FDopTimOut: integer;
+    FViewIOBuffCounter: integer;
+    FViewIOBuffActive: boolean;
+    FViewIOBufMax: integer;
+    FModbusTCPPort: word;
+    FModbusTCPHost: string;
+    FTCP_Client_Active: Boolean;
+    FHOLD_CONNECTION_WITH_MODBUS_TCP_CLIENT: Boolean;
+    FPortReady: boolean;
+    FPortName: ShortString;
+    FUpdate: boolean;
+    FDelayBeforeSendCommand: integer;
+    FOptimization: Boolean;
+    FOnLogViewerAddMessage: TLogViewerAddMessage;
+    FTimeDebug: string;
+    FClosePorts: boolean;
+
+    function FindComPortIndex(PortNumber: integer): integer;
+    function GetComPortInfo(PortNumber: integer; var PortInfo: TComPortInfo;var PortIndex:integer): Boolean;
+    procedure UpdateComPortInfo(const PortInfo: TComPortInfo); // переименовали
+    procedure AddComPortInfo(const PortInfo: TComPortInfo);
+
+    procedure WriteToBuffer(str:ShortString;Module:TFmxModule);
+
+    { ===== AddToLog =====
+    Добавляет запись в файл лога передачи данных через COM-порт, если он открыт.
+    Принимаемые параметры:
+    buffer - указатель на начало буфера с отправленной или принятой строкой;
+    length - длина буфера;
+    sended - флаг, обозначающий отправленную строку.
+    }
+    procedure AddToLog(Module:TFmxModule;buffer: PByte; length: integer; sended: Boolean;err:Boolean=false);
+
+    { ===== ClosePort =====
+    Закрывыет COM-порт.
+    }
+    procedure ClosePort;
+
+    { ===== COMLoopProc =====
+    Метод, осуществляющий цикл передачи информации через COM-порт (циклически вызывается в отдельном потоке).
+    }
+    procedure COMLoopProc;
+
+    { ===== OpenPort =====
+    Открывыет COM-порт. По результатам выполнения сохраняет дескриптор открытого порта в поле Port
+    (INVALID_HANDLE_VALUE, если не удалось открыть порт).
+    }
+    procedure OpenPort;
+
+
+
+    { ===== UpdateNext =====
+    Выполняет обновление статуса очередного модуля.
+    }
+    procedure UpdateNext;
+    { ===== SendCommand =====
+    Отправляет команду модуля модулю-устройству, возвращая управление после получения ответа (по истечении
+    таймаута). Необходимо вызывать только из потока работы с COM-портом.
+    Принимаемые параметры:
+    module - указатель на модуль, отправляющий команду;
+    command - команда, полностью приведенная в формат протокола;
+    response_length - максимальная длина полного (с учетом формата протокола) ответа от модуля-устройства на
+                      команду.
+    Возвращает false в случае:
+    - модуль не является обслуживаемым менеджером модулей (не был добавлен в список обслуживаемых модулей);
+    - произошла ошибка при работе с COM-портом;
+    - функция вызвана не из потока работы с COM-портом.
+    - если response_length=0 а terminator<>0 - ждем терминатор
+    }
+    function SendCommand(module: TFmxModule; const command: ShortString; response_length: integer;terminator:char=#0): Boolean;
+
+    procedure SetOnSendCommand(const Value: TSendCommandProcs);
+    procedure SetOnUpdateNext(const Value: TUpdateNextProcs);
+    procedure SetOnGetPort(const Value: TProcedureOfGetPortObject);
+    procedure SetComPortNumber(const Value: integer);
+    procedure SetDebug(const Value: boolean);
+    function GetRunQueriesCount: integer;
+    function GetDebug: boolean;
+    procedure SetSENDING_TRIES_COUNT(const Value: integer);
+    procedure SetActive(const Value: boolean);
+    procedure SetChangePort(const Value: boolean);
+    procedure SetErrorConnection(const Value: boolean);
+    procedure SetShowPortInLog(const Value: boolean);
+    procedure SetShowModuleInLog(const Value: boolean);
+    procedure SetPortState(const Value: shortString);
+    procedure SetPortStaus(const Value: TPortStatus);
+    procedure SetNextSleep(const Value: integer);
+    //function WriteCommand(pcmd: Pbyte; cmdsize: Cardinal):Cardinal;
+    procedure SetFormHandle(const Value: THandle);
+    function GeTFmxModulesCount: integer;
+    procedure SetDopTimOut(const Value: integer);
+    function GeTFmxModule(ModuleIndex: integer): TFmxModule;
+    function GetViewIOBuff(Index: integer): ShortString;
+    procedure SetViewIOBuff(Index: integer; const Value: ShortString);
+    procedure SetViewIOBuffCounter(const Value: integer);
+    function GetViewIOBuffColor(Index: integer): TColor;
+    procedure SetViewIOBuffColor(Index: integer; const Value: TColor);
+    procedure SetViewIOBuffActive(const Value: boolean);
+    function GetMaxViewBuffCounter: integer;
+    procedure SetViewIOBufMax(const Value: integer);
+    procedure SetCOMRunQueriesCount(const Value: integer);
+    function GetThreadRun: integer;
+    function GetCurModule: Integer;
+    procedure SetCurrentModule(const Value: integer);
+    function GetCurrentModule: integer;
+    procedure SetModbusTCPHost(const Value: string);
+    procedure SetModbusTCPPort(const Value: word);
+    procedure IdTCPClientConnected(Sender: TObject);
+    procedure IdTCPClientDisconnected(Sender: TObject);
+    procedure SetTCP_Client_Active(const Value: Boolean);
+    function TCP_Client_Connected: Boolean;
+    procedure SetHOLD_CONNECTION_WITH_MODBUS_TCP_CLIENT(const Value: Boolean);
+    function GetFirstActiveModule: Integer;
+    procedure SetPortReady(const Value: boolean);
+    procedure SetPortName(const Value: ShortString);
+    procedure SetUpdate(const Value: boolean);
+    procedure SetDelayBeforeSendCommand(const Value: integer);
+    procedure SetOptimization(const Value: Boolean);
+    function GetLogFileName: string;
+    procedure SetOnLogViewerAddMessage(const Value: TLogViewerAddMessage);
+    procedure SetModule(ModuleIndex: integer; const Value: TFmxModule);
+    procedure SetModulesCount(const Value: integer);
+    function GetComPort(PortNumber, BaudRate, Parity, Timeout: integer;
+      var PortInfo: TComPortInfo;var PortIndex:integer): Boolean;
+    procedure OpenComPort(PortNumber, BaudRate,Parity, Timeout: integer;
+      var PortInfo: TComPortInfo; var PortIndex:integer);
+    procedure CloseComPort(PortNumber: integer);
+    procedure CloseAllComPorts;
+    procedure CleanupUnusedPorts(TimeoutMinutes: integer);
+    procedure RemoveClosedPortsFromArray;
+    function GetPortName: ShortString;
+    function CountActiveModules: Integer;
+    procedure ResetCycleStatistics;
+    procedure UpdateCycleStatistics(CycleTime: Double);
+    procedure SetTimeDebug(const Value: string);
+    procedure GetNextCurrentModule(UseTime: boolean = False);
+    function HasActiveModules: Boolean;
+    procedure ClosePortHandle(PortHandle: Cardinal);
+    procedure SetClosePorts(const Value: boolean);
+    function GetComPortsCount: integer;
+    function GetComPortInformation(Idx: integer): TComPortInfo;
+    function IsOverallCommunicationAlive(): Boolean;
+    function GetPercentOfQuality: integer;
+
+  public
+  {$IFDEF  MSWINDOWS}
+    ActualTimeouts:COMMTIMEOUTS;
+  {$ENDIF}
+    FActive: boolean;
+
+    //тип порта
+    ComPortType:TComPortType;
+
+    // Время последнего полного цикла обновлений статусов модулей в мс.
+    LastLoopTime: Double;
+
+    constructor Create(AModbusTCPHost:String;AModbusTCPPort:Word);
+    destructor Destroy; override;
+
+    { ===== AddModule =====
+    Добавляет модуль в список обслуживаемых модулей.
+    Принимаемые параметры:
+    module - указатель на добавляемый модуль.
+    }
+    procedure AddModule(module: TFmxModule);
+
+    { ===== ExecuteInCOMThread =====
+    Добавляет запрос на запуск метода в потоке работы с COM-портом. Если вызвана из потока работы с
+    COM-портом, то метод запустится сразу же (если не равен nil).
+    Принимаемые параметры:
+    method - указатель на метод, который следует вызвать из потока работы с COM-портом; если nil, то не будет
+    добавлен.
+    }
+    procedure ExecuteInCOMThread(method: TProcedureOfObject; first:boolean = false);
+
+    { ===== ExecuteInMainThread =====
+    Вызывает метод в основном потоке приложения. Можно вызывать из любого потока.
+    Принимаемые параметры:
+    method - указатель на метод, который необходимо вызвать в основном потоке приложения.
+    }
+    procedure ExecuteInMainThread(method: TProcedureOfObject;Name:String);
+
+    { ===== IterateCOMLoop =====
+    Выполняет итерации цикла работы с COM-портом. Необходимо вызывать только из потока работы с COM-портом.
+    Возвращает управление, когда передаваемое количество итераций будет выполнено.
+    Принимаемые параметры:
+    iterations_count - количество итераций цикла работы с COM-портом, которое необходимо выполнить.
+    Возвращает false, если была вызвана не из потока работы с COM-портом.
+    }
+    function IterateCOMLoop(iterations_count: integer): Boolean;
+
+
+    { ===== IterateCOMLoop1 =====
+    так как процедура проливки работает в потоке работы с основным ком портом,
+    то соответственно IterateCOMLoop вызывается из него же и в случае если мы
+    пытаемся выполнить ее для второго порта(который для расходомеров), то она не
+    выполняется немедленно, а просто добавляет запрос в очередь, который
+    выполняется неизвестно когда. Поэтому попробуем сделать так, что бы
+    IterateCOMLoop вызывалась через ExecuteInCOMThread с помощью данной процедуры
+    }
+    procedure IterateCOMLoop1;
+
+    { ===== ResumeCOMThread =====
+    Продолжает выполнение потока работы с COM-портом.
+    }
+    procedure ResumeCOMThread;
+
+
+    { ===== SetLogFileName =====
+    Устанавливает имя файла лога передачи данных через COM-порт.
+    Принимаемые параметры:
+    log_filename - имя файла лога; если '', то лог не будет вестись.
+    }
+    procedure SetLogFileName(log_filename: String);
+
+    { ===== SuspendCOMThread =====
+    Приостанавливает поток работы с COM-портом.
+    }
+    procedure SuspendCOMThread;
+
+    { ===== TerminateCOMThread =====
+    Уничтожает поток работы с COM-портом.
+    }
+    procedure TerminateCOMThread;
+
+    procedure ClearViewIOBuff();
+
+    // Метод для сброса статистики
+    procedure ResetCycleStats;
+
+    property OnUpdateNext:TUpdateNextProcs read FOnUpdateNext write SetOnUpdateNext;
+
+    property OnSendCommand:TSendCommandProcs read FOnSendCommand write SetOnSendCommand;
+
+    property OnGetPort:TProcedureOfGetPortObject read FOnGetPort write SetOnGetPort;
+
+    property ComPortNumber: integer read FComPortNumber write SetComPortNumber;
+
+    property Debug:boolean read GetDebug write SetDebug;
+
+    property RunQueriesCount:integer read GetRunQueriesCount;
+
+    // Количество попыток отправить команду модулю-устройству.
+    property SENDING_TRIES_COUNT:integer read FSENDING_TRIES_COUNT write SetSENDING_TRIES_COUNT default 10;
+
+    property ChangePort:boolean read FChangePort write SetChangePort;
+
+    property Active:boolean read FActive write SetActive default False;
+
+    property Update:boolean read FUpdate write SetUpdate default True;
+
+    property ErrorConnection:boolean read FErrorConnection write SetErrorConnection;
+
+    property ShowPortInLog:boolean read FShowPortInLog write SetShowPortInLog;
+
+    property ShowModuleInLog:boolean read FShowModuleInLog write SetShowModuleInLog;
+
+    property PortState:ShortString read FPortState write SetPortState;
+
+    property PortName:ShortString read GetPortName;
+
+    property PortStatus:TPortStatus read FPortStaus write SetPortStaus;
+
+    property NextSleep:integer read FNextSleep write SetNextSleep;
+
+    property FormHandle:THandle read FFormHandle write SetFormHandle;
+
+    property ModulesCount:integer read GeTFmxModulesCount write SetModulesCount;
+
+    property DopTimOut:integer read FDopTimOut write SetDopTimOut;
+
+    property Module[ModuleIndex:integer]:TFmxModule read GeTFmxModule write SetModule;
+
+    property ViewIOBuff[Index:integer]:ShortString read GetViewIOBuff write SetViewIOBuff;
+
+    property ViewIOBuffColor[Index:integer]:TColor read GetViewIOBuffColor write SetViewIOBuffColor;
+
+    property ViewIOBuffCounter:integer read FViewIOBuffCounter write SetViewIOBuffCounter;
+
+    property MaxViewIOBuffCounter:integer read GetMaxViewBuffCounter;
+
+    property ViewIOBuffActive:boolean read FViewIOBuffActive write SetViewIOBuffActive;
+
+    property ViewIOBufMax:integer read FViewIOBufMax write SetViewIOBufMax;
+    property  COMRunQueriesCount: integer read FCOMRunQueriesCount write SetCOMRunQueriesCount;
+
+    property ThreadRun:integer read GetThreadRun;
+
+    property CurrentModule: integer read GetCurrentModule write SetCurrentModule;
+
+    property ModbusTCPHost:string read FModbusTCPHost write SetModbusTCPHost;
+
+    property ModbusTCPPort:word read FModbusTCPPort write SetModbusTCPPort;
+
+    property TCP_Client_Active:Boolean read FTCP_Client_Active write SetTCP_Client_Active;
+
+    property HOLD_CONNECTION_WITH_MODBUS_TCP_CLIENT:Boolean read FHOLD_CONNECTION_WITH_MODBUS_TCP_CLIENT write SetHOLD_CONNECTION_WITH_MODBUS_TCP_CLIENT;
+
+    property FirstActiveModule:Integer read GetFirstActiveModule;
+
+    property PortReady:boolean read FPortReady write SetPortReady;
+
+    property DelayBeforeSendCommand:integer read FDelayBeforeSendCommand write SetDelayBeforeSendCommand;
+
+    property Optimization:Boolean read FOptimization write SetOptimization;
+
+    property LogFileName:string read GetLogFileName;
+
+    property OnLogViewerAddMessage:TLogViewerAddMessage read FOnLogViewerAddMessage write SetOnLogViewerAddMessage;
+
+    // Статистика циклов опроса
+    property LastCycleTime: Double read FLastCycleTime;
+    property AverageCycleTime: Double read FAverageCycleTime;
+    property MinCycleTime: Double read FMinCycleTime;
+    property MaxCycleTime: Double read FMaxCycleTime;
+    property CycleCount: Integer read FCycleCount;
+    property CurrentCycleModules: Integer read FCurrentCycleModules;
+    property TimeDebug: string read FTimeDebug write SetTimeDebug;
+    property ClosePorts:boolean read FClosePorts write SetClosePorts; //возникло при кроссмашинном редактировании проекта - при отсутствии портов происходил сбой(зависание) при их закрытии
+    property ComPortsCount:integer read GetComPortsCount;
+    property ComPortInfo[Idx:integer]:TComPortInfo read GetComPortInformation;
+    property CommunicationState:boolean read IsOverallCommunicationAlive;
+    property PercentOfQuality:integer read GetPercentOfQuality;
+
+  end;
+
+//============================================================================================================
+//============================================================================================================
+
+implementation
+
+uses
+  SysUtils,uMessageConstants,IdGlobal,fmxkbdhelper;
+
+//============================================================================================================
+
+
+
+procedure TTransferThread.Execute;
+begin
+ try
+  while not Terminated do
+  begin
+    if Assigned(Application) then
+    begin
+       if Assigned(TransferProc) then
+          TransferProc;
+    end
+    else
+      Break;
+    sleep(1);
+  end;
+ finally
+
+ end;
+end;
+
+//============================================================================================================
+
+
+procedure TFmxModuleManager.AddToLog(Module:TFmxModule;buffer: PByte; length: integer; sended: Boolean;err:Boolean=false);
+var
+  hour, min, sec, msec: Word;
+  str,substr: String;
+  i: integer;
+  msgColor:TAlphaColor;
+begin
+  try
+
+      AssignFile(LogFile, FLogFileName);
+      {$I-}
+      Append(LogFile);
+      {$I+}
+      LogFileIsOpened := IOResult = 0;
+
+      if LogFileIsOpened then
+      begin
+        str := '';
+
+        DecodeTime(Time, hour, min, sec, msec);
+        if hour < 10 then str := str + '0';
+        str := str + IntToStr(hour) + ':';
+        if min < 10 then str := str + '0';
+        str := str + IntToStr(min) + ':';
+        if sec < 10 then str := str + '0';
+        str := str + IntToStr(sec) + ':';
+        if msec < 10 then str := str + '0';
+        if msec < 100 then str := str + '0';
+        str := str + IntToStr(msec);
+
+        substr:='';
+        if ShowPortInLog then substr:=' COM'+IntToStr(Module.PortNumber);
+        if ShowModuleInLog then
+          if Module.ModuleType<>mtDigitalUnit then
+             substr:=substr+' '+Module.ModuleName+Format('(0x%0.2X',[Module.FAddress])
+          else
+             substr:=substr+' '+Module.ModuleName;
+        if sended then
+          str := str +substr+') <-- '
+        else
+          str := str +substr+') --> ';
+
+        if (not PortReady) then
+        begin
+           str:=str+' E:'+PortState;
+           msgColor:=TAlphaColorRec.Blue;
+        end
+        else begin
+          PortState:='';
+          if Module.ASCII then
+          begin
+            if err then
+              msgColor:=TAlphaColorRec.Darkred
+            else
+              msgColor:=TAlphaColorRec.DarkGreen;
+            if length>0 then
+            begin
+              for i:=1 to length do
+                if buffer[i-1] = 13 then
+                  str := str + '<CR>'
+                else if buffer[i-1] = 10 then
+                  str := str + '<LF>'
+                else if buffer[i-1] = $A6 then
+                  str := str + '<A6>'
+                else
+                  str := str + Chr(buffer[i-1]);
+            end
+            else
+               str:=str+cTimeout;
+
+          end
+          else  begin
+            if err then
+              msgColor:=TAlphaColorRec.Darkred
+            else
+              msgColor:=TAlphaColorRec.Darkolivegreen;
+            if length>0 then
+               str:=str+'[hex] '+B2HS(@buffer[0],length)
+            else
+               str:=str+cTimeout;
+
+          end;
+        end;
+
+        if Debug then
+        if Assigned(FOnLogViewerAddMessage) then
+        begin
+           OnLogViewerAddMessage(str,msgColor);
+        end;
+        WriteLn(logFile, str);
+        CloseFile(logFile);
+      end;
+  finally
+
+  end;
+end;
+
+//============================================================================================================
+
+procedure TFmxModuleManager.ClearViewIOBuff;
+var i:integer;
+begin
+  for i:=0 to cViewIOBufMax-1 do begin
+      _ViewIOBuff[i]:='';
+      _ViewIOBuffColor[i]:=TAlphaColorRec.Black;
+  end;
+  ViewIOBuffCounter:=0;
+  FViewIOBuffActive := True;
+end;
+
+
+
+
+
+
+procedure TFmxModuleManager.ClosePort;
+begin
+  PortReady := False;
+
+  // Закрываем текущий порт через справочник
+  if FComPortNumber > 0 then
+  begin
+    CloseComPort(FComPortNumber);
+  end;
+
+  // Дополнительно закрываем все порты если требуется полная очистка
+  CloseAllComPorts;
+
+  ComPortNumber := -1;
+  Port := INVALID_HANDLE_VALUE;
+  PortStatus := psClose;
+  PortState := 'Порт закрыт';
+end;
+
+//============================================================================================================
+
+//procedure TFmxModuleManager.COMLoopProc;
+//begin
+//  while not Application.Terminated do
+//  begin
+//    if not Assigned(Application) or not Active then
+//    begin
+//      Sleep(100); // Большая задержка когда не активно
+//      Continue;
+//    end;
+//
+//    try
+//      if COMRunQueriesCount > 0 then
+//      begin
+//        // Выполняем запросы из очереди
+//        COMRunQueriesCount := COMRunQueriesCount - 1;
+//        try
+//          if Assigned(COMRunQueriesBuffer[COMRunQueriesCount + 1]) then
+//            COMRunQueriesBuffer[COMRunQueriesCount + 1]();
+//        except
+//          on e: Exception do
+//            DebugOutput('COMLoopProc Ошибка выполнения запроса: ' + e.Message);
+//        end;
+//      end
+//      else if Update then // Только если обновление включено
+//      begin
+//        // Основной цикл опроса
+//        UpdateNext;
+//      end
+//      else
+//      begin
+//        // Если обновление выключено - большая задержка
+//        Sleep(100);
+//      end;
+//    except
+//      on e: Exception do
+//      begin
+//        DebugOutput('COMLoopProc Общая ошибка: ' + e.Message);
+//        Sleep(10);
+//      end;
+//    end;
+//  end;
+//end;
+
+procedure TFmxModuleManager.COMLoopProc;
+var
+  idx:integer;
+begin
+  if Assigned(Application) then
+  try
+    Sleep(1);
+    if Assigned(Application) then
+       Application.ProcessMessages
+    else
+      Exit;
+    if COMRunQueriesCount = 0 then
+    begin
+      try
+        UpdateNext
+      except
+        on e:exception do
+          ODS(PChar('COMLoopProc UpdateNext Ошибка:'+e.Message));
+      end;
+    end
+    else begin
+      COMRunQueriesCount := COMRunQueriesCount - 1;
+      try
+        COMRunQueriesBuffer[COMRunQueriesCount + 1];
+      except
+        on e:exception do
+          ODS(PChar('COMLoopProc Ошибка:'+e.Message));
+      end;
+    end;
+  except
+
+  end;
+end;
+
+procedure TFmxModuleManager.OpenComPort(PortNumber, BaudRate,Parity,Timeout: integer; var PortInfo: TComPortInfo; var PortIndex:integer);
+{$IFDEF MSWINDOWS}
+var
+  DCB: TDCB;
+  CTO: COMMTIMEOUTS;
+{$ENDIF}
+begin
+  if PortNumber <= 0 then Exit;
+
+  FComPortsLock.Enter;
+  Inc(TimeOut,FDopTimOut);
+  try
+    // Проверяем, не открыт ли уже порт
+    if GetComPortInfo(PortNumber, PortInfo,PortIndex) then
+    begin
+      // Если параметры изменились, переоткрываем
+      if (PortInfo.BaudRate <> BaudRate) or (PortInfo.Parity <> Parity) then
+      begin
+        CloseComPort(PortNumber);
+        // После закрытия сбрасываем PortInfo
+        PortInfo.PortNumber := PortNumber;
+        PortInfo.BaudRate := BaudRate;
+        PortInfo.Parity := Parity;
+        PortInfo.Timeout := Timeout;
+        PortInfo.IsOpen := False;
+      end
+      else
+      begin
+        Exit; // Порт уже открыт с нужными параметрами
+      end;
+    end
+    else
+    begin
+      // Порт не найден, инициализируем новую запись
+      PortInfo.PortNumber := PortNumber;
+      PortInfo.BaudRate := BaudRate;
+      PortInfo.Parity := Parity;
+      PortInfo.Timeout := Timeout;
+      PortInfo.IsOpen := False;
+    end;
+
+    // Открываем порт
+    {$IFDEF MSWINDOWS}
+    PortInfo.PortHandle := CreateFile(
+      PChar('\\.\' + 'COM' + IntToStr(PortNumber)),
+      GENERIC_READ or GENERIC_WRITE,
+      0, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0
+    );
+
+    if PortInfo.PortHandle = INVALID_HANDLE_VALUE then
+    begin
+      PortInfo.IsOpen := False;
+      PortState := 'Ошибка открытия порта COM' + IntToStr(PortNumber);
+      // Сохраняем информацию о неудачной попытке
+      if FindComPortIndex(PortNumber) >= 0 then
+        UpdateComPortInfo(PortInfo)
+      else
+        AddComPortInfo(PortInfo);
+      Exit;
+    end;
+
+    // Настройка параметров порта
+    GetCommState(PortInfo.PortHandle, DCB);
+    DCB.BaudRate := BaudRate;
+    DCB.Parity := Parity;
+    DCB.ByteSize := 8;
+    DCB.StopBits := ONESTOPBIT;
+    SetCommState(PortInfo.PortHandle, DCB);
+
+    // Настройка таймаутов
+    GetCommTimeouts(PortInfo.PortHandle, CTO);
+    CTO.ReadIntervalTimeout := MAXWORD;
+    CTO.ReadTotalTimeoutMultiplier := 0;
+    CTO.ReadTotalTimeoutConstant := Timeout;
+    CTO.WriteTotalTimeoutMultiplier := 150;
+    CTO.WriteTotalTimeoutConstant := 100;
+    SetCommTimeouts(PortInfo.PortHandle, CTO);
+
+    EscapeCommFunction(PortInfo.PortHandle, SETRTS);
+    {$ENDIF}
+
+    PortInfo.IsOpen := True;
+    PortInfo.LastUsed := Now;
+
+    // Сохраняем информацию о порте
+    if FindComPortIndex(PortNumber) >= 0 then
+      UpdateComPortInfo(PortInfo)
+    else
+      AddComPortInfo(PortInfo);
+
+    PortState := 'Порт COM' + IntToStr(PortNumber) + ' открыт';
+
+  finally
+    FComPortsLock.Leave;
+  end;
+end;
+//============================================================================================================
+
+procedure TFmxModuleManager.OpenPort;
+var
+  PortInfo: TComPortInfo;
+begin
+  // ИСПРАВЛЕНИЕ: Теперь открываем порт через справочник
+  if FComPortNumber <= 0 then
+  begin
+    PortStatus := psError;
+    PortState := 'Неверный номер порта';
+    Exit;
+  end;
+
+  // Используем наш новый механизм открытия портов
+  {$IFDEF WINDOWS}
+  OpenComPort(FComPortNumber, CBR_115200, NOPARITY, 200, PortInfo);
+  {$ENDIF}
+
+  if PortInfo.IsOpen then
+  begin
+    Port := PortInfo.PortHandle;
+    PortStatus := psOpen;
+    PortReady := True;
+    PortState := 'Порт ' + PortName + ' открыт';
+  end
+  else
+  begin
+    Port := INVALID_HANDLE_VALUE;
+    PortStatus := psError;
+    PortReady := False;
+    PortState := 'Ошибка открытия порта ' + PortName;
+    ErrorConnection := True;
+  end;
+end;
+
+
+//============================================================================================================
+procedure ClearBuffer(pbuff:PByte);
+var i:byte;
+begin
+   for I := 0 to 255 do   pbuff[i]:=0;
+end;
+
+//UpdateNext
+{-----------UpdateNext- begin of procedure ---------}
+procedure TFmxModuleManager.UpdateNext;
+var
+  StartTime, PortTime, SendTime, ReadTime, UpdateTime: Cardinal;
+  ProcessingTime: Cardinal;
+
+  PortInfo: TComPortInfo;
+  PortIndex:integer;
+  CurrentModuleObj: TFmxModule;
+  stage, i, j, mlen, RequestLength, ResponseLength: integer;
+  readed: Cardinal;
+  written: Cardinal;
+  output_buffer, in_buff: array [0..255] of ansichar;
+  _TypeOfProtocol: TTypeOfProtocol;
+  response: ShortString;
+  request: ShortString;
+  _output_buffer, _in_buff: TIdBytes;
+
+
+  procedure ExecuteErrorTransaction();
+  begin
+    //таймаут
+    if Assigned(CurrentModuleObj) then
+    begin
+      CurrentModuleObj.BadPackages := CurrentModuleObj.BadPackages + 1;
+      if not CurrentModuleObj.Disguise then CurrentModuleObj.ConnectIsOK := fdqBad;
+      if CurrentModuleObj.Protocol<>tpModbusTCP then
+      begin
+         if PortIndex>=0 then
+           Inc(FComPorts[PortIndex].TimeOuts);
+      end;
+      CurrentModuleObj.TimeOuts := CurrentModuleObj.TimeOuts + 1;
+      //вызывает отработку таймаута
+      CurrentModuleObj.ReceiveResponse();
+      //отрабатываем, что она была не удачной
+      if Debug then DebugOutput('<UpdateNextX:[' + CurrentModuleObj.ModuleName + '] Responce TIMEOUT - STAGE:' + IntToStr(stage) + '>');
+      //вызывает отработку таймаута
+      CurrentModuleObj.ReceiveResponse('*', '');
+    end;
+    GetNextCurrentModule();
+  end;
+
+begin
+  //Для отладки, когда не требуется заваливать лог командами опроса
+  mlen := Length(Modules);
+  if
+     (
+       (mlen = 0) or
+       (not Update) or
+       (not Active) or
+       (not HasActiveModules) or
+       (not Assigned(Application))
+     )
+   then begin
+    Sleep(100);//Если
+    Exit;
+  end;
+
+  StartTime := GetTickCount;
+  try
+
+    CurrentModuleObj := Modules[CurrentModule];
+
+    // Очистка неиспользуемых портов при каждом полном цикле опроса
+    if CurrentModule = FirstActiveModule then
+    begin
+      CleanupUnusedPorts(5); // Очищаем порты, неиспользуемые более 5 минут
+    end;
+
+    if not Assigned(CurrentModuleObj) then
+    begin
+      if Debug then DebugOutput('UpdateNext: CurrentModuleObj is nil, skipping');
+      GetNextCurrentModule();
+      Exit;
+    end;
+
+    if Debug then DebugOutput('UpdateNext: Processing module: ' + CurrentModuleObj.ModuleName +
+               ', Disguise=' + BoolToStr(CurrentModuleObj.Disguise, True) +
+               ', Enabled=' + BoolToStr(CurrentModuleObj.EnabledAutoUpdate, True));
+
+    // ВАЖНОЕ ИЗМЕНЕНИЕ: ДЛЯ ОТКЛЮЧЕННЫХ МОДУЛЕЙ ВЫЗЫВАЕМ ReceiveResponse ОДИН РАЗ
+    if CurrentModuleObj.Disguise or (not CurrentModuleObj.EnabledAutoUpdate) then
+    begin
+      if Debug then DebugOutput('UpdateNext: Module skipped - calling ReceiveResponse once');
+      // ВЫЗЫВАЕМ ReceiveResponse ДЛЯ ОТКЛЮЧЕННЫХ МОДУЛЕЙ
+      CurrentModuleObj.ReceiveResponse('*', '');
+      GetNextCurrentModule();
+      Exit;
+    end;
+
+    // ОСНОВНАЯ ЛОГИКА ОПРОСА (ОРИГИНАЛЬНАЯ)
+    if (not CurrentModuleObj.Disguise) then
+    begin
+      if CurrentModuleObj.EnabledAutoUpdate then
+      // и если контроллер активен (не отключен)
+      begin
+        CurrentModuleObj.TotalSended := CurrentModuleObj.TotalSended + 1;
+        //обновляемся, если только сменятся значения
+        CurrentModuleObj.MustUpdate:=False;
+        // узнаем тип протокола - на данный момент все протоколы, кроме Modbus TCP работают через компорт, на это пока и ориентируемся
+        _TypeOfProtocol := CurrentModuleObj.Protocol;
+
+        //
+        // ИСПРАВЛЕНИЕ: Используем справочник портов вместо постоянного открытия/закрытия
+        //
+        PortTime := GetTickCount;
+        PortReady := False;
+        if _TypeOfProtocol in [tpProprietary..tpModbusASCII] then
+        begin
+          // Получаем порт из справочника (откроется если нужно)
+          if not GetComPort(CurrentModuleObj.PortNumber,
+                           CurrentModuleObj.BaudRate,
+                           ord(CurrentModuleObj.Parity),
+                           CurrentModuleObj.Timeout,
+                           PortInfo,PortIndex) then
+          begin
+            PortReady := False;
+            PortState := 'Ошибка открытия порта COM' + IntToStr(CurrentModuleObj.PortNumber);
+            AddToLog(CurrentModuleObj, @output_buffer[0], 0, true);
+            CurrentModuleObj.ConnectIsOK := fdqBad;
+            ErrorConnection := True;
+            ExecuteErrorTransaction();
+            Sleep(cErrorOpenComPortDelay);
+            Exit;
+          end;
+
+          // Используем handle из справочника
+          Port := PortInfo.PortHandle;
+          PortReady := PortInfo.IsOpen;
+
+          {$IFDEF MSWINDOWS}
+          // Настраиваем таймауты для текущего модуля
+          if Update then
+          begin
+            CTO.ReadTotalTimeoutConstant := CurrentModuleObj.Timeout + DopTimOut;
+            SetCommTimeouts(Port, CTO);
+          end;
+          if PortIndex>=0 then begin
+            GetCommState(PortInfo.PortHandle, DCB);
+            if (DCB.BaudRate <> CurrentModuleObj.baudrate) or
+               (DCB.Parity <> ord(CurrentModuleObj.parity)) then
+            begin
+              FComPorts[PortIndex].baudrate:=CurrentModuleObj.baudrate;
+              FComPorts[PortIndex].parity:=ord(CurrentModuleObj.parity);
+              DCB.BaudRate := FComPorts[PortIndex].baudrate;
+              DCB.Parity := FComPorts[PortIndex].parity;
+              SetCommState(PortInfo.PortHandle, DCB);
+            end;
+            FComPorts[PortIndex].TimeOut:=CTO.ReadTotalTimeoutConstant;
+          end;
+          {$ENDIF}
+        end
+        else
+        begin
+          //Modbus TCP - подключаемся
+          try
+            PortReady := TCP_Client_Connected;
+          except
+            on e: exception do
+            begin
+              PortReady := False;//для корректной отработки лога
+              PortState := 'Ошибка подключения к Modbus TCP серверу:' + e.Message;
+              AddToLog(CurrentModuleObj, @output_buffer[0], 0, true);
+              ErrorConnection := True;
+            end;
+          end;
+        end;
+        PortTime := GetTickCount - PortTime;
+        ErrorConnection := False;
+
+        if PortReady then
+        begin
+          //-------------- Если порт готов к обмена
+          try
+            //пытаемся, при неудачной попытке SENDING_TRIES_COUNT раз повторить операцию
+            // выбираем команду статуса текущего модуля.
+            //Получили содержимое пакета лоя отправки
+            request := CurrentModuleObj.StatusQuery; //важно забрать значение посылки одномоментно 13.06.2024
+            //подсчитали длину пакета для отправки
+            RequestLength := Length(request);
+            //получили длину ожидаемого ответа
+            ResponseLength := CurrentModuleObj.ResponseLength;
+
+            for j := 1 to RequestLength do
+              output_buffer[j - 1] := request[j];
+
+            //для TCP клиента формирвем запрос
+            if _TypeOfProtocol = tpModbusTCP then
+              _output_buffer := RawToBytes(output_buffer, RequestLength);
+
+            //если должны ожидать ответ
+            if (RequestLength > 0) then
+            begin
+              for stage := 1 to SENDING_TRIES_COUNT do
+              begin
+                if not Active then Exit;
+                if CurrentModuleObj.Disguise then break;
+
+                //если это повтор - следующую операцию выполняем с задержкой 28.03.2024
+                if stage > 1 then
+                begin
+                  Sleep(cDelayAfterErrorFirstRequest * stage * 2);
+                end
+                else begin
+                  if Debug then
+                    DebugOutput('<CMD:' + request + 'STAGE:' + IntToStr(stage) + '>');
+                end;
+
+                // Замер времени отправки
+                SendTime := GetTickCount;
+                //отправка запроса
+                if Update then
+                try
+                  if _TypeOfProtocol in [tpProprietary..tpModbusASCII] then
+                  begin
+{$IFDEF MSWINDOWS}
+                      //rs485
+                      //Включим линию RTS, нужна для работы прэмов
+                      if Update then
+                        EscapeCommFunction(Port, SETRTS);
+                      //сбрасываем предыдущие операции по порту
+                      if Update then
+                        PurgeComm(Port, PURGE_TXABORT or PURGE_RXABORT or PURGE_TXCLEAR or PURGE_RXCLEAR);
+                      // отправляем команду запроса статуса
+                      if Update then
+                        WriteFile(Port, output_buffer, RequestLength, written, nil);
+                      //
+                      if PortIndex>=0 then
+                         Inc(FComPorts[PortIndex].TotalAttempts);
+{$ENDIF}
+                  end
+                  else begin
+                    //Modbus TCP
+                    readed := 0;
+                    SetLength(_in_buff, 0);//сбрасываем входной буфер
+                    if Update then
+                       TCP_Client.Socket.Write(_output_buffer);
+                    written := RequestLength;
+                  end;
+                except
+                  on e: Exception do
+                  begin
+                    PortReady := False;//для корректной отработки лога
+                    PortState := 'Ошибка отправки запроса:' + e.Message;
+                  end;
+                end;
+                if Optimization then sleep(cSleepBeforeRead);
+                // ... код отправки ...
+                SendTime := GetTickCount - SendTime;
+                // Замер времени чтения
+                ReadTime := GetTickCount;
+                //Пока контроллер думает над ответом - выводим лог
+                AddToLog(CurrentModuleObj, @output_buffer[0], RequestLength, True);
+                //если ответ ожидается
+                if (ResponseLength > 0) then
+                begin
+
+                  // считываем ответ
+                  try
+                    if _TypeOfProtocol in [tpProprietary..tpModbusASCII] then
+                    begin
+{$IFDEF MSWINDOWS}
+                      //rs485
+                      if CurrentModuleObj.TerminatedChar=#$00 then
+                      begin
+                        if Update then
+                        begin
+                           GetCommTimeouts(Port, ActualTimeouts);
+                           ReadFile(Port, in_buff, ResponseLength mod 256, readed, nil)
+                        end;
+                      end   
+                      else begin
+                        var ch:AnsiChar;
+                        var total_readed:integer;
+                        total_readed:=0;
+                        for i := 1 to (ResponseLength mod 256) do
+                        begin
+                           if Update then
+                           begin
+                              GetCommTimeouts(Port, ActualTimeouts);
+                              ReadFile(Port, ch, 1, readed, nil);
+                           end;
+                           if (readed=1) then
+                           begin
+                              in_buff[i-1]:=ch;
+                              Inc(total_readed);
+                              if (ch=CurrentModuleObj.TerminatedChar) or (readed=0) then break;
+                           end;
+                        end;
+                        readed:=total_readed;
+                        ResponseLength:=readed;
+
+                      end;
+{$ENDIF}
+                    end
+                    else begin
+                      //Modbus TCP
+                      try
+                        if Update then
+                           TCP_Client.Socket.ReadBytes(_in_buff, -1);
+                        readed := Length(_in_buff);
+                        for i := 0 to readed - 1 do
+                          in_buff[i] := AnsiChar(_in_buff[i]);
+                      except
+                        on e: exception do
+                        begin
+                          PortReady := False;//для корректной отработки лога
+                          PortState := 'Ошибка чтения из Modbus TCP сервера:' + e.Message;
+                          readed := 0;
+                        end;
+                      end;
+                    end;
+                  except
+                    on e: Exception do
+                    begin
+                      PortReady := False;//для корректной отработки лога
+                      PortState := 'Ошибка получения ответа:' + e.Message;
+                    end;
+                  end;
+                  // ... код чтения ...
+                  ReadTime := GetTickCount - ReadTime;
+
+                  if (ResponseLength <> readed) then
+                  begin
+                    AddToLog(CurrentModuleObj, @in_buff[0], readed, false, true)
+                  end
+                  else
+                    AddToLog(CurrentModuleObj, @in_buff[0], readed, false);
+
+                  //пишем в лог что (MustBytesRead) количество ожидаемых байт
+                  //не соответствуют реально считанным (Real Readed)
+                  if (ResponseLength <> readed) then
+                    if Debug then
+                      DebugOutput('[' + CurrentModuleObj.ModuleName + '] MBR:' + IntToStr(ResponseLength) + ' RR:' + IntToStr(readed));
+
+                  //переносим результат в ответ
+                  //если есть принятые данные
+                  response := '';
+                  if readed > 0 then
+                  begin
+                    for j := 1 to readed do
+                    begin
+                      response := response + in_buff[j - 1];
+                    end;
+                    //проверяем их корректность
+                    if CurrentModuleObj.CheckResponse(request, response) then
+                    begin
+                      CurrentModuleObj.TotalReceived := CurrentModuleObj.TotalReceived + 1;
+                      if Debug then
+                        DebugOutput('<UpdateNext:[' + CurrentModuleObj.ModuleName + '] Response OK - STAGE:' + IntToStr(stage) + '>');
+                      UpdateTime:=GetTickCount;
+                      try
+                        CurrentModuleObj.ReceiveResponse(request, response); // !!! 22.07.2008
+                        //если после повторов есть какой-то ответ
+                        //если есть корректный ответ
+                        //берем следующий модуль
+                        GetNextCurrentModule(true);
+                      except
+                        on e: exception do
+                        begin
+                          PortReady := False;//для корректной отработки лога
+                          PortState := 'Ошибка разбора ответа:' + e.Message;
+                          AddToLog(CurrentModuleObj, @output_buffer[0], 0, true);
+                        end;
+                      end;
+                      UpdateTime:=GetTickCount-UpdateTime;
+
+                      Break;
+                    end
+                    else begin
+                      if Debug then
+                        DebugOutput('<UpdateNext:[' + CurrentModuleObj.ModuleName + '] Response BAD - STAGE:' + IntToStr(stage) + '>');
+                      if stage = SENDING_TRIES_COUNT then
+                        ExecuteErrorTransaction();
+                    end;
+                  end
+                  else begin
+                    {$IFDEF  WINDOWS}
+                    if Debug then
+                    begin
+                      DebugOutput('<UpdateNext:[' + CurrentModuleObj.ModuleName + '] TIMEOUT - STAGE:' + IntToStr(stage) + '>');
+                      DebugOutput('<TimeOuts:['
+                      + IntToStr(ActualTimeouts.ReadIntervalTimeout)+ ','
+                      + IntToStr(ActualTimeouts.ReadTotalTimeoutMultiplier)+ ','
+                      + IntToStr(ActualTimeouts.ReadTotalTimeoutConstant)+'] TIMEOUT - STAGE:' + IntToStr(stage) + '>');
+                    end;
+                    {$ENDIF}
+                    if stage = SENDING_TRIES_COUNT then
+                      ExecuteErrorTransaction();
+                  end;
+                end
+                else begin
+                  //Ответа не оожидается
+                  CurrentModuleObj.TotalReceived := CurrentModuleObj.TotalReceived + 1;
+                  GetNextCurrentModule(true);
+                  Break;
+                end;
+              end;//цикл повторов при ошибке
+            end;//if (RequestLength>0) then
+            StartTime:=GetTickCount - StartTime;
+            // Диагностика
+            if Debug and (StartTime > 100) then // Если операция дольше 100мс
+            begin
+              TimeDebug := Format('Медленный опрос %s: Пор=%dмс, Отпр=%dмс, Чтение=%dмс, Update=%dмс, Всего=%dмс',
+                [CurrentModuleObj.ModuleName, PortTime, SendTime, ReadTime,UpdateTime,StartTime]);
+              DebugOutput(TimeDebug);
+            end;
+            CurrentModuleObj.UpdateTime:=UpdateTime;
+            CurrentModuleObj.RequestTime:=StartTime;
+            CurrentModuleObj.ReadTime:=ReadTime;
+          finally
+              // Минимальная пауза между модулями
+              ProcessingTime := GetTickCount - StartTime;
+              if ProcessingTime < 5 then // Всего 5мс между модулями
+              begin
+                Sleep(5 - ProcessingTime);
+              end;
+          end;
+          //-------------- Если порт готов к обмену
+        end//if PortReady then
+        else begin
+          ErrorConnection := True;
+          if _TypeOfProtocol in [tpProprietary..tpModbusASCII] then
+          begin
+            // Закрываем проблемный порт в справочнике
+            CloseComPort(CurrentModuleObj.PortNumber);
+          end
+          else begin
+            PortReady := False;
+            if not HOLD_CONNECTION_WITH_MODBUS_TCP_CLIENT then
+              TCP_Client.Disconnect;
+          end;
+          ExecuteErrorTransaction();
+        end;
+      end//if Modules[CurrentModule].EnabledAutoUpdate and (not Modules[CurrentModule].Disguise) then - если с автообновлением и не отключен
+      else
+      begin
+        // ВЫЗЫВАЕМ ReceiveResponse ДЛЯ ОТКЛЮЧЕННЫХ МОДУЛЕЙ (без автообновления)
+        CurrentModuleObj.ReceiveResponse('*', '');
+        GetNextCurrentModule();
+      end;
+    end
+    else begin
+      GetNextCurrentModule();
+    end;
+
+  except
+    on e: exception do
+    begin
+      DebugOutput('UpdateNext Exception: ' + e.Message);
+      GetNextCurrentModule();
+    end;
+  end;
+end;
+{-----------UpdateNext - end of procedure ---------}
+
+procedure TFmxModuleManager.WriteToBuffer(str: ShortString;Module:TFmxModule);
+var tmpColor:TAlphaColor;
+begin
+   if not FViewIOBuffActive then Exit;
+   ViewIOBuff[ViewIOBuffCounter]:=str;
+   tmpColor:=TAlphaColorRec.Black;
+   if Assigned(Module) then
+   case Module.ModuleType of
+    mtCounter, mtCounterEx:tmpColor:=TColors.Brown;
+    mtFCD, mtFCD2:tmpColor:=TColors.Navy;
+    mtScales,mtScalesMT:tmpColor:=TColors.DarkBlue;
+    mtValve: tmpColor:=TColors.Green;
+    mtBIO: tmpColor:=TColors.DarkGreen;
+    mtSuperBIO: tmpColor:=TColors.DarkGreen;
+    mtT, mtTemp2, mtTemp6, mtUI,mtOldUI: tmpColor:=TColors.Blue;
+    mtVLT6000,mtATV312,mtDAC_I702X,mtVLTModbus: tmpColor:=TColors.Darkcyan;
+    mtIVTM:tmpColor:=TColors.Darkgray;
+    mtDigitalUnit:tmpColor:=TColors.Darkgoldenrod;
+    mtKM5:tmpColor:=TColors.Darkgoldenrod;
+    mtRT2:tmpColor:=TColors.goldenrod;
+   end;
+   ViewIOBuffColor[ViewIOBuffCounter]:=tmpColor;
+   ViewIOBuffCounter:=ViewIOBuffCounter+1;
+end;
+
+//============================================================================================================
+
+constructor TFmxModuleManager.Create(AModbusTCPHost: String; AModbusTCPPort: Word);
+begin
+  inherited Create;
+  // Инициализация статистики циклов
+  FClosePorts := True;
+  FCycleStartTime := GetTickCount;
+  FLastCycleTime := 0.0;
+  FAverageCycleTime := 0.0;
+  FMinCycleTime := 0.0;
+  FMaxCycleTime := 0.0;
+  FCycleCount := 0;
+  FTotalCycleTime := 0;
+  FCurrentCycleModules := 0;
+
+  Active := False;
+  Update := True;
+  DelayBeforeSendCommand := 10;
+  FHOLD_CONNECTION_WITH_MODBUS_TCP_CLIENT := True;
+  TCP_Client_Active := False;
+  TCP_Client := TIdTCPClient.Create(nil);
+  TCP_Client.OnConnected := IdTCPClientConnected;
+  TCP_Client.OnDisconnected := IdTCPClientDisConnected;
+  ModbusTCPHost := '127.0.0.1';
+  FModbusTCPPort := 502;
+  ViewIOBufMax := cViewIOBufMax;
+  FormHandle := 0;
+  FChangePort := True;
+  FShowPortInLog := True;
+  FShowModuleInLog := True;
+  FNextSleep := 1;
+  SENDING_TRIES_COUNT := 10;
+  COMRunQueriesCount := 0;
+  CurrentModule := 0;
+  LastLoopTime := 0.0;
+  LogFileIsOpened := false;
+  LoopStartTickCount := GetTickCount;
+
+  // ИСПРАВЛЕНИЕ: Инициализируем справочник портов
+  FComPortsLock := TCriticalSection.Create;
+  SetLength(FComPorts, 0);
+
+  ComPortNumber := 0;
+  ComPortType := ctMain;
+
+  // Убираем вызов OpenPort - порты будут открываться по требованию в UpdateNext
+  // OpenPort; // ЗАКОММЕНТИРОВАТЬ!
+
+  DopTimOut := c_DopTimOut;
+  TransferThread := TTransferThread.Create(true);
+  TransferThread.Priority := tpTimeCritical;
+  TransferThread.TransferProc := COMLoopProc;
+  ClearViewIOBuff();
+end;
+
+//============================================================================================================
+
+//destructor TFmxModuleManager.Destroy;
+//begin
+//  if Assigned(TransferThread) then
+//  begin
+//     TransferThread.Terminate;
+//     Active:=False;
+//     TransferThread.Free;
+//  end;
+//  SetLength(Modules, 0);
+//  CloseAllComPorts;
+//
+//  if LogFileIsOpened then begin
+//    Close(LogFile);
+//  end;
+//  TCP_Client.Free;
+//  TCP_Client:=nil;
+//  FComPortsLock.Free;
+//  inherited Destroy;
+//end;
+
+destructor TFmxModuleManager.Destroy;
+var
+  Timeout: Cardinal;
+begin
+  if Assigned(TransferThread) then
+  begin
+    // Даем потоку время на завершение
+    TransferThread.Terminate;
+    Active := False;
+
+    Timeout := 3000; // 3 секунды на завершение потока
+    {$IFDEF WINDOWS}
+    if WaitForSingleObject(TransferThread.Handle, Timeout) = WAIT_TIMEOUT then
+    begin
+      if Debug then
+        DebugOutput('Таймаут ожидания завершения потока, принудительное закрытие');
+      TerminateThread(TransferThread.Handle, 0);
+    end;
+    {$ENDIF}
+
+    TransferThread.Free;
+  end;
+
+  // Закрываем все порты
+  CloseAllComPorts;
+
+  if LogFileIsOpened then
+  begin
+    try
+      Close(LogFile);
+    except
+      // Игнорируем ошибки закрытия файла
+    end;
+  end;
+
+  if Assigned(TCP_Client) then
+  begin
+    try
+      TCP_Client.Free;
+    except
+      on E: Exception do
+        if Debug then DebugOutput('Ошибка при освобождении TCP клиента: ' + E.Message);
+    end;
+  end;
+
+  if Assigned(FComPortsLock) then
+    FComPortsLock.Free;
+
+  inherited Destroy;
+end;
+
+//============================================================================================================
+
+procedure TFmxModuleManager.AddModule(module: TFmxModule);
+var cnt:integer;
+begin
+  if Assigned(TransferThread) then
+     TransferThread.Suspend;
+  cnt:=Length(Modules);Inc(cnt);
+  SetLength(Modules,  cnt);
+  Modules[cnt - 1] := module;
+  if Assigned(TransferThread) then
+     TransferThread.Resume;
+end;
+
+procedure TFmxModuleManager.ExecuteInCOMThread(method: TProcedureOfObject; first:boolean = false);
+var
+  i: Byte;
+  x,y:Pointer;
+  counter:integer;
+  found:Boolean;
+label exit_label;
+begin
+  if Assigned(TransferThread) and Assigned(method) then
+  {$IFDEF MSWINDOWS}
+    if GetCurrentThreadID = TransferThread.ThreadID then
+  {$ENDIF}
+
+    try
+      method();
+    except
+      on e:Exception do
+      begin
+         DebugOutput('ExecuteInCOMThread( Error:'+e.Message);
+         { TODO : Удалить задачу }
+         if COMRunQueriesCount>0 then
+            COMRunQueriesCount:=COMRunQueriesCount-1;
+      end;
+    end
+    else begin
+      TransferThread.Suspend;
+      if COMRunQueriesCount < COM_RUN_QUERY_BUFFER_LENGTH then begin
+        if not first then begin
+          COMRunQueriesCount := COMRunQueriesCount + 1;
+          COMRunQueriesBuffer[COMRunQueriesCount] := method;
+        end
+        else begin
+          COMRunQueriesCount := COMRunQueriesCount + 1;
+          for i := COMRunQueriesCount downto 2 do COMRunQueriesBuffer[i] := COMRunQueriesBuffer[i-1];
+          COMRunQueriesBuffer[1] := method;
+        end;
+      end;
+      TransferThread.Resume;
+    end;// counter:=0;
+//
+// try
+//  if Assigned(method) then
+//    if  GetCurrentThreadID = TransferThread.ThreadID then
+//    begin
+//      try
+//        method();
+//      finally
+//
+//      end;
+//    end
+//    else begin
+//      TransferThread.Suspend;
+//      if COMRunQueriesCount < COM_RUN_QUERY_BUFFER_LENGTH then
+//      begin
+//        found:=false;
+//        for I := 1 to COM_RUN_QUERY_BUFFER_LENGTH do
+//        begin
+//           if (TProcedureOfObject(COMRunQueriesBuffer[I])=TProcedureOfObject(method))
+//              and COMRunQueriesBufferExes[I]
+//            then begin
+//               found:=true;
+//               OutputDebugString('method found!!!');//mod 8
+//               break;
+//            end;
+//        end;
+//        if not found then
+//          if first then begin
+//            COMRunQueriesCount := COMRunQueriesCount + 1;
+//            COMRunQueriesBufferExes[COMRunQueriesCount]:=False;
+//            COMRunQueriesBuffer[COMRunQueriesCount] := method;
+//          end
+//          else begin
+//            COMRunQueriesCount := COMRunQueriesCount + 1;
+//            for i := COMRunQueriesCount downto 2 do COMRunQueriesBuffer[i] := COMRunQueriesBuffer[i-1];
+//            COMRunQueriesBufferExes[1]:=False;
+//            COMRunQueriesBuffer[1] := method;
+//          end;
+//      end
+//      else begin
+//        COMRunQueriesCount:=0;
+//        OutputDebugString('Owerflow COMRunQueriesBuffer!!!');//mod 8
+//      end;
+//exit_label:
+//      TransferThread.Resume;
+//    end;
+//  except
+//    on e:exception do
+//    begin
+//      DebugOutput('ExecuteInCOMThread E:'+E.Message);
+//    end;
+//  end;
+end;
+
+
+//============================================================================================================
+
+procedure TFmxModuleManager.ExecuteInMainThread(method: TProcedureOfObject;Name:String);
+begin
+  if Assigned(TransferThread) then
+  try
+  {$IFDEF MSWINDOWS}
+    if (GetCurrentThreadID = TransferThread.ThreadID) and ( Assigned(method) ) then
+      TransferThread.Synchronize(method)
+    else method;
+  {$ENDIF}
+  except
+    on e:exception do
+    begin
+      DebugOutput('ExecuteInMainThread '+Name+' E:'+E.Message);
+    end;
+  end;
+
+end;
+
+//============================================================================================================
+
+function TFmxModuleManager.IterateCOMLoop(iterations_count: integer): Boolean;
+begin
+  Result := false;
+  if Assigned(TransferThread) then
+  try
+  {$IFDEF MSWINDOWS}
+    Result := GetCurrentThreadID = TransferThread.ThreadID;
+  {$ELSE}
+    Result := True;
+  {$ENDIF}
+    if Result then
+      while iterations_count > 0 do
+      begin
+        COMLoopProc;
+        iterations_count := iterations_count - 1;
+      end;
+    except
+      on e:exception do
+      begin
+        OutputDebugMessage('IterateCOMLoop E:'+E.Message);
+      end;
+    end;
+end;
+
+//============================================================================================================
+procedure TFmxModuleManager.IterateCOMLoop1;
+begin
+ try
+  IterateCOMLoop(1);
+ except
+  on e:exception do
+  begin
+    OutputDebugMessage('IterateCOMLoop1 E:'+E.Message);
+  end;
+ end;
+end;
+
+//============================================================================================================
+
+procedure TFmxModuleManager.ResumeCOMThread;
+begin
+  if Assigned(TransferThread) then
+     TransferThread.Resume;
+end;
+
+//============================================================================================================
+function TFmxModuleManager.SendCommand(module: TFmxModule; const command: ShortString; response_length: integer; terminator: char = #0): Boolean;
+var
+  PortInfo: TComPortInfo;
+  PortIndex: integer;
+  CurrentModuleObj: TFmxModule;
+  stage, i, j, mlen: integer;
+  output_buffer, in_buff: array [0..255] of ansichar;
+  readed: Cardinal;
+  written: Cardinal;
+  response: ShortString;
+  _TypeOfProtocol: TTypeOfProtocol;
+  RequestLength, ResponseLength: Cardinal;
+  _output_buffer, _in_buff: TIdBytes;
+
+  procedure ExecuteErrorTransaction();
+  begin
+    if Assigned(Modules[CurrentCommandModule]) then
+    begin
+      //таймаут
+      Modules[CurrentCommandModule].BadPackages := Modules[CurrentCommandModule].BadPackages + 1;
+      if not Modules[CurrentCommandModule].Disguise then Modules[CurrentCommandModule].ConnectIsOK := fdqBad;
+      Modules[CurrentCommandModule].TimeOuts := Modules[CurrentCommandModule].TimeOuts + 1;
+      //вызывает отработку таймаута
+      Modules[CurrentCommandModule].ReceiveResponse();
+      //отрабатываем, что она была не удачной
+      if Debug then
+        DebugOutput('<SendCommand:[' + Modules[CurrentCommandModule].ModuleName + '] Responce TIMEOUT - STAGE:' + IntToStr(stage) + '>');
+      //вызывает отработку таймаута
+      Modules[CurrentCommandModule].ReceiveResponse();
+      if PortIndex>=0 then
+         Inc(FComPorts[PortIndex].TimeOuts);
+    end;
+  end;
+
+begin
+  Result := false;
+  if not Active then Exit;
+  if not Assigned(module) then Exit;
+  sleep(DelayBeforeSendCommand);//Не разрешаем выполнять команды залпом - даем контроллерам отдышаться
+  mlen := Length(Modules);
+  if mlen = 0 then Exit;
+  CurrentCommandModule := -1;
+  //ищем наш модуль в списке модулей
+  for i := 0 to mlen - 1 do
+  begin
+    if (module = Modules[i]) then
+    begin
+      //найдем модуль, для которого требуется выполнить команду
+      CurrentCommandModule := i;
+      break
+    end;
+  end;
+  //проверяем - найден ли модуль
+  if CurrentCommandModule < 0 then
+  begin
+    if Debug then
+      DebugOutput('<MODULE (' + module.ModuleName + ') FOR COMMAND NOT FOUND>');
+    Exit;
+  end;
+
+  if Assigned(Modules[CurrentCommandModule]) then
+  try
+    CurrentModuleObj := Modules[CurrentCommandModule];
+
+    //-----------------------------------------------
+    //если флаг автообновления статуса активен
+    if (not CurrentModuleObj.Disguise) then
+    begin
+      //
+      // ИСПРАВЛЕНИЕ: Используем справочник портов вместо постоянного открытия/закрытия
+      //
+      //При отключении аналогичной нижестоящей строки в функции UpdateNext возникают ошибки обмена - здесь добавлено по аналогии - требует тестирования
+      // узнаем тип протокола - на данный момент все протоколы, кроме Modbus TCP работают через компорт, на это пока и ориентируемся
+      _TypeOfProtocol := CurrentModuleObj.Protocol;
+      PortReady := False;
+      CurrentModuleObj.TotalSended := CurrentModuleObj.TotalSended + 1;
+      //Заставляем обновиться
+      CurrentModuleObj.MustUpdate:=True;
+
+      try
+        if _TypeOfProtocol in [tpProprietary..tpModbusASCII] then
+        begin
+          // Получаем порт из справочника (откроется если нужно)
+          if not GetComPort(CurrentModuleObj.PortNumber,
+                           CurrentModuleObj.BaudRate,
+                           Ord(CurrentModuleObj.Parity),
+                           CurrentModuleObj.Timeout,
+                           PortInfo,PortIndex) then
+          begin
+            PortReady := False;
+            CurrentModuleObj.ConnectIsOK := fdqBad;
+            PortState := 'Ошибка открытия порта COM' + IntToStr(CurrentModuleObj.PortNumber);
+            AddToLog(CurrentModuleObj, @output_buffer[0], 0, true);
+            ErrorConnection := True;
+            Sleep(cErrorOpenComPortDelay);
+            Exit;
+          end;
+
+          // Используем handle из справочника
+          Port := PortInfo.PortHandle;
+          PortReady := PortInfo.IsOpen;
+
+          {$IFDEF MSWINDOWS}
+          // Настраиваем таймауты для текущего модуля
+          CTO.ReadTotalTimeoutConstant := CurrentModuleObj.Timeout + DopTimOut;
+          PortReady := SetCommTimeouts(Port, CTO);
+          if PortIndex>=0 then
+          begin
+            GetCommState(PortInfo.PortHandle, DCB);
+            if (DCB.BaudRate <> CurrentModuleObj.baudrate) or
+               (DCB.Parity <> ord(CurrentModuleObj.parity)) then
+            begin
+              FComPorts[PortIndex].baudrate:=CurrentModuleObj.baudrate;
+              FComPorts[PortIndex].parity:=ord(CurrentModuleObj.parity);
+              DCB.BaudRate := FComPorts[PortIndex].baudrate;
+              DCB.Parity := FComPorts[PortIndex].parity;
+              SetCommState(PortInfo.PortHandle, DCB);
+            end;
+            FComPorts[PortIndex].TimeOut:=CTO.ReadTotalTimeoutConstant;
+          end;
+          {$ENDIF}
+        end
+        else
+        begin
+          //Modbus TCP - подключаемся
+          PortReady := TCP_Client_Connected;
+        end;
+      except
+        on e: Exception do
+        begin
+          PortReady := False;//для корректной отработки лога
+          PortState := 'Ошибка открытия порта :' + e.Message;
+          AddToLog(CurrentModuleObj, @output_buffer[0], 0, true);
+        end;
+      end;
+
+      ErrorConnection := False;
+
+      try
+        if PortReady then
+        begin
+          //пытаемся, при неудачной попытке SENDING_TRIES_COUNT раз повторить операцию
+          // выбираем команду статуса текущего модуля.
+          ResponseLength := response_length;
+          RequestLength := Length(command);
+
+          for j := 1 to RequestLength do
+            output_buffer[j - 1] := command[j];
+
+          //для TCP клиента формирвем запрос
+          if _TypeOfProtocol = tpModbusTCP then
+            _output_buffer := RawToBytes(output_buffer, RequestLength);
+
+          if ResponseLength = 0 then
+          begin
+            AddToLog(CurrentModuleObj, @output_buffer[0], RequestLength, true);
+            if _TypeOfProtocol in [tpProprietary..tpModbusASCII] then
+            begin
+              //rs485
+  {$IFDEF MSWINDOWS}
+              PurgeComm(Port, PURGE_TXABORT or PURGE_RXABORT or PURGE_TXCLEAR or PURGE_RXCLEAR);
+              WriteFile(Port, output_buffer, RequestLength, written, nil);
+              if PortIndex>=0 then
+                 Inc(FComPorts[PortIndex].TotalAttempts);
+  {$ENDIF}
+            end
+            else begin
+              //Modbus TCP
+              TCP_Client.Socket.Write(_output_buffer);
+            end;
+            response := ''; // чтобы вернуть пустую строку.
+          end
+          else begin
+            for stage := 1 to SENDING_TRIES_COUNT do
+            begin
+              if not Active then Exit;
+              if CurrentModuleObj.Disguise then break;
+              AddToLog(CurrentModuleObj, @output_buffer[0], RequestLength, true);
+
+              //если это повтор - следующую операцию выполняем с задержкой
+              if stage > 1 then
+                Sleep(cDelayAfterErrorFirstRequest * stage * 2)
+              else begin
+                if Debug then
+                  DebugOutput('<[' + CurrentModuleObj.ModuleName + '] CMD:' + command + 'STAGE:' + IntToStr(stage) + '>');
+              end;
+
+              //Включим линию RTS, нужна для работы прэмов
+              if _TypeOfProtocol in [tpProprietary..tpModbusASCII] then
+              begin
+                //rs485
+  {$IFDEF MSWINDOWS}
+                EscapeCommFunction(Port, SETRTS);
+  {$ENDIF}
+              end;
+
+              //сбрасываем предыдущие операции по порту
+              if _TypeOfProtocol in [tpProprietary..tpModbusASCII] then
+              begin
+                //rs485
+  {$IFDEF MSWINDOWS}
+                PurgeComm(Port, PURGE_TXABORT or PURGE_RXABORT or PURGE_TXCLEAR or PURGE_RXCLEAR);
+  {$ENDIF}
+              end;
+
+              // отправляем команду запроса статуса
+              try
+                if _TypeOfProtocol in [tpProprietary..tpModbusASCII] then
+                begin
+                  //rs485
+  {$IFDEF MSWINDOWS}
+                  if PortIndex>=0 then begin
+                    GetCommState(PortInfo.PortHandle, DCB);
+                    if (DCB.BaudRate <> CurrentModuleObj.baudrate) or
+                       (DCB.Parity <> ord(CurrentModuleObj.parity)) then
+                    begin
+                      FComPorts[PortIndex].baudrate:=CurrentModuleObj.baudrate;
+                      FComPorts[PortIndex].parity:=ord(CurrentModuleObj.parity);
+                      DCB.BaudRate := FComPorts[PortIndex].baudrate;
+                      DCB.Parity := FComPorts[PortIndex].parity;
+                      SetCommState(PortInfo.PortHandle, DCB);
+                    end;
+                    FComPorts[PortIndex].TimeOut:=CTO.ReadTotalTimeoutConstant;
+                  end;
+                  WriteFile(Port, output_buffer, RequestLength, written, nil);
+  {$ENDIF}
+                end
+                else begin
+                  //Modbus TCP
+                  TCP_Client.Socket.Write(_output_buffer);
+                end;
+              except
+                on e: Exception do
+                begin
+                  PortReady := False;//для корректной отработки лога
+                  PortState := 'Ошибка отправки запроса :' + e.Message;
+                end;
+              end;
+              if Optimization then
+                 sleep(cSleepBeforeRead);
+              // считываем ответ
+              try
+                if _TypeOfProtocol in [tpProprietary..tpModbusASCII] then
+                begin
+                  //rs485
+  {$IFDEF MSWINDOWS}
+                  GetCommTimeouts(Port, ActualTimeouts);
+                  ReadFile(Port, in_buff, ResponseLength, readed, nil);
+  {$ENDIF}
+                end
+                else begin
+                  //Modbus TCP
+                  TCP_Client.Socket.ReadBytes(_in_buff, -1);
+                  readed := Length(_in_buff);
+                  for i := 0 to readed - 1 do
+                    in_buff[i] := AnsiChar(_in_buff[i]);
+                end;
+              except
+                on e: Exception do
+                begin
+                  PortReady := False;//для корректной отработки лога
+                  PortState := 'Ошибка чтения ответа :' + e.Message;
+                end;
+              end;
+
+              if (ResponseLength <> readed) then
+              begin
+                AddToLog(CurrentModuleObj, @in_buff[0], readed, false, true)
+              end
+              else
+                AddToLog(CurrentModuleObj, @in_buff[0], readed, false);
+
+              //пишем в лог что (MustBytesRead) количество ожидаемых байт
+              //не соответствуют реально считанным (Real Readed)
+              if (ResponseLength <> readed) and Debug then
+                DebugOutput('[' + CurrentModuleObj.ModuleName + '] MBR:' + IntToStr(ResponseLength) + ' RR:' + IntToStr(readed));
+
+              //переносим результат в ответ
+              //если есть принятые данные
+              response := '';
+              if readed > 0 then
+              begin
+                for j := 1 to readed do
+                  response := response + ansichar(in_buff[j - 1]);
+                //проверяем их корректность
+                if CurrentModuleObj.CheckResponse(command, response) then
+                begin
+                  CurrentModuleObj.TotalReceived := CurrentModuleObj.TotalReceived + 1;
+                  if Debug then
+                    DebugOutput('<SendCommand:[' + CurrentModuleObj.ModuleName + '] Response OK - STAGE:' + IntToStr(stage) + '>');
+                  Break;
+                end;
+                if Debug then
+                  DebugOutput('<SendCommand:[' + CurrentModuleObj.ModuleName + '] Response BAD - STAGE:' + IntToStr(stage) + '>');
+              end
+              else begin
+                ExecuteErrorTransaction();
+              end;
+            end;//цикл повторов при ошибке
+          end;
+
+          //поверка на терминацию задачи
+          if not Active then Exit;
+
+          //если после повторов есть какой-то ответ
+          //если есть корректный ответ
+          if response <> '' then
+          try
+            CurrentModuleObj.ReceiveResponse(command, response); // !!! 22.07.2008
+          except
+            on e: exception do
+            begin
+              PortReady := False;//для корректной отработки лога
+              PortState := 'Ошибка разбора ответа :' + e.Message;
+              AddToLog(CurrentModuleObj, @output_buffer[0], 0, true);
+            end;
+          end;
+        end
+        else begin
+          PortReady := False;
+          if _TypeOfProtocol in [tpProprietary..tpModbusASCII] then
+          begin
+            // Закрываем проблемный порт в справочнике
+            CloseComPort(CurrentModuleObj.PortNumber);
+          end
+          else begin
+            //Modbus TCP
+            if not HOLD_CONNECTION_WITH_MODBUS_TCP_CLIENT then
+              TCP_Client.Disconnect();
+          end;
+        end;
+      finally
+        // ...
+      end;
+    end
+    else begin
+      Result := true;
+    end;
+
+    LoopStartTickCount := GetTickCount;
+
+  except
+    on e: exception do
+      DebugOutput(e.Message);
+  end;
+
+  Result := true;
+end;
+
+//============================================================================================================
+procedure TFmxModuleManager.SetModbusTCPHost(const Value: string);
+begin
+  FModbusTCPHost := Value;
+end;
+
+procedure TFmxModuleManager.SetModbusTCPPort(const Value: word);
+begin
+  FModbusTCPPort := Value;
+end;
+
+procedure TFmxModuleManager.SetModule(ModuleIndex: integer;
+  const Value: TFmxModule);
+begin
+  if (ModuleIndex>=0) and (ModuleIndex<ModulesCount) then
+     Modules[ModuleIndex]:=Value;
+end;
+
+procedure TFmxModuleManager.SetModulesCount(const Value: integer);
+begin
+  SetLength(Modules,value);
+end;
+
+procedure TFmxModuleManager.SetNextSleep(const Value: integer);
+begin
+  FNextSleep := Value;
+end;
+
+procedure TFmxModuleManager.SetClosePorts(const Value: boolean);
+begin
+  FClosePorts := Value;
+end;
+
+//============================================================================================================
+
+procedure TFmxModuleManager.SuspendCOMThread;
+begin
+  {$IFDEF MSWINDOWS}
+    if Assigned(TransferThread) then
+       if GetCurrentThreadID <> TransferThread.ThreadID then
+       begin
+         if not TransferThread.Suspended then
+             TransferThread.Suspend;
+       end;
+  {$ENDIF}
+end;
+
+//============================================================================================================
+
+procedure TFmxModuleManager.TerminateCOMThread;
+begin
+  if Assigned(TransferThread) then
+  begin
+    Active:=False;
+//    TransferThread.Free;
+//    TransferThread := nil;
+  end;
+end;
+
+//============================================================================================================
+
+procedure TFmxModuleManager.SetOnUpdateNext(const Value: TUpdateNextProcs);
+begin
+  FOnUpdateNext := Value;
+end;
+
+procedure TFmxModuleManager.SetOptimization(const Value: Boolean);
+begin
+  FOptimization := Value;
+end;
+
+procedure TFmxModuleManager.SetPortName(const Value: ShortString);
+begin
+  FPortName := Value;
+end;
+
+procedure TFmxModuleManager.SetPortReady(const Value: boolean);
+begin
+  FPortReady := Value;
+end;
+
+procedure TFmxModuleManager.SetPortState(const Value: ShortString);
+begin
+  FPortState := Value;
+  {$IFDEF MSWINDOWS}
+  if FormHandle<>0 then
+     PostMessage(FormHandle, WM_UPDATE_PORT_INFO,0,0);
+  {$ENDIF}
+  if Debug then
+     DebugOutput(Value);
+end;
+
+procedure TFmxModuleManager.SetPortStaus(const Value: TPortStatus);
+begin
+  FPortStaus := Value;
+end;
+
+procedure TFmxModuleManager.SetSENDING_TRIES_COUNT(const Value: integer);
+begin
+  FSENDING_TRIES_COUNT := Value;
+end;
+
+procedure TFmxModuleManager.SetShowModuleInLog(const Value: boolean);
+begin
+  FShowModuleInLog := Value;
+end;
+
+procedure TFmxModuleManager.SetShowPortInLog(const Value: boolean);
+begin
+  FShowPortInLog := Value;
+end;
+
+procedure TFmxModuleManager.SetTCP_Client_Active(const Value: Boolean);
+begin
+  FTCP_Client_Active := Value;
+end;
+
+procedure TFmxModuleManager.SetTimeDebug(const Value: string);
+begin
+  FTimeDebug := Value;
+end;
+
+procedure TFmxModuleManager.SetUpdate(const Value: boolean);
+begin
+  if FUpdate <> Value then
+  begin
+    FUpdate := Value;
+    if not Value then
+    begin
+      // При отключении обновления закрываем все порты
+      CloseAllComPorts;
+      // Закрываем TCP соединение если не требуется удерживать
+      if not FHOLD_CONNECTION_WITH_MODBUS_TCP_CLIENT then
+        TCP_Client.Disconnect;
+    end
+    else
+    begin
+      // При включении обновления очищаем старые порты
+      CleanupUnusedPorts(10); // Более агрессивная очистка
+    end;
+  end;
+end;
+
+procedure TFmxModuleManager.SetViewIOBuff(Index: integer; const Value: ShortString);
+begin
+   _ViewIOBuff[Index mod ViewIOBufMax]:=Value;
+end;
+
+procedure TFmxModuleManager.SetViewIOBuffActive(const Value: boolean);
+begin
+  FViewIOBuffActive := Value;
+end;
+
+procedure TFmxModuleManager.SetViewIOBuffColor(Index: integer; const Value: TColor);
+begin
+   _ViewIOBuffColor[Index mod ViewIOBufMax]:=Value;
+end;
+
+procedure TFmxModuleManager.SetViewIOBuffCounter(const Value: integer);
+begin
+  if Value in [0..ViewIOBufMax-1] then
+     FViewIOBuffCounter := Value
+  else
+     FViewIOBuffCounter := 0;
+
+end;
+
+procedure TFmxModuleManager.SetViewIOBufMax(const Value: integer);
+begin
+  if Value in [cViewIOBufMin..cViewIOBufMax] then
+     FViewIOBufMax := Value;
+end;
+
+procedure TFmxModuleManager.SetOnSendCommand(const Value: TSendCommandProcs);
+begin
+  FOnSendCommand := Value;
+end;
+
+
+procedure TFmxModuleManager.SetOnGetPort(
+  const Value: TProcedureOfGetPortObject);
+begin
+  FOnGetPort := Value;
+end;
+
+procedure TFmxModuleManager.SetOnLogViewerAddMessage(
+  const Value: TLogViewerAddMessage);
+begin
+  FOnLogViewerAddMessage := Value;
+end;
+
+procedure TFmxModuleManager.SetChangePort(const Value: boolean);
+begin
+  FChangePort := Value;
+end;
+
+procedure TFmxModuleManager.SetComPortNumber(const Value: integer);
+begin
+  FComPortNumber := Value;
+end;
+
+procedure TFmxModuleManager.SetCOMRunQueriesCount(const Value: integer);
+begin
+  FCOMRunQueriesCount := Value;
+end;
+
+procedure TFmxModuleManager.SetCurrentModule(const Value: integer);
+begin
+  FCurrentModule := Value;
+end;
+
+procedure TFmxModuleManager.SetDebug(const Value: boolean);
+begin
+  FDebug := Value;
+end;
+
+procedure TFmxModuleManager.SetDelayBeforeSendCommand(const Value: integer);
+begin
+  FDelayBeforeSendCommand := Value;
+end;
+
+
+procedure TFmxModuleManager.SetDopTimOut(const Value: integer);
+begin
+  FDopTimOut := Value;
+end;
+
+procedure TFmxModuleManager.SetErrorConnection(const Value: boolean);
+begin
+  FErrorConnection := Value;
+  if Value then
+  begin
+     if Length(Modules)>0 then
+     if Assigned(Modules[CurrentModule]) then
+     begin
+       Modules[CurrentModule].ReceiveResponse(Modules[CurrentModule].StatusQuery, ''); // !!! 22.07.2008
+//       CurrentModule := CurrentModule + 1;
+//       if CurrentModule = Length(Modules) then begin
+//         CurrentModule := 0;
+//       end;
+     end;
+  end;
+end;
+
+procedure TFmxModuleManager.SetFormHandle(const Value: THandle);
+begin
+  FFormHandle := Value;
+end;
+
+procedure TFmxModuleManager.SetActive(const Value: boolean);
+begin
+  FActive := Value;
+  if Assigned(TransferThread) then
+    if Value then
+    begin
+      if TransferThread.Suspended then
+        TransferThread.Resume;
+      // Очистка при активации
+      CleanupUnusedPorts(15);
+    end
+    else begin
+      if not TransferThread.Suspended then
+        TransferThread.Suspend;
+      // Очистка при деактивации
+      CleanupUnusedPorts(1); // Быстрая очистка
+    end;
+end;
+
+
+
+procedure TFmxModuleManager.SetHOLD_CONNECTION_WITH_MODBUS_TCP_CLIENT(const Value: Boolean);
+begin
+  FHOLD_CONNECTION_WITH_MODBUS_TCP_CLIENT := Value;
+end;
+
+
+procedure TFmxModuleManager.SetLogFileName(log_filename: String);
+var
+  LogDir: string;
+begin
+  SuspendCOMThread;
+  try
+    // Закрываем файл если он был открыт
+    if LogFileIsOpened then
+    begin
+      try
+        CloseFile(LogFile);
+      except
+        on E: Exception do
+        begin
+          // Игнорируем ошибки при закрытии файла
+        end;
+      end;
+      LogFileIsOpened := false;
+    end;
+
+    if log_filename = '' then
+    begin
+      LogFileIsOpened := false;
+      FLogFileName := '';
+      if Debug then
+        DebugOutput('ЛОГ обмена отключен');
+    end
+    else
+    begin
+      // Проверяем и создаем директорию если нужно
+      LogDir := ExtractFilePath(log_filename);
+      if (LogDir <> '') and not DirectoryExists(LogDir) then
+      begin
+        try
+          ForceDirectories(LogDir);
+        except
+          on E: Exception do
+          begin
+            DebugOutput('Ошибка создания директории для лога: ' + E.Message);
+            LogFileIsOpened := false;
+            FLogFileName := '';
+            Exit;
+          end;
+        end;
+      end;
+
+      FLogFileName := log_filename;
+
+      try
+        AssignFile(LogFile, FLogFileName);
+        {$I-}
+        // Пробуем открыть файл для добавления, если он существует
+        if FileExists(FLogFileName) then
+        begin
+          Append(LogFile);
+          if IOResult <> 0 then
+          begin
+            // Если не удалось открыть для добавления, пробуем создать новый
+            Rewrite(LogFile);
+          end;
+        end
+        else
+        begin
+          // Файл не существует - создаем новый
+          Rewrite(LogFile);
+        end;
+        {$I+}
+
+        LogFileIsOpened := (IOResult = 0);
+
+        if LogFileIsOpened then
+        begin
+          // Добавляем заголовок в начало файла если он новый
+          if FileSize(LogFile) = 0 then
+          begin
+            WriteLn(LogFile, '=== Лог обмена данными через COM-порт и Modbus TCP ===');
+            WriteLn(LogFile, '=== Начало: ' + DateTimeToStr(Now) + ' ===');
+            WriteLn(LogFile, '');
+          end;
+
+          CloseFile(LogFile);
+
+          if Debug then
+            DebugOutput('ЛОГ обмена: ' + log_filename);
+        end
+        else
+        begin
+          DebugOutput('Ошибка открытия файла лога: ' + log_filename);
+          FLogFileName := '';
+        end;
+
+      except
+        on E: Exception do
+        begin
+          LogFileIsOpened := false;
+          FLogFileName := '';
+          DebugOutput('Ошибка при работе с файлом лога: ' + E.Message);
+        end;
+      end;
+    end;
+
+  finally
+    ResumeCOMThread;
+  end;
+end;
+
+function TFmxModuleManager.GetRunQueriesCount: integer;
+begin
+   result := COMRunQueriesCount;
+end;
+
+function TFmxModuleManager.GetThreadRun: integer;
+begin
+  if Assigned(TransferThread) then
+  begin
+     if TransferThread.Suspended then
+        result:=1
+     else
+        result:=2
+  end
+  else
+     result:=0;
+
+end;
+
+function TFmxModuleManager.GetViewIOBuff(Index: integer): ShortString;
+begin
+   result:=_ViewIOBuff[Index mod ViewIOBufMax]
+end;
+
+function TFmxModuleManager.GetViewIOBuffColor(Index: integer): TColor;
+begin
+   result:=_ViewIOBuffColor[Index mod ViewIOBufMax]
+end;
+
+function TFmxModuleManager.GetComPort(PortNumber, BaudRate, Parity, Timeout: integer;
+  var PortInfo: TComPortInfo;var PortIndex:integer): Boolean;
+begin
+  Result := False;
+
+  // Сначала пытаемся получить информацию о существующем порте
+  if GetComPortInfo(PortNumber, PortInfo,PortIndex) then
+  begin
+    Result := PortInfo.IsOpen;
+  end
+  else
+  begin
+    // Порт не найден, открываем его
+    OpenComPort(PortNumber, BaudRate, Parity, Timeout, PortInfo,PortIndex);
+    Result := PortInfo.IsOpen;
+  end;
+end;
+
+function TFmxModuleManager.GetCurModule: Integer;
+begin
+  result:=CurrentModule;
+end;
+
+function TFmxModuleManager.GetCurrentModule: integer;
+begin
+  Result := FCurrentModule;
+end;
+
+function TFmxModuleManager.GetDebug: boolean;
+begin
+  result:=FDebug;
+end;
+
+
+function TFmxModuleManager.GetLogFileName: string;
+begin
+  result:=FLogFileName;
+end;
+
+function TFmxModuleManager.GetMaxViewBuffCounter: integer;
+begin
+  result:=ViewIOBufMax;
+end;
+
+function TFmxModuleManager.GetPercentOfQuality: integer;
+var i:integer;
+    received,sended:longint;
+begin
+    received:=0;
+    sended:=0;
+    for I := 1 to ModulesCount do
+    begin
+      if Assigned(Module[I]) then
+      begin
+        Inc(sended,Module[I].TotalSended);
+        Inc(received,Module[I].TotalReceived);
+      end;
+    end;
+    if sended > 0 then
+        Result := Round(received / sended * 100)
+    else
+        Result := 100;
+end;
+
+function TFmxModuleManager.GetPortName: ShortString;
+var
+  i: integer;
+  OpenPortsList: TStringList;
+begin
+  Result := '';
+
+  // Если есть активный TCP клиент
+  if TCP_Client_Active and TCP_Client.Connected then
+  begin
+    Result := 'TCP(' + ModbusTCPHost + ':' + IntToStr(ModbusTCPPort) + ')';
+  end;
+
+  // Добавляем информацию об открытых COM портах
+  FComPortsLock.Enter;
+  try
+    OpenPortsList := TStringList.Create;
+    try
+      for i := 0 to High(FComPorts) do
+      begin
+        if FComPorts[i].IsOpen then
+        begin
+          OpenPortsList.Add('COM' + IntToStr(FComPorts[i].PortNumber) +
+                           '(' + IntToStr(FComPorts[i].BaudRate) + ')');
+        end;
+      end;
+
+      if OpenPortsList.Count > 0 then
+      begin
+        if Result <> '' then
+          Result := Result + ' + ';
+        Result := Result + 'COM[' + OpenPortsList.DelimitedText + ']';
+      end;
+
+    finally
+      OpenPortsList.Free;
+    end;
+
+    // Если нет открытых портов
+    if Result = '' then
+    begin
+      if FComPortNumber > 0 then
+        Result := 'COM' + IntToStr(FComPortNumber) + ' (закрыт)'
+      else
+        Result := 'Порты не настроены';
+    end;
+
+  finally
+    FComPortsLock.Leave;
+  end;
+end;
+
+function TFmxModuleManager.GeTFmxModule(ModuleIndex: integer): TFmxModule;
+begin
+  if (ModuleIndex>=0) and (ModuleIndex<ModulesCount) then
+    result:=Modules[ModuleIndex]
+  else
+    result:=nil;
+
+end;
+
+function TFmxModuleManager.GeTFmxModulesCount: integer;
+begin
+  result:=Length(Modules);
+end;
+
+procedure TFmxModuleManager.IdTCPClientConnected(Sender: TObject);
+begin
+  TCP_Client_Active:=True;
+end;
+
+procedure TFmxModuleManager.IdTCPClientDisconnected(Sender: TObject);
+begin
+  TCP_Client_Active:=False;
+end;
+
+
+function TFmxModuleManager.TCP_Client_Connected:Boolean;
+begin
+      if not TCP_Client.Connected then
+      begin
+         TCP_Client.Host:= ModbusTCPHost;
+         TCP_Client.Port:= FModbusTCPPort;
+      end;
+      if not FHOLD_CONNECTION_WITH_MODBUS_TCP_CLIENT then
+      begin
+         if TCP_Client.Connected then
+           TCP_Client.Disconnect;
+         TCP_Client.Host:= ModbusTCPHost;
+         TCP_Client.Port:= FModbusTCPPort;
+      end;
+      try
+        if not TCP_Client.Connected then
+        begin
+          try
+             TCP_Client.Connect();
+             result:=TCP_Client_Active;
+          except
+             result:=False;
+          end;
+        end
+        else
+          result:=TCP_Client_Active;
+      except
+        result:=False;
+      end;
+end;
+
+
+function TFmxModuleManager.FindComPortIndex(PortNumber: integer): integer;
+var
+  i: integer;
+begin
+  Result := -1;
+  for i := 0 to High(FComPorts) do
+  begin
+    if FComPorts[i].PortNumber = PortNumber then
+    begin
+      Result := i;
+      Exit;
+    end;
+  end;
+end;
+
+function TFmxModuleManager.GetComPortInfo(PortNumber: integer; var PortInfo: TComPortInfo; var PortIndex:integer): Boolean;
+var
+  Index: integer;
+begin
+  Result := False;
+  FComPortsLock.Enter;
+  PortIndex:=-1;
+  try
+    Index := FindComPortIndex(PortNumber);
+    if Index >= 0 then
+    begin
+      PortInfo := FComPorts[Index];
+      Result := PortInfo.IsOpen;
+      // Обновляем время использования
+      FComPorts[Index].LastUsed := Now;
+      //Индекс порта
+      PortIndex:=Index;
+    end
+    else begin
+      PortIndex:=-1;
+    end;
+  finally
+    FComPortsLock.Leave;
+  end;
+end;
+
+function TFmxModuleManager.GetComPortInformation(Idx: integer): TComPortInfo;
+var len:integer;
+    nullInfo:TComPortInfo;
+begin
+  FComPortsLock.Enter;
+  try
+
+     len:=Length(FComPorts);
+     if (Idx>=0) and (Idx<len)  then
+        result:=FComPorts[Idx]
+     else begin
+        nullInfo.PortHandle:=INVALID_HANDLE_VALUE;
+        nullInfo.PortNumber:=-1;
+        nullInfo.BaudRate:=0;
+        nullInfo.Parity:=0;
+        nullInfo.Timeout:=0;
+        nullInfo.IsOpen:=False;
+        nullInfo.LastUsed:=0;
+        nullInfo.TimeOuts:=0;
+        result:=nullInfo;
+     end;
+  finally
+    FComPortsLock.Leave;
+  end;
+end;
+
+function TFmxModuleManager.GetComPortsCount: integer;
+begin
+  FComPortsLock.Enter;
+  try
+      result:=Length(FComPorts);
+  finally
+    FComPortsLock.Leave;
+  end;
+end;
+
+procedure TFmxModuleManager.UpdateComPortInfo(const PortInfo: TComPortInfo);
+var
+  Index: integer;
+begin
+  FComPortsLock.Enter;
+  try
+    Index := FindComPortIndex(PortInfo.PortNumber);
+    if Index >= 0 then
+    begin
+      FComPorts[Index] := PortInfo;
+    end;
+  finally
+    FComPortsLock.Leave;
+  end;
+end;
+
+procedure TFmxModuleManager.AddComPortInfo(const PortInfo: TComPortInfo);
+begin
+  FComPortsLock.Enter;
+  try
+    SetLength(FComPorts, Length(FComPorts) + 1);
+    FComPorts[High(FComPorts)] := PortInfo;
+  finally
+    FComPortsLock.Leave;
+  end;
+end;
+
+procedure TFmxModuleManager.CloseComPort(PortNumber: integer);
+var
+  PortInfo: TComPortInfo;
+  Index: integer;
+begin
+  if not ClosePorts then Exit;
+
+  FComPortsLock.Enter;
+  try
+    Index := FindComPortIndex(PortNumber);
+    if Index >= 0 then
+    begin
+      PortInfo := FComPorts[Index];
+      if PortInfo.IsOpen then
+      begin
+        {$IFDEF MSWINDOWS}
+        PurgeComm(PortInfo.PortHandle, PURGE_TXABORT or PURGE_RXABORT or PURGE_TXCLEAR or PURGE_RXCLEAR);
+        EscapeCommFunction(PortInfo.PortHandle, CLRRTS);
+        CloseHandle(PortInfo.PortHandle);
+        {$ENDIF}
+
+        PortInfo.IsOpen := False;
+        PortInfo.PortHandle := INVALID_HANDLE_VALUE;
+        FComPorts[Index] := PortInfo; // Обновляем запись
+      end;
+    end;
+  finally
+    FComPortsLock.Leave;
+  end;
+end;
+
+//procedure TFmxModuleManager.CloseAllComPorts;
+//var
+//  i: integer;
+//begin
+//  FComPortsLock.Enter;
+//  try
+//    for i := 0 to High(FComPorts) do
+//    begin
+//      if FComPorts[i].IsOpen then
+//      begin
+//        try
+//          try
+//            {$IFDEF MSWINDOWS}
+//            PurgeComm(FComPorts[i].PortHandle, PURGE_TXABORT or PURGE_RXABORT or PURGE_TXCLEAR or PURGE_RXCLEAR);
+//            EscapeCommFunction(FComPorts[i].PortHandle, CLRRTS);
+//            CloseHandle(FComPorts[i].PortHandle);
+//           {$ENDIF}
+//          except
+//
+//          end;
+//        finally
+//          FComPorts[i].IsOpen := False;
+//          FComPorts[i].PortHandle := INVALID_HANDLE_VALUE;
+//        end;
+//      end;
+//    end;
+//    SetLength(FComPorts, 0); // Очищаем массив
+//  finally
+//    FComPortsLock.Leave;
+//  end;
+//end;
+
+//procedure TFmxModuleManager.CloseAllComPorts;
+//var
+//  i: integer;
+//  PortsToClose: array of Cardinal;
+//  j: Integer;
+//begin
+//  FComPortsLock.Enter;
+//  try
+//    // Собираем handles портов для закрытия
+//    SetLength(PortsToClose, 0);
+//    for i := 0 to High(FComPorts) do
+//    begin
+//      if FComPorts[i].IsOpen then
+//      begin
+//        SetLength(PortsToClose, Length(PortsToClose) + 1);
+//        PortsToClose[High(PortsToClose)] := FComPorts[i].PortHandle;
+//        FComPorts[i].IsOpen := False;
+//        FComPorts[i].PortHandle := INVALID_HANDLE_VALUE;
+//      end;
+//    end;
+//
+//    // Очищаем массив портов
+//    SetLength(FComPorts, 0);
+//
+//  finally
+//    FComPortsLock.Leave;
+//  end;
+//
+//  // Закрываем порты вне критической секции
+//  for j := 0 to High(PortsToClose) do
+//  begin
+//    try
+//      if ClosePorts  then
+//         ClosePortHandle(PortsToClose[j]);
+//    finally
+//      PortsToClose[j]:=0;
+//    end;
+//  end;
+//end;
+
+procedure TFmxModuleManager.CloseAllComPorts;
+var
+  i: integer;
+begin
+  FComPortsLock.Enter;
+  try
+    for i := 0 to High(FComPorts) do
+    begin
+      if FComPorts[i].IsOpen then
+        CloseComPort(FComPorts[i].PortNumber);
+    end;
+  finally
+    FComPortsLock.Leave;
+  end;
+end;
+
+//procedure TFmxModuleManager.ClosePortHandle(PortHandle: Cardinal);
+//var
+//  Attempts: Integer;
+//begin
+//  if PortHandle = INVALID_HANDLE_VALUE then Exit;
+//
+//  Attempts := 0;
+//  while Attempts < 3 do // 3 попытки закрыть порт
+//  begin
+//    try
+//      {$IFDEF MSWINDOWS}
+//      // Очистка буферов
+//      try
+//        PurgeComm(PortHandle, PURGE_TXABORT or PURGE_RXABORT or PURGE_TXCLEAR or PURGE_RXCLEAR);
+//      except
+//        // Игнорируем ошибки очистки
+//      end;
+//
+//      // Сброс линий
+//      try
+//        EscapeCommFunction(PortHandle, CLRRTS);
+//        EscapeCommFunction(PortHandle, CLRDTR);
+//      except
+//        // Игнорируем ошибки сброса линий
+//      end;
+//
+//      // Закрытие порта
+//      if CloseHandle(PortHandle) then
+//        Break // Успешно закрыт
+//      else if Debug then
+//        DebugOutput('Попытка ' + IntToStr(Attempts + 1) +
+//          ': не удалось закрыть порт. Код ошибки: ' + IntToStr(GetLastError));
+//      {$ENDIF}
+//
+//    except
+//      on E: Exception do
+//      begin
+//        if Debug then
+//          DebugOutput('Исключение при закрытии порта (попытка ' +
+//            IntToStr(Attempts + 1) + '): ' + E.Message);
+//      end;
+//    end;
+//
+//    Inc(Attempts);
+//    if Attempts < 3 then
+//      Sleep(100); // Пауза между попытками
+//  end;
+//
+//  if (Attempts = 3) and Debug then
+//    DebugOutput('Не удалось закрыть порт после 3 попыток');
+//end;
+
+procedure TFmxModuleManager.ClosePortHandle(PortHandle: Cardinal);
+var
+  Attempts: Integer;
+  {$IFDEF  MSWINDOWS}
+  Timeouts: TCommTimeouts;
+  DCB: TDCB;
+  Overlapped: TOverlapped;
+  {$ENDIF}
+begin
+  if PortHandle = INVALID_HANDLE_VALUE then Exit;
+
+  if (not ClosePorts) or Debug or CtrlDown then Exit;
+
+
+  Attempts := 0;
+  while Attempts < 3 do
+  begin
+    try
+      {$IFDEF MSWINDOWS}
+      // 1. Сначала устанавливаем нулевые таймауты для разблокировки операций
+      FillChar(Timeouts, SizeOf(Timeouts), 0);
+      Timeouts.ReadIntervalTimeout := MAXDWORD; // Для немедленного возврата из ReadFile
+      Timeouts.ReadTotalTimeoutMultiplier := 0;
+      Timeouts.ReadTotalTimeoutConstant := 0;
+      Timeouts.WriteTotalTimeoutMultiplier := 0;
+      Timeouts.WriteTotalTimeoutConstant := 0;
+
+      try
+        SetCommTimeouts(PortHandle, Timeouts);
+      except
+        // Игнорируем ошибки установки таймаутов
+      end;
+
+
+      // 2. Отменяем все ожидающие операции ввода-вывода
+      try
+        CancelIo(PortHandle);
+        // Для Windows Vista и выше можно использовать CancelIoEx для лучшего контроля
+        // CancelIoEx(PortHandle, nil);
+      except
+        // Игнорируем ошибки отмены операций
+      end;
+
+
+      // 3. Сбрасываем флаги событий
+      try
+        SetCommMask(PortHandle, 0);
+      except
+      end;
+
+      // 4. Очищаем буферы
+      try
+        PurgeComm(PortHandle, PURGE_TXABORT or PURGE_RXABORT or
+                            PURGE_TXCLEAR or PURGE_RXCLEAR);
+      except
+      end;
+
+      // 5. Сбрасываем линии
+      try
+        EscapeCommFunction(PortHandle, CLRRTS);
+        EscapeCommFunction(PortHandle, CLRDTR);
+      except
+      end;
+
+      // 6. Даем время на завершение операций
+      Sleep(50);
+
+      // 7. Закрываем порт
+      if CloseHandle(PortHandle) then
+      begin
+        if Debug then
+          DebugOutput('Порт успешно закрыт');
+        Exit; // Выходим из процедуры
+      end
+      else
+      begin
+        if Debug then
+          DebugOutput('Попытка ' + IntToStr(Attempts + 1) +
+            ': не удалось закрыть порт. Код ошибки: ' + IntToStr(GetLastError));
+      end;
+      {$ENDIF}
+
+    except
+      on E: Exception do
+      begin
+        if Debug then
+          DebugOutput('Исключение при закрытии порта (попытка ' +
+            IntToStr(Attempts + 1) + '): ' + E.Message);
+      end;
+    end;
+
+    Inc(Attempts);
+    if Attempts < 3 then
+      Sleep(100);
+  end;
+
+  if Debug then
+    DebugOutput('Не удалось корректно закрыть порт после 3 попыток. ' +
+                'Дескриптор: ' + IntToStr(PortHandle));
+end;
+
+
+procedure TFmxModuleManager.CleanupUnusedPorts(TimeoutMinutes: integer);
+var
+  i: integer;
+  CurrentTime: TDateTime;
+  ClosedCount: integer;
+begin
+  if not Assigned(FComPortsLock) then Exit;
+  if not ClosePorts then Exit;
+
+
+  ClosedCount := 0;
+  CurrentTime := Now;
+  FComPortsLock.Enter;
+  try
+    if Length(FComPorts)>0 then
+    for i := High(FComPorts) downto 0 do
+    begin
+        if FComPorts[i].IsOpen and
+           (MinutesBetween(CurrentTime, FComPorts[i].LastUsed) > TimeoutMinutes) then
+        begin
+          // Закрываем порт, который не использовался долгое время
+          {$IFDEF MSWINDOWS}
+          PurgeComm(FComPorts[i].PortHandle, PURGE_TXABORT or PURGE_RXABORT or PURGE_TXCLEAR or PURGE_RXCLEAR);
+          EscapeCommFunction(FComPorts[i].PortHandle, CLRRTS);
+          CloseHandle(FComPorts[i].PortHandle);
+          {$ENDIF}
+
+          FComPorts[i].IsOpen := False;
+          FComPorts[i].PortHandle := INVALID_HANDLE_VALUE;
+          FComPorts[i].TimeOuts:=0;
+          Inc(ClosedCount);
+
+          if Debug then
+            DebugOutput('Автоматически закрыт неиспользуемый порт COM' +
+              IntToStr(FComPorts[i].PortNumber));
+        end;
+    end;
+
+    // Удаляем закрытые порты из массива
+    if ClosedCount > 0 then
+    begin
+      RemoveClosedPortsFromArray;
+    end;
+
+  finally
+    FComPortsLock.Leave;
+  end;
+
+  if (ClosedCount > 0) and Debug then
+    DebugOutput('Автоматически закрыто портов: ' + IntToStr(ClosedCount));
+end;
+
+//procedure TFmxModuleManager.CleanupUnusedPorts(TimeoutMinutes: integer);
+//var
+//  i: integer;
+//  CurrentTime: TDateTime;
+//  ClosedCount: integer;
+//begin
+//  if not Assigned(FComPortsLock) then Exit;
+//
+//  ClosedCount := 0;
+//  CurrentTime := Now;
+//
+//  // Быстрая проверка - если не можем захватить lock, выходим
+//  if not FComPortsLock.TryEnter then
+//  begin
+//    if Debug then
+//      DebugOutput('Не удалось захватить lock для очистки портов');
+//    Exit;
+//  end;
+//
+//  try
+//    for i := High(FComPorts) downto 0 do
+//    begin
+//      if FComPorts[i].IsOpen and
+//         (MinutesBetween(CurrentTime, FComPorts[i].LastUsed) > TimeoutMinutes) then
+//      begin
+//        try
+//          CloseComPort(FComPorts[i].PortNumber);
+//          Inc(ClosedCount);
+//        except
+//          on E: Exception do
+//            if Debug then
+//              DebugOutput('Ошибка при закрытии неиспользуемого порта COM' +
+//                IntToStr(FComPorts[i].PortNumber) + ': ' + E.Message);
+//        end;
+//      end;
+//    end;
+//  finally
+//    FComPortsLock.Leave;
+//  end;
+//end;
+
+
+procedure TFmxModuleManager.RemoveClosedPortsFromArray;
+var
+  i, j: integer;
+  TempArray: TComPortArray;
+begin
+  FComPortsLock.Enter;
+  try
+    SetLength(TempArray, 0);
+    for i := 0 to High(FComPorts) do
+    begin
+      if FComPorts[i].IsOpen then
+      begin
+        SetLength(TempArray, Length(TempArray) + 1);
+        TempArray[High(TempArray)] := FComPorts[i];
+      end;
+    end;
+    FComPorts := TempArray;
+  finally
+    FComPortsLock.Leave;
+  end;
+end;
+
+
+function TFmxModuleManager.CountActiveModules: Integer;
+var
+  i: integer;
+begin
+  Result := 0;
+  for i := 0 to ModulesCount - 1 do
+  begin
+    if Assigned(Modules[i]) and
+       (not Modules[i].Disguise) and
+       Modules[i].EnabledAutoUpdate then
+    begin
+      Inc(Result);
+    end;
+  end;
+end;
+
+procedure TFmxModuleManager.UpdateCycleStatistics(CycleTime: Double);
+begin
+  // Первый цикл
+  if FCycleCount = 0 then
+  begin
+    FMinCycleTime := CycleTime;
+    FMaxCycleTime := CycleTime;
+    FAverageCycleTime := CycleTime;
+  end
+  else
+  begin
+    // Минимальное время
+    if CycleTime < FMinCycleTime then
+      FMinCycleTime := CycleTime;
+
+    // Максимальное время
+    if CycleTime > FMaxCycleTime then
+      FMaxCycleTime := CycleTime;
+
+    // Среднее время
+    FTotalCycleTime := FTotalCycleTime + CycleTime;
+    FAverageCycleTime := FTotalCycleTime / (FCycleCount + 1);
+  end;
+
+  Inc(FCycleCount);
+
+  // Сбрасываем статистику каждые 1000 циклов чтобы не накапливать ошибки
+  if FCycleCount >= 1000 then
+  begin
+    ResetCycleStatistics;
+  end;
+end;
+
+procedure TFmxModuleManager.ResetCycleStatistics;
+begin
+  FCycleCount := 0;
+  FTotalCycleTime := 0;
+  FAverageCycleTime := 0;
+  FMinCycleTime := 0;
+  FMaxCycleTime := 0;
+end;
+
+procedure TFmxModuleManager.ResetCycleStats;
+begin
+  ResetCycleStatistics;
+  FCycleStartTime := GetTickCount;
+end;
+
+
+
+function TFmxModuleManager.GetFirstActiveModule: Integer;
+var
+  i: integer;
+begin
+  // Просто находим первый активный модуль
+  for i := 0 to ModulesCount - 1 do
+  begin
+    if Assigned(Modules[i]) and
+       (not Modules[i].Disguise) and
+       Modules[i].EnabledAutoUpdate then
+    begin
+      Result := i;
+      Exit;
+    end;
+  end;
+  Result := 0; // fallback
+end;
+
+//procedure TFmxModuleManager.GetNextCurrentModule(UseTime: boolean = False);
+//var
+//  zlen, startIndex, i: Integer;
+//  found: Boolean;
+//begin
+//  zlen := Length(Modules);
+//  if zlen = 0 then Exit;
+//
+//  // ЕСЛИ НЕТ АКТИВНЫХ МОДУЛЕЙ - ПРОСТО ИНКРЕМЕНТИРУЕМ И ВЫХОДИМ
+//  if not HasActiveModules then
+//  begin
+//    CurrentModule := (CurrentModule + 1) mod zlen;
+//    Exit;
+//  end;
+//
+//  // Ищем следующий активный модуль
+//  startIndex := CurrentModule;
+//  found := False;
+//
+//  repeat
+//    CurrentModule := (CurrentModule + 1) mod zlen;
+//
+//    // Если вернулись к началу - выходим
+//    if CurrentModule = startIndex then
+//      Break;
+//
+//    // Проверяем модуль на активность
+//    if Assigned(Modules[CurrentModule]) and
+//       (not Modules[CurrentModule].Disguise) and
+//       Modules[CurrentModule].EnabledAutoUpdate then
+//    begin
+//      found := True;
+//      Break;
+//    end;
+//
+//  until False;
+//
+//  // ЕСЛИ НЕ НАШЛИ АКТИВНЫЙ МОДУЛЬ - ИЩЕМ ЛЮБОЙ ПЕРВЫЙ АКТИВНЫЙ
+//  if not found then
+//  begin
+//    for i := 0 to zlen - 1 do
+//    begin
+//      if Assigned(Modules[i]) and
+//         (not Modules[i].Disguise) and
+//         Modules[i].EnabledAutoUpdate then
+//      begin
+//        CurrentModule := i;
+//        found := True;
+//        Break;
+//      end;
+//    end;
+//  end;
+//
+//  // Расчет времени цикла
+//  if found and (CurrentModule = FirstActiveModule) then
+//  begin
+//    FLastCycleTime := (GetTickCount - FCycleStartTime) / 1000.0;
+//    UpdateCycleStatistics(FLastCycleTime);
+//    FCycleStartTime := GetTickCount;
+//    FCurrentCycleModules := CountActiveModules();
+//    LastLoopTime := FLastCycleTime;
+//  end;
+//end;
+
+procedure TFmxModuleManager.GetNextCurrentModule(UseTime: boolean = False);
+var
+  zlen, i: Integer;
+begin
+  zlen := Length(Modules);
+  if zlen = 0 then Exit;
+
+  // ПРОСТАЯ ЛОГИКА С ЗАЩИТОЙ ОТ ЗАЦИКЛИВАНИЯ
+  for i := 1 to zlen do  // Максимум zlen попыток
+  begin
+    CurrentModule := (CurrentModule + 1) mod zlen;
+
+    if Assigned(Modules[CurrentModule]) and
+       (not Modules[CurrentModule].Disguise) and
+       (Modules[CurrentModule].PriorityCounter=0) and
+       Modules[CurrentModule].EnabledAutoUpdate then
+    begin
+      // Нашли активный модуль
+      Break;
+    end
+    else
+      if Modules[CurrentModule].PriorityCounter>0 then
+         Modules[CurrentModule].PriorityCounter:=Modules[CurrentModule].PriorityCounter-1;
+
+
+    // Если прошли все модули и не нашли активный - выходим
+    if i = zlen then
+    begin
+      // Не нашли активных модулей, оставляем текущий как есть
+      Exit;
+    end;
+  end;
+  Modules[CurrentModule].PriorityCounter:=Modules[CurrentModule].Priority;
+
+  // Расчет времени цикла
+  if CurrentModule = FirstActiveModule then
+  begin
+    FLastCycleTime := (GetTickCount - FCycleStartTime) / 1000.0;
+    UpdateCycleStatistics(FLastCycleTime);
+    FCycleStartTime := GetTickCount;
+    FCurrentCycleModules := CountActiveModules();
+    LastLoopTime := FLastCycleTime;
+  end;
+end;
+
+function TFmxModuleManager.HasActiveModules: Boolean;
+var
+  i: integer;
+begin
+  Result := False;
+  for i := 0 to ModulesCount - 1 do
+  begin
+    if Assigned(Modules[i]) and
+       (not Modules[i].Disguise) and
+       Modules[i].EnabledAutoUpdate then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
+end;
+
+function TFmxModuleManager.IsOverallCommunicationAlive(): Boolean;
+var
+  i: Integer;
+  AnyModuleResponded: Boolean;
+  tmpModule: TFmxModule;
+begin
+  // Быстрая проверка порта/TCP
+  if (ComPortType = ctMain) and (not PortReady) then
+    Exit(False);
+  if (ComPortType = ctFlowmeter) and (not TCP_Client_Active) then
+    Exit(False);
+
+  // Если нет зарегистрированных модулей – считаем, что связи нет (или неопределено)
+  if ModulesCount = 0 then
+    Exit(False);
+
+  // Проверяем, отвечал ли хоть один модуль за последние N циклов
+  AnyModuleResponded := False;
+  for i := 0 to ModulesCount - 1 do
+  begin
+    tmpModule := Module[i];
+    if not Assigned(tmpModule) then Continue;
+
+    // Если модуль не отключён вручную и у него ConnectIsOK = Good
+    if (not tmpModule.Disguise) and tmpModule.EnabledAutoUpdate and (tmpModule.ConnectIsOK = fdqGood) then
+    begin
+      AnyModuleResponded := True;
+      Break;
+    end;
+  end;
+
+  Result := AnyModuleResponded;
+end;
+
+
+
+end.

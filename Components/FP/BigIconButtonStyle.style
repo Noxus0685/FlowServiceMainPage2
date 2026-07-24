@@ -1,0 +1,63 @@
+object TStyleContainer
+  object TLayout
+    StyleName = 'BigIconButtonStyle'
+    Align = Center
+    Size.Width = 83.555541992187500000
+    Size.Height = 22.333335876464840000
+    Size.PlatformDefault = False
+    TabOrder = 91
+    object TRectangle
+      StyleName = 'background'
+      Align = Contents
+      Fill.Kind = Gradient
+      Fill.Gradient.Points = <
+        item
+          Color = xFFE1E1E1
+          Offset = 0.000000000000000000
+        end
+        item
+          Color = xFFE1E1E1
+          Offset = 1.000000000000000000
+        end>
+      Locked = True
+      HitTest = False
+      Size.Width = 83.555541992187500000
+      Size.Height = 22.333335876464840000
+      Size.PlatformDefault = False
+      Stroke.Color = xFFB4B4B4
+      object TInnerGlowEffect
+        Softness = 0.400000005960464500
+        GlowColor = xFFADADAD
+        Opacity = 0.899999976158142100
+        Trigger = 'IsPressed=true'
+        Enabled = False
+      end
+    end
+    object TGlyph
+      StyleName = 'glyphstyle'
+      Margins.Left = 2.000000000000000000
+      Margins.Top = 4.000000000000000000
+      Margins.Right = 2.000000000000000000
+      Margins.Bottom = 2.000000000000000000
+      Align = Left
+      Size.Width = 20.925924301147460000
+      Size.Height = 21.296297073364260000
+      Size.PlatformDefault = False
+    end
+    object TText
+      StyleName = 'text'
+      Align = Client
+      Locked = True
+      HitTest = False
+      Margins.Left = 5.000000000000000000
+      Margins.Top = 2.000000000000000000
+      Margins.Right = 5.000000000000000000
+      Margins.Bottom = 2.000000000000000000
+      Size.Width = 73.555541992187500000
+      Size.Height = 18.333335876464840000
+      Size.PlatformDefault = False
+      Text = 'Text'
+      TextSettings.WordWrap = False
+    end
+  end
+end

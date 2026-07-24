@@ -99,6 +99,22 @@ type
 
 
 
+  TMeasurementPointParticipant = record
+    DeviceUUID: string;
+    DeviceChannelUUID: string;
+    SourcePointUUID: string;
+    SourcePointName: string;
+    SourceFlowRate: Double;
+    SourceDeviceQmaxLS: Double;
+    StoredSourcePointQLS: Double;
+    CalculatedSourceTargetQLS: Double;
+    SelectedSourceTargetQLS: Double;
+    SourceTargetQLS: Double;
+    SourceErrorPercent: Double;
+    SourcePauseSec: Double;
+  end;
+
+
   TDevicePoint = class (TTypeEntity)
   private
 
@@ -179,6 +195,8 @@ type
     Pause: Integer;              // Время стабилизации перед измерением, сек (-1 = Авто)
     RequireAutoStabilization: Boolean; // Runtime: в session-точке есть хотя бы одна исходная точка с Pause < 0
     RequiredStabilizationSec: Double;  // Runtime: максимальный неотрицательный Pause исходных точек
+    Participants: TArray<TMeasurementPointParticipant>;
+    SourcePointCount: Integer;
 
     {====================================================================}
     { ПОВТОРЫ И СЕРИИ }
@@ -1909,6 +1927,8 @@ begin
   Pause := ASource.Pause;
   RequireAutoStabilization := ASource.RequireAutoStabilization;
   RequiredStabilizationSec := ASource.RequiredStabilizationSec;
+  Participants := Copy(ASource.Participants);
+  SourcePointCount := ASource.SourcePointCount;
 
   {====================================================================}
   { ПОВТОРЫ И СЕРИИ }
@@ -1987,6 +2007,8 @@ begin
     mptsInterrupted: Result := 'прервано';
     mptsCancelled: Result := 'отменено';
     mptsSaved: Result := 'сохранено';
+    mptsStabilityError: Result := 'ошибка стабилизации';
+    mptsDevicePointMismatch: Result := 'точка прибора не сопоставлена';
   else
     Result := 'неизвестный статус';
   end;
@@ -3077,8 +3099,6 @@ begin
 end;
 
 end.
-
-
 
 
 

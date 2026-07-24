@@ -1,0 +1,634 @@
+﻿unit uTransferManager;
+
+interface
+
+uses
+  System.Classes,
+  System.SyncObjs,
+  System.SysUtils,
+  System.DateUtils,
+  Winapi.Windows,
+  FmxFPModule,
+  FmxHelper,
+  IdTCPClient,
+  IdGlobal;
+
+const
+  cSleepBeforeRead = 50;
+  cDelayAfterErrorFirstRequest = 10;
+  c_DopTimOut = 50;
+
+type
+  // Структура для хранения информации о COM-порте
+  TComPortInfo = record
+    PortHandle: Cardinal;
+    PortNumber: integer;
+    BaudRate: integer;
+    Parity: Integer;
+    Timeout: integer;
+    IsOpen: Boolean;
+    LastUsed: TDateTime;
+    TimeOuts: Longint;
+    TotalAttempts: Longint;
+  end;
+
+  // ============================================================
+  //  TTransferWorker – воркер для одного порта (синхронный)
+  // ============================================================
+  TTransferWorker = class(TThread)
+  private
+    FPortNumber: Integer;
+    FManager: TObject;                  // ссылка на TFmxModuleManager
+    FComPortInfo: TComPortInfo;
+    FTCPClient: TIdTCPClient;
+    FUseTCP: Boolean;
+    FHost: string;
+    FPort: Word;
+    FHoldConnection: Boolean;
+    FLock: TCriticalSection;
+
+    procedure ClosePort;
+    function OpenPort(AModule: TFmxModule): Boolean;
+    procedure LogTransaction(Module: TFmxModule; buffer: PByte; length: Integer;
+      sended: Boolean; err: Boolean = False);
+  protected
+   procedure Execute; override;  // <-- переопределяем
+
+  public
+    constructor Create(AManager: TObject; APortNumber: Integer; AUseTCP: Boolean = False;
+      const AHost: string = ''; APort: Word = 0);
+    destructor Destroy; override;
+
+    // Синхронная отправка команды
+    function SendCommand(AModule: TFmxModule; const ACommand: ShortString;
+      AResponseLength: Integer; ATerminator: ansiChar = #0): Boolean;
+
+    procedure Stop;
+  end;
+
+  // ============================================================
+  //  TTransferManager – менеджер воркеров
+  // ============================================================
+  TTransferManager = class
+  private
+    FWorkers: TList;                    // список TWorkerItem
+    FLock: TCriticalSection;
+    FModuleManager: TObject;
+    FDefaultRetryCount: Integer;
+
+    type
+      PWorkerItem = ^TWorkerItem;
+      TWorkerItem = record
+        Key: Integer;       // номер порта (для TCP – 0)
+        Worker: TTransferWorker;
+      end;
+
+    function FindWorker(Key: Integer): TTransferWorker;
+    function GetOrCreateWorker(AModule: TFmxModule): TTransferWorker;
+  public
+    constructor Create(AModuleManager: TObject);
+    destructor Destroy; override;
+
+    // Синхронная отправка (ждёт ответа)
+    function SendCommand(AModule: TFmxModule; const ACommand: ShortString;
+      AResponseLength: Integer; ATerminator: ansiChar = #0): Boolean;
+
+    procedure StopAll;
+    property DefaultRetryCount: Integer read FDefaultRetryCount write FDefaultRetryCount;
+  end;
+
+implementation
+
+uses
+  FmxFPModuleManager;  // для доступа к TFmxModuleManager.AddToLog
+
+// ============================================================
+//  TTransferWorker
+// ============================================================
+
+constructor TTransferWorker.Create(AManager: TObject; APortNumber: Integer;
+  AUseTCP: Boolean; const AHost: string; APort: Word);
+begin
+  inherited Create(True);
+  FManager := AManager;
+  FPortNumber := APortNumber;
+  FUseTCP := AUseTCP;
+  FHost := AHost;
+  FPort := APort;
+  FHoldConnection := False;
+  FLock := TCriticalSection.Create;
+
+  if FUseTCP then
+  begin
+    FTCPClient := TIdTCPClient.Create(nil);
+    FTCPClient.Host := FHost;
+    FTCPClient.Port := FPort;
+  end
+  else
+    FTCPClient := nil;
+
+  FillChar(FComPortInfo, SizeOf(FComPortInfo), 0);
+  FComPortInfo.PortHandle := INVALID_HANDLE_VALUE;
+  FComPortInfo.PortNumber := APortNumber;
+  FComPortInfo.IsOpen := False;
+  FreeOnTerminate := False;
+  Resume;
+end;
+
+destructor TTransferWorker.Destroy;
+begin
+  Terminate;
+  if Suspended then Resume;
+  WaitFor;
+
+  if Assigned(FTCPClient) then
+  begin
+    if FTCPClient.Connected then
+      FTCPClient.Disconnect;
+    FTCPClient.Free;
+  end;
+
+  ClosePort;
+  FLock.Free;
+  inherited;
+end;
+
+procedure TTransferWorker.Execute;
+begin
+  inherited;
+  // Поток не используется для цикла, все операции синхронные.
+  // Метод нужен только для переопределения абстрактного метода.
+  // Можно оставить пустым.
+end;
+
+procedure TTransferWorker.ClosePort;
+begin
+  FLock.Enter;
+  try
+    if FComPortInfo.IsOpen then
+    begin
+      PurgeComm(FComPortInfo.PortHandle, PURGE_TXABORT or PURGE_RXABORT or
+                PURGE_TXCLEAR or PURGE_RXCLEAR);
+      EscapeCommFunction(FComPortInfo.PortHandle, CLRRTS);
+      CloseHandle(FComPortInfo.PortHandle);
+      FComPortInfo.IsOpen := False;
+      FComPortInfo.PortHandle := INVALID_HANDLE_VALUE;
+    end;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TTransferWorker.OpenPort(AModule: TFmxModule): Boolean;
+var
+  DCB: TDCB;
+  CTO: COMMTIMEOUTS;
+  Timeout: Integer;
+  PortName: string;
+  ErrorCode: DWORD;
+begin
+  Result := False;
+
+  if FUseTCP then
+  begin
+    try
+      if not FTCPClient.Connected then
+        FTCPClient.Connect;
+      Result := FTCPClient.Connected;
+    except
+      Result := False;
+    end;
+    Exit;
+  end;
+
+  FLock.Enter;
+  try
+    // Если порт уже открыт и параметры совпадают – используем
+    if FComPortInfo.IsOpen and (FComPortInfo.PortNumber = AModule.PortNumber) then
+    begin
+      if (FComPortInfo.BaudRate <> AModule.BaudRate) or
+         (FComPortInfo.Parity <> Ord(AModule.Parity)) then
+      begin
+        ClosePort; // переоткроем с новыми параметрами
+      end
+      else
+      begin
+        // Обновляем таймаут
+        Timeout := AModule.Timeout + c_DopTimOut;
+        GetCommTimeouts(FComPortInfo.PortHandle, CTO);
+        CTO.ReadTotalTimeoutConstant := Timeout;
+        SetCommTimeouts(FComPortInfo.PortHandle, CTO);
+        FComPortInfo.LastUsed := Now;
+        Result := True;
+        Exit;
+      end;
+    end;
+
+    // Открываем порт
+    PortName := '\\.\COM' + IntToStr(AModule.PortNumber);
+
+    FComPortInfo.PortHandle := CreateFile(
+      PChar(PortName),
+      GENERIC_READ or GENERIC_WRITE,
+      0, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+
+    if FComPortInfo.PortHandle = INVALID_HANDLE_VALUE then
+    begin
+      ErrorCode := GetLastError;
+      FComPortInfo.IsOpen := False;
+      if FManager is TFmxModuleManager then
+        TFmxModuleManager(FManager).PortState := 'Ошибка открытия ' + PortName +
+          ', код: ' + IntToStr(ErrorCode);
+      Exit;
+    end;
+
+    // Настройка параметров порта
+    GetCommState(FComPortInfo.PortHandle, DCB);
+    DCB.BaudRate := AModule.BaudRate;
+    DCB.Parity := Ord(AModule.Parity);
+    DCB.ByteSize := 8;
+    DCB.StopBits := ONESTOPBIT;
+    SetCommState(FComPortInfo.PortHandle, DCB);
+
+    // Таймауты
+    GetCommTimeouts(FComPortInfo.PortHandle, CTO);
+    CTO.ReadIntervalTimeout := MAXWORD;
+    CTO.ReadTotalTimeoutMultiplier := 0;
+    CTO.ReadTotalTimeoutConstant := AModule.Timeout + c_DopTimOut;
+    CTO.WriteTotalTimeoutMultiplier := 150;
+    CTO.WriteTotalTimeoutConstant := 100;
+    SetCommTimeouts(FComPortInfo.PortHandle, CTO);
+
+    EscapeCommFunction(FComPortInfo.PortHandle, SETRTS);
+
+    FComPortInfo.IsOpen := True;
+    FComPortInfo.PortNumber := AModule.PortNumber;
+    FComPortInfo.BaudRate := AModule.BaudRate;
+    FComPortInfo.Parity := Ord(AModule.Parity);
+    FComPortInfo.Timeout := CTO.ReadTotalTimeoutConstant;
+    FComPortInfo.LastUsed := Now;
+    FComPortInfo.TimeOuts := 0;
+    FComPortInfo.TotalAttempts := 0;
+    Result := True;
+
+    if FManager is TFmxModuleManager then
+      TFmxModuleManager(FManager).PortState := 'Порт ' + PortName + ' открыт';
+
+  finally
+    FLock.Leave;
+  end;
+end;
+
+procedure TTransferWorker.LogTransaction(Module: TFmxModule; buffer: PByte;
+  length: Integer; sended: Boolean; err: Boolean);
+var
+  Manager: TFmxModuleManager;
+begin
+  if Assigned(FManager) and (FManager is TFmxModuleManager) then
+  begin
+    Manager := TFmxModuleManager(FManager);
+    Manager.AddToLog(Module, buffer, length, sended, err);
+  end;
+end;
+
+function TTransferWorker.SendCommand(AModule: TFmxModule; const ACommand: ShortString;
+  AResponseLength: Integer; ATerminator: ansiChar): Boolean;
+var
+  stage, i, RequestLength: Integer;
+  output_buffer, in_buff: array [0..255] of AnsiChar;
+  written, readed: Cardinal;
+  response: ShortString;
+  _TypeOfProtocol: TTypeOfProtocol;
+  _output_buffer, _in_buff: TIdBytes;
+  Timeout: Integer;
+  RetryCount: Integer;
+  PortOpen: Boolean;
+  LastError: DWORD;
+begin
+  Result := False;
+
+  if not Assigned(AModule) then
+  begin
+    if FManager is TFmxModuleManager then
+      TFmxModuleManager(FManager).PortState := 'SendCommand: модуль nil';
+    Exit;
+  end;
+
+  _TypeOfProtocol := AModule.Protocol;
+  RetryCount := 10; // или из менеджера
+  Timeout := AModule.Timeout;
+
+  // Открываем порт
+  PortOpen := OpenPort(AModule);
+  if not PortOpen then
+  begin
+    AModule.ConnectIsOK := fdqBad;
+    AModule.ReceiveResponse('*', '');
+    if FManager is TFmxModuleManager then
+      TFmxModuleManager(FManager).PortState := 'Не удалось открыть порт для ' + AModule.ModuleName;
+    Exit;
+  end;
+
+  // Подготовка команды
+  RequestLength := Length(ACommand);
+  for i := 1 to RequestLength do
+    output_buffer[i - 1] := ACommand[i];
+
+  if _TypeOfProtocol = tpModbusTCP then
+    _output_buffer := RawToBytes(output_buffer, RequestLength);
+
+  // Логируем отправку
+  LogTransaction(AModule, @output_buffer[0], RequestLength, True);
+
+  // Если ответ не ожидается – просто отправляем и выходим
+  if (AResponseLength = 0) and (ATerminator = #0) then
+  begin
+    if _TypeOfProtocol in [tpProprietary..tpModbusASCII] then
+    begin
+      PurgeComm(FComPortInfo.PortHandle, PURGE_TXABORT or PURGE_RXABORT or PURGE_TXCLEAR or PURGE_RXCLEAR);
+      if not WriteFile(FComPortInfo.PortHandle, output_buffer, RequestLength, written, nil) then
+      begin
+        LastError := GetLastError;
+        if FManager is TFmxModuleManager then
+          TFmxModuleManager(FManager).PortState := 'Ошибка записи: ' + IntToStr(LastError);
+      end;
+    end
+    else
+      FTCPClient.Socket.Write(_output_buffer);
+
+    Result := True;
+    Exit;
+  end;
+
+  // Цикл попыток
+  for stage := 1 to RetryCount do
+  begin
+    if Terminated then Break;
+
+    if stage > 1 then
+      Sleep(cDelayAfterErrorFirstRequest * stage * 2);
+
+    if _TypeOfProtocol in [tpProprietary..tpModbusASCII] then
+    begin
+      PurgeComm(FComPortInfo.PortHandle, PURGE_TXABORT or PURGE_RXABORT or PURGE_TXCLEAR or PURGE_RXCLEAR);
+      EscapeCommFunction(FComPortInfo.PortHandle, SETRTS);
+    end;
+
+    // Отправка
+    try
+      if _TypeOfProtocol in [tpProprietary..tpModbusASCII] then
+      begin
+        if not WriteFile(FComPortInfo.PortHandle, output_buffer, RequestLength, written, nil) then
+        begin
+          LastError := GetLastError;
+          if FManager is TFmxModuleManager then
+            TFmxModuleManager(FManager).PortState := 'Ошибка записи: ' + IntToStr(LastError);
+          Continue;
+        end;
+      end
+      else
+        FTCPClient.Socket.Write(_output_buffer);
+    except
+      on e: Exception do
+      begin
+        if FManager is TFmxModuleManager then
+          TFmxModuleManager(FManager).PortState := 'Ошибка отправки: ' + e.Message;
+        Continue;
+      end;
+    end;
+
+    // Пауза перед чтением
+//    if AModule.Optimization then
+      Sleep(cSleepBeforeRead);
+
+    // Чтение ответа
+    readed := 0;
+    if _TypeOfProtocol in [tpProprietary..tpModbusASCII] then
+    begin
+      if ATerminator = #0 then
+      begin
+        // Читаем фиксированное количество байт
+        if not ReadFile(FComPortInfo.PortHandle, in_buff, AResponseLength, readed, nil) then
+        begin
+          LastError := GetLastError;
+          if FManager is TFmxModuleManager then
+            TFmxModuleManager(FManager).PortState := 'Ошибка чтения: ' + IntToStr(LastError);
+          Continue;
+        end;
+      end
+      else
+      begin
+        // Читаем до терминатора
+        var ch: AnsiChar;
+        var total: Integer := 0;
+        while total < AResponseLength do
+        begin
+          if not ReadFile(FComPortInfo.PortHandle, ch, 1, readed, nil) then
+          begin
+            LastError := GetLastError;
+            if FManager is TFmxModuleManager then
+              TFmxModuleManager(FManager).PortState := 'Ошибка чтения: ' + IntToStr(LastError);
+            Break;
+          end;
+          if readed = 0 then Break;
+          in_buff[total] := ch;
+          Inc(total);
+          if ch = ATerminator then Break;
+        end;
+        readed := total;
+      end;
+    end
+    else
+    begin
+      // Modbus TCP
+      try
+        FTCPClient.Socket.ReadBytes(_in_buff, -1);
+        readed := Length(_in_buff);
+        for i := 0 to readed - 1 do
+          in_buff[i] := AnsiChar(_in_buff[i]);
+      except
+        on e: Exception do
+        begin
+          if FManager is TFmxModuleManager then
+            TFmxModuleManager(FManager).PortState := 'Ошибка TCP чтения: ' + e.Message;
+          readed := 0;
+        end;
+      end;
+    end;
+
+    // Логируем принятое
+    if (AResponseLength <> Integer(readed)) then
+      LogTransaction(AModule, @in_buff[0], readed, False, True)
+    else
+      LogTransaction(AModule, @in_buff[0], readed, False);
+
+    // Проверяем длину
+    if (AResponseLength > 0) and (readed = 0) then
+    begin
+      if stage = RetryCount then
+      begin
+        AModule.BadPackages := AModule.BadPackages + 1;
+        AModule.ConnectIsOK := fdqBad;
+        AModule.TimeOuts := AModule.TimeOuts + 1;
+        AModule.ReceiveResponse();
+        if FManager is TFmxModuleManager then
+          TFmxModuleManager(FManager).PortState := 'Таймаут для ' + AModule.ModuleName;
+      end;
+      Continue;
+    end;
+
+    // Формируем ответ
+    response := '';
+    for i := 1 to readed do
+      response := response + in_buff[i - 1];
+
+    // Проверяем корректность
+    if AModule.CheckResponse(ACommand, response) then
+    begin
+      AModule.TotalReceived := AModule.TotalReceived + 1;
+      AModule.ReceiveResponse(ACommand, response);
+      Result := True;
+
+      if FManager is TFmxModuleManager then
+        TFmxModuleManager(FManager).PortState := 'Успешно: ' + AModule.ModuleName;
+
+      Exit; // успех
+    end
+    else
+    begin
+      if stage = RetryCount then
+      begin
+        AModule.BadPackages := AModule.BadPackages + 1;
+        AModule.ConnectIsOK := fdqBad;
+        AModule.ReceiveResponse();
+        if FManager is TFmxModuleManager then
+          TFmxModuleManager(FManager).PortState := 'Ошибка CRC/ответа ' + AModule.ModuleName;
+      end;
+    end;
+  end;
+
+  // Если вышли из цикла – ошибка
+  if FManager is TFmxModuleManager then
+    TFmxModuleManager(FManager).PortState := 'Не удалось после ' + IntToStr(RetryCount) + ' попыток';
+end;
+
+procedure TTransferWorker.Stop;
+begin
+  Terminate;
+end;
+
+// ============================================================
+//  TTransferManager
+// ============================================================
+
+constructor TTransferManager.Create(AModuleManager: TObject);
+begin
+  FModuleManager := AModuleManager;
+  FWorkers := TList.Create;
+  FLock := TCriticalSection.Create;
+  FDefaultRetryCount := 10;
+end;
+
+destructor TTransferManager.Destroy;
+begin
+  StopAll;
+  FWorkers.Free;
+  FLock.Free;
+  inherited;
+end;
+
+function TTransferManager.FindWorker(Key: Integer): TTransferWorker;
+var
+  i: Integer;
+  Item: PWorkerItem;
+begin
+  Result := nil;
+  FLock.Enter;
+  try
+    for i := 0 to FWorkers.Count - 1 do
+    begin
+      Item := FWorkers[i];
+      if Item^.Key = Key then
+      begin
+        Result := Item^.Worker;
+        Break;
+      end;
+    end;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TTransferManager.GetOrCreateWorker(AModule: TFmxModule): TTransferWorker;
+var
+  Key: Integer;
+  UseTCP: Boolean;
+  Host: string;
+  Port: Word;
+  Item: PWorkerItem;
+begin
+  Key := AModule.PortNumber;
+  UseTCP := (AModule.Protocol = tpModbusTCP);
+
+  if UseTCP then
+  begin
+    Key := 0;  // для TCP используем ключ 0
+    Host := AModule.Info.PortDomen;
+    Port := AModule.Info.PortNumber;
+    if Port = 0 then
+      Port := 502;
+  end;
+
+  Result := FindWorker(Key);
+  if Assigned(Result) then Exit;
+
+  // Создаём нового воркера
+  Result := TTransferWorker.Create(FModuleManager, Key, UseTCP, Host, Port);
+  New(Item);
+  Item^.Key := Key;
+  Item^.Worker := Result;
+  FLock.Enter;
+  try
+    FWorkers.Add(Item);
+  finally
+    FLock.Leave;
+  end;
+end;
+
+function TTransferManager.SendCommand(AModule: TFmxModule; const ACommand: ShortString;
+  AResponseLength: Integer; ATerminator: ansiChar): Boolean;
+var
+  Worker: TTransferWorker;
+begin
+  Result := False;
+  if not Assigned(AModule) then Exit;
+
+  Worker := GetOrCreateWorker(AModule);
+  if not Assigned(Worker) then Exit;
+
+  // Синхронный вызов (воркер сам выполняет и возвращает результат)
+  Result := Worker.SendCommand(AModule, ACommand, AResponseLength, ATerminator);
+end;
+
+procedure TTransferManager.StopAll;
+var
+  i: Integer;
+  Item: PWorkerItem;
+begin
+  FLock.Enter;
+  try
+    for i := 0 to FWorkers.Count - 1 do
+    begin
+      Item := FWorkers[i];
+      Item^.Worker.Stop;
+      Item^.Worker.WaitFor;
+      Item^.Worker.Free;
+      Dispose(Item);
+    end;
+    FWorkers.Clear;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+end.
