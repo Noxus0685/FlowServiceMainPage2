@@ -2332,7 +2332,7 @@ begin
     Lines.Add('RunCompleted=' + SBool((FCurrentStage = msDone) and (FStopReason = msrNone)));
     if FStopReason = msrNone then
       Lines.Add('RunResult=Success')
-    else if FStopReason = msrStopped then
+    else if FStopReason in [msrUserStop, msrCancelledBeforeStart] then
       Lines.Add('RunResult=Cancelled')
     else
       Lines.Add('RunResult=Error');
