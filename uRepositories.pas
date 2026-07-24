@@ -355,7 +355,8 @@ type
     function LoadSpillageSessionsByDevice(const ADeviceUUID: string): Boolean;
     function LoadSpillagesByDevice(const ADeviceUUID: string): Boolean;
     function SaveDevice(ADevice: TDevice): Boolean;
-    function UpdateDevice(ADevice: TDevice): Boolean;
+    function SaveDeviceResults(ADevice: TDevice): Boolean;
+    function UpdateDevice(ADevice: TDevice; ASavePoints: Boolean = True): Boolean;
     {$ENDREGION}
 
     { ================= DEVICES ================= }
@@ -4412,7 +4413,25 @@ begin
   end;
 end;
 
-function TDeviceRepository.UpdateDevice(ADevice: TDevice): Boolean;
+
+function TDeviceRepository.SaveDeviceResults(ADevice: TDevice): Boolean;
+begin
+  Result := False;
+  if (ADevice = nil) or (FDM = nil) then
+    Exit;
+
+  if Trim(ADevice.UUID) = '' then
+    ADevice.UUID := TGUID.NewGuid.ToString;
+
+  if (ADevice.State = osNew) and DeviceExistsInDB(ADevice.UUID) then
+    ADevice.State := osModified;
+  if ADevice.State = osClean then
+    ADevice.State := osModified;
+
+  Result := UpdateDevice(ADevice, False);
+end;
+
+function TDeviceRepository.UpdateDevice(ADevice: TDevice; ASavePoints: Boolean): Boolean;
 var
   Q: TFDQuery;
   OwnsTransaction: Boolean;
@@ -4584,7 +4603,7 @@ begin
 
     Q.ExecSQL;
 
-      if not UpdateDevicePoints(ADevice) then
+      if ASavePoints and (not UpdateDevicePoints(ADevice)) then
         raise Exception.Create('Ошибка сохранения точек прибора');
 
       if (ADevice.Sessions <> nil) and (ADevice.Sessions.Count > 0) then
