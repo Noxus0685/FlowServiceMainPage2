@@ -2,7 +2,6 @@
 
 uses
   FMX.Forms,
-  FmxHelper in 'FmxHelper.pas',
   frmCalibrCoefs in 'frmCalibrCoefs.pas' {FrameCalibrCoefs: TFrame},
   frmFlowMeterProperties in 'frmFlowMeterProperties.pas' {FrameFlowMeterProperties: TFrame},
   frmMainTable in 'frmMainTable.pas' {FrameMainTable: TFrame},
@@ -39,7 +38,9 @@ uses
   frmMeterValueSelect in 'frmMeterValueSelect.pas' {FormMeterValueSelect},
   frmMeterValueEditFrame in 'frmMeterValueEditFrame.pas' {FrameMeterValueEdit: TFrame},
   uControlRegister in 'uControlRegister.pas',
-  uSyncSetup in 'uSyncSetup.pas';
+  uSyncSetup in 'uSyncSetup.pas',
+  FmxHelper in 'FmxHelper.pas',
+  FMX.SimpleChart in '..\FMXFP\Components\FP\FMX.SimpleChart.pas';
 
 {$R *.res}
 

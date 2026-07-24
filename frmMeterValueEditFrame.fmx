@@ -1,18 +1,18 @@
 object FrameMeterValueEdit: TFrameMeterValueEdit
-  Size.Width = 909.000000000000000000
+  Size.Width = 908.000000000000000000
   Size.Height = 620.000000000000000000
   Size.PlatformDefault = False
   object TabControlMain: TTabControl
     Align = Client
-    Size.Width = 909.000000000000000000
+    Size.Width = 908.000000000000000000
     Size.Height = 620.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 1
     TabPosition = PlatformDefault
     Sizes = (
-      909s
+      908s
       615s
-      909s
+      908s
       615s)
     object TabItemMainParameters: TTabItem
       CustomIcon = <
@@ -51,13 +51,13 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
         Margins.Bottom = 8.000000000000000000
         Position.X = 8.000000000000000000
         Position.Y = 459.000000000000000000
-        Size.Width = 893.000000000000000000
+        Size.Width = 892.000000000000000000
         Size.Height = 148.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
         object LabelConclusionTitle: TLabel
           Align = Top
-          Size.Width = 893.000000000000000000
+          Size.Width = 892.000000000000000000
           Size.Height = 24.000000000000000000
           Size.PlatformDefault = False
           Text = #1047#1072#1082#1083#1102#1095#1077#1085#1080#1077
@@ -65,7 +65,7 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
         object LayoutConclusionIndicators: TLayout
           Align = Top
           Position.Y = 24.000000000000000000
-          Size.Width = 893.000000000000000000
+          Size.Width = 892.000000000000000000
           Size.Height = 68.000000000000000000
           Size.PlatformDefault = False
           object RectangleSignalStable: TRectangle
@@ -222,11 +222,11 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
           DataDetectorTypes = []
           ReadOnly = True
           Align = Client
-          Size.Width = 893.000000000000000000
+          Size.Width = 892.000000000000000000
           Size.Height = 56.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
-          Viewport.Width = 893.000000000000000000
+          Viewport.Width = 892.000000000000000000
           Viewport.Height = 56.000000000000000000
         end
       end
@@ -236,20 +236,20 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
         Margins.Top = 8.000000000000000000
         Margins.Right = 8.000000000000000000
         Margins.Bottom = 4.000000000000000000
-        Size.Width = 893.000000000000000000
+        Size.Width = 892.000000000000000000
         Size.Height = 443.000000000000000000
         Size.PlatformDefault = False
         TabIndex = 0
         TabOrder = 1
         TabPosition = PlatformDefault
         Sizes = (
-          893s
+          892s
           438s
-          893s
+          892s
           438s
-          893s
+          892s
           438s
-          893s
+          892s
           438s)
         object TabItemStabilityData: TTabItem
           CustomIcon = <
@@ -267,14 +267,14 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
           ExplicitSize.cy = 26.000000000000000000
           object LayoutDataRoot: TLayout
             Align = Client
-            Size.Width = 893.000000000000000000
+            Size.Width = 892.000000000000000000
             Size.Height = 438.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
             object GroupSamplesGrid: TGroupBox
               Align = Client
               Margins.Right = 8.000000000000000000
-              Size.Width = 485.000000000000000000
+              Size.Width = 484.000000000000000000
               Size.Height = 438.000000000000000000
               Size.PlatformDefault = False
               Text = #1058#1072#1073#1083#1080#1094#1072' '#1090#1077#1089#1090#1086#1074#1099#1093' '#1079#1085#1072#1095#1077#1085#1080#1081
@@ -286,12 +286,12 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
                 Margins.Top = 4.000000000000000000
                 Margins.Right = 4.000000000000000000
                 Margins.Bottom = 4.000000000000000000
-                Size.Width = 477.000000000000000000
+                Size.Width = 476.000000000000000000
                 Size.Height = 430.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 0
                 Options = [ColumnResize, ColLines, RowLines, AlwaysShowSelection, Tabs, Header, AutoDisplacement]
-                Viewport.Width = 477.000000000000000000
+                Viewport.Width = 476.000000000000000000
                 Viewport.Height = 430.000000000000000000
                 object StringColumnSampleNumber: TStringColumn
                   Header = #8470
@@ -337,7 +337,7 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
             end
             object LayoutSampleSide: TVertScrollBox
               Align = Right
-              Position.X = 493.000000000000000000
+              Position.X = 492.000000000000000000
               Size.Width = 400.000000000000000000
               Size.Height = 438.000000000000000000
               Size.PlatformDefault = False
@@ -695,7 +695,7 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
           ExplicitSize.cy = 26.000000000000000000
           object SettingsScrollBox: TVertScrollBox
             Align = Client
-            Size.Width = 893.000000000000000000
+            Size.Width = 892.000000000000000000
             Size.Height = 438.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
@@ -1163,7 +1163,7 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
           ExplicitSize.cy = 26.000000000000000000
           object ResultScrollBox: TVertScrollBox
             Align = Client
-            Size.Width = 893.000000000000000000
+            Size.Width = 892.000000000000000000
             Size.Height = 438.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
