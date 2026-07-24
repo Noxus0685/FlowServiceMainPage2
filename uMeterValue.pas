@@ -1657,22 +1657,25 @@ function TMeterValue.AnalyzePointStabilityForMeasurement(const AMinTimeStampMs: 
   const AWindowDurationSec: Double; const AMinSampleCount: Integer;
   const AMaxSampleAgeSec: Double; const ATargetValue: Double;
   const AErrorPercent: Double; out AInfo: TMeterValueStabilityInfo): Boolean;
-const
-  SAMPLE_INTERVAL_TOLERANCE_MS = 250.0;
 var
   SourceSamples: TArray<TMeterValueSample>;
   Window: TArray<TMeterValueSample>;
   CurrentMs, RequiredWindowMs, WindowStartMs, FirstMs, LastMs, LastSampleTimeMs: Int64;
-  I, Count: Integer;
-  AllowedDeviation: Double;
-  Msg: string;
+  PreviousSampleTimeMs, EffectiveWindowStartMs: Int64;
+  I, Count, IntervalCount: Integer;
+  AllowedDeviation, SampleIntervalMs, IntervalSum: Double;
+  Msg, LeftBoundaryText, RightBoundaryText: string;
 begin
   AInfo := Default(TMeterValueStabilityInfo);
   AInfo.Status := mvssUnknown;
   AInfo.FirstOutOfRangeSampleIndex := -1;
+  AInfo.PreviousSampleTimeMs := -1;
+  AInfo.FirstWindowSampleTimeMs := -1;
+  AInfo.LastWindowSampleTimeMs := -1;
   AInfo.PointErrorPercent := AErrorPercent;
   AInfo.SampleCount := 0;
   CurrentMs := GetMonotonicTimeMs;
+  AInfo.CurrentAnalysisTimeMs := CurrentMs;
 
   if (AWindowDurationSec <= 0) or (AMinSampleCount < 1) or (AMaxSampleAgeSec < 0) or
      IsNan(AErrorPercent) or IsInfinite(AErrorPercent) or (AErrorPercent < 0) then
@@ -1692,20 +1695,33 @@ begin
   SetLength(AInfo.SampleResults, Length(SourceSamples));
   RequiredWindowMs := Round(AWindowDurationSec * 1000.0);
   WindowStartMs := CurrentMs - RequiredWindowMs;
+  AInfo.WindowStartMs := WindowStartMs;
+  AInfo.RequiredSampleCount := AMinSampleCount;
+  AInfo.RequiredWindowDurationSec := AWindowDurationSec;
   SetLength(Window, Length(SourceSamples));
   Count := 0;
   LastSampleTimeMs := Low(Int64);
+  PreviousSampleTimeMs := Low(Int64);
+  IntervalSum := 0;
+  IntervalCount := 0;
   for I := 0 to High(SourceSamples) do
   begin
     AInfo.SampleResults[I].SourceIndex := I;
     AInfo.SampleResults[I].TimeStampMs := SourceSamples[I].TimeStampMs;
     AInfo.SampleResults[I].IsInRange := (SourceSamples[I].Value >= AInfo.StabilityLowerLimit) and
       (SourceSamples[I].Value <= AInfo.StabilityUpperLimit);
+    if (I > 0) and (SourceSamples[I].TimeStampMs > SourceSamples[I - 1].TimeStampMs) then
+    begin
+      IntervalSum := IntervalSum + (SourceSamples[I].TimeStampMs - SourceSamples[I - 1].TimeStampMs);
+      Inc(IntervalCount);
+    end;
     if (SourceSamples[I].TimeStampMs >= AMinTimeStampMs) and (SourceSamples[I].TimeStampMs <= CurrentMs) then
     begin
       if (LastSampleTimeMs = Low(Int64)) or (SourceSamples[I].TimeStampMs > LastSampleTimeMs) then
         LastSampleTimeMs := SourceSamples[I].TimeStampMs;
-      if SourceSamples[I].TimeStampMs >= WindowStartMs then
+      if SourceSamples[I].TimeStampMs < WindowStartMs then
+        PreviousSampleTimeMs := SourceSamples[I].TimeStampMs
+      else
       begin
         Window[Count] := SourceSamples[I];
         AInfo.SampleResults[I].InWindow := True;
@@ -1717,6 +1733,14 @@ begin
   SetLength(Window, Count);
   AInfo.SampleCount := Length(SourceSamples);
   AInfo.UsedSampleCount := Count;
+  if PreviousSampleTimeMs <> Low(Int64) then
+    AInfo.PreviousSampleTimeMs := PreviousSampleTimeMs;
+  if IntervalCount > 0 then
+    SampleIntervalMs := IntervalSum / IntervalCount
+  else
+    SampleIntervalMs := 1000.0;
+  AInfo.SampleIntervalMs := SampleIntervalMs;
+  AInfo.BoundaryToleranceMs := EnsureRange(Round(SampleIntervalMs * 0.35), 100, 400);
 
   if LastSampleTimeMs <> Low(Int64) then
   begin
@@ -1731,7 +1755,17 @@ begin
   begin
     FirstMs := Window[0].TimeStampMs;
     LastMs := Window[Count - 1].TimeStampMs;
-    AInfo.WindowDurationSec := (LastMs - FirstMs) / 1000.0;
+    AInfo.FirstWindowSampleTimeMs := FirstMs;
+    AInfo.LastWindowSampleTimeMs := LastMs;
+    AInfo.HasLeftBoundaryCoverage := (PreviousSampleTimeMs <> Low(Int64)) or
+      (FirstMs <= WindowStartMs + AInfo.BoundaryToleranceMs);
+    AInfo.HasRightBoundaryCoverage := CurrentMs - LastMs <= AInfo.BoundaryToleranceMs;
+    if AInfo.HasLeftBoundaryCoverage then
+      EffectiveWindowStartMs := WindowStartMs
+    else
+      EffectiveWindowStartMs := FirstMs;
+    AInfo.WindowDurationSec := (LastMs - EffectiveWindowStartMs) / 1000.0;
+    AInfo.ActualWindowDurationSec := AInfo.WindowDurationSec;
     AInfo.CurrentValue := Window[Count - 1].Value;
     AInfo.HasCurrentValue := True;
     AInfo.MinValue := Window[0].Value;
@@ -1762,8 +1796,9 @@ begin
   end;
 
   AInfo.HasEnoughSamples := Count >= AMinSampleCount;
-  AInfo.HasFullWindow := (Count > 0) and
-    (AInfo.WindowDurationSec * 1000.0 + SAMPLE_INTERVAL_TOLERANCE_MS >= RequiredWindowMs);
+  AInfo.HasFullWindow := (Count > 0) and AInfo.HasLeftBoundaryCoverage and
+    AInfo.HasRightBoundaryCoverage and
+    ((AInfo.LastWindowSampleTimeMs - WindowStartMs) >= RequiredWindowMs - AInfo.BoundaryToleranceMs);
   AInfo.HasEnoughWindow := AInfo.HasFullWindow;
   if not AInfo.HasEnoughSamples then Include(AInfo.FailReasons, mvsfrNotEnoughSamples);
   if not AInfo.HasFullWindow then Include(AInfo.FailReasons, mvsfrWindowNotFilled);
@@ -1787,7 +1822,19 @@ begin
 
   Msg := '';
   if mvsfrWindowNotFilled in AInfo.FailReasons then
-    Msg := Msg + Format('Набор окна стабилизации: %.1f из %.1f с. ', [AInfo.WindowDurationSec, AWindowDurationSec]);
+  begin
+    if AInfo.HasLeftBoundaryCoverage then
+      LeftBoundaryText := 'покрыта'
+    else
+      LeftBoundaryText := 'не покрыта';
+    if AInfo.HasRightBoundaryCoverage then
+      RightBoundaryText := 'покрыта'
+    else
+      RightBoundaryText := 'не покрыта';
+    Msg := Msg + Format('Окно стабилизации не заполнено: покрытие %.1f из %.1f с; отсчётов %d из %d; левая граница %s; правая граница %s. ',
+      [AInfo.ActualWindowDurationSec, AWindowDurationSec, AInfo.UsedSampleCount, AMinSampleCount,
+       LeftBoundaryText, RightBoundaryText]);
+  end;
   if mvsfrNotEnoughSamples in AInfo.FailReasons then
     Msg := Msg + Format('Недостаточно отсчётов: %d из %d. ', [AInfo.UsedSampleCount, AMinSampleCount]);
   if (mvsfrSampleBelowStabilityRange in AInfo.FailReasons) or
