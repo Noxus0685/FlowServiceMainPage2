@@ -2637,7 +2637,7 @@ var
   ExistingPoint: TDevicePoint;
   Participant: TMeasurementPointParticipant;
   StoredQLS, CalculatedQLS, TargetQLS, MergeTolerance: Double;
-  DerivedQmaxLS, PointQValidationToleranceLS, RelativeQmaxDiff: Double;
+  DerivedQmaxLS, EffectiveDeviceQmaxLS, PointQValidationToleranceLS, RelativeQmaxDiff: Double;
   ProcessingDeviceCount, ProcessingDevicePointCount, ParticipantCount: Integer;
   I, J, DuplicateParticipantCount, LostSourcePointCount: Integer;
   TotalDeviceChannelCount, EnabledDeviceChannelCount, DisabledDeviceChannelCount: Integer;
@@ -2646,7 +2646,7 @@ var
   ChannelIndex: Integer;
   IncludedInAutomaticSession: Boolean;
   QmaxMismatch: Boolean;
-  SkipReason, DeviceResolveSource, FirstQmaxBindingError: string;
+  SkipReason, DeviceResolveSource: string;
   Action, Reason, PointName: string;
   ChannelUUIDText, ChannelDeviceUUIDText, ChannelDeviceNameText: string;
   SelectedDeviceUUIDText, SelectedDeviceNameText, RepoDeviceUUIDText: string;
@@ -2802,7 +2802,6 @@ begin
   TotalDeviceChannelCount := 0;
   EnabledDeviceChannelCount := 0;
   DisabledDeviceChannelCount := 0;
-  FirstQmaxBindingError := '';
 
   if FWorkTable.DeviceChannels.Count = 0 then
     FWorkTable.AddDeviceChannel(True, -1, TWorkTable.BuildChannelDefaultText(1), '', '-', '');
@@ -2918,12 +2917,9 @@ begin
       StoredQLS := SourcePoint.Q;
       CalculatedQLS := 0;
       DerivedQmaxLS := 0;
+      EffectiveDeviceQmaxLS := Device.Qmax;
       if IsValidFlowValue(SourcePoint.FlowRate) and IsValidFlowValue(StoredQLS) then
-      begin
         DerivedQmaxLS := StoredQLS / SourcePoint.FlowRate;
-      end;
-      if IsValidFlowValue(Device.Qmax) and IsValidFlowValue(SourcePoint.FlowRate) then
-        CalculatedQLS := Device.Qmax * SourcePoint.FlowRate;
       QmaxMismatch := False;
       RelativeQmaxDiff := 0;
       if IsValidFlowValue(DerivedQmaxLS) and IsValidFlowValue(Device.Qmax) then
@@ -2931,21 +2927,19 @@ begin
         RelativeQmaxDiff := Abs(Device.Qmax - DerivedQmaxLS) / Max(Abs(DerivedQmaxLS), 1E-12);
         QmaxMismatch := RelativeQmaxDiff > QmaxMismatchRelativeTolerance;
       end;
-      AddDiagnosticEvent(Format('SessionSourcePointQmaxValidation: ChannelDeviceUUID=%s; SelectedDeviceUUID=%s; SelectedDeviceQmaxLS=%.6f; SourcePointQLS=%.6f; SourcePointFlowRate=%.9f; DerivedQmaxLS=%.6f; QmaxMismatch=%s',
-        [ChannelDeviceUUIDText, Device.UUID, Device.Qmax, StoredQLS, SourcePoint.FlowRate, DerivedQmaxLS, BoolText(QmaxMismatch)]));
+      if QmaxMismatch and IsValidFlowValue(DerivedQmaxLS) then
+        EffectiveDeviceQmaxLS := DerivedQmaxLS;
+      if IsValidFlowValue(EffectiveDeviceQmaxLS) and IsValidFlowValue(SourcePoint.FlowRate) then
+        CalculatedQLS := EffectiveDeviceQmaxLS * SourcePoint.FlowRate;
+      AddDiagnosticEvent(Format('SessionSourcePointQmaxValidation: ChannelDeviceUUID=%s; SelectedDeviceUUID=%s; SelectedDeviceQmaxLS=%.6f; EffectiveDeviceQmaxLS=%.6f; SourcePointQLS=%.6f; SourcePointFlowRate=%.9f; DerivedQmaxLS=%.6f; QmaxMismatch=%s',
+        [ChannelDeviceUUIDText, Device.UUID, Device.Qmax, EffectiveDeviceQmaxLS, StoredQLS, SourcePoint.FlowRate, DerivedQmaxLS, BoolText(QmaxMismatch)]));
       if QmaxMismatch then
-      begin
-        PointName := Format('InvalidDeviceQmaxBinding: ChannelUUID=%s; DeviceUUID=%s; StoredQmax=%.6f; DerivedQmax=%.6f; SourcePointUUID=%s; StoredPointQLS=%.6f; SourceFlowRate=%.9f; CalculatedTargetQLS=%.6f; RelativeQmaxDiff=%.9f',
-          [Channel.UUID, Device.UUID, Device.Qmax, DerivedQmaxLS, SourcePoint.UUID, StoredQLS, SourcePoint.FlowRate, CalculatedQLS, RelativeQmaxDiff]);
-        AddDiagnosticEvent(PointName);
-        if FirstQmaxBindingError = '' then
-          FirstQmaxBindingError := PointName;
-        Continue;
-      end;
+        AddDiagnosticEvent(Format('DeviceQmaxBindingCorrectedFromSourcePoint: ChannelUUID=%s; DeviceUUID=%s; StoredQmax=%.6f; DerivedQmax=%.6f; SourcePointUUID=%s; StoredPointQLS=%.6f; SourceFlowRate=%.9f; CalculatedTargetQLS=%.6f; RelativeQmaxDiff=%.9f',
+          [Channel.UUID, Device.UUID, Device.Qmax, DerivedQmaxLS, SourcePoint.UUID, StoredQLS, SourcePoint.FlowRate, CalculatedQLS, RelativeQmaxDiff]));
       if not IsValidFlowValue(CalculatedQLS) then
       begin
         AddDiagnosticEvent(Format('SessionSourcePoint: DeviceUUID=%s; DeviceChannelUUID=%s; SourcePointUUID=%s; SourcePointName=%s; SourceFlowRate=%.9f; DeviceQmaxLS=%.6f; StoredPointQLS=%.6f; CalculatedTargetQLS=%.6f; DerivedQmaxLS=%.6f; SelectedTargetQLS=0; MatchedSessionPointUUID=; MatchedSessionPointQLS=0; MergeToleranceLS=0; Action=Skipped; Reason=InvalidCalculatedTargetQLS',
-          [Device.UUID, Channel.UUID, SourcePoint.UUID, SourcePoint.Name, SourcePoint.FlowRate, Device.Qmax, StoredQLS, CalculatedQLS, DerivedQmaxLS]));
+          [Device.UUID, Channel.UUID, SourcePoint.UUID, SourcePoint.Name, SourcePoint.FlowRate, EffectiveDeviceQmaxLS, StoredQLS, CalculatedQLS, DerivedQmaxLS]));
         Continue;
       end;
 
@@ -2955,7 +2949,7 @@ begin
         TargetQLS := StoredQLS
       else if IsValidFlowValue(StoredQLS) then
         AddDiagnosticEvent(Format('SourcePointQMismatch: CurrentDeviceUUID=%s; CurrentDeviceQmaxLS=%.6f; SourcePointQLS=%.6f; SourcePointFlowRate=%.9f; CalculatedTargetQLS=%.6f; DerivedQmaxLS=%.6f',
-          [Device.UUID, Device.Qmax, StoredQLS, SourcePoint.FlowRate, CalculatedQLS, DerivedQmaxLS]));
+          [Device.UUID, EffectiveDeviceQmaxLS, StoredQLS, SourcePoint.FlowRate, CalculatedQLS, DerivedQmaxLS]));
 
       Participant := Default(TMeasurementPointParticipant);
       Participant.DeviceUUID := Device.UUID;
@@ -2963,7 +2957,7 @@ begin
       Participant.SourcePointUUID := SourcePoint.UUID;
       Participant.SourcePointName := SourcePoint.Name;
       Participant.SourceFlowRate := SourcePoint.FlowRate;
-      Participant.SourceDeviceQmaxLS := Device.Qmax;
+      Participant.SourceDeviceQmaxLS := EffectiveDeviceQmaxLS;
       Participant.StoredSourcePointQLS := StoredQLS;
       Participant.CalculatedSourceTargetQLS := CalculatedQLS;
       Participant.SelectedSourceTargetQLS := TargetQLS;
@@ -3022,7 +3016,7 @@ begin
 
       AddDiagnosticEvent(Format('SessionSourcePoint: DeviceUUID=%s; DeviceChannelUUID=%s; SourcePointUUID=%s; SourcePointName=%s; SourceFlowRate=%.9f; DeviceQmaxLS=%.6f; StoredPointQLS=%.6f; CalculatedTargetQLS=%.6f; DerivedQmaxLS=%.6f; SelectedTargetQLS=%.6f; MatchedSessionPointUUID=%s; MatchedSessionPointQLS=%.6f; MergeToleranceLS=%.9f; Action=%s; Reason=%s',
         [Device.UUID, Channel.UUID, SourcePoint.UUID, SourcePoint.Name, SourcePoint.FlowRate,
-         Device.Qmax, StoredQLS, CalculatedQLS, DerivedQmaxLS, TargetQLS, SessionPoint.UUID, SessionPoint.Q,
+         EffectiveDeviceQmaxLS, StoredQLS, CalculatedQLS, DerivedQmaxLS, TargetQLS, SessionPoint.UUID, SessionPoint.Q,
          MergeTolerance, Action, Reason]));
     end;
     AddDiagnosticEvent(Format('CreateSessionDeviceSummary: DeviceUUID=%s; DeviceName=%s; DeviceQmaxLS=%.6f; EnabledSourcePointCount=%d; AddedParticipantCount=%d; CreatedPhysicalPointCount=%d; MergedParticipantCount=%d',
@@ -3092,12 +3086,6 @@ begin
      ResolvedUniqueDeviceCount, DistinctDeviceQmaxCount, ProcessingDeviceCount,
      ProcessingDevicePointCount, FPoints.Count, ParticipantCount, ParticipantCount,
      DuplicateParticipantCount, LostSourcePointCount]));
-
-  if FirstQmaxBindingError <> '' then
-  begin
-    ProtocolManager.AddMessage(pcError, psMeasurement, 'InvalidDeviceQmaxBinding', 'Некорректная привязка Qmax прибора', FirstQmaxBindingError);
-    raise Exception.Create(FirstQmaxBindingError);
-  end;
 
   if FPoints.Count = 0 then
   begin
