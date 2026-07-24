@@ -92,31 +92,6 @@
               Text = #8212
             end
           end
-          object RectangleStabilityConfirmed: TRectangle
-            Position.X = 238.000000000000000000
-            Position.Y = 2.000000000000000000
-            Size.Width = 228.000000000000000000
-            Size.Height = 30.000000000000000000
-            Size.PlatformDefault = False
-            Stroke.Color = claNull
-            object LabelStabilityConfirmedCaption: TLabel
-              Align = Left
-              Margins.Left = 8.000000000000000000
-              Position.X = 8.000000000000000000
-              Size.Width = 168.000000000000000000
-              Size.Height = 30.000000000000000000
-              Size.PlatformDefault = False
-              Text = #1057#1090#1072#1073#1080#1083#1100#1085#1086#1089#1090#1100' '#1087#1086#1076#1090#1074#1077#1088#1078#1076#1077#1085#1072
-            end
-            object LabelStabilityConfirmedValue: TLabel
-              Align = Client
-              Size.Width = 52.000000000000000000
-              Size.Height = 30.000000000000000000
-              Size.PlatformDefault = False
-              TextSettings.HorzAlign = Center
-              Text = #8212
-            end
-          end
           object RectangleCurrentInRange: TRectangle
             Position.X = 476.000000000000000000
             Position.Y = 2.000000000000000000
@@ -784,23 +759,6 @@
                 TabOrder = 3
                 Position.X = 280.000000000000000000
                 Position.Y = 120.000000000000000000
-                Size.Width = 120.000000000000000000
-                Size.Height = 24.000000000000000000
-                Size.PlatformDefault = False
-              end
-              object LabelConfirmationTimeSec: TLabel
-                Position.X = 12.000000000000000000
-                Position.Y = 152.000000000000000000
-                Size.Width = 240.000000000000000000
-                Size.Height = 22.000000000000000000
-                Size.PlatformDefault = False
-                Text = #1042#1088#1077#1084#1103' '#1087#1086#1076#1090#1074#1077#1088#1078#1076#1077#1085#1080#1103', '#1089
-              end
-              object EditConfirmationTimeSec: TEdit
-                Touch.InteractiveGestures = [LongTap, DoubleTap]
-                TabOrder = 4
-                Position.X = 280.000000000000000000
-                Position.Y = 150.000000000000000000
                 Size.Width = 120.000000000000000000
                 Size.Height = 24.000000000000000000
                 Size.PlatformDefault = False
