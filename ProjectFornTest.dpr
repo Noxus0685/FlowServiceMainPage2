@@ -24,6 +24,7 @@ uses
   uMKSDebug in 'uMKSDebug.pas',
   uFlowMeter in 'uFlowMeter.pas',
   uMeasurementRun in 'uMeasurementRun.pas',
+  uAutoMeasurementTestRunner in 'uAutoMeasurementTestRunner.pas',
   uMeterValue in 'uMeterValue.pas',
   uObservable in 'uObservable.pas',
   uParameter in 'uParameter.pas',
