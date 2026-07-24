@@ -1437,10 +1437,10 @@ begin
     FireEvent(mePointDone);
     if FMode = mrmManual then
       FNextStageAfterSave := msDone
+    else if FindNextEnabledPointIndex(FCurrentPointIndex + 1) < 0 then
+      FNextStageAfterSave := msDone
     else
-    begin
       FNextStageAfterSave := msSelectPoint;
-    end;
   end
   else
     FNextStageAfterSave := msWaitMeasureStart;
@@ -1497,9 +1497,25 @@ end;
 
 procedure TMeasurementRun.FinalizeMeasurementRun(AResult: TMeasurementRunResult;
   AReason: TMeasurementRunDoneReason);
+var
+  PreviousStage: EMeasurementState;
+  PreviousWorkTableState: EStateWorkTable;
+  CurrentPointIndexBefore: Integer;
+  NextStageAfterSaveBefore: EMeasurementState;
+  DisplayedStatusText: string;
+  FinalWorkTableStateText: string;
 begin
   if FFinalized then
     Exit;
+
+  PreviousStage := FCurrentStage;
+  if FWorkTable <> nil then
+    PreviousWorkTableState := FWorkTable.State
+  else
+    PreviousWorkTableState := swtNONE;
+  CurrentPointIndexBefore := FCurrentPointIndex;
+  NextStageAfterSaveBefore := FNextStageAfterSave;
+
   FFinalized := True;
 
   if (GetCurrentPoint <> nil) and (GetCurrentPoint.Status = mptsResultsRead) then
@@ -1508,6 +1524,7 @@ begin
   FRunCompleted := True;
   FRunResult := AResult;
   FDoneReason := AReason;
+  FCurrentStage := msDone;
   if AResult = mrrSuccess then
   begin
     FStopRequested := False;
@@ -1524,14 +1541,36 @@ begin
   if FWorkTable <> nil then
     FWorkTable.State := swtNONE;
 
+  case FRunResult of
+    mrrCancelled: DisplayedStatusText := 'Отменено';
+    mrrError: DisplayedStatusText := 'Ошибка';
+  else
+    if FRunCompleted and (FRunResult = mrrSuccess) then
+      DisplayedStatusText := 'Завершено'
+    else if FStopRequested then
+      DisplayedStatusText := 'Остановка'
+    else
+      DisplayedStatusText := MeasurementStateToString(FCurrentStage);
+  end;
+
+  if FWorkTable <> nil then
+    FinalWorkTableStateText := TWorkTable.WorkTableStateToString(FWorkTable.State)
+  else
+    FinalWorkTableStateText := TWorkTable.WorkTableStateToString(swtNONE);
+
+  AddDiagnosticEvent(Format('FinalizeMeasurementRun: PreviousStage=%s; FinalStage=%s; PreviousWorkTableState=%s; FinalWorkTableState=%s; RunCompleted=%s; RunResult=%s; DoneReason=%s; StopRequested=%s; CurrentPointIndexBefore=%d; CurrentPointIndexAfter=%d; NextStageAfterSaveBefore=%s; NextStageAfterSaveAfter=%s; DisplayedStatusText=%s',
+    [MeasurementStateToString(PreviousStage), MeasurementStateToString(FCurrentStage),
+     TWorkTable.WorkTableStateToString(PreviousWorkTableState), FinalWorkTableStateText,
+     BoolToStr(FRunCompleted, True), GetEnumName(TypeInfo(TMeasurementRunResult), Ord(FRunResult)),
+     GetEnumName(TypeInfo(TMeasurementRunDoneReason), Ord(FDoneReason)), BoolToStr(FStopRequested, True),
+     CurrentPointIndexBefore, FCurrentPointIndex, MeasurementStateToString(NextStageAfterSaveBefore),
+     MeasurementStateToString(FNextStageAfterSave), DisplayedStatusText]));
+
   if AResult = mrrSuccess then
   begin
     AddDiagnosticEvent('meAllDone');
     FireEvent(meAllDone);
-  end
-  else
-    AddDiagnosticEvent('Run finalized: Result=' + GetEnumName(TypeInfo(TMeasurementRunResult), Ord(AResult)) +
-      '; DoneReason=' + GetEnumName(TypeInfo(TMeasurementRunDoneReason), Ord(AReason)));
+  end;
 
   Notify(Integer(meStateChanged), nil);
   if FThread <> nil then
