@@ -3222,7 +3222,6 @@ begin
       //
       // В групповой поиск включаются только те каналы, которые прошли
       // IsChannelValidForSelection.
-      if Channel.Group > 0 then
       begin
         if not Groups.TryGetValue(Channel.Group, GroupChannels) then
         begin
@@ -3581,15 +3580,10 @@ begin
       if QmaxBase <= 0 then
         Continue;
 
-      if Channel.Group > 0 then
-      begin
-        if GroupSums.TryGetValue(Channel.Group, GroupSum) then
-          GroupSums[Channel.Group] := GroupSum + QmaxBase
-        else
-          GroupSums.Add(Channel.Group, QmaxBase);
-      end
-      else if QmaxBase > Result then
-        Result := QmaxBase;
+      if GroupSums.TryGetValue(Channel.Group, GroupSum) then
+        GroupSums[Channel.Group] := GroupSum + QmaxBase
+      else
+        GroupSums.Add(Channel.Group, QmaxBase);
     end;
 
     for Pair in GroupSums do
@@ -6557,8 +6551,7 @@ begin
     begin
       for J := 0 to AChannels.Count - 1 do
         if (AChannels[J] <> nil) and AChannels[J].Enabled and
-           (((GroupKey > 0) and (AChannels[J].Group = GroupKey)) or
-            ((GroupKey <= 0) and (J = I))) and
+           (AChannels[J].Group = GroupKey) and
            (AChannels[J].FlowMeter <> nil) and (AChannels[J].FlowMeter.Device <> nil) then
           SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[J].FlowMeter.Device.Qmax, 4);
 
@@ -7080,8 +7073,7 @@ begin
 
   for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
     if IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I]) and
-       (((GroupKey > 0) and (AWorkTable.EtalonChannels[I].Group = GroupKey)) or
-        ((GroupKey <= 0) and (I = ActiveEtalonIndex))) then
+       (AWorkTable.EtalonChannels[I].Group = GroupKey) then
     begin
       ChannelCoef := GetChannelFlowCoef(AWorkTable.EtalonChannels[I]);
       if ChannelCoef > 0 then
