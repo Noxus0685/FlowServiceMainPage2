@@ -3792,6 +3792,7 @@ var
   StableStatus: string;
   CurrentSecond: Int64;
   StableTimeoutSec: Integer;
+  StableElapsedMs: Int64;
 begin
   if FMode = mrmManual then
   begin
@@ -3809,6 +3810,14 @@ begin
 
   CurrentTick := TThread.GetTickCount64;
   StableTimeoutSec := CalcStableTimeoutSec;
+  if FWaitStableStartedMs > 0 then
+  begin
+    StableElapsedMs := TMeterValue.GetMonotonicTimeMs - FWaitStableStartedMs;
+    if StableElapsedMs < 0 then
+      StableElapsedMs := 0;
+  end
+  else
+    StableElapsedMs := 0;
 
   if (FWorkTable <> nil) and (FWorkTable.State <> swtMONITOR) then
   begin
@@ -3844,7 +3853,7 @@ begin
           'Ожидание стабилизации эталона', StableInfo.StatusText);
       end;
 
-      if (((CurrentTick - FWaitStableStartedMs) / 1000) > StableTimeoutSec) then
+      if ((StableElapsedMs / 1000) > StableTimeoutSec) then
       begin
         ProtocolManager.AddMessage(pcError, psMeasurement, 'StableFailed',
           'Не удалось установить параметры измерения', StableInfo.StatusText);
@@ -3898,7 +3907,7 @@ begin
       FStableTimerResetReason := StableInfo.StatusText;
       FLastDeviceStableStateKnown := True;
       FLastDeviceStableState := False;
-      if (((CurrentTick - FWaitStableStartedMs) / 1000) > StableTimeoutSec) then
+      if ((StableElapsedMs / 1000) > StableTimeoutSec) then
       begin
         ProtocolManager.AddMessage(pcError, psMeasurement, 'StableFailed',
           'Не удалось стабилизировать приборы', StableInfo.StatusText);
