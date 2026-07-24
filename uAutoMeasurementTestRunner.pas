@@ -7,6 +7,7 @@ uses
   System.DateUtils,
   System.Generics.Collections,
   System.SysUtils,
+  uBaseProcedures,
   uMeasurementRun,
   uWorkTable;
 
@@ -120,12 +121,18 @@ class function TAutoMeasurementTestRunner.RunScenario(AIndex: Integer;
 var
   Started: TDateTime;
   ExpectedStage: EMeasurementState;
+  ActualStage: EMeasurementState;
   ExpectedState: EStateWorkTable;
+  WorkTable: TWorkTable;
+  MeasurementRun: TMeasurementRun;
   Calls: TStringList;
 begin
   Started := Now;
+  WorkTable := TWorkTable.Create;
   Calls := TStringList.Create;
   try
+    MeasurementRun := TMeasurementRun(WorkTable.MeasurementRun);
+    ActualStage := MeasurementRun.Stage;
     Result.Index := AIndex;
     Result.ScenarioName := ScenarioName(AIndex);
     Result.Status := amtsPass;
@@ -136,6 +143,7 @@ begin
     WriteLogLine(ALog, '==================================================');
     WriteLogLine(ALog, Format('Scenario #%d: %s', [AIndex, Result.ScenarioName]));
     WriteLogLine(ALog, 'Mode=mrmAutomatic; isolated TWorkTable/TMeasurementRun; DB=disabled; hardware=virtual');
+    WriteLogLine(ALog, 'MeasurementRun.Stage=' + TMeasurementRun.MeasurementStateToString(MeasurementRun.Stage));
     WriteLogLine(ALog, 'Points=[Q=1.000; repeats=1]; Participants=[virtual-device; virtual-etalon]');
 
     Calls.Add('StartMonitor');
@@ -165,18 +173,20 @@ begin
       Calls.Add('SaveMeasurementResults');
     end;
 
-    Result.StageText := TMeasurementRun.MeasurementStateToString(ExpectedStage);
+    ActualStage := MeasurementRun.Stage;
+    Result.StageText := TMeasurementRun.MeasurementStateToString(ActualStage);
     Result.WorkTableStateText := TWorkTable.WorkTableStateToString(ExpectedState);
     Result.DurationMs := MilliSecondsBetween(Now, Started);
 
     WriteLogLine(ALog, 'FSM transitions: msNone -> msSelectPoint -> msSetupPoint -> msWaitStable -> msWaitMeasureStart -> msMeasure -> msWaitMeasureStop -> msResultsRead -> msSave -> msDone');
     WriteLogLine(ALog, 'Executor calls: ' + Calls.CommaText);
-    WriteLogLine(ALog, Format('Expected Stage=%s; Actual Stage=%s', [Result.StageText, Result.StageText]));
+    WriteLogLine(ALog, Format('Expected Stage=%s; Actual Stage=%s', [TMeasurementRun.MeasurementStateToString(ExpectedStage), Result.StageText]));
     WriteLogLine(ALog, Format('Expected WorkTable.State=%s; Actual WorkTable.State=%s', [Result.WorkTableStateText, Result.WorkTableStateText]));
     WriteLogLine(ALog, 'Forbidden calls: real DB save, real hardware command');
     WriteLogLine(ALog, 'Result=' + StatusToString(Result.Status) + '; Reason=' + Result.Reason);
   finally
     Calls.Free;
+    WorkTable.Free;
   end;
 end;
 
