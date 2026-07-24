@@ -72,6 +72,7 @@ type
     FStabilitySettings: TMeterValueStabilitySettings;
     /// <summary>Chronological history of physical-value samples used only by stability analysis.</summary>
     FSamples: TList<TMeterValueSample>;
+    FActiveStabilityStartMs: Int64;
     /// <summary>Second bucket of the latest automatic stability sample.</summary>
     FAutomaticSampleBucket: Int64;
     /// <summary>Index of the latest automatic stability sample; always validated before reuse.</summary>
@@ -355,6 +356,7 @@ type
     class function AnalyzeSingleStabilityWindow(
       const ASamples: TArray<TMeterValueSample>;
       const ASettings: TMeterValueStabilitySettings;
+      const AAnalysisStartMs: Int64;
       const ACurrentMs: Int64;
       const ATargetValue: Double;
       const ALowerLimit: Double;
@@ -364,6 +366,7 @@ type
     class function AnalyzeStabilitySequence(
       const ASamples: TArray<TMeterValueSample>;
       const ASettings: TMeterValueStabilitySettings;
+      const AAnalysisStartMs: Int64;
       const ACurrentMs: Int64;
       const ATargetValue: Double;
       const ALowerLimit: Double;
@@ -490,6 +493,7 @@ begin
   Coefs := TList<TCoef>.Create;
   FAggregateMeterValues := TObjectList<TMeterValue>.Create(False);
   FSamples := TList<TMeterValueSample>.Create;
+  FActiveStabilityStartMs := 0;
   FAutomaticSampleBucket := -1;
   FAutomaticSampleIndex := -1;
   FSampleLock := TCriticalSection.Create;
@@ -1225,6 +1229,7 @@ var
   LastSample: TMeterValueSample;
   LastIndex: Integer;
   CutoffMs: Int64;
+  MaxHistorySamples: Integer;
 begin
   Sample.TimeStampMs := ATimeStampMs;
   Sample.Value := AValue;
@@ -1249,10 +1254,14 @@ begin
       end;
     end;
 
+    if FActiveStabilityStartMs <= 0 then
+      FActiveStabilityStartMs := ATimeStampMs;
     FSamples.Add(Sample);
-    CutoffMs := ATimeStampMs - Round(Max(1.0, FStabilitySettings.WindowDurationSec * 2.0) * 1000.0);
+    CutoffMs := ATimeStampMs - Round(Max(FStabilitySettings.WindowDurationSec * 10.0, 300.0) * 1000.0);
+    MaxHistorySamples := Max(FStabilitySettings.MinSampleCount * 20, ARRAY_SIZE);
     while (FSamples.Count > 0) and
-      ((FSamples.Count > ARRAY_SIZE) or (FSamples[0].TimeStampMs < CutoffMs)) do
+      (FSamples[0].TimeStampMs < FActiveStabilityStartMs) and
+      ((FSamples.Count > MaxHistorySamples) or (FSamples[0].TimeStampMs < CutoffMs)) do
       FSamples.Delete(0);
   finally
     FSampleLock.Leave;
@@ -1267,6 +1276,7 @@ var
   LastIndex: Integer;
   InsertIndex: Integer;
   CutoffMs: Int64;
+  MaxHistorySamples: Integer;
 begin
   CurrentBucket := ATimeStampMs div 1000;
   FSampleLock.Enter;
@@ -1305,14 +1315,18 @@ begin
 
     Sample.TimeStampMs := ATimeStampMs;
     Sample.Value := AValue;
+    if FActiveStabilityStartMs <= 0 then
+      FActiveStabilityStartMs := ATimeStampMs;
     InsertIndex := 0;
     while (InsertIndex < FSamples.Count) and
       (FSamples[InsertIndex].TimeStampMs < ATimeStampMs) do
       Inc(InsertIndex);
     FSamples.Insert(InsertIndex, Sample);
-    CutoffMs := ATimeStampMs - Round(Max(1.0, FStabilitySettings.WindowDurationSec * 2.0) * 1000.0);
+    CutoffMs := ATimeStampMs - Round(Max(FStabilitySettings.WindowDurationSec * 10.0, 300.0) * 1000.0);
+    MaxHistorySamples := Max(FStabilitySettings.MinSampleCount * 20, ARRAY_SIZE);
     while (FSamples.Count > 0) and
-      ((FSamples.Count > ARRAY_SIZE) or (FSamples[0].TimeStampMs < CutoffMs)) do
+      (FSamples[0].TimeStampMs < FActiveStabilityStartMs) and
+      ((FSamples.Count > MaxHistorySamples) or (FSamples[0].TimeStampMs < CutoffMs)) do
     begin
       FSamples.Delete(0);
       Dec(InsertIndex);
@@ -1337,6 +1351,7 @@ begin
   FSampleLock.Enter;
   try
     FSamples.Clear;
+    FActiveStabilityStartMs := 0;
     FAutomaticSampleBucket := -1;
     FAutomaticSampleIndex := -1;
     ResetStabilityInfo;
@@ -1440,6 +1455,7 @@ begin
   FSampleLock.Enter;
   try
     FSamples.Clear;
+    FActiveStabilityStartMs := 0;
     FAutomaticSampleBucket := -1;
     FAutomaticSampleIndex := -1;
     ResetStabilityInfo;
@@ -1549,6 +1565,19 @@ begin
   end;
 end;
 
+function GetFirstSampleTimeMs(const ASamples: TArray<TMeterValueSample>; const ADefaultMs: Int64): Int64;
+var
+  I: Integer;
+begin
+  Result := ADefaultMs;
+  for I := 0 to High(ASamples) do
+    if ASamples[I].TimeStampMs <= ADefaultMs then
+    begin
+      Result := ASamples[I].TimeStampMs;
+      Exit;
+    end;
+end;
+
 function TMeterValue.AnalyzeStability(out AInfo: TMeterValueStabilityInfo): Boolean;
 var
   Samples: TArray<TMeterValueSample>;
@@ -1561,7 +1590,7 @@ begin
     FStabilitySettings.TargetAccuracyPlusPercent,
     FStabilitySettings.TargetAccuracyMinusPercent,
     FStabilitySettings.TargetToleranceAbsolute, LowerLimit, UpperLimit);
-  Result := AnalyzeStabilitySequence(Samples, FStabilitySettings, CurrentMs,
+  Result := AnalyzeStabilitySequence(Samples, FStabilitySettings, GetFirstSampleTimeMs(Samples, CurrentMs), CurrentMs,
     FStabilitySettings.TargetValue, LowerLimit, UpperLimit, AInfo);
   FSampleLock.Enter;
   try
@@ -1591,7 +1620,7 @@ begin
     Settings.TargetAccuracyPlusPercent,
     Settings.TargetAccuracyMinusPercent,
     Settings.TargetToleranceAbsolute, LowerLimit, UpperLimit);
-  Result := AnalyzeStabilitySequence(Samples, Settings, CurrentMs,
+  Result := AnalyzeStabilitySequence(Samples, Settings, GetFirstSampleTimeMs(Samples, CurrentMs), CurrentMs,
     Settings.TargetValue, LowerLimit, UpperLimit, AInfo);
   FSampleLock.Enter;
   try
@@ -1640,7 +1669,7 @@ begin
     Settings.TargetAccuracyPlusPercent,
     Settings.TargetAccuracyMinusPercent,
     Settings.TargetToleranceAbsolute, LowerLimit, UpperLimit);
-  Result := AnalyzeStabilitySequence(Samples, Settings, CurrentMs,
+  Result := AnalyzeStabilitySequence(Samples, Settings, AMinTimeStampMs, CurrentMs,
     Settings.TargetValue, LowerLimit, UpperLimit, AInfo);
   FSampleLock.Enter;
   try
@@ -1657,22 +1686,25 @@ function TMeterValue.AnalyzePointStabilityForMeasurement(const AMinTimeStampMs: 
   const AWindowDurationSec: Double; const AMinSampleCount: Integer;
   const AMaxSampleAgeSec: Double; const ATargetValue: Double;
   const AErrorPercent: Double; out AInfo: TMeterValueStabilityInfo): Boolean;
-const
-  SAMPLE_INTERVAL_TOLERANCE_MS = 250.0;
 var
   SourceSamples: TArray<TMeterValueSample>;
   Window: TArray<TMeterValueSample>;
   CurrentMs, RequiredWindowMs, WindowStartMs, FirstMs, LastMs, LastSampleTimeMs: Int64;
-  I, Count: Integer;
-  AllowedDeviation: Double;
+  I, Count, IntervalCount: Integer;
+  LastOutOfRangeTimeMs: Int64;
+  AllowedDeviation, SampleIntervalMs, IntervalSum, RangeEpsilon: Double;
   Msg: string;
 begin
   AInfo := Default(TMeterValueStabilityInfo);
   AInfo.Status := mvssUnknown;
   AInfo.FirstOutOfRangeSampleIndex := -1;
+  AInfo.PreviousSampleTimeMs := -1;
+  AInfo.FirstWindowSampleTimeMs := -1;
+  AInfo.LastWindowSampleTimeMs := -1;
   AInfo.PointErrorPercent := AErrorPercent;
   AInfo.SampleCount := 0;
   CurrentMs := GetMonotonicTimeMs;
+  AInfo.CurrentAnalysisTimeMs := CurrentMs;
 
   if (AWindowDurationSec <= 0) or (AMinSampleCount < 1) or (AMaxSampleAgeSec < 0) or
      IsNan(AErrorPercent) or IsInfinite(AErrorPercent) or (AErrorPercent < 0) then
@@ -1691,21 +1723,54 @@ begin
   SourceSamples := GetSamples;
   SetLength(AInfo.SampleResults, Length(SourceSamples));
   RequiredWindowMs := Round(AWindowDurationSec * 1000.0);
-  WindowStartMs := CurrentMs - RequiredWindowMs;
+  WindowStartMs := AMinTimeStampMs;
+  AInfo.WindowStartMs := WindowStartMs;
+  AInfo.RequiredSampleCount := AMinSampleCount;
+  AInfo.RequiredWindowDurationSec := AWindowDurationSec;
   SetLength(Window, Length(SourceSamples));
   Count := 0;
   LastSampleTimeMs := Low(Int64);
+  IntervalSum := 0;
+  IntervalCount := 0;
   for I := 0 to High(SourceSamples) do
   begin
     AInfo.SampleResults[I].SourceIndex := I;
     AInfo.SampleResults[I].TimeStampMs := SourceSamples[I].TimeStampMs;
-    AInfo.SampleResults[I].IsInRange := (SourceSamples[I].Value >= AInfo.StabilityLowerLimit) and
-      (SourceSamples[I].Value <= AInfo.StabilityUpperLimit);
+    RangeEpsilon := Max(1E-9, Abs(ATargetValue) * 1E-9);
+    AInfo.SampleResults[I].IsInRange := (SourceSamples[I].Value >= AInfo.StabilityLowerLimit - RangeEpsilon) and
+      (SourceSamples[I].Value <= AInfo.StabilityUpperLimit + RangeEpsilon);
+    if (I > 0) and (SourceSamples[I].TimeStampMs > SourceSamples[I - 1].TimeStampMs) then
+    begin
+      IntervalSum := IntervalSum + (SourceSamples[I].TimeStampMs - SourceSamples[I - 1].TimeStampMs);
+      Inc(IntervalCount);
+    end;
     if (SourceSamples[I].TimeStampMs >= AMinTimeStampMs) and (SourceSamples[I].TimeStampMs <= CurrentMs) then
     begin
       if (LastSampleTimeMs = Low(Int64)) or (SourceSamples[I].TimeStampMs > LastSampleTimeMs) then
         LastSampleTimeMs := SourceSamples[I].TimeStampMs;
-      if SourceSamples[I].TimeStampMs >= WindowStartMs then
+      Window[Count] := SourceSamples[I];
+      AInfo.SampleResults[I].InWindow := True;
+      AInfo.SampleResults[I].IsInDisplayAnalysisWindow := True;
+      Inc(Count);
+    end;
+  end;
+  SetLength(Window, Count);
+  LastOutOfRangeTimeMs := Low(Int64);
+  RangeEpsilon := Max(1E-9, Abs(ATargetValue) * 1E-9);
+  for I := 0 to Count - 1 do
+    if (Window[I].Value < AInfo.StabilityLowerLimit - RangeEpsilon) or
+       (Window[I].Value > AInfo.StabilityUpperLimit + RangeEpsilon) then
+      LastOutOfRangeTimeMs := Window[I].TimeStampMs;
+  if LastOutOfRangeTimeMs <> Low(Int64) then
+  begin
+    WindowStartMs := LastOutOfRangeTimeMs + 1;
+    AInfo.WindowStartMs := WindowStartMs;
+    Count := 0;
+    for I := 0 to High(SourceSamples) do
+    begin
+      AInfo.SampleResults[I].InWindow := False;
+      AInfo.SampleResults[I].IsInDisplayAnalysisWindow := False;
+      if (SourceSamples[I].TimeStampMs >= WindowStartMs) and (SourceSamples[I].TimeStampMs <= CurrentMs) then
       begin
         Window[Count] := SourceSamples[I];
         AInfo.SampleResults[I].InWindow := True;
@@ -1713,10 +1778,16 @@ begin
         Inc(Count);
       end;
     end;
+    SetLength(Window, Count);
   end;
-  SetLength(Window, Count);
   AInfo.SampleCount := Length(SourceSamples);
   AInfo.UsedSampleCount := Count;
+  if IntervalCount > 0 then
+    SampleIntervalMs := IntervalSum / IntervalCount
+  else
+    SampleIntervalMs := 1000.0;
+  AInfo.SampleIntervalMs := SampleIntervalMs;
+  AInfo.BoundaryToleranceMs := EnsureRange(Round(SampleIntervalMs * 0.35), 100, 400);
 
   if LastSampleTimeMs <> Low(Int64) then
   begin
@@ -1731,7 +1802,12 @@ begin
   begin
     FirstMs := Window[0].TimeStampMs;
     LastMs := Window[Count - 1].TimeStampMs;
-    AInfo.WindowDurationSec := (LastMs - FirstMs) / 1000.0;
+    AInfo.FirstWindowSampleTimeMs := FirstMs;
+    AInfo.LastWindowSampleTimeMs := LastMs;
+    AInfo.HasLeftBoundaryCoverage := True;
+    AInfo.HasRightBoundaryCoverage := True;
+    AInfo.WindowDurationSec := Max(0.0, (LastMs - WindowStartMs) / 1000.0);
+    AInfo.ActualWindowDurationSec := AInfo.WindowDurationSec;
     AInfo.CurrentValue := Window[Count - 1].Value;
     AInfo.HasCurrentValue := True;
     AInfo.MinValue := Window[0].Value;
@@ -1740,8 +1816,9 @@ begin
     begin
       AInfo.MinValue := Min(AInfo.MinValue, Window[I].Value);
       AInfo.MaxValue := Max(AInfo.MaxValue, Window[I].Value);
-      if (Window[I].Value < AInfo.StabilityLowerLimit) or
-         (Window[I].Value > AInfo.StabilityUpperLimit) then
+      RangeEpsilon := Max(1E-9, Abs(ATargetValue) * 1E-9);
+      if (Window[I].Value < AInfo.StabilityLowerLimit - RangeEpsilon) or
+         (Window[I].Value > AInfo.StabilityUpperLimit + RangeEpsilon) then
       begin
         AInfo.AllSamplesInRange := False;
         Inc(AInfo.OutOfRangeSampleCount);
@@ -1763,7 +1840,7 @@ begin
 
   AInfo.HasEnoughSamples := Count >= AMinSampleCount;
   AInfo.HasFullWindow := (Count > 0) and
-    (AInfo.WindowDurationSec * 1000.0 + SAMPLE_INTERVAL_TOLERANCE_MS >= RequiredWindowMs);
+    (AInfo.ActualWindowDurationSec + EPS >= AWindowDurationSec);
   AInfo.HasEnoughWindow := AInfo.HasFullWindow;
   if not AInfo.HasEnoughSamples then Include(AInfo.FailReasons, mvsfrNotEnoughSamples);
   if not AInfo.HasFullWindow then Include(AInfo.FailReasons, mvsfrWindowNotFilled);
@@ -1773,8 +1850,9 @@ begin
     AInfo.IsDataActual and AInfo.AllSamplesInRange;
   AInfo.IsConfirmed := AInfo.IsSignalStable;
   AInfo.IsStabilityConfirmed := AInfo.IsSignalStable;
-  AInfo.IsCurrentValueInRange := AInfo.HasCurrentValue and (AInfo.CurrentValue >= AInfo.StabilityLowerLimit) and
-    (AInfo.CurrentValue <= AInfo.StabilityUpperLimit);
+  RangeEpsilon := Max(1E-9, Abs(ATargetValue) * 1E-9);
+  AInfo.IsCurrentValueInRange := AInfo.HasCurrentValue and (AInfo.CurrentValue >= AInfo.StabilityLowerLimit - RangeEpsilon) and
+    (AInfo.CurrentValue <= AInfo.StabilityUpperLimit + RangeEpsilon);
   AInfo.IsMeanValueInRange := True;
   AInfo.IsForecastInRange := True;
   AInfo.IsSuitableForMeasurement := AInfo.IsSignalStable;
@@ -1787,9 +1865,10 @@ begin
 
   Msg := '';
   if mvsfrWindowNotFilled in AInfo.FailReasons then
-    Msg := Msg + Format('Набор окна стабилизации: %.1f из %.1f с. ', [AInfo.WindowDurationSec, AWindowDurationSec]);
+    Msg := Msg + Format('Окно стабилизации не заполнено: прошло %.1f из %.1f с; отсчётов %d из %d. ',
+      [AInfo.ActualWindowDurationSec, AWindowDurationSec, AInfo.UsedSampleCount, AMinSampleCount]);
   if mvsfrNotEnoughSamples in AInfo.FailReasons then
-    Msg := Msg + Format('Недостаточно отсчётов: %d из %d. ', [AInfo.UsedSampleCount, AMinSampleCount]);
+    Msg := Msg + Format('Недостаточно отсчётов: %d из %d; длительность %.1f из %.1f с. ', [AInfo.UsedSampleCount, AMinSampleCount, AInfo.ActualWindowDurationSec, AWindowDurationSec]);
   if (mvsfrSampleBelowStabilityRange in AInfo.FailReasons) or
      (mvsfrSampleAboveStabilityRange in AInfo.FailReasons) then
     Msg := Msg + Format('Отсчёт вне допуска точки: значение %.6f; диапазон %.6f..%.6f. ',
@@ -1816,6 +1895,7 @@ end;
 class function TMeterValue.AnalyzeSingleStabilityWindow(
   const ASamples: TArray<TMeterValueSample>;
   const ASettings: TMeterValueStabilitySettings;
+  const AAnalysisStartMs: Int64;
   const ACurrentMs: Int64;
   const ATargetValue: Double;
   const ALowerLimit: Double;
@@ -1829,9 +1909,9 @@ type
 var
   Window: TArray<TIndexedSample>;
   Used: TArray<TIndexedSample>;
-  CutoffMs, FirstMs, LastMs, LastSampleTimeMs: Int64;
+  FirstMs, LastMs, LastSampleTimeMs: Int64;
   I, N: Integer;
-  Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept: Double;
+  Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept, RangeEpsilon: Double;
   Msg: string;
   OutlierValues: TArray<Double>;
   Outliers: TArray<Boolean>;
@@ -1860,8 +1940,9 @@ begin
   begin
     AInfo.SampleResults[I].SourceIndex := I;
     AInfo.SampleResults[I].TimeStampMs := ASamples[I].TimeStampMs;
-    AInfo.SampleResults[I].IsInRange := (ASamples[I].Value >= ALowerLimit) and
-      (ASamples[I].Value <= AUpperLimit);
+    RangeEpsilon := Max(1E-9, Abs(ATargetValue) * 1E-9);
+    AInfo.SampleResults[I].IsInRange := (ASamples[I].Value >= ALowerLimit - RangeEpsilon) and
+      (ASamples[I].Value <= AUpperLimit + RangeEpsilon);
   end;
 
   if not ASettings.Enabled then
@@ -1899,10 +1980,13 @@ begin
     AInfo.LastSampleAgeSec := Max(0.0, (ACurrentMs - LastSampleTimeMs) / 1000.0);
   end;
 
-  CutoffMs := ACurrentMs - Round(ASettings.WindowDurationSec * 1000.0);
+  AInfo.WindowStartMs := AAnalysisStartMs;
+  AInfo.CurrentAnalysisTimeMs := ACurrentMs;
+  AInfo.RequiredSampleCount := ASettings.MinSampleCount;
+  AInfo.RequiredWindowDurationSec := ASettings.WindowDurationSec;
   SetLength(Window, 0);
   for I := 0 to High(ASamples) do
-    if (ASamples[I].TimeStampMs >= CutoffMs) and
+    if (ASamples[I].TimeStampMs >= AAnalysisStartMs) and
        (ASamples[I].TimeStampMs <= ACurrentMs) then
     begin
       AddWindowSample(I, ASamples[I]);
@@ -1916,14 +2000,17 @@ begin
   begin
     FirstMs := Window[0].Sample.TimeStampMs;
     LastMs := Window[N - 1].Sample.TimeStampMs;
+    AInfo.FirstWindowSampleTimeMs := FirstMs;
+    AInfo.LastWindowSampleTimeMs := LastMs;
     AInfo.CurrentValue := Window[N - 1].Sample.Value;
-    AInfo.WindowDurationSec := (LastMs - FirstMs) / 1000.0;
+    AInfo.WindowDurationSec := Max(0.0, (LastMs - AAnalysisStartMs) / 1000.0);
+    AInfo.ActualWindowDurationSec := AInfo.WindowDurationSec;
     AInfo.HasCurrentValue := True;
   end;
 
   AInfo.HasEnoughSamples := N >= ASettings.MinSampleCount;
   AInfo.HasFullWindow := (N > 0) and
-    (AInfo.WindowDurationSec * 1000.0 + 250.0 >= Round(ASettings.WindowDurationSec * 1000.0));
+    (AInfo.ActualWindowDurationSec + EPS >= ASettings.WindowDurationSec);
   AInfo.HasEnoughWindow := AInfo.HasFullWindow;
   AInfo.IsDataActual := AInfo.HasLastSampleAge and (AInfo.LastSampleAgeSec <= ASettings.MaxSampleAgeSec);
   if not AInfo.HasEnoughSamples then Include(AInfo.FailReasons, mvsfrNotEnoughSamples);
@@ -2022,8 +2109,9 @@ begin
     Intercept := AInfo.MeanValue - AInfo.TrendRate * MeanT;
     AInfo.ForecastValue := Intercept + AInfo.TrendRate * (T + ASettings.ForecastHorizonSec);
     AInfo.HasForecast := AInfo.HasTrend;
-    AInfo.IsForecastInRange := AInfo.HasForecast and (AInfo.ForecastValue >= ALowerLimit) and
-      (AInfo.ForecastValue <= AUpperLimit);
+    RangeEpsilon := Max(1E-9, Abs(ATargetValue) * 1E-9);
+    AInfo.IsForecastInRange := AInfo.HasForecast and (AInfo.ForecastValue >= ALowerLimit - RangeEpsilon) and
+      (AInfo.ForecastValue <= AUpperLimit + RangeEpsilon);
   end;
 
   AInfo.IsVariationStable := AInfo.Variation <= ASettings.MaxVariation;
@@ -2039,10 +2127,11 @@ begin
     AInfo.IsOutlierLevelAcceptable and not (mvsfrInvalidSettings in AInfo.FailReasons);
   AInfo.IsSignalStable := MathStable;
 
-  AInfo.IsCurrentValueInRange := AInfo.HasCurrentValue and (AInfo.CurrentValue >= ALowerLimit) and
-    (AInfo.CurrentValue <= AUpperLimit);
-  AInfo.IsMeanValueInRange := AInfo.HasStatistics and (AInfo.MeanValue >= ALowerLimit) and
-    (AInfo.MeanValue <= AUpperLimit);
+  RangeEpsilon := Max(1E-9, Abs(ATargetValue) * 1E-9);
+  AInfo.IsCurrentValueInRange := AInfo.HasCurrentValue and (AInfo.CurrentValue >= ALowerLimit - RangeEpsilon) and
+    (AInfo.CurrentValue <= AUpperLimit + RangeEpsilon);
+  AInfo.IsMeanValueInRange := AInfo.HasStatistics and (AInfo.MeanValue >= ALowerLimit - RangeEpsilon) and
+    (AInfo.MeanValue <= AUpperLimit + RangeEpsilon);
   if ASettings.RequireCurrentValueInRange and AInfo.HasCurrentValue and not AInfo.IsCurrentValueInRange then
     Include(AInfo.FailReasons, mvsfrCurrentValueOutOfRange);
   if ASettings.RequireMeanValueInRange and AInfo.HasStatistics and not AInfo.IsMeanValueInRange then
@@ -2064,11 +2153,11 @@ begin
   else AInfo.Status := mvssUnstable;
 
   Msg := '';
-  if mvsfrNotEnoughSamples in AInfo.FailReasons then Msg := Msg + Format('Недостаточно отсчётов: %d из %d. ', [AInfo.UsedSampleCount, ASettings.MinSampleCount]);
-  if mvsfrWindowNotFilled in AInfo.FailReasons then Msg := Msg + Format('Набор окна стабилизации: %.1f из %.1f с. ', [AInfo.WindowDurationSec, ASettings.WindowDurationSec]);
+  if mvsfrWindowNotFilled in AInfo.FailReasons then Msg := Msg + Format('Окно стабилизации не заполнено: прошло %.1f из %.1f с; отсчётов %d из %d. ', [AInfo.ActualWindowDurationSec, ASettings.WindowDurationSec, AInfo.UsedSampleCount, ASettings.MinSampleCount]);
+  if mvsfrNotEnoughSamples in AInfo.FailReasons then Msg := Msg + Format('Недостаточно отсчётов: %d из %d; длительность %.1f из %.1f с. ', [AInfo.UsedSampleCount, ASettings.MinSampleCount, AInfo.ActualWindowDurationSec, ASettings.WindowDurationSec]);
   if mvsfrInsufficientTimeSpread in AInfo.FailReasons then Msg := Msg + 'Недостаточный временной интервал между точками для расчёта тренда. ';
   if mvsfrStaleData in AInfo.FailReasons then Msg := Msg + Format('Данные устарели: последнее значение получено %.1f с назад. ', [AInfo.LastSampleAgeSec]);
-  if mvsfrVariationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Размах %.4f превышает допустимые %.4f. ', [AInfo.Variation, ASettings.MaxVariation]);
+  if mvsfrVariationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Окно заполнено: %.1f с; отсчётов %d. Размах %.4f превышает допустимые %.4f. ', [AInfo.ActualWindowDurationSec, AInfo.UsedSampleCount, AInfo.Variation, ASettings.MaxVariation]);
   if mvsfrDeviationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Стандартное отклонение %.4f превышает допустимые %.4f. ', [AInfo.StdDeviation, ASettings.MaxStdDeviation]);
   if mvsfrTrendTooHigh in AInfo.FailReasons then Msg := Msg + Format('Тренд %.6f ед./с превышает допустимые %.6f ед./с. ', [AInfo.TrendRate, ASettings.MaxTrendRate]);
   if mvsfrTooManyOutliers in AInfo.FailReasons then Msg := Msg + Format('Доля выбросов %.2f превышает допустимые %.2f. ', [AInfo.OutlierFraction, ASettings.MaxOutlierFraction]);
@@ -2087,6 +2176,7 @@ end;
 class function TMeterValue.AnalyzeStabilitySequence(
   const ASamples: TArray<TMeterValueSample>;
   const ASettings: TMeterValueStabilitySettings;
+  const AAnalysisStartMs: Int64;
   const ACurrentMs: Int64;
   const ATargetValue: Double;
   const ALowerLimit: Double;
@@ -2094,9 +2184,35 @@ class function TMeterValue.AnalyzeStabilitySequence(
   out AInfo: TMeterValueStabilityInfo): Boolean;
 var
   I: Integer;
+  Candidate: TMeterValueStabilityInfo;
+
+  function HasBlockingFailure(const AReasons: TMeterValueStabilityFailReasons): Boolean;
+  begin
+    Result := (mvsfrVariationTooHigh in AReasons) or
+      (mvsfrDeviationTooHigh in AReasons) or
+      (mvsfrTrendTooHigh in AReasons) or
+      (mvsfrTooManyOutliers in AReasons) or
+      (mvsfrCurrentValueOutOfRange in AReasons) or
+      (mvsfrMeanValueOutOfRange in AReasons) or
+      (mvsfrForecastOutOfRange in AReasons);
+  end;
 begin
-  Result := AnalyzeSingleStabilityWindow(ASamples, ASettings, ACurrentMs,
+  Result := AnalyzeSingleStabilityWindow(ASamples, ASettings, AAnalysisStartMs, ACurrentMs,
     ATargetValue, ALowerLimit, AUpperLimit, AInfo);
+
+  if HasBlockingFailure(AInfo.FailReasons) then
+    for I := 1 to High(ASamples) do
+      if ASamples[I].TimeStampMs <= ACurrentMs then
+      begin
+        AnalyzeSingleStabilityWindow(ASamples, ASettings, ASamples[I].TimeStampMs, ACurrentMs,
+          ATargetValue, ALowerLimit, AUpperLimit, Candidate);
+        if (Candidate.Status = mvssStable) or (not HasBlockingFailure(Candidate.FailReasons)) then
+        begin
+          AInfo := Candidate;
+          Result := AInfo.Status = mvssStable;
+          Break;
+        end;
+      end;
 
   for I := 0 to High(AInfo.SampleResults) do
   begin
@@ -2127,7 +2243,7 @@ class function TMeterValue.AnalyzeStabilitySamples(
   var AStabilityConfirmed: Boolean;
   out AInfo: TMeterValueStabilityInfo): Boolean;
 begin
-  Result := AnalyzeStabilitySequence(ASamples, ASettings, ACurrentMs,
+  Result := AnalyzeStabilitySequence(ASamples, ASettings, GetFirstSampleTimeMs(ASamples, ACurrentMs), ACurrentMs,
     ATargetValue, ALowerLimit, AUpperLimit, AInfo);
   if AInfo.IsSignalStable then
     AStableCandidateSinceMs := ACurrentMs - Round(AInfo.StableCandidateDurationSec * 1000.0)

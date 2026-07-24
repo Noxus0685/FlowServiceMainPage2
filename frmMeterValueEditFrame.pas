@@ -2529,6 +2529,7 @@ var
   ForecastSeries: TChartSeries;
   LowerSeries: TChartSeries;
   UpperSeries: TChartSeries;
+  StartSeries: TChartSeries;
   I: Integer;
   SampleIndex: Integer;
   Sample: TMeterValueSample;
@@ -2541,6 +2542,9 @@ var
   ForecastEndTimeSec: Double;
   LowerLimit: Double;
   UpperLimit: Double;
+  MinDisplayValue: Double;
+  MaxDisplayValue: Double;
+  AnalysisStartSec: Double;
   ToleranceColor: TAlphaColor;
   ChartSettings: TMeterValueStabilitySettings;
 
@@ -2576,11 +2580,21 @@ begin
       MinActualTimeSec := (FDisplayedSamples[Indexes[0]].TimeStampMs - BaseTimeMs) / 1000;
       MaxActualTimeSec := (FDisplayedSamples[Indexes[Indexes.Count - 1]].TimeStampMs - BaseTimeMs) / 1000;
       ForecastEndTimeSec := MaxActualTimeSec;
+      MinDisplayValue := ValueToCurrentDimension(FDisplayedSamples[Indexes[0]].Value);
+      MaxDisplayValue := MinDisplayValue;
+      for SampleIndex in Indexes do
+      begin
+        DisplayValue := ValueToCurrentDimension(FDisplayedSamples[SampleIndex].Value);
+        MinDisplayValue := Min(MinDisplayValue, DisplayValue);
+        MaxDisplayValue := Max(MaxDisplayValue, DisplayValue);
+      end;
       HasLimits := (Indexes.Count > 1) and TryGetTestTargetLimits(LowerLimit, UpperLimit);
       if HasLimits then
       begin
         LowerLimit := ValueToCurrentDimension(LowerLimit);
         UpperLimit := ValueToCurrentDimension(UpperLimit);
+        MinDisplayValue := Min(MinDisplayValue, LowerLimit);
+        MaxDisplayValue := Max(MaxDisplayValue, UpperLimit);
         LowerSeries := ChartStability.AddSeries('Нижняя граница');
         UpperSeries := ChartStability.AddSeries('Верхняя граница');
         ToleranceColor := ChartColorOptionToAlphaColor(ChartSettings.ChartToleranceColor);
@@ -2623,6 +2637,17 @@ begin
         LowerSeries.AddPoint(MaxActualTimeSec, LowerLimit);
         UpperSeries.AddPoint(MinActualTimeSec, UpperLimit);
         UpperSeries.AddPoint(MaxActualTimeSec, UpperLimit);
+      end;
+      if (FTestStabilityInfo.WindowStartMs > 0) and
+         (FTestStabilityInfo.WindowStartMs >= BaseTimeMs) then
+      begin
+        AnalysisStartSec := (FTestStabilityInfo.WindowStartMs - BaseTimeMs) / 1000;
+        StartSeries := ChartStability.AddSeries('Начало участка');
+        StartSeries.Color := TAlphaColors.Gray;
+        StartSeries.Thickness := 1;
+        StartSeries.ShowMarkers := False;
+        StartSeries.AddPoint(AnalysisStartSec, MinDisplayValue);
+        StartSeries.AddPoint(AnalysisStartSec, MaxDisplayValue);
       end;
     finally
       Indexes.Free;

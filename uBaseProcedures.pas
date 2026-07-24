@@ -315,6 +315,18 @@ type
     IsForecastInRange: Boolean;
     /// <summary>Actual duration in seconds between first and last samples in the active window.</summary>
     WindowDurationSec: Double;
+    WindowStartMs: Int64;
+    CurrentAnalysisTimeMs: Int64;
+    PreviousSampleTimeMs: Int64;
+    FirstWindowSampleTimeMs: Int64;
+    LastWindowSampleTimeMs: Int64;
+    RequiredSampleCount: Integer;
+    ActualWindowDurationSec: Double;
+    RequiredWindowDurationSec: Double;
+    SampleIntervalMs: Double;
+    BoundaryToleranceMs: Integer;
+    HasLeftBoundaryCoverage: Boolean;
+    HasRightBoundaryCoverage: Boolean;
     /// <summary>Age in seconds of the latest sample.</summary>
     LastSampleAgeSec: Double;
     /// <summary>OutlierCount divided by active-window sample count.</summary>
