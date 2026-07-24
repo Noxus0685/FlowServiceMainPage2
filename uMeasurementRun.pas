@@ -2655,7 +2655,6 @@ var
   DeviceUUIDs: TArray<string>;
   DeviceQmaxValues: TArray<Double>;
   DevicePointers: TArray<NativeUInt>;
-  DerivedQmaxValues: TArray<Double>;
 
   function IsValidFlowValue(const AValue: Double): Boolean;
   begin
@@ -2715,20 +2714,6 @@ var
     DeviceUUIDs[K] := ADevice.UUID;
     DeviceQmaxValues[K] := ADevice.Qmax;
     DevicePointers[K] := NativeUInt(Pointer(ADevice));
-  end;
-
-  procedure AddDerivedQmax(const AValue: Double);
-  var
-    K: Integer;
-  begin
-    if not IsValidFlowValue(AValue) then
-      Exit;
-    for K := 0 to High(DerivedQmaxValues) do
-      if Abs(DerivedQmaxValues[K] - AValue) <= FlowMergeTolerance(DerivedQmaxValues[K], AValue) then
-        Exit;
-    K := Length(DerivedQmaxValues);
-    SetLength(DerivedQmaxValues, K + 1);
-    DerivedQmaxValues[K] := AValue;
   end;
 
 
@@ -2936,7 +2921,6 @@ begin
       if IsValidFlowValue(SourcePoint.FlowRate) and IsValidFlowValue(StoredQLS) then
       begin
         DerivedQmaxLS := StoredQLS / SourcePoint.FlowRate;
-        AddDerivedQmax(DerivedQmaxLS);
       end;
       if IsValidFlowValue(Device.Qmax) and IsValidFlowValue(SourcePoint.FlowRate) then
         CalculatedQLS := Device.Qmax * SourcePoint.FlowRate;
@@ -3072,13 +3056,6 @@ begin
           ProtocolManager.AddMessage(pcError, psMeasurement, 'DeviceChannelBindingMismatch', 'Некорректная привязка каналов приборов', PointName);
           raise Exception.Create(PointName);
         end;
-    if (DistinctDeviceQmaxCount = 1) and (Length(DerivedQmaxValues) > 1) then
-    begin
-      PointName := 'DeviceChannelBindingMismatch: all resolved device Qmax values are equal but source points derive different Qmax values';
-      AddDiagnosticEvent(PointName);
-      ProtocolManager.AddMessage(pcError, psMeasurement, 'DeviceChannelBindingMismatch', 'Некорректная привязка каналов приборов', PointName);
-      raise Exception.Create(PointName);
-    end;
   end;
 
   FPoints.Sort(TComparer<TDevicePoint>.Construct(
