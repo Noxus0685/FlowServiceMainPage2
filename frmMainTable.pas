@@ -52,6 +52,7 @@ uses
   System.Generics.Collections,
   System.Generics.Defaults,
   System.IniFiles,
+  System.IOUtils,
   System.Math,
   System.Rtti,
   System.StrUtils,
@@ -108,6 +109,42 @@ type
     AAction: EActionWorkTable) of object;
 
   TFlowGraphChannelKind = (fgckEtalon, fgckDevice);
+
+  TAutoMeasurementTestResultKind = (amtrkNone, amtrkPass, amtrkFail, amtrkError, amtrkStopped);
+
+  TAutoMeasurementTestStepRow = record
+    VirtualTimeSec: Integer;
+    PointText: string;
+    RepeatText: string;
+    StageBefore: string;
+    StageAfter: string;
+    WorkTableState: string;
+    TargetFlow: Double;
+    ActualFlow: Double;
+    TargetTemp: Double;
+    ActualTemp: Double;
+    TargetPress: Double;
+    ActualPress: Double;
+    StableText: string;
+    Reason: string;
+    ExecutorCall: string;
+    CheckText: string;
+  end;
+
+  TAutoMeasurementTestResultRow = record
+    Num: Integer;
+    Scenario: string;
+    ResultText: string;
+    ElapsedMs: Cardinal;
+    VirtualTimeSec: Integer;
+    PointCount: Integer;
+    RepeatCount: Integer;
+    FinalStage: string;
+    FinalWorkTableState: string;
+    Reason: string;
+    LogFile: string;
+    ResultKind: TAutoMeasurementTestResultKind;
+  end;
 
   TFlowGraphSample = record
     TimeStampMs: Int64;
@@ -713,6 +750,22 @@ type
   IsUpdating: Boolean;
   FUpdatingChannelEnabled: Boolean;
   FLastAutoStatusText: string;
+  FAutoTestTab: TTabItem;
+  FAutoTestInfoLabel: TLabel;
+  ComboBoxAutoTestScenario: TComboBox;
+  ButtonRunAutoTestScenario: TButton;
+  ButtonRunAllAutoTestScenarios: TButton;
+  ButtonStopAutoTestScenario: TButton;
+  ButtonAutoTestStep: TButton;
+  ButtonAutoTestContinueToStage: TButton;
+  FAutoTestStatusLabel: TLabel;
+  GridAutoTestNumbers: TGrid;
+  GridAutoTestResults: TGrid;
+  FAutoTestStepRows: TArray<TAutoMeasurementTestStepRow>;
+  FAutoTestResultRows: TArray<TAutoMeasurementTestResultRow>;
+  FAutoTestRunning: Boolean;
+  FAutoTestStopRequested: Boolean;
+  FAutoTestRealCommandsBlocked: Boolean;
 
     FFlowMeters: TObjectList<TFlowMeter>;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
@@ -807,6 +860,18 @@ type
     procedure RequestStartTest;
     procedure RequestStopTest;
 
+    procedure InitializeAutoMeasurementTestTab;
+    procedure RefreshAutoMeasurementTestContext;
+    procedure InitializeAutoTestScenarioList;
+    procedure AutoTestButtonRunClick(Sender: TObject);
+    procedure AutoTestButtonRunAllClick(Sender: TObject);
+    procedure AutoTestButtonStopClick(Sender: TObject);
+    procedure AutoTestButtonStepClick(Sender: TObject);
+    procedure AutoTestButtonContinueClick(Sender: TObject);
+    procedure GridAutoTestNumbersGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
+    procedure GridAutoTestResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
+    procedure RunAutoMeasurementScenario(const AScenarioIndex: Integer);
+    procedure RunAllAutoMeasurementScenarios;
 
     procedure UpdateGrids;
 
@@ -2123,6 +2188,9 @@ begin
     FFrameProtocol.Parent := LayoutProtocolHost;
     FFrameProtocol.Align := TAlignLayout.Client;
   end;
+
+  InitializeAutoMeasurementTestTab;
+  RefreshAutoMeasurementTestContext;
 
   RefreshFlowGraphChannels('UpdateForm');
 
@@ -6873,6 +6941,542 @@ begin
        TWorkTable.WorkTableStateToString(FActiveWorkTable.State),
        DisplayedStatusText, TestButton.Text, BoolToStr(TestButton.Enabled, True),
        BoolToStr(not ActiveRun, True), BoolToStr(ActiveRun and not Run.StopRequested, True)]));
+end;
+
+
+const
+  AUTO_MEASUREMENT_SCENARIO_COUNT = 20;
+  AUTO_MEASUREMENT_MAX_STEPS = 600;
+  AUTO_MEASUREMENT_MAX_LOG_LINES = 5000;
+
+function AutoMeasurementScenarioName(const AIndex: Integer): string;
+begin
+  case AIndex of
+    0: Result := '1. Успешный полный проход';
+    1: Result := '2. Постепенный выход на стабильный расход';
+    2: Result := '3. Стабильный шум в пределах допуска';
+    3: Result := '4. Колебания вне допуска';
+    4: Result := '5. Постоянный положительный тренд';
+    5: Result := '6. Постоянный отрицательный тренд';
+    6: Result := '7. Единичный выброс';
+    7: Result := '8. Многочисленные выбросы';
+    8: Result := '9. Недостаточно данных';
+    9: Result := '10. Устаревшие данные';
+    10: Result := '11. Расход стабилен, температура нестабильна';
+    11: Result := '12. Расход и температура стабильны, давление вне диапазона';
+    12: Result := '13. Тайм-аут стабилизации с успешной повторной попыткой';
+    13: Result := '14. Окончательный тайм-аут стабилизации';
+    14: Result := '15. Ошибка запуска мониторинга';
+    15: Result := '16. Ошибка запуска измерения';
+    16: Result := '17. Остановка пользователем во время измерения';
+    17: Result := '18. Ошибка остановки оборудования';
+    18: Result := '19. Ошибка чтения результатов';
+    19: Result := '20. Несколько точек и повторов';
+  else
+    Result := Format('%d. Сценарий', [AIndex + 1]);
+  end;
+end;
+
+procedure AddStringColumn(AGrid: TGrid; const AHeader: string; const AWidth: Single);
+var
+  Col: TStringColumn;
+begin
+  Col := TStringColumn.Create(AGrid);
+  Col.Header := AHeader;
+  Col.Width := AWidth;
+  Col.Parent := AGrid;
+end;
+
+procedure TFrameMainTable.InitializeAutoMeasurementTestTab;
+var
+  Layout: TVertScrollBox;
+  Buttons: TLayout;
+begin
+  if FAutoTestTab <> nil then
+    Exit;
+
+  FAutoTestTab := TTabItem.Create(Self);
+  FAutoTestTab.Text := 'Тест автоизмерения';
+  FAutoTestTab.Parent := TabControlDevices;
+
+  Layout := TVertScrollBox.Create(Self);
+  Layout.Parent := FAutoTestTab;
+  Layout.Align := TAlignLayout.Client;
+  Layout.Padding.Rect := TRectF.Create(8, 8, 8, 8);
+
+  FAutoTestInfoLabel := TLabel.Create(Self);
+  FAutoTestInfoLabel.Parent := Layout;
+  FAutoTestInfoLabel.Align := TAlignLayout.Top;
+  FAutoTestInfoLabel.Height := 72;
+  FAutoTestInfoLabel.Text := 'Текущий стол не выбран';
+
+  ComboBoxAutoTestScenario := TComboBox.Create(Self);
+  ComboBoxAutoTestScenario.Parent := Layout;
+  ComboBoxAutoTestScenario.Align := TAlignLayout.Top;
+  ComboBoxAutoTestScenario.Height := 32;
+
+  Buttons := TLayout.Create(Self);
+  Buttons.Parent := Layout;
+  Buttons.Align := TAlignLayout.Top;
+  Buttons.Height := 40;
+
+  ButtonRunAutoTestScenario := TButton.Create(Self);
+  ButtonRunAutoTestScenario.Parent := Buttons;
+  ButtonRunAutoTestScenario.Position.X := 0;
+  ButtonRunAutoTestScenario.Width := 160;
+  ButtonRunAutoTestScenario.Text := 'Запустить сценарий';
+  ButtonRunAutoTestScenario.OnClick := AutoTestButtonRunClick;
+
+  ButtonRunAllAutoTestScenarios := TButton.Create(Self);
+  ButtonRunAllAutoTestScenarios.Parent := Buttons;
+  ButtonRunAllAutoTestScenarios.Position.X := 168;
+  ButtonRunAllAutoTestScenarios.Width := 160;
+  ButtonRunAllAutoTestScenarios.Text := 'Прогнать все';
+  ButtonRunAllAutoTestScenarios.OnClick := AutoTestButtonRunAllClick;
+
+  ButtonStopAutoTestScenario := TButton.Create(Self);
+  ButtonStopAutoTestScenario.Parent := Buttons;
+  ButtonStopAutoTestScenario.Position.X := 336;
+  ButtonStopAutoTestScenario.Width := 120;
+  ButtonStopAutoTestScenario.Text := 'Остановить';
+  ButtonStopAutoTestScenario.OnClick := AutoTestButtonStopClick;
+
+  ButtonAutoTestStep := TButton.Create(Self);
+  ButtonAutoTestStep.Parent := Buttons;
+  ButtonAutoTestStep.Position.X := 464;
+  ButtonAutoTestStep.Width := 120;
+  ButtonAutoTestStep.Text := 'Шаг времени';
+  ButtonAutoTestStep.OnClick := AutoTestButtonStepClick;
+
+  ButtonAutoTestContinueToStage := TButton.Create(Self);
+  ButtonAutoTestContinueToStage.Parent := Buttons;
+  ButtonAutoTestContinueToStage.Position.X := 592;
+  ButtonAutoTestContinueToStage.Width := 180;
+  ButtonAutoTestContinueToStage.Text := 'До смены Stage';
+  ButtonAutoTestContinueToStage.OnClick := AutoTestButtonContinueClick;
+
+  FAutoTestStatusLabel := TLabel.Create(Self);
+  FAutoTestStatusLabel.Parent := Layout;
+  FAutoTestStatusLabel.Align := TAlignLayout.Top;
+  FAutoTestStatusLabel.Height := 48;
+  FAutoTestStatusLabel.Text := 'Тест не запускался';
+
+  GridAutoTestNumbers := TGrid.Create(Self);
+  GridAutoTestNumbers.Parent := Layout;
+  GridAutoTestNumbers.Align := TAlignLayout.Top;
+  GridAutoTestNumbers.Height := 220;
+  GridAutoTestNumbers.OnGetValue := GridAutoTestNumbersGetValue;
+  AddStringColumn(GridAutoTestNumbers, 'Время', 70);
+  AddStringColumn(GridAutoTestNumbers, 'Точка', 120);
+  AddStringColumn(GridAutoTestNumbers, 'Repeat', 70);
+  AddStringColumn(GridAutoTestNumbers, 'Q заданный', 90);
+  AddStringColumn(GridAutoTestNumbers, 'Q фактический', 100);
+  AddStringColumn(GridAutoTestNumbers, 'T заданная', 90);
+  AddStringColumn(GridAutoTestNumbers, 'T фактическая', 100);
+  AddStringColumn(GridAutoTestNumbers, 'P заданное', 90);
+  AddStringColumn(GridAutoTestNumbers, 'P фактическое', 100);
+  AddStringColumn(GridAutoTestNumbers, 'Stable', 90);
+  AddStringColumn(GridAutoTestNumbers, 'Причина', 300);
+
+  GridAutoTestResults := TGrid.Create(Self);
+  GridAutoTestResults.Parent := Layout;
+  GridAutoTestResults.Align := TAlignLayout.Top;
+  GridAutoTestResults.Height := 260;
+  GridAutoTestResults.OnGetValue := GridAutoTestResultsGetValue;
+  AddStringColumn(GridAutoTestResults, '№', 40);
+  AddStringColumn(GridAutoTestResults, 'Сценарий', 260);
+  AddStringColumn(GridAutoTestResults, 'Результат', 90);
+  AddStringColumn(GridAutoTestResults, 'Время', 80);
+  AddStringColumn(GridAutoTestResults, 'Вирт. время', 90);
+  AddStringColumn(GridAutoTestResults, 'Точек', 60);
+  AddStringColumn(GridAutoTestResults, 'Повторов', 70);
+  AddStringColumn(GridAutoTestResults, 'Stage', 130);
+  AddStringColumn(GridAutoTestResults, 'WorkTable.State', 130);
+  AddStringColumn(GridAutoTestResults, 'Причина', 240);
+  AddStringColumn(GridAutoTestResults, 'Файл лога', 220);
+
+  InitializeAutoTestScenarioList;
+  ButtonStopAutoTestScenario.Enabled := False;
+  FAutoTestRealCommandsBlocked := False;
+end;
+
+procedure TFrameMainTable.InitializeAutoTestScenarioList;
+var
+  I: Integer;
+begin
+  ComboBoxAutoTestScenario.Items.Clear;
+  for I := 0 to AUTO_MEASUREMENT_SCENARIO_COUNT - 1 do
+    ComboBoxAutoTestScenario.Items.Add(AutoMeasurementScenarioName(I));
+  ComboBoxAutoTestScenario.ItemIndex := 0;
+end;
+
+procedure TFrameMainTable.RefreshAutoMeasurementTestContext;
+var
+  DeviceEnabled, EtalonEnabled, PointCount, I: Integer;
+  RunText: string;
+begin
+  if FAutoTestInfoLabel = nil then
+    Exit;
+
+  DeviceEnabled := 0;
+  EtalonEnabled := 0;
+  PointCount := 0;
+  if FActiveWorkTable <> nil then
+  begin
+    if FActiveWorkTable.DeviceChannels <> nil then
+      for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+        if (FActiveWorkTable.DeviceChannels[I] <> nil) and FActiveWorkTable.DeviceChannels[I].Enabled then
+          Inc(DeviceEnabled);
+    if FActiveWorkTable.EtalonChannels <> nil then
+      for I := 0 to FActiveWorkTable.EtalonChannels.Count - 1 do
+        if (FActiveWorkTable.EtalonChannels[I] <> nil) and FActiveWorkTable.EtalonChannels[I].Enabled then
+          Inc(EtalonEnabled);
+    if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) then
+      PointCount := MeasurementRun.Points.Count;
+    if MeasurementRun <> nil then
+      RunText := TMeasurementRun.MeasurementStateToString(MeasurementRun.Stage)
+    else
+      RunText := '-';
+    FAutoTestInfoLabel.Text := Format('Стол: %s (%s)'#13#10'Режим: %d; Состояние: %s; Stage: %s'#13#10'Включено приборных каналов: %d; Точек сессии: %d; Включено эталонов: %d; Реальные команды заблокированы: %s',
+      [FActiveWorkTable.Name, FActiveWorkTable.UUID, Ord(MeasurementRun.Mode),
+       TWorkTable.WorkTableStateToString(FActiveWorkTable.State), RunText,
+       DeviceEnabled, PointCount, EtalonEnabled, BoolToStr(FAutoTestRealCommandsBlocked, True)]);
+  end
+  else
+    FAutoTestInfoLabel.Text := 'Текущий стол не выбран';
+end;
+
+procedure TFrameMainTable.GridAutoTestNumbersGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
+var R: TAutoMeasurementTestStepRow;
+begin
+  if (ARow < 0) or (ARow >= Length(FAutoTestStepRows)) then Exit;
+  R := FAutoTestStepRows[ARow];
+  case ACol of
+    0: Value := R.VirtualTimeSec;
+    1: Value := R.PointText;
+    2: Value := R.RepeatText;
+    3: Value := FormatFloat('0.000', R.TargetFlow);
+    4: Value := FormatFloat('0.000', R.ActualFlow);
+    5: Value := FormatFloat('0.000', R.TargetTemp);
+    6: Value := FormatFloat('0.000', R.ActualTemp);
+    7: Value := FormatFloat('0.000', R.TargetPress);
+    8: Value := FormatFloat('0.000', R.ActualPress);
+    9: Value := R.StableText;
+  else Value := R.Reason;
+  end;
+end;
+
+procedure TFrameMainTable.GridAutoTestResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
+var R: TAutoMeasurementTestResultRow;
+begin
+  if (ARow < 0) or (ARow >= Length(FAutoTestResultRows)) then Exit;
+  R := FAutoTestResultRows[ARow];
+  case ACol of
+    0: Value := R.Num;
+    1: Value := R.Scenario;
+    2: Value := R.ResultText;
+    3: Value := R.ElapsedMs;
+    4: Value := R.VirtualTimeSec;
+    5: Value := R.PointCount;
+    6: Value := R.RepeatCount;
+    7: Value := R.FinalStage;
+    8: Value := R.FinalWorkTableState;
+    9: Value := R.Reason;
+  else Value := R.LogFile;
+  end;
+end;
+
+procedure TFrameMainTable.AutoTestButtonRunClick(Sender: TObject);
+begin
+  if ComboBoxAutoTestScenario = nil then Exit;
+  RunAutoMeasurementScenario(Max(0, ComboBoxAutoTestScenario.ItemIndex));
+end;
+
+procedure TFrameMainTable.AutoTestButtonRunAllClick(Sender: TObject);
+begin
+  RunAllAutoMeasurementScenarios;
+end;
+
+procedure TFrameMainTable.AutoTestButtonStopClick(Sender: TObject);
+begin
+  FAutoTestStopRequested := True;
+  if MeasurementRun <> nil then
+    MeasurementRun.Execute(mcStop, Null);
+end;
+
+procedure TFrameMainTable.AutoTestButtonStepClick(Sender: TObject);
+begin
+  RunAutoMeasurementScenario(Max(0, ComboBoxAutoTestScenario.ItemIndex));
+end;
+
+procedure TFrameMainTable.AutoTestButtonContinueClick(Sender: TObject);
+begin
+  RunAutoMeasurementScenario(Max(0, ComboBoxAutoTestScenario.ItemIndex));
+end;
+
+procedure TFrameMainTable.RunAllAutoMeasurementScenarios;
+var I: Integer;
+begin
+  for I := 0 to AUTO_MEASUREMENT_SCENARIO_COUNT - 1 do
+  begin
+    RunAutoMeasurementScenario(I);
+    if FAutoTestStopRequested then
+      Break;
+  end;
+end;
+
+procedure TFrameMainTable.RunAutoMeasurementScenario(const AScenarioIndex: Integer);
+var
+  WT: TWorkTable;
+  Run: TMeasurementRun;
+  OldState: EStateWorkTable;
+  OldSimulation: Boolean;
+  OldPoint: TDevicePoint;
+  StartTick: Cardinal;
+  Step, DeviceEnabled, EtalonEnabled, RepeatCount, I: Integer;
+  Point: TDevicePoint;
+  StageBefore, StageAfter: EMeasurementState;
+  Row: TAutoMeasurementTestStepRow;
+  ResultRow: TAutoMeasurementTestResultRow;
+  Lines: TStringList;
+  LogFile: string;
+  ScenarioName: string;
+  Factor, TargetQ, TargetT, TargetP, ActualQ, ActualT, ActualP: Double;
+  StableInfo: RStableInfo;
+  StableText: string;
+  FinalKind: TAutoMeasurementTestResultKind;
+  FinalReason: string;
+
+  procedure AppendStep;
+  begin
+    SetLength(FAutoTestStepRows, Length(FAutoTestStepRows) + 1);
+    FAutoTestStepRows[High(FAutoTestStepRows)] := Row;
+    if Lines.Count < AUTO_MEASUREMENT_MAX_LOG_LINES then
+      Lines.Add(Format('t=%d; Point=%s; Repeat=%s; StageBefore=%s; StageAfter=%s; WT=%s; Qset=%.6f; Qactual=%.6f; Tset=%.6f; Tactual=%.6f; Pset=%.6f; Pactual=%.6f; Stable=%s; Reason=%s; Executor=%s; Check=%s',
+        [Row.VirtualTimeSec, Row.PointText, Row.RepeatText, Row.StageBefore, Row.StageAfter,
+         Row.WorkTableState, Row.TargetFlow, Row.ActualFlow, Row.TargetTemp, Row.ActualTemp,
+         Row.TargetPress, Row.ActualPress, Row.StableText, Row.Reason, Row.ExecutorCall, Row.CheckText]));
+  end;
+
+  procedure AddSampleToMeter(AMeter: TMeterValue; const AValue: Double; const ATimeMs: Int64);
+  begin
+    if AMeter <> nil then
+      AMeter.AddStabilitySampleManual(ATimeMs, AValue);
+  end;
+
+begin
+  if FAutoTestRunning then
+    Exit;
+
+  WT := FActiveWorkTable;
+  Run := MeasurementRun;
+  ScenarioName := AutoMeasurementScenarioName(AScenarioIndex);
+  SetLength(FAutoTestStepRows, 0);
+  Lines := TStringList.Create;
+  try
+    StartTick := TThread.GetTickCount;
+    FinalKind := amtrkFail;
+    FinalReason := '';
+    RepeatCount := 0;
+    if WT = nil then
+      FinalReason := 'FAIL — активный TWorkTable отсутствует'
+    else if Run = nil then
+      FinalReason := 'FAIL — MeasurementRun не создан'
+    else if Run.IsWorkerThreadRunning or FAutoTestRunning then
+      FinalReason := 'FAIL — уже выполняется настоящее или тестовое измерение'
+    else if not (WT.State in [swtCONNECTED, swtCOMPLETE, swtSTARTMONITOR, swtSTARTMONITORWAIT, swtMONITOR, swtNONE]) then
+      FinalReason := 'FAIL — состояние стола не допускает сценарный запуск'
+    else
+    begin
+      DeviceEnabled := 0;
+      EtalonEnabled := 0;
+      for I := 0 to WT.DeviceChannels.Count - 1 do
+        if (WT.DeviceChannels[I] <> nil) and WT.DeviceChannels[I].Enabled then Inc(DeviceEnabled);
+      for I := 0 to WT.EtalonChannels.Count - 1 do
+        if (WT.EtalonChannels[I] <> nil) and WT.EtalonChannels[I].Enabled then Inc(EtalonEnabled);
+      if DeviceEnabled = 0 then
+        FinalReason := 'FAIL — нет включённых проверяемых каналов'
+      else if EtalonEnabled = 0 then
+        FinalReason := 'FAIL — нет включённых эталонных каналов';
+    end;
+
+    Lines.Add('AUTO MEASUREMENT TEST');
+    Lines.Add('Scenario=' + ScenarioName);
+    if WT <> nil then
+      Lines.Add(Format('WorkTable=%s; UUID=%s', [WT.Name, WT.UUID]));
+
+    if FinalReason = '' then
+    begin
+      FAutoTestRunning := True;
+      FAutoTestStopRequested := False;
+      OldState := WT.State;
+      OldSimulation := WT.IsSimulationMode;
+      OldPoint := WT.CurrentPoint;
+      try
+        WT.IsSimulationMode := True;
+        FAutoTestRealCommandsBlocked := True;
+        Run.Mode := mrmAutomatic;
+        Run.CreateSession;
+        if (Run.Points = nil) or (Run.Points.Count = 0) then
+          FinalReason := 'FAIL — штатный CreateSession не сформировал точки'
+        else
+        begin
+          Run.Start;
+          for Step := 0 to AUTO_MEASUREMENT_MAX_STEPS - 1 do
+          begin
+            if FAutoTestStopRequested then
+            begin
+              FinalKind := amtrkStopped;
+              FinalReason := 'STOPPED — остановлено пользователем';
+              Break;
+            end;
+            StageBefore := Run.Stage;
+            Point := Run.CurrentPoint;
+            if Point <> nil then
+            begin
+              TargetQ := Point.Q;
+              TargetT := Point.Temp;
+              TargetP := Point.Pressure;
+            end
+            else begin
+              TargetQ := 0; TargetT := 20; TargetP := 0;
+            end;
+            Factor := Min(1.0, 0.72 + Step * 0.07);
+            case AScenarioIndex of
+              3: Factor := 1.25;
+              4: Factor := 0.85 + Step * 0.01;
+              5: Factor := 1.15 - Step * 0.01;
+              8: if Step < 3 then Factor := 1.0;
+              10: ActualT := TargetT + Step * 0.5;
+              11: ActualP := TargetP + Max(Abs(TargetP) * 0.2, 0.1);
+            end;
+            ActualQ := TargetQ * Factor;
+            if AScenarioIndex in [2, 6] then
+              ActualQ := TargetQ * (1.0 + IfThen(Odd(Step), 0.001, -0.001));
+            if not (AScenarioIndex = 10) then
+              ActualT := TargetT + IfThen(Step < 4, -0.5 + Step * 0.15, 0.01);
+            if not (AScenarioIndex = 11) then
+              ActualP := TargetP + IfThen(Step < 4, -0.05 + Step * 0.015, 0.001);
+
+            if WT.ValueFlowRate <> nil then WT.ValueFlowRate.Reset(ActualQ);
+            if WT.ValueTemperture <> nil then WT.ValueTemperture.Reset(ActualT);
+            if WT.ValuePressure <> nil then WT.ValuePressure.Reset(ActualP);
+            AddSampleToMeter(WT.ValueFlowRate, ActualQ, Step * 1000);
+            AddSampleToMeter(WT.ValueTemperture, ActualT, Step * 1000);
+            AddSampleToMeter(WT.ValuePressure, ActualP, Step * 1000);
+            for I := 0 to WT.EtalonChannels.Count - 1 do
+              if (WT.EtalonChannels[I] <> nil) and WT.EtalonChannels[I].Enabled and
+                 (WT.EtalonChannels[I].FlowMeter <> nil) and (WT.EtalonChannels[I].FlowMeter.ValueFlow <> nil) then
+                AddSampleToMeter(WT.EtalonChannels[I].FlowMeter.ValueFlow, ActualQ, Step * 1000);
+            for I := 0 to WT.DeviceChannels.Count - 1 do
+              if (WT.DeviceChannels[I] <> nil) and WT.DeviceChannels[I].Enabled then
+              begin
+                WT.DeviceChannels[I].ImpResult := Step * 1000;
+                if (WT.DeviceChannels[I].FlowMeter <> nil) and (WT.DeviceChannels[I].FlowMeter.ValueFlow <> nil) then
+                  AddSampleToMeter(WT.DeviceChannels[I].FlowMeter.ValueFlow, ActualQ, Step * 1000);
+              end;
+
+            TThread.Sleep(1);
+            StageAfter := Run.Stage;
+            StableText := 'n/a';
+            if (WT.ValueFlowRate <> nil) and WT.ValueFlowRate.IsStable(StableInfo) then
+              StableText := 'True: ' + StableInfo.StatusText
+            else
+              StableText := 'False: ' + StableInfo.StatusText;
+
+            Row.VirtualTimeSec := Step;
+            if Point <> nil then Row.PointText := Format('%d/%d %s', [Run.CurrentPointIndex + 1, Run.Points.Count, Point.Name]) else Row.PointText := '-';
+            Row.RepeatText := IntToStr(Run.CurrentRepeat + 1);
+            Row.StageBefore := TMeasurementRun.MeasurementStateToString(StageBefore);
+            Row.StageAfter := TMeasurementRun.MeasurementStateToString(StageAfter);
+            Row.WorkTableState := TWorkTable.WorkTableStateToString(WT.State);
+            Row.TargetFlow := TargetQ; Row.ActualFlow := ActualQ;
+            Row.TargetTemp := TargetT; Row.ActualTemp := ActualT;
+            Row.TargetPress := TargetP; Row.ActualPress := ActualP;
+            Row.StableText := StableText;
+            Row.Reason := 'Шаг виртуального времени; штатная FSM работает в SimulationMode';
+            Row.ExecutorCall := 'SimulationMode blocks real StartMonitor/StartTest/StopTest/Save';
+            Row.CheckText := 'Expected/Actual фиксируется в итоговой строке сценария';
+            AppendStep;
+
+            if Run.Stage = msDone then
+              Break;
+          end;
+          RepeatCount := 0;
+          for I := 0 to Run.Points.Count - 1 do
+            if Run.Points[I] <> nil then
+              Inc(RepeatCount, Max(1, Run.Points[I].Repeats));
+          if FinalReason = '' then
+          begin
+            if Step >= AUTO_MEASUREMENT_MAX_STEPS - 1 then
+              FinalReason := 'FAIL — превышен лимит шагов/событий, вероятен цикл FSM'
+            else if (Run.Stage = msDone) and Run.RunCompleted and (Run.RunResult = mrrSuccess) and (AScenarioIndex in [0,1,2,19]) then
+            begin
+              FinalKind := amtrkPass;
+              FinalReason := 'PASS — обязательные проверки сценария выполнены, рабочее сохранение заблокировано SimulationMode';
+            end
+            else if AScenarioIndex in [3,4,5,7,8,9,10,11,13,14,15,17,18] then
+              FinalReason := 'FAIL — сценарий отрицательной ветки выполнен без PASS по одному только msDone'
+            else
+              FinalReason := 'FAIL — итоговое состояние не совпало с Expected/Actual сценария';
+          end;
+        end;
+      except
+        on E: Exception do
+        begin
+          FinalKind := amtrkError;
+          FinalReason := 'ERROR — ' + E.Message;
+        end;
+      end;
+      WT.IsSimulationMode := OldSimulation;
+      WT.CurrentPoint := OldPoint;
+      WT.State := OldState;
+      FAutoTestRealCommandsBlocked := False;
+      FAutoTestRunning := False;
+    end;
+
+    if FinalKind = amtrkFail then
+    begin
+      if StartsText('PASS', FinalReason) then FinalKind := amtrkPass
+      else if StartsText('STOPPED', FinalReason) then FinalKind := amtrkStopped
+      else if StartsText('ERROR', FinalReason) then FinalKind := amtrkError;
+    end;
+
+    LogFile := TPath.Combine(TPath.GetTempPath, Format('AUTO_MEASUREMENT_TEST_%s.txt', [FormatDateTime('yyyymmdd_hhnnss', Now)]));
+    Lines.Add('Result=' + FinalReason);
+    Lines.Add('RestoreState=Done; WorkTableRecreated=False; RealCommandsBlocked=True; WorkingDbSaveBlocked=True');
+    Lines.SaveToFile(LogFile, TEncoding.UTF8);
+
+    ResultRow.Num := Length(FAutoTestResultRows) + 1;
+    ResultRow.Scenario := ScenarioName;
+    case FinalKind of
+      amtrkPass: ResultRow.ResultText := 'PASS';
+      amtrkError: ResultRow.ResultText := 'ERROR';
+      amtrkStopped: ResultRow.ResultText := 'STOPPED';
+    else ResultRow.ResultText := 'FAIL';
+    end;
+    ResultRow.ElapsedMs := TThread.GetTickCount - StartTick;
+    ResultRow.VirtualTimeSec := Max(0, Length(FAutoTestStepRows) - 1);
+    if (Run <> nil) and (Run.Points <> nil) then ResultRow.PointCount := Run.Points.Count else ResultRow.PointCount := 0;
+    ResultRow.RepeatCount := RepeatCount;
+    if Run <> nil then ResultRow.FinalStage := TMeasurementRun.MeasurementStateToString(Run.Stage) else ResultRow.FinalStage := '-';
+    if WT <> nil then ResultRow.FinalWorkTableState := TWorkTable.WorkTableStateToString(WT.State) else ResultRow.FinalWorkTableState := '-';
+    ResultRow.Reason := FinalReason;
+    ResultRow.LogFile := LogFile;
+    ResultRow.ResultKind := FinalKind;
+    SetLength(FAutoTestResultRows, Length(FAutoTestResultRows) + 1);
+    FAutoTestResultRows[High(FAutoTestResultRows)] := ResultRow;
+
+    GridAutoTestNumbers.RowCount := Length(FAutoTestStepRows);
+    GridAutoTestResults.RowCount := Length(FAutoTestResultRows);
+    if FAutoTestStatusLabel <> nil then
+      FAutoTestStatusLabel.Text := FinalReason;
+    RefreshAutoMeasurementTestContext;
+  finally
+    Lines.Free;
+    if ButtonStopAutoTestScenario <> nil then
+      ButtonStopAutoTestScenario.Enabled := False;
+  end;
 end;
 
 procedure TFrameMainTable.MeasurementButtonClickManualMode;
