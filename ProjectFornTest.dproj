@@ -196,7 +196,7 @@
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_Locale>1033</VerInfo_Locale>
-        <DCC_UnitSearchPath>C:\D\FlowServiceMainPage2\Main2;C:\D\FlowServiceMainPage2\Components\FP;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>C:\D\FlowServiceMainPage2\Components\FP;D:\Projects\FlowServiceX\FMXFP\Components\ICS\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
@@ -217,7 +217,6 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="FmxHelper.pas"/>
         <DCCReference Include="frmCalibrCoefs.pas">
             <Form>FrameCalibrCoefs</Form>
             <FormType>fmx</FormType>
@@ -314,6 +313,8 @@
         </DCCReference>
         <DCCReference Include="uControlRegister.pas"/>
         <DCCReference Include="uSyncSetup.pas"/>
+        <DCCReference Include="FmxHelper.pas"/>
+        <DCCReference Include="..\FMXFP\Components\FP\FMX.SimpleChart.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
