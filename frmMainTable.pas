@@ -7379,10 +7379,13 @@ begin
             TThread.Sleep(1);
             StageAfter := Run.Stage;
             StableText := 'n/a';
-            if (WT.ValueFlowRate <> nil) and WT.ValueFlowRate.IsStable(StableInfo) then
-              StableText := 'True: ' + StableInfo.StatusText
-            else
-              StableText := 'False: ' + StableInfo.StatusText;
+            if WT.FlowRate <> nil then
+            begin
+              if WT.FlowRate.IsStable(StableInfo) then
+                StableText := 'True: ' + StableInfo.StatusText
+              else
+                StableText := 'False: ' + StableInfo.StatusText;
+            end;
 
             Row.VirtualTimeSec := Step;
             if Point <> nil then Row.PointText := Format('%d/%d %s', [Run.CurrentPointIndex + 1, Run.Points.Count, Point.Name]) else Row.PointText := '-';

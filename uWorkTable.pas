@@ -449,6 +449,7 @@ type
     FState: EStateWorkTable;
     FAction: EActionWorkTable;
     FIsActive: Boolean;
+    FIsSimulationMode: Boolean;
 
     FTimeSet : Integer;
     FLimitImpSet: Integer;
@@ -849,6 +850,7 @@ type
   procedure StopMonitor;
   procedure SaveMeasurementResults;
 
+  property IsSimulationMode: Boolean read FIsSimulationMode write FIsSimulationMode;
 
   end;
 
