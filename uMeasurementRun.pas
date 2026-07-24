@@ -203,7 +203,23 @@ type
     msrError,
     msrCancelledBeforeStart,
     msrEmergency,
-    msrExternalCommand
+    msrExternalCommand,
+    msrUserRollback
+  );
+
+  TMeasurementRunResult = (
+    mrrNone,
+    mrrSuccess,
+    mrrCancelled,
+    mrrError
+  );
+
+  TMeasurementRunDoneReason = (
+    mdrNone,
+    mdrEndOfPointList,
+    mdrUserCancelled,
+    mdrUserRollback,
+    mdrError
   );
 
 
@@ -278,6 +294,14 @@ type
     FStabilityDataStartMs: Int64;
     FLastWaitPointSetupLogMs: Int64;
     FLastWaitPointSetupLogState: EStateWorkTable;
+    FRunCompleted: Boolean;
+    FRunResult: TMeasurementRunResult;
+    FDoneReason: TMeasurementRunDoneReason;
+    FRequestStopCalled: Boolean;
+    FFinalized: Boolean;
+
+    procedure ResetRuntimeContext;
+    procedure FinalizeMeasurementRun(AResult: TMeasurementRunResult; AReason: TMeasurementRunDoneReason);
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
     procedure SetStage(const ANewStage: EMeasurementState);
@@ -413,6 +437,10 @@ type
     property Attempt: Integer read FAttempt;
     property MaxAttemptCount: Integer read FMaxAttemptCount;
     property IsWorkerThreadRunning: Boolean read IsThreadRunning;
+    property RunCompleted: Boolean read FRunCompleted;
+    property RunResult: TMeasurementRunResult read FRunResult;
+    property DoneReason: TMeasurementRunDoneReason read FDoneReason;
+    property RequestStopCalled: Boolean read FRequestStopCalled;
 
     property ManualFlowRate: Double read FManualFlowRate write FManualFlowRate;
     property ManualFluidTemp: Double read FManualFluidTemp write FManualFluidTemp;
@@ -1426,15 +1454,86 @@ end;
 
 procedure TMeasurementRun.EnterDone;
 begin
+  if FFinalized then
+    Exit;
+
+  if FStopRequested or (FStopReason in [msrUserStop, msrCancelledBeforeStart]) then
+    FinalizeMeasurementRun(mrrCancelled, mdrUserCancelled)
+  else if FStopReason in [msrError, msrEmergency] then
+    FinalizeMeasurementRun(mrrError, mdrError)
+  else
+    FinalizeMeasurementRun(mrrSuccess, mdrEndOfPointList);
+end;
+
+procedure TMeasurementRun.ResetRuntimeContext;
+begin
+  FCurrentPointIndex := -1;
+  FCurrentRepeat := 0;
+  FForceNextPoint := -1;
+  FAttempt := 0;
+  FMeasureTimeout := 0;
+  FPhysicalMeasureStarted := False;
+  FPhysicalStopRequested := False;
+  FActualStopEventFired := False;
+  FNextStageAfterSave := msNone;
+  FWaitStartedTick := 0;
+  FStableSinceMs := 0;
+  FDevicesStableSinceMs := 0;
+  FLastDeviceStableStateKnown := False;
+  FLastDeviceStableState := False;
+  FRequireAutoStabilization := False;
+  FRequiredDeviceStabilizationSec := 0;
+  FLastStableProgressSecond := -1;
+  FStableTimerResetReason := '';
+  ResetPointSetupState;
+  if FWorkTable <> nil then
+  begin
+    FWorkTable.CurrentPoint := nil;
+    if (FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.ValueSet <> nil) then
+      FWorkTable.FlowRate.ValueSet.Value := 0;
+    FWorkTable.TimeResult := 0;
+  end;
+end;
+
+procedure TMeasurementRun.FinalizeMeasurementRun(AResult: TMeasurementRunResult;
+  AReason: TMeasurementRunDoneReason);
+begin
+  if FFinalized then
+    Exit;
+  FFinalized := True;
+
   if (GetCurrentPoint <> nil) and (GetCurrentPoint.Status = mptsResultsRead) then
     SetCurrentPointStatus(mptsDone);
-  if (FStopReason = msrNone) then
+
+  FRunCompleted := True;
+  FRunResult := AResult;
+  FDoneReason := AReason;
+  if AResult = mrrSuccess then
+  begin
+    FStopRequested := False;
+    FStopReason := msrNone;
+  end
+  else if AResult = mrrCancelled then
+  begin
+    FStopReason := msrUserStop;
+    if GetCurrentPoint <> nil then
+      SetCurrentPointStatus(mptsCancelled);
+  end;
+
+  ResetRuntimeContext;
+  if FWorkTable <> nil then
+    FWorkTable.State := swtNONE;
+
+  if AResult = mrrSuccess then
   begin
     AddDiagnosticEvent('meAllDone');
     FireEvent(meAllDone);
   end
   else
-    AddDiagnosticEvent('Run finished with error; meAllDone suppressed');
+    AddDiagnosticEvent('Run finalized: Result=' + GetEnumName(TypeInfo(TMeasurementRunResult), Ord(AResult)) +
+      '; DoneReason=' + GetEnumName(TypeInfo(TMeasurementRunDoneReason), Ord(AReason)));
+
+  Notify(Integer(meStateChanged), nil);
   if FThread <> nil then
     FThread.Terminate;
 end;
@@ -2346,13 +2445,10 @@ begin
     Lines.Add('MeasurementRun.Stage=' + MeasurementStateToString(FCurrentStage));
     Lines.Add('WorkerThreadRunning=' + SBool(IsThreadRunning));
     Lines.Add('StopRequested=' + SBool(FStopRequested));
-    Lines.Add('RunCompleted=' + SBool((FCurrentStage = msDone) and (FStopReason = msrNone)));
-    if FStopReason = msrNone then
-      Lines.Add('RunResult=Success')
-    else if FStopReason in [msrUserStop, msrCancelledBeforeStart] then
-      Lines.Add('RunResult=Cancelled')
-    else
-      Lines.Add('RunResult=Error');
+    Lines.Add('RunCompleted=' + SBool(FRunCompleted));
+    Lines.Add('RunResult=' + GetEnumName(TypeInfo(TMeasurementRunResult), Ord(FRunResult)));
+    Lines.Add('DoneReason=' + GetEnumName(TypeInfo(TMeasurementRunDoneReason), Ord(FDoneReason)));
+    Lines.Add('RequestStopCalled=' + SBool(FRequestStopCalled));
     Lines.Add('LastProcessedPointIndex=' + IntToStr(FLastProcessedPointIndex));
     if FLastProcessedPointName <> '' then
       Lines.Add('LastProcessedPointName=' + FLastProcessedPointName)
@@ -2462,7 +2558,7 @@ begin
     end;
     Lines.Add('StopCriteriaReached=' + SBool(IsCommandStopLimitReached(Reason)));
     Lines.Add('StopReason=' + MeasurementStopReasonToString(FStopReason));
-    Lines.Add('RequestStopCalled=' + SBool(FStopRequested));
+    Lines.Add('RequestStopCalled=' + SBool(FRequestStopCalled));
     Lines.Add('RouteStopInWorker=<см. события>');
     Lines.Add('');
     Lines.Add('[ПЕРЕХОД]');
@@ -2480,10 +2576,7 @@ begin
       Lines.Add('NextPointReason=<следующая включенная точка не найдена>');
     Lines.Add('CurrentStage=' + MeasurementStateToString(FCurrentStage));
     Lines.Add('NextStageAfterSave=' + MeasurementStateToString(FNextStageAfterSave));
-    if FCurrentStage = msDone then
-      Lines.Add('DoneReason=EndOfPointList')
-    else
-      Lines.Add('DoneReason=<см. события>');
+    Lines.Add('DoneReason=' + GetEnumName(TypeInfo(TMeasurementRunDoneReason), Ord(FDoneReason)));
     Lines.Add('');
     Lines.Add('[СОХРАНЕНИЕ]');
     Lines.Add('SaveMeasurementResultsCalled=' + SBool(FLastSaveMeasurementResultsCalled));
@@ -3207,6 +3300,11 @@ begin
     FRequiredDeviceStabilizationSec := 0;
     FLastStableProgressSecond := -1;
     FStableTimerResetReason := '';
+    FRunCompleted := False;
+    FRunResult := mrrNone;
+    FDoneReason := mdrNone;
+    FRequestStopCalled := False;
+    FFinalized := False;
 
     case Mode of
       mrmAutomatic:
@@ -3418,7 +3516,10 @@ begin
     else
     begin
       Duplicate := False;
+      FRequestStopCalled := True;
       FStopRequested := True;
+      FRunResult := mrrCancelled;
+      FDoneReason := mdrUserCancelled;
       ResetPointSetupState;
       FIsPaused := False;
       if FStopReason in [msrNone, msrNormalComplete] then
@@ -3445,7 +3546,11 @@ begin
 
   AddDiagnosticEvent('RequestStop called');
   if StageSnapshot in [msWaitMeasureStart, msMeasure] then
+  begin
     SetStage(msWaitMeasureStop);
+  end
+  else if not (StageSnapshot in [msNone, msDone, msSave, msResultsRead, msWaitMeasureStop]) then
+    SetStage(msDone);
   FireEvent(meStopRequested);
 end;
 
@@ -4088,6 +4193,12 @@ end;
 procedure TMeasurementRun.ProcessStage;
 begin
   AddWorkTableStateDiagnosticEvent;
+  if IsStopRequested and not (FCurrentStage in [msWaitMeasureStop, msResultsRead, msSave, msDone]) then
+  begin
+    RouteStopInWorker;
+    if FCurrentStage = msDone then
+      Exit;
+  end;
   case FCurrentStage of
     msSelectPoint: ProcessSelectPoint;
     msSelectEtalon: ProcessSelectEtalon;
@@ -4657,6 +4768,11 @@ begin
             MeasurementStopReasonToString(GetStopReason));
           MarkInterruptedPointIfNeeded;
         end;
+        if IsStopRequested then
+        begin
+          FinalizeMeasurementRun(mrrCancelled, mdrUserCancelled);
+          Exit;
+        end;
         SetStage(msSave);
         Exit;
       end;
@@ -4705,6 +4821,8 @@ begin
             'Результат прерванного измерения прочитан',
             MeasurementStopReasonToString(GetStopReason));
           MarkInterruptedPointIfNeeded;
+          FinalizeMeasurementRun(mrrCancelled, mdrUserCancelled);
+          Exit;
         end;
         SetStage(msSave);
         Exit;
@@ -4949,6 +5067,7 @@ begin
     msrCancelledBeforeStart: Result := 'отмена до начала измерения';
     msrEmergency: Result := 'аварийное завершение';
     msrExternalCommand: Result := 'внешняя команда';
+    msrUserRollback: Result := 'отмена результатов пользователем';
   else
     Result := 'неизвестная причина';
   end;

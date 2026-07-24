@@ -778,6 +778,7 @@ type
     procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
     procedure EnforceDataPointsColumnsLayout;
     procedure MarkChannelDeviceModified(AChannel: TChannel);
+    procedure PersistChannelEnabled(AWorkTable: TWorkTable; AChannel: TChannel; const AKind: string; const AOldEnabled, ANewEnabled: Boolean);
     procedure ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
     procedure RefreshMonitorIndicator;
     procedure RefreshPumpsCombo;
@@ -795,8 +796,8 @@ type
     procedure UpdateTestButton;
     procedure UpdateTestButtonByWorkTableState;
     procedure UpdateTestButtonByMeasurementRun;
-    procedure TestButtonClickManualMode;
-    procedure TestButtonClickAutoMode;
+    procedure MeasurementButtonClickManualMode;
+    procedure MeasurementButtonClickAutoMode;
     function IsTestButtonSaveMode: Boolean;
     function IsMeasurementActive(AWorkTable: TWorkTable): Boolean;
     function NeedSaveMeasurementResults(AWorkTable: TWorkTable): Boolean;
@@ -3152,6 +3153,43 @@ begin
 
  // if DataManager <> nil then
  //   DataManager.Save;
+end;
+
+
+procedure TFrameMainTable.PersistChannelEnabled(AWorkTable: TWorkTable; AChannel: TChannel;
+  const AKind: string; const AOldEnabled, ANewEnabled: Boolean);
+var
+  Ini: TIniFile;
+  StoragePath: string;
+  SectionName: string;
+begin
+  if (AWorkTable = nil) or (AChannel = nil) then
+    Exit;
+
+  StoragePath := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
+    'Settings' + PathDelim + 'TableSettings.ini';
+  ForceDirectories(ExtractFilePath(StoragePath));
+
+  if SameText(AKind, 'Etalon') then
+    SectionName := Format('WorkTables/%s/EtalonChannels/%s', [AWorkTable.UUID, AChannel.UUID])
+  else
+    SectionName := Format('WorkTables/%s/DeviceChannels/%s', [AWorkTable.UUID, AChannel.UUID]);
+
+  Ini := TIniFile.Create(StoragePath);
+  try
+    Ini.WriteBool(SectionName, 'Enabled', ANewEnabled);
+    Ini.UpdateFile;
+    ProtocolManager.AddMessage(pcAction, psForm, 'ChannelEnabledChanged',
+      'Изменён флаг включения канала рабочего стола',
+      Format('WorkTableUUID=%s; ChannelKind=%s; ChannelUUID=%s; OldEnabled=%s; NewEnabled=%s; StoragePath=%s; SaveResult=Success',
+        [AWorkTable.UUID, AKind, AChannel.UUID, BoolToStr(AOldEnabled, True),
+         BoolToStr(ANewEnabled, True), StoragePath]));
+  finally
+    Ini.Free;
+  end;
+
+  if WorkTableManager <> nil then
+    WorkTableManager.Save;
 end;
 
 procedure TFrameMainTable.MarkChannelDeviceModified(AChannel: TChannel);
@@ -6734,6 +6772,8 @@ procedure TFrameMainTable.UpdateTestButtonByMeasurementRun;
 var
   Run: TMeasurementRun;
   CanStart: Boolean;
+  ActiveRun: Boolean;
+  DisplayedStatusText: string;
 begin
   if TestButton = nil then
     Exit;
@@ -6772,57 +6812,57 @@ begin
     Exit;
   end;
 
-  case Run.Stage of
-    msNone,
-    msDone:
-      begin
-        TestButton.Text := 'Старт';
-        TestButton.Tag := 1;
-        TestButton.Enabled := CanStart;
-      end;
+  ActiveRun := not (Run.Stage in [msNone, msDone]);
 
-    msSelectPoint,
-    msSelectEtalon,
-    msSetupPoint,
-    msWaitStable,
-    msWaitMeasureStart,
-    msMeasure:
-      begin
-        TestButton.Text := 'Стоп';
-        TestButton.Tag := 3;
-        TestButton.Enabled := True;
-      end;
-
-    msWaitMeasureStop:
-      begin
-        TestButton.Text := 'Остановка';
-        TestButton.Tag := 4;
-        TestButton.Enabled := False;
-      end;
-
-    msResultsRead:
-      begin
-        TestButton.Text := 'Чтение';
-        TestButton.Tag := 5;
-        TestButton.Enabled := False;
-      end;
-
-    msSave:
-      begin
-        TestButton.Text := 'Сохранение';
-        TestButton.Tag := 5;
-        TestButton.Enabled := False;
-      end;
+  if Run.StopRequested and ActiveRun then
+  begin
+    TestButton.Text := 'Остановка...';
+    TestButton.Tag := 4;
+    TestButton.Enabled := False;
+  end
+  else if ActiveRun then
+  begin
+    TestButton.Text := 'Отмена';
+    TestButton.Tag := 3;
+    TestButton.Enabled := True;
+  end
+  else if Run.RunCompleted and (Run.RunResult = mrrSuccess) then
+  begin
+    TestButton.Text := 'Отменить результаты';
+    TestButton.Tag := 7;
+    TestButton.Enabled := True;
+  end
   else
-    begin
-      TestButton.Text := 'Старт';
-      TestButton.Tag := 0;
-      TestButton.Enabled := False;
-    end;
+  begin
+    TestButton.Text := 'Старт';
+    TestButton.Tag := 1;
+    TestButton.Enabled := CanStart;
   end;
+
+  case Run.RunResult of
+    mrrCancelled: DisplayedStatusText := 'Отменено';
+    mrrError: DisplayedStatusText := 'Ошибка';
+  else
+    if Run.RunCompleted then
+      DisplayedStatusText := 'Завершено'
+    else if Run.StopRequested then
+      DisplayedStatusText := 'Остановка'
+    else
+      DisplayedStatusText := TMeasurementRun.MeasurementStateToString(Run.Stage);
+  end;
+
+  ProtocolManager.AddMessage(pcInfo, psForm, 'AutomaticRunUIState',
+    'Обновление UI автоматического измерения',
+    Format('MeasurementRun.Stage=%s; RunCompleted=%s; RunResult=%d; StopRequested=%s; WorkTable.State=%s; DisplayedStatusText=%s; MainActionButtonText=%s; MainActionButtonEnabled=%s; ChannelCheckboxesEnabled=%s; CanCancelActiveRun=%s; CanRollbackCompletedRun=%s',
+      [TMeasurementRun.MeasurementStateToString(Run.Stage), BoolToStr(Run.RunCompleted, True),
+       Ord(Run.RunResult), BoolToStr(Run.StopRequested, True),
+       TWorkTable.WorkTableStateToString(FActiveWorkTable.State),
+       DisplayedStatusText, TestButton.Text, BoolToStr(TestButton.Enabled, True),
+       BoolToStr(not ActiveRun, True), BoolToStr(ActiveRun and not Run.StopRequested, True),
+       BoolToStr(Run.RunCompleted and (Run.RunResult = mrrSuccess), True)]));
 end;
 
-procedure TFrameMainTable.TestButtonClickManualMode;
+procedure TFrameMainTable.MeasurementButtonClickManualMode;
 begin
   if FActiveWorkTable = nil then
     Exit;
@@ -6839,7 +6879,7 @@ begin
     StartMeasurement;
 end;
 
-procedure TFrameMainTable.TestButtonClickAutoMode;
+procedure TFrameMainTable.MeasurementButtonClickAutoMode;
 var
   Run: TMeasurementRun;
 begin
@@ -6848,22 +6888,29 @@ begin
     Exit;
 
   case Run.Stage of
-    msNone,
-    msDone:
+    msNone:
       StartMeasurement;
+
+    msDone:
+      if Run.RunCompleted and (Run.RunResult = mrrSuccess) then
+      begin
+        ProtocolManager.AddMessage(pcAction, psForm, 'RollbackMeasurementRun',
+          'Запрошена отмена результатов последнего автоматического запуска', '');
+        Run.Execute(mcCancel);
+      end
+      else
+        StartMeasurement;
 
     msSelectPoint,
     msSelectEtalon,
     msSetupPoint,
     msWaitStable,
     msWaitMeasureStart,
-    msMeasure:
-      StopMeasurement;
-
+    msMeasure,
     msWaitMeasureStop,
     msResultsRead,
     msSave:
-      Exit;
+      StopMeasurement;
   else
     Exit;
   end;
@@ -6916,7 +6963,9 @@ begin
     if (Channel <> nil) and
        Channel.Enabled and
        (Channel.FlowMeter <> nil) and
-       (Channel.FlowMeter.Device <> nil) then
+       (Channel.FlowMeter.Device <> nil) and
+       ((Channel.FlowMeter.Device.Spillages = nil) or
+        (Channel.FlowMeter.Device.Spillages.Count = 0)) then
     begin
       Result := True;
       Exit;
@@ -6935,6 +6984,9 @@ begin
     Exit;
 
   if not (WorkTable.State in [swtCOMPLETE, swtFINALREAD]) then
+    Exit;
+
+  if not NeedSaveMeasurementResults(WorkTable) then
     Exit;
 
   ProtocolManager.AddMessage(pcAction, psForm, 'AcceptResults',
@@ -6959,14 +7011,29 @@ end;
 // - start a new measurement.
 // Business logic must be kept in dedicated helper methods.
 procedure TFrameMainTable.TestButtonClick(Sender: TObject);
+var
+  WorkTable: TWorkTable;
 begin
-  if FActiveWorkTable = nil then
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
     Exit;
 
   if (SwitchAuto <> nil) and SwitchAuto.IsChecked then
-    TestButtonClickAutoMode
+  begin
+    MeasurementButtonClickAutoMode;
+    Exit;
+  end;
+
+  if IsTestButtonSaveMode then
+  begin
+    AcceptMeasurementResults;
+    Exit;
+  end;
+
+  if IsMeasurementActive(WorkTable) then
+    StopMeasurement
   else
-    TestButtonClickManualMode;
+    StartMeasurement;
 end;
 
 procedure TFrameMainTable.Button1Click(Sender: TObject);
@@ -7678,6 +7745,8 @@ begin
     if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
     begin
       Changed := WorkTable.DeviceChannels[ARow].Enabled <> Value.AsBoolean;
+      if Changed then
+        PersistChannelEnabled(WorkTable, WorkTable.DeviceChannels[ARow], 'Device', WorkTable.DeviceChannels[ARow].Enabled, Value.AsBoolean);
       if FUpdatingChannelEnabled then
         Exit;
       FUpdatingChannelEnabled := True;
@@ -8321,6 +8390,8 @@ begin
     if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
      begin
       Changed := WorkTable.EtalonChannels[ARow].Enabled <> Value.AsBoolean;
+      if Changed then
+        PersistChannelEnabled(WorkTable, WorkTable.EtalonChannels[ARow], 'Etalon', WorkTable.EtalonChannels[ARow].Enabled, Value.AsBoolean);
       if FUpdatingChannelEnabled then
         Exit;
       FUpdatingChannelEnabled := True;
