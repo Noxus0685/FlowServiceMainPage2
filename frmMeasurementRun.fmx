@@ -165,7 +165,7 @@
       Size.Width = 630.000000000000000000
       Size.Height = 22.000000000000000000
       Size.PlatformDefault = False
-      Text = '—'
+      Text = #8212
     end
     object GridAutoTestResults: TGrid
       Position.X = 8.000000000000000000
