@@ -1,4 +1,4 @@
-﻿object FrameMeasurementRun: TFrameMeasurementRun
+object FrameMeasurementRun: TFrameMeasurementRun
   Size.Width = 1228.000000000000000000
   Size.Height = 888.000000000000000000
   Size.PlatformDefault = False
