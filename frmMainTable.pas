@@ -54,6 +54,7 @@ uses
   System.IniFiles,
   System.Math,
   System.Rtti,
+  System.StrUtils,
   System.SysUtils,
   System.Types,
   System.UITypes,
@@ -711,6 +712,7 @@ type
   FRows: array of TRowData;
   IsUpdating: Boolean;
   FUpdatingChannelEnabled: Boolean;
+  FLastAutoStatusText: string;
 
     FFlowMeters: TObjectList<TFlowMeter>;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
@@ -6828,9 +6830,9 @@ begin
   end
   else if Run.RunCompleted and (Run.RunResult = mrrSuccess) then
   begin
-    TestButton.Text := 'Отменить результаты';
-    TestButton.Tag := 7;
-    TestButton.Enabled := True;
+    TestButton.Text := 'Старт';
+    TestButton.Tag := 1;
+    TestButton.Enabled := CanStart;
   end
   else
   begin
@@ -6851,15 +6853,26 @@ begin
       DisplayedStatusText := TMeasurementRun.MeasurementStateToString(Run.Stage);
   end;
 
+  if DisplayedStatusText <> FLastAutoStatusText then
+  begin
+    ProtocolManager.AddMessage(pcInfo, psForm, 'AutoStatusChanged',
+      'Изменён отображаемый статус автоматического измерения',
+      Format('Stage=%s; WorkTableState=%s; RunCompleted=%s; RunResult=%d; DoneReason=%d; StopRequested=%s; PreviousStatusText=%s; NewStatusText=%s; Reason=UpdateTestButtonByMeasurementRun',
+        [TMeasurementRun.MeasurementStateToString(Run.Stage),
+         TWorkTable.WorkTableStateToString(FActiveWorkTable.State),
+         BoolToStr(Run.RunCompleted, True), Ord(Run.RunResult), Ord(Run.DoneReason),
+         BoolToStr(Run.StopRequested, True), FLastAutoStatusText, DisplayedStatusText]));
+    FLastAutoStatusText := DisplayedStatusText;
+  end;
+
   ProtocolManager.AddMessage(pcInfo, psForm, 'AutomaticRunUIState',
     'Обновление UI автоматического измерения',
-    Format('MeasurementRun.Stage=%s; RunCompleted=%s; RunResult=%d; StopRequested=%s; WorkTable.State=%s; DisplayedStatusText=%s; MainActionButtonText=%s; MainActionButtonEnabled=%s; ChannelCheckboxesEnabled=%s; CanCancelActiveRun=%s; CanRollbackCompletedRun=%s',
+    Format('MeasurementRun.Stage=%s; RunCompleted=%s; RunResult=%d; StopRequested=%s; WorkTable.State=%s; DisplayedStatusText=%s; MainActionButtonText=%s; MainActionButtonEnabled=%s; ChannelCheckboxesEnabled=%s; CanCancelActiveRun=%s',
       [TMeasurementRun.MeasurementStateToString(Run.Stage), BoolToStr(Run.RunCompleted, True),
        Ord(Run.RunResult), BoolToStr(Run.StopRequested, True),
        TWorkTable.WorkTableStateToString(FActiveWorkTable.State),
        DisplayedStatusText, TestButton.Text, BoolToStr(TestButton.Enabled, True),
-       BoolToStr(not ActiveRun, True), BoolToStr(ActiveRun and not Run.StopRequested, True),
-       BoolToStr(Run.RunCompleted and (Run.RunResult = mrrSuccess), True)]));
+       BoolToStr(not ActiveRun, True), BoolToStr(ActiveRun and not Run.StopRequested, True)]));
 end;
 
 procedure TFrameMainTable.MeasurementButtonClickManualMode;
@@ -7863,8 +7876,13 @@ begin
 
   if Column = CheckColumnEtalonEnable1 then
   begin
+    if FUpdatingChannelEnabled then
+      Exit;
     if WorkTable <> nil then
     begin
+      FUpdatingChannelEnabled := True;
+      try
+      PersistChannelEnabled(WorkTable, WorkTable.EtalonChannels[Row], 'Etalon', WorkTable.EtalonChannels[Row].Enabled, not WorkTable.EtalonChannels[Row].Enabled);
       WorkTable.EtalonChannels[Row].Enabled := not WorkTable.EtalonChannels[Row].Enabled;
       if WorkTable.EtalonChannels[Row].Enabled then
         begin
@@ -7877,6 +7895,9 @@ begin
           ApplyEnabledChannelSimulationValues(WorkTable, True);
         end;
       MarkChannelDeviceModified(WorkTable.EtalonChannels[Row]);
+      finally
+        FUpdatingChannelEnabled := False;
+      end;
     end
     else
       FRows[Row].Enabled := not FRows[Row].Enabled;
@@ -8016,19 +8037,47 @@ procedure TFrameMainTable.DisableOtherChannelGroups(AChannels: TObjectList<TChan
 var
   J: Integer;
   ActiveGroup: Integer;
+  SelectedChannel: TChannel;
+  OtherChannel: TChannel;
+  OldEnabled: Boolean;
+  WorkTableUUID: string;
 begin
   if (AChannels = nil) or (AActiveIndex < 0) or (AActiveIndex >= AChannels.Count) or
      (AChannels[AActiveIndex] = nil) then
     Exit;
 
-  ActiveGroup := AChannels[AActiveIndex].Group;
+  SelectedChannel := AChannels[AActiveIndex];
+  ActiveGroup := SelectedChannel.Group;
+  if FActiveWorkTable <> nil then
+    WorkTableUUID := FActiveWorkTable.UUID
+  else
+    WorkTableUUID := '';
   for J := 0 to AChannels.Count - 1 do
-    if (J <> AActiveIndex) and (AChannels[J] <> nil) and
-       ((ActiveGroup <= 0) or (AChannels[J].Group <> ActiveGroup)) then
+  begin
+    OtherChannel := AChannels[J];
+    if (J = AActiveIndex) or (OtherChannel = nil) or
+       (OtherChannel.Group <> ActiveGroup) then
+      Continue;
+
+    OldEnabled := OtherChannel.Enabled;
+    if OldEnabled then
     begin
-      AChannels[J].Enabled := False;
-      ClearChannelSimulationValues(AChannels[J]);
+      OtherChannel.Enabled := False;
+      ClearChannelSimulationValues(OtherChannel);
+      MarkChannelDeviceModified(OtherChannel);
+      if FActiveWorkTable <> nil then
+        PersistChannelEnabled(FActiveWorkTable, OtherChannel, 'Etalon', OldEnabled, False);
     end;
+
+    ProtocolManager.AddMessage(pcAction, psForm, 'EtalonEnabledGroupChange',
+      'Взаимоисключение эталонных каналов одной группы',
+      Format('WorkTableUUID=%s; SelectedChannelUUID=%s; SelectedChannelName=%s; SelectedGroup=%d; SelectedOldEnabled=%s; SelectedNewEnabled=%s; AffectedChannelUUID=%s; AffectedChannelName=%s; AffectedGroup=%d; AffectedOldEnabled=%s; AffectedNewEnabled=%s; Reason=ExclusiveGroupSelection',
+        [WorkTableUUID,
+         SelectedChannel.UUID, SelectedChannel.Name, ActiveGroup,
+         BoolToStr(SelectedChannel.Enabled, True), BoolToStr(True, True),
+         OtherChannel.UUID, OtherChannel.Name, OtherChannel.Group,
+         BoolToStr(OldEnabled, True), BoolToStr(OtherChannel.Enabled, True)]));
+  end;
 end;
 
 
@@ -8389,11 +8438,11 @@ begin
 
     if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
      begin
+      if FUpdatingChannelEnabled then
+        Exit;
       Changed := WorkTable.EtalonChannels[ARow].Enabled <> Value.AsBoolean;
       if Changed then
         PersistChannelEnabled(WorkTable, WorkTable.EtalonChannels[ARow], 'Etalon', WorkTable.EtalonChannels[ARow].Enabled, Value.AsBoolean);
-      if FUpdatingChannelEnabled then
-        Exit;
       FUpdatingChannelEnabled := True;
       try
         WorkTable.EtalonChannels[ARow].Enabled := Value.AsBoolean;
