@@ -54,8 +54,8 @@ type
     StringColumnLimitVolume: TStringColumn;
     LayoutAutoTests: TLayout;
     ComboBoxAutoTestScenario: TComboBox;
-    ButtonAutoTestStart: TButton;
-    ButtonAutoTestRunAll: TButton;
+    ButtonRunAutoTestScenario: TButton;
+    ButtonRunAllAutoTestScenarios: TButton;
     LabelAutoTestResult: TLabel;
     GridAutoTestResults: TGrid;
     StringColumnAutoTestNo: TStringColumn;
@@ -78,8 +78,8 @@ type
     procedure SpeedButtonPointDeleteClick(Sender: TObject);
     procedure SpeedButtonPointNextClick(Sender: TObject);
     procedure SpeedButtonPointPrevClick(Sender: TObject);
-    procedure ButtonAutoTestStartClick(Sender: TObject);
-    procedure ButtonAutoTestRunAllClick(Sender: TObject);
+    procedure ButtonRunAutoTestScenarioClick(Sender: TObject);
+    procedure ButtonRunAllAutoTestScenariosClick(Sender: TObject);
     procedure GridAutoTestResultsGetValue(Sender: TObject; const ACol,
       ARow: Integer; var Value: TValue);
     procedure GridAutoTestResultsDrawColumnCell(Sender: TObject;
@@ -134,8 +134,8 @@ begin
   SpeedButtonPause.OnClick := SpeedButtonPauseClick;
   SpeedButtonPointDelete.OnClick := SpeedButtonPointDeleteClick;
   SpeedButtonCreatePoints.OnClick := SpeedButtonCreatePointsClick;
-  ButtonAutoTestStart.OnClick := ButtonAutoTestStartClick;
-  ButtonAutoTestRunAll.OnClick := ButtonAutoTestRunAllClick;
+  ButtonRunAutoTestScenario.OnClick := ButtonRunAutoTestScenarioClick;
+  ButtonRunAllAutoTestScenarios.OnClick := ButtonRunAllAutoTestScenariosClick;
   GridAutoTestResults.OnGetValue := GridAutoTestResultsGetValue;
   GridAutoTestResults.OnDrawColumnCell := GridAutoTestResultsDrawColumnCell;
   TAutoMeasurementTestRunner.FillScenarioNames(ComboBoxAutoTestScenario.Items);
@@ -532,8 +532,8 @@ procedure TFrameMeasurementRun.SetAutoTestControlsEnabled(const AEnabled: Boolea
 begin
   FAutoTestRunning := not AEnabled;
   ComboBoxAutoTestScenario.Enabled := AEnabled;
-  ButtonAutoTestStart.Enabled := AEnabled;
-  ButtonAutoTestRunAll.Enabled := AEnabled;
+  ButtonRunAutoTestScenario.Enabled := AEnabled;
+  ButtonRunAllAutoTestScenarios.Enabled := AEnabled;
 end;
 
 procedure TFrameMeasurementRun.AddAutoTestResult(const AResult: TAutoMeasurementTestResult);
@@ -598,12 +598,12 @@ begin
     end);
 end;
 
-procedure TFrameMeasurementRun.ButtonAutoTestStartClick(Sender: TObject);
+procedure TFrameMeasurementRun.ButtonRunAutoTestScenarioClick(Sender: TObject);
 begin
   RunAutoTests(False);
 end;
 
-procedure TFrameMeasurementRun.ButtonAutoTestRunAllClick(Sender: TObject);
+procedure TFrameMeasurementRun.ButtonRunAllAutoTestScenariosClick(Sender: TObject);
 begin
   RunAutoTests(True);
 end;

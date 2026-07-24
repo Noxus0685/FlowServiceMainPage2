@@ -126,6 +126,7 @@ object FrameMeasurementRun: TFrameMeasurementRun
       TextSettings.Trimming = None
       OnClick = SpeedButtonCreatePointsClick
     end
+  end
   object LayoutAutoTests: TLayout
     Align = Bottom
     Position.Y = 708.000000000000000000
@@ -141,23 +142,23 @@ object FrameMeasurementRun: TFrameMeasurementRun
       Size.PlatformDefault = False
       TabOrder = 0
     end
-    object ButtonAutoTestStart: TButton
+    object ButtonRunAutoTestScenario: TButton
       Position.X = 336.000000000000000000
       Position.Y = 8.000000000000000000
       Size.Width = 96.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
       Text = #1057#1090#1072#1088#1090
-      OnClick = ButtonAutoTestStartClick
+      OnClick = ButtonRunAutoTestScenarioClick
     end
-    object ButtonAutoTestRunAll: TButton
+    object ButtonRunAllAutoTestScenarios: TButton
       Position.X = 440.000000000000000000
       Position.Y = 8.000000000000000000
       Size.Width = 128.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
       Text = #1055#1088#1086#1075#1085#1072#1090#1100' '#1074#1089#1077
-      OnClick = ButtonAutoTestRunAllClick
+      OnClick = ButtonRunAllAutoTestScenariosClick
     end
     object LabelAutoTestResult: TLabel
       Position.X = 584.000000000000000000
