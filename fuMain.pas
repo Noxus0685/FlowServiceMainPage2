@@ -639,8 +639,7 @@ begin
       SUM := 0;
       for J := 0 to AChannels.Count - 1 do
         if (AChannels[J] <> nil) and AChannels[J].Enabled and
-           (((GroupKey > 0) and (AChannels[J].Group = GroupKey)) or
-            ((GroupKey <= 0) and (J = I))) and
+           (AChannels[J].Group = GroupKey) and
            (AChannels[J].FlowMeter <> nil) and (AChannels[J].FlowMeter.Device <> nil) then
           SUM := SUM + WorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[J].FlowMeter.Device.Qmax, 4);
 
@@ -767,8 +766,7 @@ var
 
     for K := 0 to AChannels.Count - 1 do
       if (AChannels[K] <> nil) and AChannels[K].Enabled and
-         (((AGroup > 0) and (AChannels[K].Group = AGroup)) or
-          ((AGroup <= 0) and (K = AChannelIndex))) and
+         (AChannels[K].Group = AGroup) and
          (AChannels[K].FlowMeter <> nil) and (AChannels[K].FlowMeter.Device <> nil) then
         Result := Result + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[K].FlowMeter.Device.Qmax, 4);
   end;
@@ -838,8 +836,7 @@ begin
     end;
   for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
     if (AWorkTable.EtalonChannels[I] <> nil) and AWorkTable.EtalonChannels[I].Enabled and
-       (((GroupKey > 0) and (AWorkTable.EtalonChannels[I].Group = GroupKey)) or
-        ((GroupKey <= 0) and (I = ActiveEtalonIndex))) then
+       (AWorkTable.EtalonChannels[I].Group = GroupKey) then
     begin
       ChannelCoef := GetChannelFlowCoef(AWorkTable.EtalonChannels[I]);
       if ChannelCoef > 0 then

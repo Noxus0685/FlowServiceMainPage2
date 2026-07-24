@@ -865,7 +865,7 @@ begin
   if FCurrentStage = ANewStage then
     Exit;
 
-  FWaitStartedTick := TThread.GetTickCount64;
+  FWaitStartedTick := TMeterValue.GetMonotonicTimeMs;
 
   OldStage := FCurrentStage;
   TransitionText := Format('%s -> %s', [MeasurementStateToString(OldStage),
@@ -884,7 +884,7 @@ begin
   FCurrentStage := ANewStage;
 
   ProtocolManager.AddMessage(pcState, psMeasurement, 'SetStage',
-    'Переход этапа измерения, тайм аут: ' +inttostr(TThread.GetTickCount64 - FWaitStartedTick)+'; ', TransitionText);
+    'Переход этапа измерения, тайм аут: ' +inttostr(TMeterValue.GetMonotonicTimeMs - FWaitStartedTick)+'; ', TransitionText);
   AddDiagnosticEvent('Stage ' + MeasurementStateToString(OldStage) + ' -> ' + MeasurementStateToString(ANewStage));
   if FWorkTable <> nil then
     FWorkTable.MeasurementRunStateChanged(Self, ANewStage);
@@ -903,7 +903,7 @@ end;
 
 procedure TMeasurementRun.DoEnterStage(AOldStage, ANewStage: EMeasurementState);
 begin
-  FWaitStartedTick := TThread.GetTickCount64;
+  FWaitStartedTick := TMeterValue.GetMonotonicTimeMs;
   if ANewStage in [msNone, msSelectPoint, msSetupPoint, msDone] then
   begin
     FDevicesStableSinceMs := 0;
@@ -1247,7 +1247,7 @@ begin
 
   // Начать новый период публикации состояния стабилизации.
   // Первое промежуточное сообщение появится через 2 секунды.
-  FLastStableProtocolTick := TThread.GetTickCount64;
+  FLastStableProtocolTick := TMeterValue.GetMonotonicTimeMs;
   FStableSinceMs := 0;
   FDevicesStableSinceMs := 0;
   FLastDeviceStableStateKnown := False;
@@ -1437,10 +1437,10 @@ begin
     FireEvent(mePointDone);
     if FMode = mrmManual then
       FNextStageAfterSave := msDone
+    else if FindNextEnabledPointIndex(FCurrentPointIndex + 1) < 0 then
+      FNextStageAfterSave := msDone
     else
-    begin
       FNextStageAfterSave := msSelectPoint;
-    end;
   end
   else
     FNextStageAfterSave := msWaitMeasureStart;
@@ -1497,9 +1497,25 @@ end;
 
 procedure TMeasurementRun.FinalizeMeasurementRun(AResult: TMeasurementRunResult;
   AReason: TMeasurementRunDoneReason);
+var
+  PreviousStage: EMeasurementState;
+  PreviousWorkTableState: EStateWorkTable;
+  CurrentPointIndexBefore: Integer;
+  NextStageAfterSaveBefore: EMeasurementState;
+  DisplayedStatusText: string;
+  FinalWorkTableStateText: string;
 begin
   if FFinalized then
     Exit;
+
+  PreviousStage := FCurrentStage;
+  if FWorkTable <> nil then
+    PreviousWorkTableState := FWorkTable.State
+  else
+    PreviousWorkTableState := swtNONE;
+  CurrentPointIndexBefore := FCurrentPointIndex;
+  NextStageAfterSaveBefore := FNextStageAfterSave;
+
   FFinalized := True;
 
   if (GetCurrentPoint <> nil) and (GetCurrentPoint.Status = mptsResultsRead) then
@@ -1508,6 +1524,7 @@ begin
   FRunCompleted := True;
   FRunResult := AResult;
   FDoneReason := AReason;
+  FCurrentStage := msDone;
   if AResult = mrrSuccess then
   begin
     FStopRequested := False;
@@ -1524,14 +1541,36 @@ begin
   if FWorkTable <> nil then
     FWorkTable.State := swtNONE;
 
+  case FRunResult of
+    mrrCancelled: DisplayedStatusText := 'Отменено';
+    mrrError: DisplayedStatusText := 'Ошибка';
+  else
+    if FRunCompleted and (FRunResult = mrrSuccess) then
+      DisplayedStatusText := 'Завершено'
+    else if FStopRequested then
+      DisplayedStatusText := 'Остановка'
+    else
+      DisplayedStatusText := MeasurementStateToString(FCurrentStage);
+  end;
+
+  if FWorkTable <> nil then
+    FinalWorkTableStateText := TWorkTable.WorkTableStateToString(FWorkTable.State)
+  else
+    FinalWorkTableStateText := TWorkTable.WorkTableStateToString(swtNONE);
+
+  AddDiagnosticEvent(Format('FinalizeMeasurementRun: PreviousStage=%s; FinalStage=%s; PreviousWorkTableState=%s; FinalWorkTableState=%s; RunCompleted=%s; RunResult=%s; DoneReason=%s; StopRequested=%s; CurrentPointIndexBefore=%d; CurrentPointIndexAfter=%d; NextStageAfterSaveBefore=%s; NextStageAfterSaveAfter=%s; DisplayedStatusText=%s',
+    [MeasurementStateToString(PreviousStage), MeasurementStateToString(FCurrentStage),
+     TWorkTable.WorkTableStateToString(PreviousWorkTableState), FinalWorkTableStateText,
+     BoolToStr(FRunCompleted, True), GetEnumName(TypeInfo(TMeasurementRunResult), Ord(FRunResult)),
+     GetEnumName(TypeInfo(TMeasurementRunDoneReason), Ord(FDoneReason)), BoolToStr(FStopRequested, True),
+     CurrentPointIndexBefore, FCurrentPointIndex, MeasurementStateToString(NextStageAfterSaveBefore),
+     MeasurementStateToString(FNextStageAfterSave), DisplayedStatusText]));
+
   if AResult = mrrSuccess then
   begin
     AddDiagnosticEvent('meAllDone');
     FireEvent(meAllDone);
-  end
-  else
-    AddDiagnosticEvent('Run finalized: Result=' + GetEnumName(TypeInfo(TMeasurementRunResult), Ord(AResult)) +
-      '; DoneReason=' + GetEnumName(TypeInfo(TMeasurementRunDoneReason), Ord(AReason)));
+  end;
 
   Notify(Integer(meStateChanged), nil);
   if FThread <> nil then
@@ -1626,7 +1665,7 @@ begin
 сделать настройку для общего времени стабилизации }
 
 
-  DiagnosticSecond := Trunc((TThread.GetTickCount64 - FWaitStartedTick) / 1000);
+  DiagnosticSecond := Trunc((TMeterValue.GetMonotonicTimeMs - FWaitStartedTick) / 1000);
   DiagnosticText := Format('IsStable=%s; EtalonStable=%s; ConditionsStable=%s; DevicesStable=%s; ReadyToMeasure=%s; Reason=%s',
     [BoolToStr(Result, True), BoolToStr(EtalonStable, True), BoolToStr(ConditionsStable, True),
      BoolToStr(DevicesStable, True), BoolToStr(Result, True), StableInfo.StatusText]);
@@ -1775,7 +1814,7 @@ var
 
   procedure PublishDeviceLog(const AText: string);
   begin
-    CurrentTick := TThread.GetTickCount64;
+    CurrentTick := TMeterValue.GetMonotonicTimeMs;
     if (AText <> FLastDeviceStabilityLogText) or
        (FLastDeviceStabilityLogTick = 0) or
        (CurrentTick - FLastDeviceStabilityLogTick >= 5000) then
@@ -2380,10 +2419,10 @@ begin
 
     WaitStableSec := 0;
     if FCurrentStage = msWaitStable then
-      WaitStableSec := (TThread.GetTickCount64 - FWaitStartedTick) / 1000;
+      WaitStableSec := (TMeterValue.GetMonotonicTimeMs - FWaitStartedTick) / 1000;
     MeasureSec := 0;
     if FCurrentStage = msMeasure then
-      MeasureSec := (TThread.GetTickCount64 - FWaitStartedTick) / 1000;
+      MeasureSec := (TMeterValue.GetMonotonicTimeMs - FWaitStartedTick) / 1000;
 
     if FCurrentStage = msDone then
       NextIndex := -1
@@ -2523,8 +2562,8 @@ begin
     Lines.Add('DevicesStableSinceMs=' + UIntToStr(FDevicesStableSinceMs));
     if FDevicesStableSinceMs <> 0 then
     begin
-      Lines.Add('DevicesStableDurationSec=' + SFloat((TThread.GetTickCount64 - FDevicesStableSinceMs) / 1000));
-      Lines.Add('DevicesStableRemainingSec=' + SFloat(Max(0.0, FRequiredDeviceStabilizationSec - ((TThread.GetTickCount64 - FDevicesStableSinceMs) / 1000))));
+      Lines.Add('DevicesStableDurationSec=' + SFloat((TMeterValue.GetMonotonicTimeMs - FDevicesStableSinceMs) / 1000));
+      Lines.Add('DevicesStableRemainingSec=' + SFloat(Max(0.0, FRequiredDeviceStabilizationSec - ((TMeterValue.GetMonotonicTimeMs - FDevicesStableSinceMs) / 1000))));
       Lines.Add('DevicesStableTimerRunning=True');
     end
     else
@@ -4323,7 +4362,7 @@ begin
     Exit;
   end;
 
-  CurrentTick := TThread.GetTickCount64;
+  CurrentTick := TMeterValue.GetMonotonicTimeMs;
   StableTimeoutSec := CalcStableTimeoutSec;
   if FWaitStableStartedMs > 0 then
   begin
@@ -4510,7 +4549,7 @@ begin
         Exit;
       end;
   end;
-   timeout := (TThread.GetTickCount64 - FWaitStartedTick)/1000;
+   timeout := (TMeterValue.GetMonotonicTimeMs - FWaitStartedTick)/1000;
   if timeout > DEFAULT_START_TIMEOUT_S then
   begin
     ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1403, 'Таймаут ожидания запуска измерения'));
@@ -4739,7 +4778,7 @@ begin
     end;
   end;
 
-  if Int64(TThread.GetTickCount64 - FWaitStartedTick) > Int64(FMeasureTimeout) * 1000 then
+  if Int64(TMeterValue.GetMonotonicTimeMs - FWaitStartedTick) > Int64(FMeasureTimeout) * 1000 then
   begin
     SetStopReason(msrError);
     FireEvent(meMeasureTimeout, BuildError(1401, 'Таймаут измерения'));
@@ -4794,7 +4833,7 @@ begin
       end;
   end;
 
-  if (TThread.GetTickCount64 - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
+  if (TMeterValue.GetMonotonicTimeMs - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
   begin
     ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1406, 'Таймаут ожидания остановки измерения'));
   end;
@@ -4840,7 +4879,7 @@ begin
       end;
   end;
 
-  if (TThread.GetTickCount64 - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
+  if (TMeterValue.GetMonotonicTimeMs - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
   begin
     ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1411, 'Таймаут чтения результатов'));
   end;
