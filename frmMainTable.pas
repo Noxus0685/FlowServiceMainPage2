@@ -128,6 +128,13 @@ type
     StableText: string;
     Reason: string;
     ExecutorCall: string;
+    QParameter: Double;
+    QSample: Double;
+    SampleTimeMs: Int64;
+    TimeSource: string;
+    VirtualCommand: string;
+    VirtualResponse: string;
+    ProgressText: string;
     CheckText: string;
   end;
 
@@ -7071,11 +7078,18 @@ begin
   AddStringColumn(GridAutoTestNumbers, 'Repeat', 70);
   AddStringColumn(GridAutoTestNumbers, 'Q заданный', 90);
   AddStringColumn(GridAutoTestNumbers, 'Q фактический', 100);
+  AddStringColumn(GridAutoTestNumbers, 'Q parameter', 100);
+  AddStringColumn(GridAutoTestNumbers, 'Q sample', 100);
+  AddStringColumn(GridAutoTestNumbers, 'Sample time', 100);
+  AddStringColumn(GridAutoTestNumbers, 'Time source', 90);
   AddStringColumn(GridAutoTestNumbers, 'T заданная', 90);
   AddStringColumn(GridAutoTestNumbers, 'T фактическая', 100);
   AddStringColumn(GridAutoTestNumbers, 'P заданное', 90);
   AddStringColumn(GridAutoTestNumbers, 'P фактическое', 100);
   AddStringColumn(GridAutoTestNumbers, 'Stable', 90);
+  AddStringColumn(GridAutoTestNumbers, 'Virtual command', 130);
+  AddStringColumn(GridAutoTestNumbers, 'Virtual response', 130);
+  AddStringColumn(GridAutoTestNumbers, 'Progress', 90);
   AddStringColumn(GridAutoTestNumbers, 'Причина', 300);
 
   GridAutoTestResults := TGrid.Create(Self);
@@ -7157,11 +7171,18 @@ begin
     2: Value := R.RepeatText;
     3: Value := FormatFloat('0.000', R.TargetFlow);
     4: Value := FormatFloat('0.000', R.ActualFlow);
-    5: Value := FormatFloat('0.000', R.TargetTemp);
-    6: Value := FormatFloat('0.000', R.ActualTemp);
-    7: Value := FormatFloat('0.000', R.TargetPress);
-    8: Value := FormatFloat('0.000', R.ActualPress);
-    9: Value := R.StableText;
+    5: Value := FormatFloat('0.000', R.QParameter);
+    6: Value := FormatFloat('0.000', R.QSample);
+    7: Value := R.SampleTimeMs;
+    8: Value := R.TimeSource;
+    9: Value := FormatFloat('0.000', R.TargetTemp);
+    10: Value := FormatFloat('0.000', R.ActualTemp);
+    11: Value := FormatFloat('0.000', R.TargetPress);
+    12: Value := FormatFloat('0.000', R.ActualPress);
+    13: Value := R.StableText;
+    14: Value := R.VirtualCommand;
+    15: Value := R.VirtualResponse;
+    16: Value := R.ProgressText;
   else Value := R.Reason;
   end;
 end;
@@ -7244,6 +7265,13 @@ var
   Factor, TargetQ, TargetT, TargetP, ActualQ, ActualT, ActualP: Double;
   StableInfo: RStableInfo;
   StableText: string;
+  LastProgressKey: string;
+  ProgressKey: string;
+  NoProgressSteps: Integer;
+  AppliedQ: Double;
+  LastSampleQ: Double;
+  LastSampleTimeMs: Int64;
+  PointNameForLog: string;
   FinalKind: TAutoMeasurementTestResultKind;
   FinalReason: string;
 
@@ -7264,6 +7292,23 @@ var
       AMeter.AddStabilitySampleManual(ATimeMs, AValue);
   end;
 
+  function ReadLastSample(AMeter: TMeterValue; out AValue: Double; out ATimeMs: Int64): Boolean;
+  var
+    LocalSamples: TArray<TMeterValueSample>;
+  begin
+    Result := False;
+    AValue := 0;
+    ATimeMs := 0;
+    if AMeter = nil then
+      Exit;
+    LocalSamples := AMeter.GetStabilitySamples;
+    if Length(LocalSamples) = 0 then
+      Exit;
+    AValue := LocalSamples[High(LocalSamples)].Value;
+    ATimeMs := LocalSamples[High(LocalSamples)].TimeStampMs;
+    Result := True;
+  end;
+
 begin
   if FAutoTestRunning then
     Exit;
@@ -7278,6 +7323,8 @@ begin
     FinalKind := amtrkFail;
     FinalReason := '';
     RepeatCount := 0;
+    LastProgressKey := '';
+    NoProgressSteps := 0;
     if WT = nil then
       FinalReason := 'FAIL — активный TWorkTable отсутствует'
     else if Run = nil then
@@ -7314,6 +7361,7 @@ begin
       OldPoint := WT.CurrentPoint;
       try
         WT.IsSimulationMode := True;
+        TMeterValue.EnableVirtualClock(0);
         FAutoTestRealCommandsBlocked := True;
         Run.Mode := mrmAutomatic;
         Run.CreateSession;
@@ -7330,6 +7378,7 @@ begin
               FinalReason := 'STOPPED — остановлено пользователем';
               Break;
             end;
+            TMeterValue.AdvanceVirtualClock(1000);
             StageBefore := Run.Stage;
             Point := Run.CurrentPoint;
             if Point <> nil then
@@ -7358,23 +7407,57 @@ begin
             if not (AScenarioIndex = 11) then
               ActualP := TargetP + IfThen(Step < 4, -0.05 + Step * 0.015, 0.001);
 
+            if WT.FlowRate <> nil then
+            begin
+              WT.FlowRate.SetValue(ActualQ);
+              AddSampleToMeter(WT.FlowRate.Value, ActualQ, TMeterValue.GetMonotonicTimeMs);
+            end;
+            if WT.FluidTemp <> nil then
+            begin
+              WT.FluidTemp.SetValue(ActualT);
+              AddSampleToMeter(WT.FluidTemp.Value, ActualT, TMeterValue.GetMonotonicTimeMs);
+            end;
+            if WT.FluidPress <> nil then
+            begin
+              WT.FluidPress.SetValue(ActualP);
+              AddSampleToMeter(WT.FluidPress.Value, ActualP, TMeterValue.GetMonotonicTimeMs);
+            end;
             if WT.ValueFlowRate <> nil then WT.ValueFlowRate.Reset(ActualQ);
             if WT.ValueTemperture <> nil then WT.ValueTemperture.Reset(ActualT);
             if WT.ValuePressure <> nil then WT.ValuePressure.Reset(ActualP);
-            AddSampleToMeter(WT.ValueFlowRate, ActualQ, Step * 1000);
-            AddSampleToMeter(WT.ValueTemperture, ActualT, Step * 1000);
-            AddSampleToMeter(WT.ValuePressure, ActualP, Step * 1000);
             for I := 0 to WT.EtalonChannels.Count - 1 do
               if (WT.EtalonChannels[I] <> nil) and WT.EtalonChannels[I].Enabled and
                  (WT.EtalonChannels[I].FlowMeter <> nil) and (WT.EtalonChannels[I].FlowMeter.ValueFlow <> nil) then
-                AddSampleToMeter(WT.EtalonChannels[I].FlowMeter.ValueFlow, ActualQ, Step * 1000);
+                AddSampleToMeter(WT.EtalonChannels[I].FlowMeter.ValueFlow, ActualQ, TMeterValue.GetMonotonicTimeMs);
             for I := 0 to WT.DeviceChannels.Count - 1 do
               if (WT.DeviceChannels[I] <> nil) and WT.DeviceChannels[I].Enabled then
               begin
                 WT.DeviceChannels[I].ImpResult := Step * 1000;
                 if (WT.DeviceChannels[I].FlowMeter <> nil) and (WT.DeviceChannels[I].FlowMeter.ValueFlow <> nil) then
-                  AddSampleToMeter(WT.DeviceChannels[I].FlowMeter.ValueFlow, ActualQ, Step * 1000);
+                  AddSampleToMeter(WT.DeviceChannels[I].FlowMeter.ValueFlow, ActualQ, TMeterValue.GetMonotonicTimeMs);
               end;
+
+            AppliedQ := 0;
+            LastSampleQ := 0;
+            LastSampleTimeMs := 0;
+            if (WT.FlowRate <> nil) and (WT.FlowRate.Value <> nil) then
+              AppliedQ := WT.FlowRate.Value.Value;
+            if WT.FlowRate <> nil then
+              ReadLastSample(WT.FlowRate.Value, LastSampleQ, LastSampleTimeMs);
+            if (not SameValue(ActualQ, AppliedQ, 1E-9)) or
+               (not SameValue(ActualQ, LastSampleQ, 1E-9)) or
+               (LastSampleTimeMs <> TMeterValue.GetMonotonicTimeMs) then
+            begin
+              if Point <> nil then
+                PointNameForLog := Point.Name
+              else
+                PointNameForLog := '-';
+              FinalReason := Format('FAIL — тестовое значение не передано в рабочий параметр; Parameter=FlowRate; GeneratedQ=%.9f; AppliedQ=%.9f; LastSampleQ=%.9f; SampleTime=%d; VirtualTime=%d; Point=%s; Stage=%s; WorkTable.State=%s',
+                [ActualQ, AppliedQ, LastSampleQ, LastSampleTimeMs, TMeterValue.GetMonotonicTimeMs,
+                 PointNameForLog, TMeasurementRun.MeasurementStateToString(Run.Stage),
+                 TWorkTable.WorkTableStateToString(WT.State)]);
+              Break;
+            end;
 
             TThread.Sleep(1);
             StageAfter := Run.Stage;
@@ -7387,6 +7470,15 @@ begin
                 StableText := 'False: ' + StableInfo.StatusText;
             end;
 
+            ProgressKey := Format('%d|%d|%d|%d', [Ord(Run.Stage), Ord(WT.State), Run.CurrentPointIndex, Run.CurrentRepeat]);
+            if ProgressKey = LastProgressKey then
+              Inc(NoProgressSteps)
+            else
+            begin
+              LastProgressKey := ProgressKey;
+              NoProgressSteps := 0;
+            end;
+
             Row.VirtualTimeSec := Step;
             if Point <> nil then Row.PointText := Format('%d/%d %s', [Run.CurrentPointIndex + 1, Run.Points.Count, Point.Name]) else Row.PointText := '-';
             Row.RepeatText := IntToStr(Run.CurrentRepeat + 1);
@@ -7394,13 +7486,27 @@ begin
             Row.StageAfter := TMeasurementRun.MeasurementStateToString(StageAfter);
             Row.WorkTableState := TWorkTable.WorkTableStateToString(WT.State);
             Row.TargetFlow := TargetQ; Row.ActualFlow := ActualQ;
+            Row.QParameter := AppliedQ; Row.QSample := LastSampleQ;
+            Row.SampleTimeMs := LastSampleTimeMs; Row.TimeSource := 'Virtual';
             Row.TargetTemp := TargetT; Row.ActualTemp := ActualT;
             Row.TargetPress := TargetP; Row.ActualPress := ActualP;
             Row.StableText := StableText;
-            Row.Reason := 'Шаг виртуального времени; штатная FSM работает в SimulationMode';
-            Row.ExecutorCall := 'SimulationMode blocks real StartMonitor/StartTest/StopTest/Save';
-            Row.CheckText := 'Expected/Actual фиксируется в итоговой строке сценария';
+            Row.VirtualCommand := 'Virtual command boundary';
+            Row.VirtualResponse := TWorkTable.WorkTableStateToString(WT.State);
+            if NoProgressSteps = 0 then Row.ProgressText := 'True' else Row.ProgressText := 'False';
+            Row.Reason := 'Шаг виртуального времени; значения прочитаны обратно из производственных параметров';
+            Row.ExecutorCall := Row.VirtualCommand;
+            Row.CheckText := 'Generated/Applied/Sample verified';
             AppendStep;
+
+            if NoProgressSteps >= 20 then
+            begin
+              FinalReason := Format('FAIL — отсутствует прогресс FSM; Stage=%s; WorkTable.State=%s; Point=%d; Repeat=%d; GeneratedQ=%.9f; AppliedQ=%.9f; LastSampleQ=%.9f; TargetQ=%.9f; StableStatus=%s; LastVirtualCommand=%s; LastVirtualResponse=%s; VirtualTime=%d; RealExecutionTime=%d',
+                [TMeasurementRun.MeasurementStateToString(Run.Stage), TWorkTable.WorkTableStateToString(WT.State),
+                 Run.CurrentPointIndex, Run.CurrentRepeat, ActualQ, AppliedQ, LastSampleQ, TargetQ, StableText,
+                 Row.VirtualCommand, Row.VirtualResponse, TMeterValue.GetMonotonicTimeMs, TThread.GetTickCount - StartTick]);
+              Break;
+            end;
 
             if Run.Stage = msDone then
               Break;
@@ -7431,6 +7537,15 @@ begin
           FinalReason := 'ERROR — ' + E.Message;
         end;
       end;
+      if (Run <> nil) and Run.IsWorkerThreadRunning then
+        Run.Execute(mcStop, Null);
+      for I := 0 to 50 do
+      begin
+        if (Run = nil) or (not Run.IsWorkerThreadRunning) then
+          Break;
+        TThread.Sleep(1);
+      end;
+      TMeterValue.DisableVirtualClock;
       WT.IsSimulationMode := OldSimulation;
       WT.CurrentPoint := OldPoint;
       WT.State := OldState;
