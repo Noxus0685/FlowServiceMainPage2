@@ -86,6 +86,8 @@ type
     ButtonSampleDelete: TButton;
     ButtonSamplesClear: TButton;
     GroupAnalysis: TGroupBox;
+    GroupStabilityScenario: TGroupBox;
+    GroupSamplesGenerator: TGroupBox;
     ButtonAnalyze: TButton;
     CheckBoxAutoAnalyze: TCheckBox;
     ComboBoxStabilityScenario: TComboBox;

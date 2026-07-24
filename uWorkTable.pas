@@ -3222,7 +3222,6 @@ begin
       //
       // В групповой поиск включаются только те каналы, которые прошли
       // IsChannelValidForSelection.
-      if Channel.Group > 0 then
       begin
         if not Groups.TryGetValue(Channel.Group, GroupChannels) then
         begin
@@ -3581,15 +3580,10 @@ begin
       if QmaxBase <= 0 then
         Continue;
 
-      if Channel.Group > 0 then
-      begin
-        if GroupSums.TryGetValue(Channel.Group, GroupSum) then
-          GroupSums[Channel.Group] := GroupSum + QmaxBase
-        else
-          GroupSums.Add(Channel.Group, QmaxBase);
-      end
-      else if QmaxBase > Result then
-        Result := QmaxBase;
+      if GroupSums.TryGetValue(Channel.Group, GroupSum) then
+        GroupSums[Channel.Group] := GroupSum + QmaxBase
+      else
+        GroupSums.Add(Channel.Group, QmaxBase);
     end;
 
     for Pair in GroupSums do
@@ -5495,6 +5489,13 @@ var
   end;
 begin
 
+  if IsSimulationMode then
+  begin
+    ProtocolManager.AddMessage(pcInfo, psWorkTable, 'SaveMeasurementResults',
+      'Сценарный тест: рабочее сохранение результатов заблокировано', Name);
+    Exit;
+  end;
+
   DeviceRepo := nil;
   if DataManager <> nil then
     DeviceRepo := DataManager.ActiveDeviceRepo;
@@ -5695,6 +5696,16 @@ end;
 
 procedure TWorkTable.StartTest;
 begin
+  if IsSimulationMode then
+  begin
+    ResetMeasurementValues;
+    CaptureEnvironmentSimulationBase;
+    State := swtEXECUTE;
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartTest',
+      'Сценарный тест: реальный запуск измерения заблокирован, состояние swtEXECUTE установлено имитатором', Name);
+    Exit;
+  end;
+
   if State in [swtSTARTMONITOR, swtSTARTMONITORWAIT, swtMONITOR] then
     ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
       'Переход из режима монитора к измерению без промежуточной остановки', Name);
@@ -5711,6 +5722,15 @@ end;
 
 procedure TWorkTable.StartTestRepeat;
 begin
+  if IsSimulationMode then
+  begin
+    ResetSpillageRuntimeValues;
+    State := swtEXECUTE;
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartTestRepeat',
+      'Сценарный тест: реальный повторный запуск измерения заблокирован, состояние swtEXECUTE установлено имитатором', Name);
+    Exit;
+  end;
+
   ResetSpillageRuntimeValues;
   State := swtSTARTTEST;
 
@@ -5722,6 +5742,16 @@ end;
 
 procedure TWorkTable.StartMonitor;
 begin
+  if IsSimulationMode then
+  begin
+    ResetMeasurementValues;
+    CaptureEnvironmentSimulationBase;
+    State := swtMONITOR;
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMonitor',
+      'Сценарный тест: реальный запуск мониторинга заблокирован, состояние swtMONITOR установлено имитатором', Name);
+    Exit;
+  end;
+
   ResetMeasurementValues;
   CaptureEnvironmentSimulationBase;
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartMonitor',
@@ -5731,11 +5761,27 @@ end;
 
 procedure TWorkTable.StopTest;
 begin
+  if IsSimulationMode then
+  begin
+    State := swtCOMPLETE;
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopTest',
+      'Сценарный тест: реальная остановка измерения заблокирована, состояние swtCOMPLETE установлено имитатором', Name);
+    Exit;
+  end;
+
   FireAction(awtStopTest, 'StopTest', 'Запрошена остановка теста');
 end;
 
 procedure TWorkTable.StopMonitor;
 begin
+  if IsSimulationMode then
+  begin
+    State := swtCONNECTED;
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopMonitor',
+      'Сценарный тест: реальная остановка мониторинга заблокирована, состояние swtCONNECTED установлено имитатором', Name);
+    Exit;
+  end;
+
   DoStopMonitor;
   FireAction(awtStopMonitor, 'StopMonitor', 'Запрошена остановка мониторинга');
 end;
@@ -6557,8 +6603,7 @@ begin
     begin
       for J := 0 to AChannels.Count - 1 do
         if (AChannels[J] <> nil) and AChannels[J].Enabled and
-           (((GroupKey > 0) and (AChannels[J].Group = GroupKey)) or
-            ((GroupKey <= 0) and (J = I))) and
+           (AChannels[J].Group = GroupKey) and
            (AChannels[J].FlowMeter <> nil) and (AChannels[J].FlowMeter.Device <> nil) then
           SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[J].FlowMeter.Device.Qmax, 4);
 
@@ -7080,8 +7125,7 @@ begin
 
   for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
     if IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I]) and
-       (((GroupKey > 0) and (AWorkTable.EtalonChannels[I].Group = GroupKey)) or
-        ((GroupKey <= 0) and (I = ActiveEtalonIndex))) then
+       (AWorkTable.EtalonChannels[I].Group = GroupKey) then
     begin
       ChannelCoef := GetChannelFlowCoef(AWorkTable.EtalonChannels[I]);
       if ChannelCoef > 0 then
