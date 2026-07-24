@@ -17,6 +17,8 @@ checks = {
         'AppliedQ := WT.FlowRate.Value.Value', 'ReadLastSample(WT.FlowRate.Value',
         'FAIL — тестовое значение не передано в рабочий параметр'
     ]),
+    'scenario waits for selected point before injection': 'DeliveryCheck=Skipped; Reason=PointNotSelected' in frm and 'FAIL — штатная FSM не выбрала точку' in frm,
+    'scenario starts virtual time after existing samples': 'MaxExistingSampleTimeMs' in frm and 'VirtualTimeStartMs := Max(TMeterValue.GetMonotonicTimeMs, MaxExistingSampleTimeMs) + 1' in frm,
     'scenario has early no-progress detection': 'FAIL — отсутствует прогресс FSM' in frm and 'NoProgressSteps >= 20' in frm,
     'scenario restores simulation mode and virtual clock': 'TMeterValue.DisableVirtualClock' in frm and 'WT.IsSimulationMode := OldSimulation' in frm,
     'virtual executor blocks real commands with responses': all(x in work for x in [

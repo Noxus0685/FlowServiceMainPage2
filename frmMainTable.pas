@@ -7271,6 +7271,17 @@ var
   AppliedQ: Double;
   LastSampleQ: Double;
   LastSampleTimeMs: Int64;
+  VirtualTimeStartMs: Int64;
+  MaxExistingSampleTimeMs: Int64;
+  PointWaitSteps: Integer;
+  ValuesInjected: Boolean;
+  PointReady: Boolean;
+  OldFlowValue: Double;
+  OldTempValue: Double;
+  OldPressValue: Double;
+  OldFlowSamples: TArray<TMeterValueSample>;
+  OldTempSamples: TArray<TMeterValueSample>;
+  OldPressSamples: TArray<TMeterValueSample>;
   PointNameForLog: string;
   FinalKind: TAutoMeasurementTestResultKind;
   FinalReason: string;
@@ -7309,6 +7320,36 @@ var
     Result := True;
   end;
 
+  function LastSampleTimeOf(AMeter: TMeterValue): Int64;
+  var
+    Value: Double;
+  begin
+    Result := 0;
+    ReadLastSample(AMeter, Value, Result);
+  end;
+
+  procedure SnapshotMeter(AMeter: TMeterValue; out ASamples: TArray<TMeterValueSample>; out AValue: Double);
+  begin
+    AValue := 0;
+    SetLength(ASamples, 0);
+    if AMeter = nil then
+      Exit;
+    AValue := AMeter.Value;
+    ASamples := AMeter.GetStabilitySamples;
+  end;
+
+  procedure RestoreMeter(AMeter: TMeterValue; const ASamples: TArray<TMeterValueSample>; const AValue: Double);
+  var
+    Sample: TMeterValueSample;
+  begin
+    if AMeter = nil then
+      Exit;
+    AMeter.ClearStabilitySamples;
+    AMeter.Value := AValue;
+    for Sample in ASamples do
+      AMeter.AddStabilitySampleManual(Sample.TimeStampMs, Sample.Value);
+  end;
+
 begin
   if FAutoTestRunning then
     Exit;
@@ -7325,6 +7366,10 @@ begin
     RepeatCount := 0;
     LastProgressKey := '';
     NoProgressSteps := 0;
+    PointWaitSteps := 0;
+    ValuesInjected := False;
+    VirtualTimeStartMs := 0;
+    MaxExistingSampleTimeMs := 0;
     if WT = nil then
       FinalReason := 'FAIL — активный TWorkTable отсутствует'
     else if Run = nil then
@@ -7360,9 +7405,23 @@ begin
       OldSimulation := WT.IsSimulationMode;
       OldPoint := WT.CurrentPoint;
       try
+        if WT.FlowRate <> nil then SnapshotMeter(WT.FlowRate.Value, OldFlowSamples, OldFlowValue);
+        if WT.FluidTemp <> nil then SnapshotMeter(WT.FluidTemp.Value, OldTempSamples, OldTempValue);
+        if WT.FluidPress <> nil then SnapshotMeter(WT.FluidPress.Value, OldPressSamples, OldPressValue);
+        MaxExistingSampleTimeMs := 0;
+        if WT.FlowRate <> nil then
+          MaxExistingSampleTimeMs := Max(MaxExistingSampleTimeMs, LastSampleTimeOf(WT.FlowRate.Value));
+        if WT.FluidTemp <> nil then
+          MaxExistingSampleTimeMs := Max(MaxExistingSampleTimeMs, LastSampleTimeOf(WT.FluidTemp.Value));
+        if WT.FluidPress <> nil then
+          MaxExistingSampleTimeMs := Max(MaxExistingSampleTimeMs, LastSampleTimeOf(WT.FluidPress.Value));
+        VirtualTimeStartMs := Max(TMeterValue.GetMonotonicTimeMs, MaxExistingSampleTimeMs) + 1;
         WT.IsSimulationMode := True;
-        TMeterValue.EnableVirtualClock(0);
+        TMeterValue.EnableVirtualClock(VirtualTimeStartMs);
         FAutoTestRealCommandsBlocked := True;
+        Lines.Add(Format('ScenarioStart; InitialStage=%s; InitialWorkTableState=%s; CurrentMonotonicTime=%d; MaxExistingSampleTime=%d; VirtualTimeStart=%d',
+          [TMeasurementRun.MeasurementStateToString(Run.Stage), TWorkTable.WorkTableStateToString(WT.State),
+           VirtualTimeStartMs - 1, MaxExistingSampleTimeMs, VirtualTimeStartMs]));
         Run.Mode := mrmAutomatic;
         Run.CreateSession;
         if (Run.Points = nil) or (Run.Points.Count = 0) then
@@ -7378,18 +7437,50 @@ begin
               FinalReason := 'STOPPED — остановлено пользователем';
               Break;
             end;
-            TMeterValue.AdvanceVirtualClock(1000);
             StageBefore := Run.Stage;
+            TThread.Sleep(1);
             Point := Run.CurrentPoint;
-            if Point <> nil then
+            PointReady := (Point <> nil) and (Run.CurrentPointIndex >= 0) and
+              (Run.Points <> nil) and (Run.CurrentPointIndex < Run.Points.Count) and
+              (Run.Points[Run.CurrentPointIndex] = Point) and
+              (Run.Stage in [msSelectPoint, msSelectEtalon, msSetupPoint, msWaitPointSetup, msWaitStable, msWaitMeasureStart, msMeasure, msWaitMeasureStop, msResultsRead, msSave]);
+            if not PointReady then
             begin
-              TargetQ := Point.Q;
-              TargetT := Point.Temp;
-              TargetP := Point.Pressure;
-            end
-            else begin
-              TargetQ := 0; TargetT := 20; TargetP := 0;
+              Inc(PointWaitSteps);
+              Row.VirtualTimeSec := Integer(TMeterValue.GetMonotonicTimeMs - VirtualTimeStartMs);
+              Row.PointText := '-';
+              Row.RepeatText := '-';
+              Row.StageBefore := TMeasurementRun.MeasurementStateToString(StageBefore);
+              Row.StageAfter := TMeasurementRun.MeasurementStateToString(Run.Stage);
+              Row.WorkTableState := TWorkTable.WorkTableStateToString(WT.State);
+              Row.TargetFlow := 0; Row.ActualFlow := 0;
+              Row.QParameter := 0; Row.QSample := 0; Row.SampleTimeMs := 0; Row.TimeSource := 'Virtual';
+              Row.TargetTemp := 0; Row.ActualTemp := 0; Row.TargetPress := 0; Row.ActualPress := 0;
+              Row.StableText := 'DeliveryCheck=Skipped';
+              Row.VirtualCommand := 'WaitPointSelection';
+              Row.VirtualResponse := TWorkTable.WorkTableStateToString(WT.State);
+              Row.ProgressText := 'WaitingPoint';
+              Row.Reason := 'Reason=PointNotSelected';
+              Row.ExecutorCall := Row.VirtualCommand;
+              Row.CheckText := 'DeliveryCheck=Skipped; Reason=PointNotSelected';
+              AppendStep;
+              if PointWaitSteps >= 40 then
+              begin
+                FinalReason := 'FAIL — штатная FSM не выбрала точку';
+                Break;
+              end;
+              Continue;
             end;
+
+            if PointWaitSteps > 0 then
+              Lines.Add(Format('PointSelected; PointIndex=%d; PointName=%s; TargetQ=%.9f; Stage=%s; VirtualTime=%d',
+                [Run.CurrentPointIndex, Point.Name, Point.Q, TMeasurementRun.MeasurementStateToString(Run.Stage),
+                 TMeterValue.GetMonotonicTimeMs]));
+
+            TMeterValue.AdvanceVirtualClock(1000);
+            TargetQ := Point.Q;
+            TargetT := Point.Temp;
+            TargetP := Point.Pressure;
             Factor := Min(1.0, 0.72 + Step * 0.07);
             case AScenarioIndex of
               3: Factor := 1.25;
@@ -7402,6 +7493,14 @@ begin
             ActualQ := TargetQ * Factor;
             if AScenarioIndex in [2, 6] then
               ActualQ := TargetQ * (1.0 + IfThen(Odd(Step), 0.001, -0.001));
+            if (TargetQ > 0) and SameValue(ActualQ, 0, 1E-12) then
+            begin
+              FinalReason := Format('FAIL — для выбранной точки сформирован нулевой расход; PointIndex=%d; PointName=%s; TargetQ=%.9f; Stage=%s; GeneratedQ=%.9f; Source=SelectedMeasurementRunPoint',
+                [Run.CurrentPointIndex, Point.Name, TargetQ, TMeasurementRun.MeasurementStateToString(Run.Stage), ActualQ]);
+              Break;
+            end;
+            ValuesInjected := True;
+
             if not (AScenarioIndex = 10) then
               ActualT := TargetT + IfThen(Step < 4, -0.5 + Step * 0.15, 0.01);
             if not (AScenarioIndex = 11) then
@@ -7444,9 +7543,9 @@ begin
               AppliedQ := WT.FlowRate.Value.Value;
             if WT.FlowRate <> nil then
               ReadLastSample(WT.FlowRate.Value, LastSampleQ, LastSampleTimeMs);
-            if (not SameValue(ActualQ, AppliedQ, 1E-9)) or
+            if ValuesInjected and ((not SameValue(ActualQ, AppliedQ, 1E-9)) or
                (not SameValue(ActualQ, LastSampleQ, 1E-9)) or
-               (LastSampleTimeMs <> TMeterValue.GetMonotonicTimeMs) then
+               (LastSampleTimeMs <> TMeterValue.GetMonotonicTimeMs)) then
             begin
               if Point <> nil then
                 PointNameForLog := Point.Name
@@ -7479,7 +7578,7 @@ begin
               NoProgressSteps := 0;
             end;
 
-            Row.VirtualTimeSec := Step;
+            Row.VirtualTimeSec := Integer((TMeterValue.GetMonotonicTimeMs - VirtualTimeStartMs) div 1000);
             if Point <> nil then Row.PointText := Format('%d/%d %s', [Run.CurrentPointIndex + 1, Run.Points.Count, Point.Name]) else Row.PointText := '-';
             Row.RepeatText := IntToStr(Run.CurrentRepeat + 1);
             Row.StageBefore := TMeasurementRun.MeasurementStateToString(StageBefore);
@@ -7545,6 +7644,9 @@ begin
           Break;
         TThread.Sleep(1);
       end;
+      if WT.FlowRate <> nil then RestoreMeter(WT.FlowRate.Value, OldFlowSamples, OldFlowValue);
+      if WT.FluidTemp <> nil then RestoreMeter(WT.FluidTemp.Value, OldTempSamples, OldTempValue);
+      if WT.FluidPress <> nil then RestoreMeter(WT.FluidPress.Value, OldPressSamples, OldPressValue);
       TMeterValue.DisableVirtualClock;
       WT.IsSimulationMode := OldSimulation;
       WT.CurrentPoint := OldPoint;
