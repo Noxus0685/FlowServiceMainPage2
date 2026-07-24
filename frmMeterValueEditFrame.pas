@@ -66,8 +66,6 @@ type
     LabelConclusionTitle: TLabel;
     RectangleSignalStable: TRectangle;
     LabelSignalStableValue: TLabel;
-    RectangleStabilityConfirmed: TRectangle;
-    LabelStabilityConfirmedValue: TLabel;
     RectangleCurrentInRange: TRectangle;
     LabelCurrentInRangeValue: TLabel;
     RectangleMeanInRange: TRectangle;
@@ -107,7 +105,6 @@ type
     EditMinSampleCount: TEdit;
     EditWindowDurationSec: TEdit;
     EditMaxSampleAgeSec: TEdit;
-    EditConfirmationTimeSec: TEdit;
     EditExitThresholdFactor: TEdit;
     EditMaxVariation: TEdit;
     EditMaxStdDeviation: TEdit;
@@ -488,7 +485,6 @@ begin
   EditMinSampleCount.OnExit := HandleSettingsChange;
   EditWindowDurationSec.OnExit := HandleSettingsChange;
   EditMaxSampleAgeSec.OnExit := HandleSettingsChange;
-  EditConfirmationTimeSec.OnExit := HandleSettingsChange;
   EditExitThresholdFactor.OnExit := HandleSettingsChange;
   EditMaxVariation.OnExit := HandleSettingsChange;
   EditMaxStdDeviation.OnExit := HandleSettingsChange;
@@ -536,9 +532,8 @@ begin
   SetHintFor('LabelStabilityDisplayUnit', 'Единица, выбранная для отображения текущего TMeterValue. Все размерные значения результатов и соответствующие настройки показываются в этой единице. Внутреннее хранение может выполняться в базовой единице.');
   SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения по заданным критериям.');
   SetHintFor('LabelMinSampleCount', 'Минимальное количество отсчётов в окне анализа для достоверного результата.');
-  SetHintFor('LabelWindowDurationSec', 'Длительность временного окна, по которому рассчитываются размах, отклонение и тренд.');
+  SetHintFor('LabelWindowDurationSec', 'Для стабильности одновременно требуется полная длительность окна и не меньше указанного количества отсчётов.');
   SetHintFor('LabelMaxSampleAgeSec', 'Максимально допустимый возраст последнего отсчёта относительно текущего времени анализа.');
-  SetHintFor('LabelConfirmationTimeSec', 'Время, в течение которого условия стабильности должны оставаться выполненными для подтверждения.');
   SetHintFor('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности, задающий гистерезис выхода.');
   SetHintFor('LabelMaxVariation', 'Максимально допустимый размах значений в окне анализа.');
   SetHintFor('LabelMaxStdDeviation', 'Максимально допустимое стандартное отклонение значений в окне анализа.');
@@ -929,9 +924,8 @@ begin
   SetLabelText('LabelGeneratorNoise', 'Шум ±, ' + UnitName);
   SetLabelText('LabelGeneratorOutlierAmplitude', 'Амплитуда выброса, ' + UnitName);
   SetLabelText('LabelMinSampleCount', 'Минимальное количество отсчётов, шт.');
-  SetLabelText('LabelWindowDurationSec', 'Длительность окна, с');
+  SetLabelText('LabelWindowDurationSec', 'Длительность стабилизации, с');
   SetLabelText('LabelMaxSampleAgeSec', 'Максимальный возраст данных, с');
-  SetLabelText('LabelConfirmationTimeSec', 'Время подтверждения, с');
   SetLabelText('LabelMaxVariation', 'Максимальный размах, ' + UnitName);
   SetLabelText('LabelMaxStdDeviation', 'Максимальное стандартное отклонение, ' + UnitName);
   SetLabelText('LabelMaxTrendRate', 'Максимальная скорость тренда, ' + UnitName + ' за с');
@@ -973,10 +967,9 @@ begin
   SetHintFor('LabelStabilityDisplayUnit', 'Единица, выбранная для отображения текущего TMeterValue. Все размерные значения результатов и соответствующие настройки показываются в этой единице. Внутреннее хранение может выполняться в базовой единице.');
   SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения. При отключении анализ не подтверждает готовность измерения.');
   SetHintFor('ComboBoxSampleSource', 'Выбирает массив для preview-анализа. История TMeterValue использует рабочую историю текущего значения. Тестовый массив не изменяет рабочую историю.');
-  SetLabelHint('LabelMinSampleCount', 'Минимальное число допустимых точек в текущем окне, необходимое для расчёта статистики. Если после исключения выбросов их меньше указанного числа, анализ возвращает недостаточно данных. Единица: шт.');
-  SetLabelHint('LabelWindowDurationSec', 'Длительность интервала истории, используемого для анализа стабильности. Учитываются точки от текущего времени анализа минус указанное число секунд до текущего времени. Более длинное окно сглаживает кратковременные изменения, но медленнее реагирует на смену режима. Единица: с.');
+  SetLabelHint('LabelMinSampleCount', 'Минимальное число отсчётов в текущем окне, необходимое для расчёта статистики; проверяется независимо от длительности окна. Единица: шт.');
+  SetLabelHint('LabelWindowDurationSec', 'Полная длительность непрерывной стабилизации. Для стабильности одновременно требуется заполнить это окно по времени и иметь не меньше минимального количества отсчётов. Единица: с.');
   SetLabelHint('LabelMaxSampleAgeSec', 'Максимально допустимое время с момента последней точки до текущего времени анализа. Если последняя точка старше указанного значения, данные считаются устаревшими. Единица: с.');
-  SetLabelHint('LabelConfirmationTimeSec', 'Минимальное время, в течение которого сигнал должен непрерывно удовлетворять условиям стабильности, прежде чем стабильность будет подтверждена. Точки этого периода отмечаются в таблице как “Стаб”. Единица: с.');
   SetLabelHint('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности. Большее значение создаёт гистерезис и снижает частые переключения, меньшее быстрее снимает подтверждение. Безразмерная величина.');
   SetLabelHint('LabelMaxVariation', 'Максимально допустимый размах между минимумом и максимумом в использованных точках. Единица: ' + UnitName + '. Чем меньше порог, тем строже проверка стабильности.');
   SetLabelHint('LabelMaxStdDeviation', 'Стандартное отклонение характеризует абсолютный разброс значений и имеет ту же физическую единицу, что и измеряемая величина. Это не процент, если отдельно не указано относительное стандартное отклонение. Единица: ' + UnitName + '.');
@@ -1495,7 +1488,6 @@ end;
 procedure TFrameMeterValueEdit.ResetConclusionIndicators;
 begin
   SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, '—', COLOR_NONE);
-  SetConclusionIndicator(RectangleStabilityConfirmed, LabelStabilityConfirmedValue, '—', COLOR_NONE);
   SetConclusionIndicator(RectangleCurrentInRange, LabelCurrentInRangeValue, '—', COLOR_NONE);
   SetConclusionIndicator(RectangleMeanInRange, LabelMeanInRangeValue, '—', COLOR_NONE);
   SetConclusionIndicator(RectangleForecastInRange, LabelForecastInRangeValue, '—', COLOR_NONE);
@@ -1516,7 +1508,6 @@ begin
   if mvsfrNoData in AInfo.FailReasons then
   begin
     SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, '—', COLOR_NONE);
-    SetConclusionIndicator(RectangleStabilityConfirmed, LabelStabilityConfirmedValue, '—', COLOR_NONE);
     SetConclusionIndicator(RectangleCurrentInRange, LabelCurrentInRangeValue, '—', COLOR_NONE);
     SetConclusionIndicator(RectangleMeanInRange, LabelMeanInRangeValue, '—', COLOR_NONE);
     SetConclusionIndicator(RectangleForecastInRange, LabelForecastInRangeValue, '—', COLOR_NONE);
@@ -1530,13 +1521,6 @@ begin
     SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, 'НЕТ', COLOR_WARNING)
   else
     SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, 'НЕТ', COLOR_WARNING);
-
-  if AInfo.IsStabilityConfirmed then
-    SetConclusionIndicator(RectangleStabilityConfirmed, LabelStabilityConfirmedValue, 'ДА', COLOR_COMPLETED)
-  else if AInfo.IsSignalStable and (mvsfrWaitingForConfirmation in AInfo.FailReasons) then
-    SetConclusionIndicator(RectangleStabilityConfirmed, LabelStabilityConfirmedValue, 'НЕТ', COLOR_RUNNING)
-  else
-    SetConclusionIndicator(RectangleStabilityConfirmed, LabelStabilityConfirmedValue, 'НЕТ', COLOR_WARNING);
 
   if AInfo.HasCurrentValue then
   begin
@@ -1573,7 +1557,7 @@ begin
   else if mvsfrInvalidSettings in AInfo.FailReasons then
     SuitableColor := COLOR_INVALID
   else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or
-          (mvsfrInsufficientWindow in AInfo.FailReasons) then
+          (mvsfrWindowNotFilled in AInfo.FailReasons) then
     SuitableColor := COLOR_WARNING
   else if mvsfrStaleData in AInfo.FailReasons then
     SuitableColor := COLOR_INVALID
@@ -1586,8 +1570,6 @@ begin
       (mvsfrForecastOutOfRange in AInfo.FailReasons);
     if RangeFailure then
       SuitableColor := COLOR_INVALID
-    else if mvsfrWaitingForConfirmation in AInfo.FailReasons then
-      SuitableColor := COLOR_RUNNING
     else
       SuitableColor := COLOR_INVALID;
   end;
@@ -1876,8 +1858,6 @@ var
       FTestSettings.WindowDurationSec := 10;
     if FTestSettings.MaxSampleAgeSec <= 0 then
       FTestSettings.MaxSampleAgeSec := 3;
-    if FTestSettings.ConfirmationTimeSec < 0 then
-      FTestSettings.ConfirmationTimeSec := 3;
     if FTestSettings.ExitThresholdFactor < 1 then
       FTestSettings.ExitThresholdFactor := 1.2;
     if FTestSettings.OutlierFactor <= 0 then
@@ -2045,7 +2025,6 @@ begin
           FTestSettings.MaxStdDeviation := DisplayDeltaToBase('0.01');
           FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.001');
           FTestSettings.MaxSampleAgeSec := 3;
-          FTestSettings.ConfirmationTimeSec := 3;
           for I := 0 to Count - 1 do
             AddSamplePoint(I, BaseValue);
         end;
@@ -2685,10 +2664,6 @@ begin
     Lines.Add('Скорость тренда: ' + EditResultTrendRate.Text + ' за с.');
     Lines.Add('Направление тренда: ' + TrendDirectionText(AInfo.TrendDirection, AInfo.HasTrend) + '.');
     Lines.Add('Предварительная стабильность: ' + BoolText(AInfo.IsSignalStable) + '.');
-    Lines.Add('Подтверждение стабильности: ' + BoolText(AInfo.IsStabilityConfirmed) + '.');
-    if AInfo.IsSignalStable and not AInfo.IsStabilityConfirmed then
-      Lines.Add('Время подтверждения: ' + FormatInfoFloat(AInfo.StableCandidateDurationSec, True, 2) +
-        ' из ' + FormatInfoFloat(FTestSettings.ConfirmationTimeSec, True, 2) + ' с.');
 
     Lines.Add('');
     Lines.Add('Прогноз через ' + FormatInfoFloat(FTestSettings.ForecastHorizonSec, AInfo.HasForecast, 2) + ' с: ' +
@@ -2764,7 +2739,6 @@ begin
     EditMinSampleCount.Text := IntToStr(FTestSettings.MinSampleCount);
     EditWindowDurationSec.Text := FormatFloat('0.########', FTestSettings.WindowDurationSec);
     EditMaxSampleAgeSec.Text := FormatFloat('0.########', FTestSettings.MaxSampleAgeSec);
-    EditConfirmationTimeSec.Text := FormatFloat('0.########', FTestSettings.ConfirmationTimeSec);
     EditExitThresholdFactor.Text := FormatFloat('0.########', FTestSettings.ExitThresholdFactor);
     EditMaxVariation.Text := BaseDeltaToDisplayText(FTestSettings.MaxVariation);
     EditMaxStdDeviation.Text := BaseDeltaToDisplayText(FTestSettings.MaxStdDeviation);
@@ -2814,7 +2788,6 @@ begin
   TryReadInteger(EditMinSampleCount.Text, ASettings.MinSampleCount);
   TryReadFloat(EditWindowDurationSec.Text, ASettings.WindowDurationSec);
   TryReadFloat(EditMaxSampleAgeSec.Text, ASettings.MaxSampleAgeSec);
-  TryReadFloat(EditConfirmationTimeSec.Text, ASettings.ConfirmationTimeSec);
   TryReadFloat(EditExitThresholdFactor.Text, ASettings.ExitThresholdFactor);
   ASettings.MaxVariation := DisplayDeltaToBase(EditMaxVariation.Text);
   ASettings.MaxStdDeviation := DisplayDeltaToBase(EditMaxStdDeviation.Text);
@@ -2851,7 +2824,6 @@ begin
     SameValue(ALeft.ForecastHorizonSec, ARight.ForecastHorizonSec, 1E-9) and
     SameValue(ALeft.MaxOutlierFraction, ARight.MaxOutlierFraction, 1E-9) and
     SameValue(ALeft.OutlierFactor, ARight.OutlierFactor, 1E-9) and
-    SameValue(ALeft.ConfirmationTimeSec, ARight.ConfirmationTimeSec, 1E-9) and
     SameValue(ALeft.ExitThresholdFactor, ARight.ExitThresholdFactor, 1E-9) and
     SameValue(ALeft.TargetValue, ARight.TargetValue, 1E-9) and
     SameValue(ALeft.TargetAccuracyPlusPercent, ARight.TargetAccuracyPlusPercent, 1E-9) and
@@ -2949,7 +2921,7 @@ begin
   AErrorText := '';
 
   if (EditMinSampleCount = nil) or (EditWindowDurationSec = nil) or
-     (EditMaxSampleAgeSec = nil) or (EditConfirmationTimeSec = nil) or
+     (EditMaxSampleAgeSec = nil) or
      (EditExitThresholdFactor = nil) or (EditMaxVariation = nil) or
      (EditMaxStdDeviation = nil) or (EditMaxTrendRate = nil) or
      (EditMaxOutlierFractionPercent = nil) or (EditOutlierFactor = nil) or
@@ -2966,11 +2938,9 @@ begin
   else if IntValue < 1 then
     AErrorText := 'Минимальное количество отсчётов должно быть не меньше 1.'
   else if (not TryReadFloat(EditWindowDurationSec.Text, DoubleValue)) or (DoubleValue <= 0) then
-    AErrorText := 'Длительность окна должна быть положительным числом.'
+    AErrorText := 'Длительность стабилизации должна быть положительным числом.'
   else if (not TryReadFloat(EditMaxSampleAgeSec.Text, DoubleValue)) or (DoubleValue < 0) then
     AErrorText := 'Максимальный возраст данных не может быть отрицательным.'
-  else if (not TryReadFloat(EditConfirmationTimeSec.Text, DoubleValue)) or (DoubleValue < 0) then
-    AErrorText := 'Время подтверждения не может быть отрицательным.'
   else if (not TryReadFloat(EditExitThresholdFactor.Text, DoubleValue)) or (DoubleValue < 1) then
     AErrorText := 'Коэффициент порога выхода должен быть не меньше 1.'
   else if (not TryReadFloat(EditMaxVariation.Text, DoubleValue)) or (DoubleValue < 0) then

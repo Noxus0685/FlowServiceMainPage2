@@ -1860,14 +1860,16 @@ begin
         StableInfo.LowerLimit := TargetValue - AllowedDeviation;
         StableInfo.UpperLimit := TargetValue + AllowedDeviation;
 
-        ValueFlow.AnalyzeStabilityForMeasurement(FStabilityDataStartMs, SignalInfo);
+        Settings := ValueFlow.StabilitySettings;
+        Settings.WindowDurationSec := Max(0.001, FRequiredDeviceStabilizationSec);
+        ValueFlow.AnalyzeStabilityForMeasurement(FStabilityDataStartMs, Settings, SignalInfo);
         CurrentInRange := (ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit);
         MeanInRange := (SignalInfo.MeanValue >= StableInfo.LowerLimit) and (SignalInfo.MeanValue <= StableInfo.UpperLimit);
         ForecastInRange := (SignalInfo.ForecastValue >= StableInfo.LowerLimit) and (SignalInfo.ForecastValue <= StableInfo.UpperLimit);
         SignalInfo.IsCurrentValueInRange := CurrentInRange;
         SignalInfo.IsMeanValueInRange := MeanInRange;
         SignalInfo.IsForecastInRange := ForecastInRange;
-        StableReady := SignalInfo.IsSignalStable and SignalInfo.IsStabilityConfirmed;
+        StableReady := SignalInfo.IsSignalStable;
         RangeReady := CheckRangeRequirements(Settings, SignalInfo);
         Ready := StableReady;
         if RequireRange then
@@ -2032,11 +2034,12 @@ begin
           GroupFlows.Add(GroupKey, ActualValue);
 
         Settings := StableValue.StabilitySettings;
-        StableValue.AnalyzeStabilityForMeasurement(FStabilityDataStartMs, SignalInfo);
+        Settings.WindowDurationSec := Max(0.001, FRequiredDeviceStabilizationSec);
+        StableValue.AnalyzeStabilityForMeasurement(FStabilityDataStartMs, Settings, SignalInfo);
         SignalInfo.IsCurrentValueInRange := (ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit);
         SignalInfo.IsMeanValueInRange := (SignalInfo.MeanValue >= StableInfo.LowerLimit) and (SignalInfo.MeanValue <= StableInfo.UpperLimit);
         SignalInfo.IsForecastInRange := (SignalInfo.ForecastValue >= StableInfo.LowerLimit) and (SignalInfo.ForecastValue <= StableInfo.UpperLimit);
-        ChannelStable := SignalInfo.IsSignalStable and SignalInfo.IsStabilityConfirmed;
+        ChannelStable := SignalInfo.IsSignalStable;
         ChannelStable := ChannelStable and
           ((not Settings.RequireCurrentValueInRange) or SignalInfo.IsCurrentValueInRange) and
           ((not Settings.RequireMeanValueInRange) or SignalInfo.IsMeanValueInRange) and
@@ -2045,7 +2048,7 @@ begin
         AllChannelsStable := AllChannelsStable and ChannelStable;
         AddDiagnosticEvent(Format('EtalonChannelReady=%s; UUID=%s; Name=%s; Group=%d; Actual=%.6f; Target=%.6f; StableReady=%s; RangeReady=%s',
           [BoolToStr(ChannelStable, True), Channel.UUID, Channel.Name, Channel.Group, ActualValue, TargetValue,
-           BoolToStr(SignalInfo.IsSignalStable and SignalInfo.IsStabilityConfirmed, True),
+           BoolToStr(SignalInfo.IsSignalStable, True),
            BoolToStr(((not Settings.RequireCurrentValueInRange) or SignalInfo.IsCurrentValueInRange) and
              ((not Settings.RequireMeanValueInRange) or SignalInfo.IsMeanValueInRange) and
              ((not Settings.RequireForecastInRange) or SignalInfo.IsForecastInRange), True)]));
@@ -3655,8 +3658,7 @@ var
       Exit;
     Settings := AMeterValue.StabilitySettings;
     MinHistorySec := Max(Settings.WindowDurationSec, Max(0.0, Settings.MinSampleCount - 1.0));
-    NeedSec := MinHistorySec + Settings.ConfirmationTimeSec +
-      FRequiredDeviceStabilizationSec + SETUP_MARGIN_SEC;
+    NeedSec := MinHistorySec + FRequiredDeviceStabilizationSec + SETUP_MARGIN_SEC;
     Result := Max(Result, Ceil(NeedSec));
   end;
 begin
@@ -3933,10 +3935,7 @@ begin
     FLastDeviceStableState := True;
 
     DeviceElapsedSec := (CurrentTick - FDevicesStableSinceMs) / 1000;
-    if FRequireAutoStabilization then
-      ReadyToMeasure := DevicesStable
-    else
-      ReadyToMeasure := DevicesStable and (DeviceElapsedSec >= FRequiredDeviceStabilizationSec);
+    ReadyToMeasure := DevicesStable;
     DeviceElapsedSecond := Trunc(DeviceElapsedSec);
 
     if (FRequiredDeviceStabilizationSec > 0) and (DeviceElapsedSecond <> FLastStableProgressSecond) then
