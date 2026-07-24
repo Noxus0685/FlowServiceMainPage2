@@ -143,3 +143,9 @@ __astcache/
 # Личные сертификаты
 *.pfx
 *.p12
+
+# Local/runtime/build folders
+/Keys/
+/Win32/
+/Win64/
+/__history/
