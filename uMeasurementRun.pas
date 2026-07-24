@@ -275,6 +275,8 @@ type
     FSetupTargetFlowLS: Double;
     FSetupStartedMs: Int64;
     FStabilityDataStartMs: Int64;
+    FLastWaitPointSetupLogMs: Int64;
+    FLastWaitPointSetupLogState: EStateWorkTable;
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
     procedure SetStage(const ANewStage: EMeasurementState);
@@ -348,6 +350,7 @@ type
     function GetSelectedEtalonUUID: string;
     function IsSetupPointSynchronized(out AReason: string): Boolean;
     function HasNewStabilityDataSince(const ATimeStampMs: Int64; out AFirstSampleTimeMs: Int64): Boolean;
+    function BuildPointSetupIdentityLog: string;
     procedure ResetPointSetupState;
     procedure StartNewStabilityAttempt;
 
@@ -707,6 +710,8 @@ begin
   FSetupTargetFlowLS := 0;
   FSetupStartedMs := 0;
   FStabilityDataStartMs := 0;
+  FLastWaitPointSetupLogMs := 0;
+  FLastWaitPointSetupLogState := swtNONE;
 end;
 
 function TMeasurementRun.BuildPointSelectionLog(APoint: TDevicePoint): string;
@@ -1083,7 +1088,10 @@ begin
     if FMode = mrmAutomatic then
       EnterSelectPoint
     else
+    begin
+      SetStopReason(msrError);
       SetStage(msDone);
+    end;
   end;
 end;
 
@@ -1418,8 +1426,13 @@ procedure TMeasurementRun.EnterDone;
 begin
   if (GetCurrentPoint <> nil) and (GetCurrentPoint.Status = mptsResultsRead) then
     SetCurrentPointStatus(mptsDone);
-  AddDiagnosticEvent('meAllDone');
-  FireEvent(meAllDone);
+  if (FStopReason = msrNone) then
+  begin
+    AddDiagnosticEvent('meAllDone');
+    FireEvent(meAllDone);
+  end
+  else
+    AddDiagnosticEvent('Run finished with error; meAllDone suppressed');
   if FThread <> nil then
     FThread.Terminate;
 end;
@@ -1981,12 +1994,27 @@ begin
   SetCurrentPointStatus(AStatus);
   FireEvent(AEvent, AError);
   FCurrentRepeat := 0;
-  SetStopReason(msrError);
 
-  if FMode = mrmAutomatic then
-    SetStage(msSelectPoint)
+  if (FMode = mrmAutomatic) and (AStatus = mptsSetupError) then
+  begin
+    Inc(FAttempt);
+    if FAttempt < FMaxAttemptCount then
+    begin
+      AddDiagnosticEvent(Format('Retry setup point: Attempt=%d of %d; %s', [FAttempt + 1, FMaxAttemptCount, BuildPointSetupIdentityLog]));
+      ResetPointSetupState;
+      SetStage(msSetupPoint);
+    end
+    else
+    begin
+      SetStopReason(msrError);
+      SetStage(msDone);
+    end;
+  end
   else
+  begin
+    SetStopReason(msrError);
     SetStage(msDone);
+  end;
 end;
 
 
@@ -3242,10 +3270,14 @@ begin
   FSetupTargetFlowLS := APoint.Q;
   FSetupStartedMs := TMeterValue.GetMonotonicTimeMs;
   FPointSetupCommandSent := True;
+  FWorkTable.InstalledMeasurementPointUUID := FSetupPointUUID;
+  FWorkTable.InstalledMeasurementPointIndex := FSetupPointIndex;
+  FWorkTable.InstalledMeasurementTargetFlowLS := FSetupTargetFlowLS;
+
   AddDiagnosticEvent(Format(
-    'SetupPoint command: PointIndex=%d; PointUUID=%s; PointName=%s; TargetFlowLS=%.6f; SelectedEtalonUUID=%s; WorkTableState=%s; Attempt=%d; CommandSent=%s',
+    'SetupPoint command: PointIndex=%d; MeasurementPointUUID=%s; PointName=%s; TargetFlowLS=%.6f; SelectedEtalonUUID=%s; WorkTableState=%s; Attempt=%d; CommandSent=%s; %s',
     [FSetupPointIndex, FSetupPointUUID, APoint.Name, FSetupTargetFlowLS, GetSelectedEtalonUUID,
-     TWorkTable.WorkTableStateToString(FWorkTable.State), FAttempt, BoolToStr(FPointSetupCommandSent, True)]));
+     TWorkTable.WorkTableStateToString(FWorkTable.State), FAttempt, BoolToStr(FPointSetupCommandSent, True), BuildPointSetupIdentityLog]));
 
   if (APoint.Q >= 0) and (FWorkTable.FlowRate <> nil) then
   begin
@@ -3338,32 +3370,72 @@ end;
 function TMeasurementRun.IsSetupPointSynchronized(out AReason: string): Boolean;
 var
   Point: TDevicePoint;
-  RuntimeUUID: string;
   RuntimeTarget: Double;
 begin
   Result := False;
   AReason := '';
   Point := GetCurrentPoint;
   if Point = nil then
-    AReason := 'CurrentPoint=nil'
+    AReason := 'MeasurementRunPoint=nil'
+  else if FWorkTable = nil then
+    AReason := 'WorkTable=nil'
   else if not FPointSetupCommandSent then
     AReason := 'PointSetupCommandNotSent'
+  else if FWorkTable.State <> swtMONITOR then
+    AReason := 'WorkTableState=' + TWorkTable.WorkTableStateToString(FWorkTable.State)
   else if FCurrentPointIndex <> FSetupPointIndex then
-    AReason := Format('CurrentPointIndex=%d; SetupPointIndex=%d', [FCurrentPointIndex, FSetupPointIndex])
+    AReason := Format('MeasurementRunPointIndex=%d; SetupPointIndex=%d', [FCurrentPointIndex, FSetupPointIndex])
   else if Point.UUID <> FSetupPointUUID then
-    AReason := Format('CurrentPointUUID=%s; SetupPointUUID=%s', [Point.UUID, FSetupPointUUID])
+    AReason := Format('MeasurementRunPointUUID=%s; SetupPointUUID=%s', [Point.UUID, FSetupPointUUID])
+  else if FWorkTable.InstalledMeasurementPointIndex <> FSetupPointIndex then
+    AReason := Format('InstalledMeasurementPointIndex=%d; SetupPointIndex=%d', [FWorkTable.InstalledMeasurementPointIndex, FSetupPointIndex])
+  else if FWorkTable.InstalledMeasurementPointUUID <> FSetupPointUUID then
+    AReason := Format('InstalledMeasurementPointUUID=%s; SetupPointUUID=%s', [FWorkTable.InstalledMeasurementPointUUID, FSetupPointUUID])
+  else if not SameValue(FWorkTable.InstalledMeasurementTargetFlowLS, FSetupTargetFlowLS, 1E-6) then
+    AReason := Format('InstalledMeasurementTargetFlowLS=%.6f; SetupTargetFlowLS=%.6f', [FWorkTable.InstalledMeasurementTargetFlowLS, FSetupTargetFlowLS])
   else begin
-    RuntimeUUID := '';
-    if (FWorkTable <> nil) and (FWorkTable.CurrentPoint <> nil) then
-      RuntimeUUID := FWorkTable.CurrentPoint.UUID;
     RuntimeTarget := GetRuntimeTargetFlowLS;
-    if RuntimeUUID <> FSetupPointUUID then
-      AReason := Format('RuntimePointUUID=%s; SetupPointUUID=%s', [RuntimeUUID, FSetupPointUUID])
-    else if not SameValue(RuntimeTarget, FSetupTargetFlowLS, 1E-6) then
-      AReason := Format('RuntimeTargetFlowLS=%.6f; SetupTargetFlowLS=%.6f', [RuntimeTarget, FSetupTargetFlowLS])
+    if not SameValue(RuntimeTarget, FSetupTargetFlowLS, 1E-6) then
+      AReason := Format('TargetFlowRuntimeLS=%.6f; TargetFlowSetupLS=%.6f', [RuntimeTarget, FSetupTargetFlowLS])
     else
       Result := True;
   end;
+
+  if AReason <> '' then
+    AReason := AReason + '; ' + BuildPointSetupIdentityLog;
+end;
+
+function TMeasurementRun.BuildPointSetupIdentityLog: string;
+var
+  Point: TDevicePoint;
+  MeasurementUUID: string;
+  RuntimeUUID: string;
+  InstalledUUID: string;
+  InstalledIndex: Integer;
+  WorkTableStateText: string;
+begin
+  Point := GetCurrentPoint;
+  MeasurementUUID := '';
+  if Point <> nil then
+    MeasurementUUID := Point.UUID;
+
+  RuntimeUUID := '';
+  InstalledUUID := '';
+  InstalledIndex := -1;
+  WorkTableStateText := '<nil>';
+  if FWorkTable <> nil then
+  begin
+    InstalledUUID := FWorkTable.InstalledMeasurementPointUUID;
+    InstalledIndex := FWorkTable.InstalledMeasurementPointIndex;
+    WorkTableStateText := TWorkTable.WorkTableStateToString(FWorkTable.State);
+    if FWorkTable.CurrentPoint <> nil then
+      RuntimeUUID := FWorkTable.CurrentPoint.UUID;
+  end;
+
+  Result := Format('MeasurementRunPointIndex=%d; MeasurementRunPointUUID=%s; SetupPointIndex=%d; SetupPointUUID=%s; InstalledMeasurementPointIndex=%d; InstalledMeasurementPointUUID=%s; WorkTableRuntimePointUUID=%s; TargetFlowSetupLS=%.6f; TargetFlowRuntimeLS=%.6f; WorkTableState=%s',
+    [FCurrentPointIndex, MeasurementUUID, FSetupPointIndex, FSetupPointUUID,
+     InstalledIndex, InstalledUUID, RuntimeUUID, FSetupTargetFlowLS,
+     GetRuntimeTargetFlowLS, WorkTableStateText]);
 end;
 
 function TMeasurementRun.HasNewStabilityDataSince(const ATimeStampMs: Int64;
@@ -3385,7 +3457,7 @@ begin
       Continue;
     Samples := Channel.FlowMeter.ValueFlow.GetStabilitySamples;
     for J := 0 to High(Samples) do
-      if Samples[J].TimeStampMs >= ATimeStampMs then
+      if Samples[J].TimeStampMs > ATimeStampMs then
       begin
         AFirstSampleTimeMs := Samples[J].TimeStampMs;
         Exit(True);
@@ -3401,6 +3473,8 @@ begin
   FSetupTargetFlowLS := 0;
   FSetupStartedMs := 0;
   FStabilityDataStartMs := 0;
+  FLastWaitPointSetupLogMs := 0;
+  FLastWaitPointSetupLogState := swtNONE;
 end;
 
 procedure TMeasurementRun.StartNewStabilityAttempt;
@@ -3492,8 +3566,12 @@ begin
       ContinueAfterPointError(mptsSetupError, mePointNotSet, BuildError(1211,
         'Мониторинг не запустился после установки точки'))
     else
-      AddDiagnosticEvent('WaitPointSetup: waiting swtMONITOR; WorkTableState=' +
-        TWorkTable.WorkTableStateToString(FWorkTable.State));
+      if (FLastWaitPointSetupLogState <> FWorkTable.State) or (CurrentMs - FLastWaitPointSetupLogMs >= 1000) then
+      begin
+        FLastWaitPointSetupLogState := FWorkTable.State;
+        FLastWaitPointSetupLogMs := CurrentMs;
+        AddDiagnosticEvent('WaitPointSetup: waiting swtMONITOR; ' + BuildPointSetupIdentityLog);
+      end;
     Exit;
   end;
 
@@ -3507,7 +3585,12 @@ begin
 
   if not HasNewStabilityDataSince(FSetupStartedMs, FirstSampleTimeMs) then
   begin
-    AddDiagnosticEvent('WaitPointSetup: history is not updated yet');
+    CurrentMs := TMeterValue.GetMonotonicTimeMs;
+    if CurrentMs - FLastWaitPointSetupLogMs >= 1000 then
+    begin
+      FLastWaitPointSetupLogMs := CurrentMs;
+      AddDiagnosticEvent('WaitPointSetup: history is not updated yet; ' + BuildPointSetupIdentityLog);
+    end;
     Exit;
   end;
 

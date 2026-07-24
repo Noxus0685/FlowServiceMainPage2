@@ -614,6 +614,9 @@ type
   private
 
   FCurrentPoint:  TDevicePoint;
+  FInstalledMeasurementPointUUID: string;
+  FInstalledMeasurementPointIndex: Integer;
+  FInstalledMeasurementTargetFlowLS: Double;
   FParameterObserver: IEventObserver;
 
   procedure SetState(const ANewState: EStateWorkTable);
@@ -726,6 +729,9 @@ type
     property LimitImpSet: Integer read FLimitImpSet write FLimitImpSet;
     property LimitVolumeSet: Double read FLimitVolumeSet write FLimitVolumeSet;
     property CurrentPoint:  TDevicePoint read FCurrentPoint write FCurrentPoint;
+    property InstalledMeasurementPointUUID: string read FInstalledMeasurementPointUUID write FInstalledMeasurementPointUUID;
+    property InstalledMeasurementPointIndex: Integer read FInstalledMeasurementPointIndex write FInstalledMeasurementPointIndex;
+    property InstalledMeasurementTargetFlowLS: Double read FInstalledMeasurementTargetFlowLS write FInstalledMeasurementTargetFlowLS;
 
     property Repeats: Integer read FRepeats write FRepeats;
     property &Repeat: Integer read FRepeat write FRepeat;
@@ -2061,6 +2067,9 @@ begin
   FSimulationTargetFlowBase := 0;
   FDeviceSimulationFlowRate := 0;
   FHasDeviceSimulationFlowRate := False;
+  FInstalledMeasurementPointUUID := '';
+  FInstalledMeasurementPointIndex := -1;
+  FInstalledMeasurementTargetFlowLS := 0;
 
   FCurrentPoint := TDevicePoint.Create(0);
   FCurrentPoint.LimitTime := -1;
@@ -5315,6 +5324,18 @@ end;
 procedure TWorkTable.MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint;
   APointIndex: Integer);
 begin
+  FInstalledMeasurementPointIndex := APointIndex;
+  if APoint <> nil then
+  begin
+    FInstalledMeasurementPointUUID := APoint.UUID;
+    FInstalledMeasurementTargetFlowLS := APoint.Q;
+  end
+  else
+  begin
+    FInstalledMeasurementPointUUID := '';
+    FInstalledMeasurementTargetFlowLS := 0;
+  end;
+
   if (FCurrentPoint <> nil) and (APoint <> nil) then
     FCurrentPoint.Assign(APoint, True);
 
