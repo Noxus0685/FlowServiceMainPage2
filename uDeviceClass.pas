@@ -106,6 +106,9 @@ type
     SourcePointName: string;
     SourceFlowRate: Double;
     SourceDeviceQmaxLS: Double;
+    StoredSourcePointQLS: Double;
+    CalculatedSourceTargetQLS: Double;
+    SelectedSourceTargetQLS: Double;
     SourceTargetQLS: Double;
     SourceErrorPercent: Double;
     SourcePauseSec: Double;
