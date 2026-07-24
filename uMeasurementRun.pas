@@ -2374,7 +2374,8 @@ procedure TMeasurementRun.CreateSession;
 var
   Point: TDevicePoint;
 begin
-  FPoints.Clear;
+  if FPoints.Count<=0 then
+    FPoints.Clear;
   if FWorkTable = nil then
     Exit;
 
@@ -2496,8 +2497,8 @@ var
 begin
   if FPoints = nil then
     FPoints := TObjectList<TDevicePoint>.Create(True);
-
-  FPoints.Clear;
+  if FPoints.Count<=0 then
+    FPoints.Clear;
   if FWorkTable = nil then
     Exit;
 

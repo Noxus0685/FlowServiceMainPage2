@@ -1,0 +1,174 @@
+object FrameCalibrCoefs: TFrameCalibrCoefs
+  Size.Width = 850.000000000000000000
+  Size.Height = 619.000000000000000000
+  Size.PlatformDefault = False
+  object Layout1: TLayout
+    Align = Client
+    Size.Width = 850.000000000000000000
+    Size.Height = 619.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    object Grid1: TGrid
+      Align = Client
+      CanFocus = True
+      ClipChildren = True
+      Size.Width = 850.000000000000000000
+      Size.Height = 328.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      Viewport.Width = 830.000000000000000000
+      Viewport.Height = 287.000000000000000000
+      object CheckColumnCoefEnable: TCheckColumn
+        Header = #1042#1082#1083
+        HeaderSettings.TextSettings.WordWrap = False
+      end
+      object StringColumnCoefName: TStringColumn
+        Header = #1048#1084#1103
+        HeaderSettings.TextSettings.WordWrap = False
+        Size.Width = 36.000000000000000000
+      end
+      object StringColumnCoefEtalonValue: TStringColumn
+        Header = #1069#1090#1072#1083#1086#1085
+        HeaderSettings.TextSettings.WordWrap = False
+        Size.Width = 92.000000000000000000
+      end
+      object StringColumnCoefDeviceValue: TStringColumn
+        Header = #1055#1088#1080#1073#1086#1088' '#1080#1089#1093
+        HeaderSettings.TextSettings.WordWrap = False
+      end
+      object StringColumnCoefInitError: TStringColumn
+        Header = #1055#1086#1075#1088' '#1080#1089#1093', %'
+        HeaderSettings.TextSettings.WordWrap = False
+      end
+      object StringColumnCoefError: TStringColumn
+        Header = #1055#1086#1075#1088', '#1088#1072#1089#1095
+        HeaderSettings.TextSettings.WordWrap = False
+      end
+      object StringColumnCoefK: TStringColumn
+        Header = #1050#1086#1101#1092'-'#1085#1090' K'
+        HeaderSettings.TextSettings.WordWrap = False
+      end
+      object StringColumnCoefb: TStringColumn
+        Header = #1050#1086#1101#1092'-'#1085#1090' b'
+        HeaderSettings.TextSettings.WordWrap = False
+      end
+      object StringColumnCoefFrom: TStringColumn
+        Header = #1043#1088#1072#1085#1080#1094#1072' '#1076#1086
+        HeaderSettings.TextSettings.WordWrap = False
+      end
+      object StringColumnCoefTo: TStringColumn
+        Header = #1043#1088#1072#1085#1080#1094#1072' '#1087#1086#1089#1083#1077
+        HeaderSettings.TextSettings.WordWrap = False
+      end
+    end
+    object ToolBar1: TToolBar
+      Align = MostTop
+      Size.Width = 850.000000000000000000
+      Size.Height = 40.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 1
+      object SpeedButtonCoefsClear: TSpeedButton
+        Align = Left
+        Size.Width = 57.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'pagecurltoolbutton'
+        Text = 'SpeedButtonCoefsClear'
+        TextSettings.Trimming = None
+      end
+      object SpeedButtonCoefDelete: TSpeedButton
+        Align = Left
+        Position.X = 57.000000000000000000
+        Size.Width = 49.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'trashtoolbutton'
+        Text = 'SpeedButtonCoefDelete'
+        TextSettings.Trimming = None
+      end
+      object SpeedButtonCefAdd: TSpeedButton
+        Align = Left
+        Position.X = 106.000000000000000000
+        Size.Width = 56.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'additembutton'
+        Text = 'SpeedButtonCefAdd'
+        TextSettings.Trimming = None
+      end
+      object SpeedButtonCoefsRefresh: TSpeedButton
+        Align = Left
+        Position.X = 162.000000000000000000
+        Size.Width = 64.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'refreshtoolbutton'
+        Text = 'SpeedButtonCoefsRefresh'
+        TextSettings.Trimming = None
+      end
+      object ComboBoxUnitsResult: TComboBox
+        Touch.InteractiveGestures = [LongTap, DoubleTap]
+        Align = Left
+        Items.Strings = (
+          #1084'3/'#1095)
+        ItemIndex = 0
+        ItemHeight = 19.000000000000000000
+        Margins.Left = 10.000000000000000000
+        Margins.Top = 5.000000000000000000
+        Margins.Right = 10.000000000000000000
+        Margins.Bottom = 5.000000000000000000
+        Position.X = 236.000000000000000000
+        Position.Y = 5.000000000000000000
+        Size.Width = 103.000000000000000000
+        Size.Height = 30.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 0
+      end
+    end
+    object Layout2: TLayout
+      Align = Bottom
+      Position.Y = 378.000000000000000000
+      Size.Width = 850.000000000000000000
+      Size.Height = 241.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 2
+      object Chart1: TChart
+        Foot.Font.StyleExt = {00040000000200000004000000}
+        Legend.Title.Font.StyleExt = {00070000000000000004000000}
+        SubFoot.Font.StyleExt = {00040000000200000004000000}
+        Title.Text.Strings = (
+          'TChart')
+        Zoom.Brush.Kind = None
+        Zoom.Pen.Fill.Color = claSilver
+        Align = Client
+        TabOrder = 0
+        Size.Width = 702.000000000000000000
+        Size.Height = 241.000000000000000000
+        Size.PlatformDefault = False
+        ColorPaletteIndex = 13
+      end
+      object Layout3: TLayout
+        Align = Right
+        Position.X = 702.000000000000000000
+        Size.Width = 148.000000000000000000
+        Size.Height = 241.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 1
+        object ComboBox1: TComboBox
+          Position.X = 16.000000000000000000
+          Position.Y = 40.000000000000000000
+          TabOrder = 0
+        end
+      end
+    end
+    object Splitter1: TSplitter
+      Align = Bottom
+      Cursor = crVSplit
+      MinSize = 20.000000000000000000
+      Position.Y = 368.000000000000000000
+      Size.Width = 850.000000000000000000
+      Size.Height = 10.000000000000000000
+      Size.PlatformDefault = False
+    end
+  end
+end

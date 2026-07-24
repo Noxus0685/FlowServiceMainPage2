@@ -1,0 +1,70 @@
+object DM: TDM
+  Height = 720
+  Width = 960
+  PixelsPerInch = 144
+  object TypesConnection: TFDConnection
+    Params.Strings = (
+      'Database='
+      'DriverID=SQLite')
+    Connected = True
+    Left = 336
+    Top = 172
+  end
+  object FDPhysSQLiteDriverLink1: TFDPhysSQLiteDriverLink
+    Left = 576
+    Top = 36
+  end
+  object Types: TFDTable
+    Connection = TypesConnection
+    TableName = 'Types'
+    Left = 336
+    Top = 276
+  end
+  object Diameters: TFDTable
+    Connection = TypesConnection
+    UpdateOptions.UpdateTableName = 'Diabeters'
+    TableName = 'Diameters'
+    Left = 336
+    Top = 456
+  end
+  object TypePoints: TFDTable
+    Connection = TypesConnection
+    UpdateOptions.UpdateTableName = 'TypePoints'
+    TableName = 'TypePoints'
+    Left = 336
+    Top = 540
+  end
+  object DevicesConnection: TFDConnection
+    Params.Strings = (
+      'Database='
+      'DriverID=SQLite')
+    Connected = True
+    Left = 108
+    Top = 36
+  end
+  object Devices: TFDTable
+    Connection = DevicesConnection
+    TableName = 'Devices'
+    Left = 108
+    Top = 132
+  end
+  object DevicePoints: TFDTable
+    Connection = DevicesConnection
+    TableName = 'DevicePoints'
+    Left = 108
+    Top = 228
+  end
+  object SpillagePoints: TFDTable
+    Connection = DevicesConnection
+    TableName = 'SpillagePoints'
+    Left = 108
+    Top = 336
+  end
+  object Categories: TFDTable
+    Connection = TypesConnection
+    UpdateOptions.UpdateTableName = 'Diabeters'
+    TableName = 'Categories'
+    Left = 328
+    Top = 368
+  end
+end
