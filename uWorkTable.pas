@@ -626,7 +626,7 @@ type
   function ResolveParameterStateEvent(AParameters: TParameter): ENotifyEvent;
   function ResolveParameterActionEvent(AParameters: TParameter; AParameterAction: EActionParameter): ENotifyEvent;
 
-  procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
+
   function CreateActionNotification(AAction: EActionWorkTable; const ASourceName: string;
     const ADescription: string): TActionNotification;
   procedure FireAction(AAction: EActionWorkTable; const ASourceName: string; const ADescription: string);
@@ -668,7 +668,7 @@ type
       AWorkTables: TObjectList<TWorkTable>); static;
 
   procedure Rebind;
-
+  procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
   function AddPump(const APumpName: string): TPump; overload;
   function AddPump(APump: TPump): Boolean; overload;
   procedure RemovePump(const APumpUUID: string); overload;
