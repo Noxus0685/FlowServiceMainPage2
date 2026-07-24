@@ -1987,6 +1987,8 @@ begin
     mptsInterrupted: Result := 'прервано';
     mptsCancelled: Result := 'отменено';
     mptsSaved: Result := 'сохранено';
+    mptsStabilityError: Result := 'ошибка стабилизации';
+    mptsDevicePointMismatch: Result := 'точка прибора не сопоставлена';
   else
     Result := 'неизвестный статус';
   end;

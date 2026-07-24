@@ -137,7 +137,9 @@ type
     mptsMeasureError = 13,
     mptsInterrupted = 14,
     mptsCancelled = 15,
-    mptsSaved = 16
+    mptsSaved = 16,
+    mptsStabilityError = 17,
+    mptsDevicePointMismatch = 18
   );
 
   /// <summary>One physical-value sample stored by TMeterValue for stability analysis.</summary>
