@@ -5442,7 +5442,17 @@ var
   DevicePoint: TDevicePoint;
   MatchedPoint: TDevicePoint;
   BeforePointCount: Integer;
+  AfterPointCount: Integer;
   BeforePointUUIDs: string;
+
+
+  function BoolText(const AValue: Boolean): string;
+  begin
+    if AValue then
+      Result := 'True'
+    else
+      Result := 'False';
+  end;
 
   function DevicePointUUIDList(ADevice: TDevice): string;
   var
@@ -5480,7 +5490,7 @@ var
         if P <> nil then
           LogMKS('DBG SP 1101', ACaption + ' POINT',
             Format('PointUUID=%s; PointName=%s; FlowRate=%.9f; Q=%.6f; Enabled=%s; State=%s',
-              [P.UUID, P.Name, P.FlowRate, P.Q, BoolToStr(P.Enabled, True),
+              [P.UUID, P.Name, P.FlowRate, P.Q, BoolText(P.Enabled),
                GetEnumName(TypeInfo(TObjectState), Ord(P.State))]));
   end;
 begin
@@ -5668,11 +5678,13 @@ begin
         LogDevicePointsForSave('BeforeSaveDevicePoints', Device);
         DeviceRepo.SaveDeviceResults(Device);
         LogDevicePointsForSave('AfterSaveDevicePoints', Device);
-        if ((Device.Points = nil) and (BeforePointCount <> 0)) or
-           ((Device.Points <> nil) and (Device.Points.Count <> BeforePointCount)) then
+        AfterPointCount := 0;
+        if Device.Points <> nil then
+          AfterPointCount := Device.Points.Count;
+        if BeforePointCount <> AfterPointCount then
           LogMKS('DBG SP 1102', 'DevicePointsChangedDuringSave',
             Format('DeviceUUID=%s; OldCount=%d; NewCount=%d; RemovedPointsUUID=%s',
-              [Device.UUID, BeforePointCount, IfThen(Device.Points <> nil, Device.Points.Count, 0), BeforePointUUIDs]));
+              [Device.UUID, BeforePointCount, AfterPointCount, BeforePointUUIDs]));
       end;
     finally
       Point.Free;
