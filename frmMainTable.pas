@@ -34,10 +34,7 @@ uses
   FMX.TabControl,
   FMX.TreeView,
   FMX.Types,
-  FMXTee.Chart,
-  FMXTee.Engine,
-  FMXTee.Procs,
-  FMXTee.Series,
+  FMX.SimpleChart,
   frmCalibrCoefs,
   frmChannelProperties,
   frmFlowMeterProperties,
@@ -55,8 +52,10 @@ uses
   System.Generics.Collections,
   System.Generics.Defaults,
   System.IniFiles,
+  System.IOUtils,
   System.Math,
   System.Rtti,
+  System.StrUtils,
   System.SysUtils,
   System.Types,
   System.UITypes,
@@ -110,6 +109,49 @@ type
     AAction: EActionWorkTable) of object;
 
   TFlowGraphChannelKind = (fgckEtalon, fgckDevice);
+
+  TAutoMeasurementTestResultKind = (amtrkNone, amtrkPass, amtrkFail, amtrkError, amtrkStopped);
+
+  TAutoMeasurementTestStepRow = record
+    VirtualTimeSec: Integer;
+    PointText: string;
+    RepeatText: string;
+    StageBefore: string;
+    StageAfter: string;
+    WorkTableState: string;
+    TargetFlow: Double;
+    ActualFlow: Double;
+    TargetTemp: Double;
+    ActualTemp: Double;
+    TargetPress: Double;
+    ActualPress: Double;
+    StableText: string;
+    Reason: string;
+    ExecutorCall: string;
+    QParameter: Double;
+    QSample: Double;
+    SampleTimeMs: Int64;
+    TimeSource: string;
+    VirtualCommand: string;
+    VirtualResponse: string;
+    ProgressText: string;
+    CheckText: string;
+  end;
+
+  TAutoMeasurementTestResultRow = record
+    Num: Integer;
+    Scenario: string;
+    ResultText: string;
+    ElapsedMs: Cardinal;
+    VirtualTimeSec: Integer;
+    PointCount: Integer;
+    RepeatCount: Integer;
+    FinalStage: string;
+    FinalWorkTableState: string;
+    Reason: string;
+    LogFile: string;
+    ResultKind: TAutoMeasurementTestResultKind;
+  end;
 
   TFlowGraphSample = record
     TimeStampMs: Int64;
@@ -529,7 +571,7 @@ type
     LayoutGraphsClient: TLayout;
     LayoutEtalonGraphSection: TLayout;
     LayoutEtalonChart: TLayout;
-    ChartEtalonFlow: TChart;
+    ChartEtalonFlow: TSimpleChart;
     LayoutEtalonSelection: TLayout;
     LabelEtalonSelection: TLabel;
     HorzScrollBoxEtalonSelection: THorzScrollBox;
@@ -537,7 +579,7 @@ type
     SplitterFlowGraphs: TSplitter;
     LayoutDeviceGraphSection: TLayout;
     LayoutDeviceChart: TLayout;
-    ChartDeviceFlow: TChart;
+    ChartDeviceFlow: TSimpleChart;
     LayoutDeviceSelection: TLayout;
     LabelDeviceSelection: TLabel;
     HorzScrollBoxDeviceSelection: THorzScrollBox;
@@ -695,14 +737,6 @@ type
     FGraphChannelsReady: Boolean;
     FGraphSamplingActive: Boolean;
     FLastGraphRunActive: Boolean;
-    FEtalonChartSeries: TObjectDictionary<string, TLineSeries>;
-    FDeviceChartSeries: TObjectDictionary<string, TLineSeries>;
-    FEtalonLowerToleranceSeries: TLineSeries;
-    FEtalonUpperToleranceSeries: TLineSeries;
-    FEtalonTargetSeries: TLineSeries;
-    FDeviceLowerToleranceSeries: TLineSeries;
-    FDeviceUpperToleranceSeries: TLineSeries;
-    FDeviceTargetSeries: TLineSeries;
   FFrameMeasurementRun: TFrameMeasurementRun;
   FFrameMRResults: TFrameMRResults;
   FFrameProtocol: TFrameProtocol;
@@ -722,6 +756,23 @@ type
   FRows: array of TRowData;
   IsUpdating: Boolean;
   FUpdatingChannelEnabled: Boolean;
+  FLastAutoStatusText: string;
+  FAutoTestTab: TTabItem;
+  FAutoTestInfoLabel: TLabel;
+  ComboBoxAutoTestScenario: TComboBox;
+  ButtonRunAutoTestScenario: TButton;
+  ButtonRunAllAutoTestScenarios: TButton;
+  ButtonStopAutoTestScenario: TButton;
+  ButtonAutoTestStep: TButton;
+  ButtonAutoTestContinueToStage: TButton;
+  FAutoTestStatusLabel: TLabel;
+  GridAutoTestNumbers: TGrid;
+  GridAutoTestResults: TGrid;
+  FAutoTestStepRows: TArray<TAutoMeasurementTestStepRow>;
+  FAutoTestResultRows: TArray<TAutoMeasurementTestResultRow>;
+  FAutoTestRunning: Boolean;
+  FAutoTestStopRequested: Boolean;
+  FAutoTestRealCommandsBlocked: Boolean;
 
     FFlowMeters: TObjectList<TFlowMeter>;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
@@ -755,13 +806,14 @@ type
     procedure RefreshFlowGraphChannels(const AReason: string = 'Unspecified');
     procedure AddFlowGraphSamples(const ATimeStampMs: Int64);
     procedure RenderFlowGraphs;
-    procedure SyncFlowChartSeries(AChart: TChart; AGraphSeries: TObjectDictionary<string, TFlowGraphSeries>; AChartSeries: TObjectDictionary<string, TLineSeries>);
-    procedure ClearFlowChartSeries(AChart: TChart; AChartSeries: TObjectDictionary<string, TLineSeries>; const AReason: string = 'Unspecified');
     procedure EnsureFlowGraphDictionaries;
-    procedure EnsureToleranceSeries;
-    procedure FreeToleranceSeries;
-    procedure UpdateToleranceSeries(AChart: TChart; ALowerSeries, AUpperSeries, ATargetSeries: TLineSeries; const ALimits: TFlowGraphLimits; const AAxisMinSec, AAxisMaxSec: Double);
-    procedure RenderFlowChart(AChart: TChart; AGraphSeries: TObjectDictionary<string, TFlowGraphSeries>; AChartSeries: TObjectDictionary<string, TLineSeries>; const AVisibleXMinMs, AVisibleXMaxMs: Int64; const AAxisMinSec, AAxisMaxSec: Double; AMeasurementSegment: Boolean);
+    procedure UpdateEtalonFlowChart;
+    procedure UpdateDeviceFlowChart;
+    procedure RenderFlowChart(AChart: TSimpleChart; AGraphSeries: TObjectDictionary<string, TFlowGraphSeries>; const ATitle: string; const AVisibleXMinMs, AVisibleXMaxMs: Int64; const AAxisMinSec, AAxisMaxSec: Double; AMeasurementSegment: Boolean);
+    procedure AddFlowLimitSeries(AChart: TSimpleChart; const ALimits: TFlowGraphLimits; const AAxisMinSec, AAxisMaxSec: Double);
+    procedure ApplyFlowChartSeriesStyle(const ASeries: TChartSeries; const AColor: TAlphaColor; const AThickness: Single; const AShowMarkers: Boolean);
+    procedure RefreshFlowGraphCheckBoxes;
+    procedure FlowGraphCheckBoxChange(Sender: TObject);
     function TryGetCurrentPointGraphTarget(out ATargetLS: Double): Boolean;
     function TryGetCurrentPointGraphTolerance(out ALowerLS: Double; out AUpperLS: Double): Boolean;
     function TryGetCurrentPointGraphLimits(out ATargetLS: Double; out ALowerLS: Double; out AUpperLS: Double): Boolean;
@@ -771,11 +823,11 @@ type
     function BuildFlowGraphSeriesKey(const AKind: string; AWorkTable: TWorkTable; AChannel: TChannel; AChannelIndex: Integer): string;
     function BuildFlowGraphCaption(AChannel: TChannel; AChannelIndex: Integer; const AFallbackPrefix: string): string;
     function IsValidFlowGraphChannel(AChannel: TChannel): Boolean;
+    function FlowToCurrentDimension(const AFlowLS: Double): Double;
     function FlowGraphDisplayValue(AWorkTable: TWorkTable; const ABaseFlowLS: Double): Double;
     function FlowGraphSamplesCount(ADict: TObjectDictionary<string, TFlowGraphSeries>): Integer;
-    function FlowGraphChartCount(ADict: TObjectDictionary<string, TLineSeries>): Integer;
-    procedure LogFlowGraphClear(const AMethod, AReason: string; const APointIndex: Integer; const ASeriesKey: string; const ASamplesBefore, ASamplesAfter, ALineSeriesBefore, ALineSeriesAfter: Integer);
-    procedure ButtonClearFlowGraphsClick(Sender: TObject);
+    procedure SetFlowChartYAxis(AChart: TSimpleChart; const AYMin, AYMax: Double);
+   procedure ButtonClearFlowGraphsClick(Sender: TObject);
 
     procedure UpdateUIFromValues;
     procedure SetValues;
@@ -788,6 +840,7 @@ type
     procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
     procedure EnforceDataPointsColumnsLayout;
     procedure MarkChannelDeviceModified(AChannel: TChannel);
+    procedure PersistChannelEnabled(AWorkTable: TWorkTable; AChannel: TChannel; const AKind: string; const AOldEnabled, ANewEnabled: Boolean);
     procedure ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
     procedure RefreshMonitorIndicator;
     procedure RefreshPumpsCombo;
@@ -805,8 +858,8 @@ type
     procedure UpdateTestButton;
     procedure UpdateTestButtonByWorkTableState;
     procedure UpdateTestButtonByMeasurementRun;
-    procedure TestButtonClickManualMode;
-    procedure TestButtonClickAutoMode;
+    procedure MeasurementButtonClickManualMode;
+    procedure MeasurementButtonClickAutoMode;
     function IsTestButtonSaveMode: Boolean;
     function IsMeasurementActive(AWorkTable: TWorkTable): Boolean;
     function NeedSaveMeasurementResults(AWorkTable: TWorkTable): Boolean;
@@ -814,6 +867,18 @@ type
     procedure RequestStartTest;
     procedure RequestStopTest;
 
+    procedure InitializeAutoMeasurementTestTab;
+    procedure RefreshAutoMeasurementTestContext;
+    procedure InitializeAutoTestScenarioList;
+    procedure AutoTestButtonRunClick(Sender: TObject);
+    procedure AutoTestButtonRunAllClick(Sender: TObject);
+    procedure AutoTestButtonStopClick(Sender: TObject);
+    procedure AutoTestButtonStepClick(Sender: TObject);
+    procedure AutoTestButtonContinueClick(Sender: TObject);
+    procedure GridAutoTestNumbersGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
+    procedure GridAutoTestResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
+    procedure RunAutoMeasurementScenario(const AScenarioIndex: Integer);
+    procedure RunAllAutoMeasurementScenarios;
 
     procedure UpdateGrids;
 
@@ -1108,11 +1173,6 @@ end;
 
 destructor TFrameMainTable.Destroy;
 begin
-  FreeToleranceSeries;
-  ClearFlowChartSeries(ChartEtalonFlow, FEtalonChartSeries, 'Destroy');
-  ClearFlowChartSeries(ChartDeviceFlow, FDeviceChartSeries, 'Destroy');
-  FreeAndNil(FEtalonChartSeries);
-  FreeAndNil(FDeviceChartSeries);
   FreeAndNil(FFlowGraphHistory);
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
@@ -2135,6 +2195,9 @@ begin
     FFrameProtocol.Parent := LayoutProtocolHost;
     FFrameProtocol.Align := TAlignLayout.Client;
   end;
+
+  InitializeAutoMeasurementTestTab;
+  RefreshAutoMeasurementTestContext;
 
   RefreshFlowGraphChannels('UpdateForm');
 
@@ -3167,6 +3230,43 @@ begin
 
  // if DataManager <> nil then
  //   DataManager.Save;
+end;
+
+
+procedure TFrameMainTable.PersistChannelEnabled(AWorkTable: TWorkTable; AChannel: TChannel;
+  const AKind: string; const AOldEnabled, ANewEnabled: Boolean);
+var
+  Ini: TIniFile;
+  StoragePath: string;
+  SectionName: string;
+begin
+  if (AWorkTable = nil) or (AChannel = nil) then
+    Exit;
+
+  StoragePath := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
+    'Settings' + PathDelim + 'TableSettings.ini';
+  ForceDirectories(ExtractFilePath(StoragePath));
+
+  if SameText(AKind, 'Etalon') then
+    SectionName := Format('WorkTables/%s/EtalonChannels/%s', [AWorkTable.UUID, AChannel.UUID])
+  else
+    SectionName := Format('WorkTables/%s/DeviceChannels/%s', [AWorkTable.UUID, AChannel.UUID]);
+
+  Ini := TIniFile.Create(StoragePath);
+  try
+    Ini.WriteBool(SectionName, 'Enabled', ANewEnabled);
+    Ini.UpdateFile;
+    ProtocolManager.AddMessage(pcAction, psForm, 'ChannelEnabledChanged',
+      'Изменён флаг включения канала рабочего стола',
+      Format('WorkTableUUID=%s; ChannelKind=%s; ChannelUUID=%s; OldEnabled=%s; NewEnabled=%s; StoragePath=%s; SaveResult=Success',
+        [AWorkTable.UUID, AKind, AChannel.UUID, BoolToStr(AOldEnabled, True),
+         BoolToStr(ANewEnabled, True), StoragePath]));
+  finally
+    Ini.Free;
+  end;
+
+  if WorkTableManager <> nil then
+    WorkTableManager.Save;
 end;
 
 procedure TFrameMainTable.MarkChannelDeviceModified(AChannel: TChannel);
@@ -5191,11 +5291,16 @@ begin
     Result := Format('%s %d', [AFallbackPrefix, AChannelIndex + 1]);
 end;
 
+function TFrameMainTable.FlowToCurrentDimension(const AFlowLS: Double): Double;
+begin
+  Result := AFlowLS;
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
+    Result := FActiveWorkTable.ValueFlowRate.GetDoubleNum(AFlowLS, FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
+end;
+
 function TFrameMainTable.FlowGraphDisplayValue(AWorkTable: TWorkTable; const ABaseFlowLS: Double): Double;
 begin
-  Result := ABaseFlowLS;
-  if (AWorkTable <> nil) and (AWorkTable.ValueFlowRate <> nil) then
-    Result := AWorkTable.ValueFlowRate.GetDoubleNum(ABaseFlowLS, AWorkTable.ValueFlowRate.CurrentDimIndex);
+  Result := FlowToCurrentDimension(ABaseFlowLS);
 end;
 
 function TFrameMainTable.IsFlowGraphSamplingActive(AWorkTable: TWorkTable): Boolean;
@@ -5214,17 +5319,12 @@ procedure TFrameMainTable.EnsureFlowGraphDictionaries;
 begin
   if FFlowGraphHistory = nil then
     FFlowGraphHistory := TFlowGraphHistory.Create;
-  if FEtalonChartSeries = nil then
-    FEtalonChartSeries := TObjectDictionary<string, TLineSeries>.Create;
-  if FDeviceChartSeries = nil then
-    FDeviceChartSeries := TObjectDictionary<string, TLineSeries>.Create;
   if LayoutEtalonGraphSection <> nil then
     LayoutEtalonGraphSection.Visible := True;
   if SplitterFlowGraphs <> nil then
     SplitterFlowGraphs.Visible := True;
   if LayoutDeviceGraphSection <> nil then
     LayoutDeviceGraphSection.Visible := True;
-  EnsureToleranceSeries;
 end;
 
 function TFrameMainTable.FlowGraphSamplesCount(ADict: TObjectDictionary<string, TFlowGraphSeries>): Integer;
@@ -5237,92 +5337,6 @@ begin
   for Pair in ADict do
     if (Pair.Value <> nil) and (Pair.Value.Samples <> nil) then
       Inc(Result, Pair.Value.Samples.Count);
-end;
-
-function TFrameMainTable.FlowGraphChartCount(ADict: TObjectDictionary<string, TLineSeries>): Integer;
-var
-  Pair: TPair<string, TLineSeries>;
-begin
-  Result := 0;
-  if ADict = nil then
-    Exit;
-  for Pair in ADict do
-    if Pair.Value <> nil then
-      Inc(Result, Pair.Value.Count);
-end;
-
-procedure TFrameMainTable.LogFlowGraphClear(const AMethod, AReason: string; const APointIndex: Integer; const ASeriesKey: string; const ASamplesBefore, ASamplesAfter, ALineSeriesBefore, ALineSeriesAfter: Integer);
-begin
-  if Assigned(ProtocolManager) then
-    ProtocolManager.AddMessage(pcAction, psForm, 'FlowGraphClear',
-      Format('Method=%s; Reason=%s; PointIndex=%d; SeriesKey=%s; SamplesBefore=%d; SamplesAfter=%d; LineSeriesBefore=%d; LineSeriesAfter=%d',
-        [AMethod, AReason, APointIndex, ASeriesKey, ASamplesBefore, ASamplesAfter, ALineSeriesBefore, ALineSeriesAfter]), '');
-end;
-
-procedure TFrameMainTable.ClearFlowChartSeries(AChart: TChart; AChartSeries: TObjectDictionary<string, TLineSeries>; const AReason: string);
-var
-  Pair: TPair<string, TLineSeries>;
-begin
-  if AChartSeries = nil then
-    Exit;
-  for Pair in AChartSeries do
-  begin
-    if Pair.Value <> nil then
-      LogFlowGraphClear('LineSeries.Clear', AReason, FCurrentGraphPointIndex, Pair.Key, -1, -1, Pair.Value.Count, 0);
-    if (AChart <> nil) and (Pair.Value <> nil) then
-      AChart.RemoveSeries(Pair.Value);
-    Pair.Value.Free;
-  end;
-  LogFlowGraphClear('ChartSeries.Clear', AReason, FCurrentGraphPointIndex, '', -1, -1, FlowGraphChartCount(AChartSeries), 0);
-  AChartSeries.Clear;
-end;
-
-procedure TFrameMainTable.EnsureToleranceSeries;
-  function EnsureLine(AChart: TChart; var ALine: TLineSeries; const ATitle: string; AColor: TAlphaColor; ADashed: Boolean): TLineSeries;
-  begin
-    if (AChart = nil) or (ALine <> nil) then
-      Exit(ALine);
-    ALine := TLineSeries.Create(AChart);
-    ALine.ParentChart := AChart;
-    ALine.Title := ATitle;
-    ALine.SeriesColor := AColor;
-    ALine.Color := AColor;
-    ALine.ShowInLegend := False;
-    ALine.Active := False;
-    ALine.LinePen.Width := 1;
-    ALine.Pointer.Visible := False;
-    Result := ALine;
-  end;
-begin
-  EnsureLine(ChartEtalonFlow, FEtalonLowerToleranceSeries, 'Нижний допуск', TAlphaColors.Red, True);
-  EnsureLine(ChartEtalonFlow, FEtalonUpperToleranceSeries, 'Верхний допуск', TAlphaColors.Red, True);
-  EnsureLine(ChartEtalonFlow, FEtalonTargetSeries, 'Заданный расход', TAlphaColors.Green, False);
-  EnsureLine(ChartDeviceFlow, FDeviceLowerToleranceSeries, 'Нижний допуск', TAlphaColors.Red, True);
-  EnsureLine(ChartDeviceFlow, FDeviceUpperToleranceSeries, 'Верхний допуск', TAlphaColors.Red, True);
-  EnsureLine(ChartDeviceFlow, FDeviceTargetSeries, 'Заданный расход', TAlphaColors.Green, False);
-  if ChartEtalonFlow <> nil then
-    ChartEtalonFlow.Legend.LegendStyle := lsSeries;
-  if ChartDeviceFlow <> nil then
-    ChartDeviceFlow.Legend.LegendStyle := lsSeries;
-end;
-
-
-procedure TFrameMainTable.FreeToleranceSeries;
-  procedure FreeLine(AChart: TChart; var ALine: TLineSeries);
-  begin
-    if ALine = nil then
-      Exit;
-    if AChart <> nil then
-      AChart.RemoveSeries(ALine);
-    FreeAndNil(ALine);
-  end;
-begin
-  FreeLine(ChartEtalonFlow, FEtalonLowerToleranceSeries);
-  FreeLine(ChartEtalonFlow, FEtalonUpperToleranceSeries);
-  FreeLine(ChartEtalonFlow, FEtalonTargetSeries);
-  FreeLine(ChartDeviceFlow, FDeviceLowerToleranceSeries);
-  FreeLine(ChartDeviceFlow, FDeviceUpperToleranceSeries);
-  FreeLine(ChartDeviceFlow, FDeviceTargetSeries);
 end;
 
 function TFrameMainTable.TryGetCurrentPointGraphTarget(out ATargetLS: Double): Boolean;
@@ -5349,8 +5363,8 @@ var
   TargetLS: Double;
   Run: TMeasurementRun;
   Point: TDevicePoint;
-  PointErrorPercent: Double;
-  AllowedDeviationLS: Double;
+  MinPercent, MaxPercent: Double;
+  AllowedMinusLS, AllowedPlusLS: Double;
 begin
   ALowerLS := 0;
   AUpperLS := 0;
@@ -5359,12 +5373,12 @@ begin
     Exit;
   Run := TMeasurementRun(FActiveWorkTable.MeasurementRun);
   Point := Run.CurrentPoint;
-  PointErrorPercent := Abs(Point.Error);
-  if IsNan(PointErrorPercent) or IsInfinite(PointErrorPercent) or (PointErrorPercent <= 0) then
+  if (Point = nil) or (not AccuracyToRange(Point.FlowAccuracy, MinPercent, MaxPercent)) then
     Exit;
-  AllowedDeviationLS := Abs(TargetLS) * PointErrorPercent / 100.0;
-  ALowerLS := TargetLS - AllowedDeviationLS;
-  AUpperLS := TargetLS + AllowedDeviationLS;
+  AllowedMinusLS := Abs(TargetLS) * Abs(MinPercent) / 100.0;
+  AllowedPlusLS := Abs(TargetLS) * Abs(MaxPercent) / 100.0;
+  ALowerLS := TargetLS - AllowedMinusLS;
+  AUpperLS := TargetLS + AllowedPlusLS;
   Result := (not IsNan(ALowerLS)) and (not IsInfinite(ALowerLS)) and
     (not IsNan(AUpperLS)) and (not IsInfinite(AUpperLS));
 end;
@@ -5390,50 +5404,6 @@ begin
     ALimits.ToleranceValid := TryGetCurrentPointGraphTolerance(ALimits.LowerLS, ALimits.UpperLS);
   ALimits.Valid := ALimits.ToleranceValid;
   Result := ALimits.TargetValid;
-end;
-
-procedure TFrameMainTable.SyncFlowChartSeries(AChart: TChart; AGraphSeries: TObjectDictionary<string, TFlowGraphSeries>; AChartSeries: TObjectDictionary<string, TLineSeries>);
-var
-  Pair: TPair<string, TFlowGraphSeries>;
-  Line: TLineSeries;
-  RemoveKeys: TList<string>;
-  Key: string;
-begin
-  if (AChart = nil) or (AGraphSeries = nil) or (AChartSeries = nil) then
-    Exit;
-
-  for Pair in AGraphSeries do
-  begin
-    if not AChartSeries.TryGetValue(Pair.Key, Line) then
-    begin
-      Line := TLineSeries.Create(AChart);
-      Line.ParentChart := AChart;
-      Line.ShowInLegend := True;
-      Line.LinePen.Width := 2;
-      Line.Pointer.Visible := False;
-      AChartSeries.Add(Pair.Key, Line);
-    end;
-    Line.Title := Pair.Value.Caption;
-    Line.SeriesColor := Pair.Value.Color;
-    Line.Color := Pair.Value.Color;
-    Line.Active := Pair.Value.Visible;
-  end;
-
-  RemoveKeys := TList<string>.Create;
-  try
-    for Key in AChartSeries.Keys do
-      if not AGraphSeries.ContainsKey(Key) then
-        RemoveKeys.Add(Key);
-    for Key in RemoveKeys do
-      if AChartSeries.TryGetValue(Key, Line) then
-      begin
-        AChart.RemoveSeries(Line);
-        AChartSeries.Remove(Key);
-        Line.Free;
-      end;
-  finally
-    RemoveKeys.Free;
-  end;
 end;
 
 procedure TFrameMainTable.RefreshFlowGraphChannels(const AReason: string);
@@ -5488,10 +5458,7 @@ procedure TFrameMainTable.RefreshFlowGraphChannels(const AReason: string);
         ADict.Add(Key, S);
       end
       else
-      begin
         S.Caption := Caption;
-        S.Visible := C.Enabled;
-      end;
     end;
   end;
 var
@@ -5520,10 +5487,61 @@ begin
   finally
     ValidKeys.Free;
   end;
-  SyncFlowChartSeries(ChartEtalonFlow, FFlowGraphHistory.EtalonSeries, FEtalonChartSeries);
-  SyncFlowChartSeries(ChartDeviceFlow, FFlowGraphHistory.DeviceSeries, FDeviceChartSeries);
+  RefreshFlowGraphCheckBoxes;
   if FActiveWorkTable <> nil then
     RenderFlowGraphs;
+end;
+
+
+procedure TFrameMainTable.FlowGraphCheckBoxChange(Sender: TObject);
+var
+  CheckBox: TCheckBox;
+  Series: TFlowGraphSeries;
+begin
+  if not (Sender is TCheckBox) then
+    Exit;
+  CheckBox := TCheckBox(Sender);
+  if FFlowGraphHistory = nil then
+    Exit;
+  if FFlowGraphHistory.EtalonSeries.TryGetValue(CheckBox.TagString, Series) then
+    Series.Visible := CheckBox.IsChecked
+  else if FFlowGraphHistory.DeviceSeries.TryGetValue(CheckBox.TagString, Series) then
+    Series.Visible := CheckBox.IsChecked
+  else
+    Exit;
+  UpdateEtalonFlowChart;
+  UpdateDeviceFlowChart;
+end;
+
+procedure TFrameMainTable.RefreshFlowGraphCheckBoxes;
+  procedure BuildChecks(AParent: TFlowLayout; ADict: TObjectDictionary<string, TFlowGraphSeries>);
+  var
+    Pair: TPair<string, TFlowGraphSeries>;
+    CheckBox: TCheckBox;
+  begin
+    if (AParent = nil) or (ADict = nil) then
+      Exit;
+    while AParent.ChildrenCount > 0 do
+      AParent.Children[0].Free;
+    for Pair in ADict do
+    begin
+      if Pair.Value = nil then
+        Continue;
+      CheckBox := TCheckBox.Create(AParent);
+      CheckBox.Parent := AParent;
+      CheckBox.Text := Pair.Value.Caption;
+      CheckBox.TagString := Pair.Key;
+      CheckBox.IsChecked := Pair.Value.Visible;
+      CheckBox.Width := 220;
+      CheckBox.Height := 32;
+      CheckBox.OnChange := FlowGraphCheckBoxChange;
+    end;
+  end;
+begin
+  if FFlowGraphHistory = nil then
+    Exit;
+  BuildChecks(FlowLayoutEtalonChecks, FFlowGraphHistory.EtalonSeries);
+  BuildChecks(FlowLayoutDeviceChecks, FFlowGraphHistory.DeviceSeries);
 end;
 
 procedure TFrameMainTable.AddFlowGraphSamples(const ATimeStampMs: Int64);
@@ -5601,110 +5619,211 @@ begin
   AddList(FActiveWorkTable.DeviceChannels, FFlowGraphHistory.DeviceSeries, 'Device', 'Приборный канал');
 end;
 
-procedure TFrameMainTable.UpdateToleranceSeries(AChart: TChart; ALowerSeries, AUpperSeries, ATargetSeries: TLineSeries; const ALimits: TFlowGraphLimits; const AAxisMinSec, AAxisMaxSec: Double);
-var
-  TargetValue, LowerValue, UpperValue: Double;
+procedure TFrameMainTable.ApplyFlowChartSeriesStyle(const ASeries: TChartSeries;
+  const AColor: TAlphaColor; const AThickness: Single; const AShowMarkers: Boolean);
 begin
-  if (ALowerSeries = nil) or (AUpperSeries = nil) or (ATargetSeries = nil) then
+  if ASeries = nil then
     Exit;
-  LogFlowGraphClear('LineSeries.Clear', 'UpdateToleranceSeries', FCurrentGraphPointIndex, ALowerSeries.Title, -1, -1, ALowerSeries.Count, 0);
-  ALowerSeries.Clear;
-  LogFlowGraphClear('LineSeries.Clear', 'UpdateToleranceSeries', FCurrentGraphPointIndex, AUpperSeries.Title, -1, -1, AUpperSeries.Count, 0);
-  AUpperSeries.Clear;
-  LogFlowGraphClear('LineSeries.Clear', 'UpdateToleranceSeries', FCurrentGraphPointIndex, ATargetSeries.Title, -1, -1, ATargetSeries.Count, 0);
-  ATargetSeries.Clear;
-  ALowerSeries.ShowInLegend := False;
-  AUpperSeries.ShowInLegend := False;
-  ATargetSeries.ShowInLegend := False;
-  if ALimits.TargetValid then
-  begin
-    TargetValue := FlowGraphDisplayValue(FActiveWorkTable, ALimits.TargetLS);
-    ATargetSeries.AddXY(AAxisMinSec, TargetValue);
-    ATargetSeries.AddXY(AAxisMaxSec, TargetValue);
-    ATargetSeries.Active := True;
-  end
-  else
-    ATargetSeries.Active := False;
 
-  if ALimits.ToleranceValid then
-  begin
-    LowerValue := FlowGraphDisplayValue(FActiveWorkTable, ALimits.LowerLS);
-    UpperValue := FlowGraphDisplayValue(FActiveWorkTable, ALimits.UpperLS);
-    ALowerSeries.AddXY(AAxisMinSec, LowerValue);
-    ALowerSeries.AddXY(AAxisMaxSec, LowerValue);
-    AUpperSeries.AddXY(AAxisMinSec, UpperValue);
-    AUpperSeries.AddXY(AAxisMaxSec, UpperValue);
-    ALowerSeries.Active := True;
-    AUpperSeries.Active := True;
-  end
-  else
-  begin
-    ALowerSeries.Active := False;
-    AUpperSeries.Active := False;
-  end;
+  ASeries.Color := AColor;
+  ASeries.Thickness := EnsureRange(AThickness, 0.5, 10.0);
+  ASeries.ShowMarkers := AShowMarkers;
 end;
 
 
+procedure TFrameMainTable.SetFlowChartYAxis(AChart: TSimpleChart; const AYMin, AYMax: Double);
+begin
+  if (AChart = nil) or IsNan(AYMin) or IsInfinite(AYMin) or
+     IsNan(AYMax) or IsInfinite(AYMax) or (AYMax <= AYMin) then
+    Exit;
+  AChart.YMin := AYMin;
+  AChart.YMax := AYMax;
+end;
 
-procedure TFrameMainTable.RenderFlowChart(AChart: TChart; AGraphSeries: TObjectDictionary<string, TFlowGraphSeries>; AChartSeries: TObjectDictionary<string, TLineSeries>; const AVisibleXMinMs, AVisibleXMaxMs: Int64; const AAxisMinSec, AAxisMaxSec: Double; AMeasurementSegment: Boolean);
+procedure TFrameMainTable.AddFlowLimitSeries(AChart: TSimpleChart; const ALimits: TFlowGraphLimits; const AAxisMinSec, AAxisMaxSec: Double);
+var
+  TargetSeries, LowerSeries, UpperSeries: TChartSeries;
+  TargetValue, LowerValue, UpperValue: Double;
+begin
+  if AChart = nil then
+    Exit;
+
+  if ALimits.TargetValid then
+  begin
+    TargetValue := FlowToCurrentDimension(ALimits.TargetLS);
+    TargetSeries := AChart.AddSeries('Заданный расход');
+    ApplyFlowChartSeriesStyle(TargetSeries, TAlphaColors.Green, 1.5, False);
+    TargetSeries.AddPoint(AAxisMinSec, TargetValue);
+    TargetSeries.AddPoint(AAxisMaxSec, TargetValue);
+  end;
+
+  if ALimits.ToleranceValid then
+  begin
+    LowerValue := FlowToCurrentDimension(ALimits.LowerLS);
+    UpperValue := FlowToCurrentDimension(ALimits.UpperLS);
+    LowerSeries := AChart.AddSeries('Нижняя граница');
+    UpperSeries := AChart.AddSeries('Верхняя граница');
+    ApplyFlowChartSeriesStyle(LowerSeries, TAlphaColors.Red, 1.0, False);
+    ApplyFlowChartSeriesStyle(UpperSeries, TAlphaColors.Red, 1.0, False);
+    LowerSeries.AddPoint(AAxisMinSec, LowerValue);
+    LowerSeries.AddPoint(AAxisMaxSec, LowerValue);
+    UpperSeries.AddPoint(AAxisMinSec, UpperValue);
+    UpperSeries.AddPoint(AAxisMaxSec, UpperValue);
+  end;
+end;
+
+procedure TFrameMainTable.RenderFlowChart(AChart: TSimpleChart; AGraphSeries: TObjectDictionary<string, TFlowGraphSeries>; const ATitle: string; const AVisibleXMinMs, AVisibleXMaxMs: Int64; const AAxisMinSec, AAxisMaxSec: Double; AMeasurementSegment: Boolean);
 var
   Pair: TPair<string, TFlowGraphSeries>;
   Sample: TFlowGraphSample;
-  Line: TLineSeries;
+  Series: TChartSeries;
   XSec, V: Double;
-  VisibleCount: Integer;
   UnitName: string;
+  Limits: TFlowGraphLimits;
+  HasData: Boolean;
+  DataMinLS, DataMaxLS, YDataMin, YDataMax, RangeLS, PaddingLS: Double;
+  AxisMinDisplay, AxisMaxDisplay: Double;
 begin
-  if (AChart = nil) or (AGraphSeries = nil) or (AChartSeries = nil) then
+  if (AChart = nil) or (AGraphSeries = nil) then
     Exit;
-  SyncFlowChartSeries(AChart, AGraphSeries, AChartSeries);
-  for Pair in AGraphSeries do
-    if AChartSeries.TryGetValue(Pair.Key, Line) then
-    begin
-      LogFlowGraphClear('LineSeries.Clear', 'RenderFlowChart', FCurrentGraphPointIndex, Pair.Key, -1, -1, Line.Count, 0);
-      Line.Clear;
-      Line.Active := Pair.Value.Visible;
-      VisibleCount := 0;
-      if Pair.Value.Visible then
-        for Sample in Pair.Value.Samples do
-        begin
-          if AMeasurementSegment then
-          begin
-            if (FCurrentGraphPointStartMs <= 0) or (Sample.TimeStampMs < FCurrentGraphPointStartMs) then
-              Continue;
-            XSec := (Sample.TimeStampMs - FCurrentGraphPointStartMs) / 1000.0;
-          end
-          else
-          begin
-            if (Sample.TimeStampMs < AVisibleXMinMs) or (Sample.TimeStampMs > AVisibleXMaxMs) then
-              Continue;
-            if FGraphMonitorStartMs > 0 then
-              XSec := (Sample.TimeStampMs - FGraphMonitorStartMs) / 1000.0
-            else
-              XSec := (Sample.TimeStampMs - AVisibleXMinMs) / 1000.0;
-          end;
-          if (XSec < AAxisMinSec) or (XSec > AAxisMaxSec) then
-            Continue;
-          V := FlowGraphDisplayValue(FActiveWorkTable, Sample.Value);
-          if IsNan(V) or IsInfinite(V) then
-            Continue;
-          Line.AddXY(XSec, V);
-          Inc(VisibleCount);
-        end;
-      Line.Pointer.Visible := Pair.Value.Visible and (VisibleCount = 1);
-      Line.LinePen.Visible := Pair.Value.Visible and (VisibleCount >= 2);
-    end;
   if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
     UnitName := FActiveWorkTable.ValueFlowRate.GetDimName
   else
     UnitName := 'л/с';
-  AChart.Legend.LegendStyle := lsSeries;
-  AChart.BottomAxis.Title.Caption := 'Время, с';
-  AChart.LeftAxis.Title.Caption := 'Расход, ' + UnitName;
-  AChart.BottomAxis.Automatic := False;
-  AChart.BottomAxis.SetMinMax(AAxisMinSec, AAxisMaxSec);
-  AChart.LeftAxis.Automatic := True;
-  AChart.Invalidate;
+
+  AChart.BeginUpdate;
+  try
+    AChart.ClearAllSeries;
+    AChart.Title := ATitle;
+    AChart.XTitle := 'Время, с';
+    AChart.YTitle := 'Расход, ' + UnitName;
+
+    HasData := False;
+    DataMinLS := 0;
+    DataMaxLS := 0;
+    TryGetFlowGraphLimits(Limits);
+
+    for Pair in AGraphSeries do
+    begin
+      if (Pair.Value = nil) or (not Pair.Value.Visible) then
+        Continue;
+      Series := AChart.AddSeries(Pair.Value.Caption);
+      ApplyFlowChartSeriesStyle(Series, Pair.Value.Color, 2.0, True);
+      for Sample in Pair.Value.Samples do
+      begin
+        if AMeasurementSegment then
+        begin
+          if (FCurrentGraphPointStartMs <= 0) or (Sample.TimeStampMs < FCurrentGraphPointStartMs) then
+            Continue;
+          XSec := (Sample.TimeStampMs - FCurrentGraphPointStartMs) / 1000.0;
+        end
+        else
+        begin
+          if (Sample.TimeStampMs < AVisibleXMinMs) or (Sample.TimeStampMs > AVisibleXMaxMs) then
+            Continue;
+          if FGraphMonitorStartMs > 0 then
+            XSec := (Sample.TimeStampMs - FGraphMonitorStartMs) / 1000.0
+          else
+            XSec := (Sample.TimeStampMs - AVisibleXMinMs) / 1000.0;
+        end;
+        if (XSec < AAxisMinSec) or (XSec > AAxisMaxSec) then
+          Continue;
+        V := Sample.Value;
+        if IsNan(V) or IsInfinite(V) then
+          Continue;
+        if not HasData then
+        begin
+          DataMinLS := V;
+          DataMaxLS := V;
+          HasData := True;
+        end
+        else
+        begin
+          DataMinLS := Min(DataMinLS, V);
+          DataMaxLS := Max(DataMaxLS, V);
+        end;
+        Series.AddPoint(XSec, FlowToCurrentDimension(V));
+      end;
+    end;
+
+    if Limits.TargetValid then
+    begin
+      if HasData then
+      begin
+        YDataMin := Min(DataMinLS, Limits.TargetLS);
+        YDataMax := Max(DataMaxLS, Limits.TargetLS);
+      end
+      else
+      begin
+        YDataMin := Limits.TargetLS;
+        YDataMax := Limits.TargetLS;
+      end;
+      if Limits.ToleranceValid then
+      begin
+        YDataMin := Min(YDataMin, Min(Limits.LowerLS, Limits.UpperLS));
+        YDataMax := Max(YDataMax, Max(Limits.LowerLS, Limits.UpperLS));
+      end;
+      RangeLS := YDataMax - YDataMin;
+      if RangeLS > 0 then
+        PaddingLS := Max(RangeLS * 0.10, Max(Abs(Limits.TargetLS) * 0.001, 0.000001))
+      else
+        PaddingLS := Max(Abs(YDataMin) * 0.01, 0.001);
+      AxisMinDisplay := FlowToCurrentDimension(YDataMin - PaddingLS);
+      AxisMaxDisplay := FlowToCurrentDimension(YDataMax + PaddingLS);
+      SetFlowChartYAxis(AChart, AxisMinDisplay, AxisMaxDisplay);
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcAction, psForm, 'FlowChartLimits',
+          Format('PointName=%s; PointQ_LS=%.12g; PointQ_Display=%.12g; FlowAccuracy=%s; LowerLS=%.12g; UpperLS=%.12g; LowerDisplay=%.12g; UpperDisplay=%.12g; ActualMinLS=%.12g; ActualMaxLS=%.12g; ActualMinDisplay=%.12g; ActualMaxDisplay=%.12g; YAxisMin=%.12g; YAxisMax=%.12g; DisplayUnit=%s',
+            [FCurrentGraphPointKey, Limits.TargetLS, FlowToCurrentDimension(Limits.TargetLS), TMeasurementRun(FActiveWorkTable.MeasurementRun).CurrentPoint.FlowAccuracy, Limits.LowerLS, Limits.UpperLS, FlowToCurrentDimension(Limits.LowerLS), FlowToCurrentDimension(Limits.UpperLS), DataMinLS, DataMaxLS, FlowToCurrentDimension(DataMinLS), FlowToCurrentDimension(DataMaxLS), AxisMinDisplay, AxisMaxDisplay, UnitName]), '');
+    end;
+
+    AddFlowLimitSeries(AChart, Limits, AAxisMinSec, AAxisMaxSec);
+  finally
+    AChart.EndUpdate;
+  end;
+  AChart.InvalidateChart;
+end;
+
+procedure TFrameMainTable.UpdateEtalonFlowChart;
+var
+  BaseMs: Int64;
+  AxisMinSec, AxisMaxSec: Double;
+begin
+  if FFlowGraphHistory = nil then
+    Exit;
+  BaseMs := FGraphMonitorStartMs;
+  if FCurrentGraphPointStartMs > 0 then
+    BaseMs := FCurrentGraphPointStartMs;
+  AxisMinSec := 0;
+  AxisMaxSec := GraphVisibleWindowSec;
+  if BaseMs > 0 then
+  begin
+    AxisMinSec := Max(0.0, (FFlowGraphXMin - BaseMs) / 1000.0);
+    AxisMaxSec := Max(GraphVisibleWindowSec, (FFlowGraphXMax - BaseMs) / 1000.0);
+  end;
+  RenderFlowChart(ChartEtalonFlow, FFlowGraphHistory.EtalonSeries, 'Расход эталонов',
+    FFlowGraphXMin, FFlowGraphXMax, AxisMinSec, AxisMaxSec, FCurrentGraphPointStartMs > 0);
+end;
+
+procedure TFrameMainTable.UpdateDeviceFlowChart;
+var
+  BaseMs: Int64;
+  AxisMinSec, AxisMaxSec: Double;
+begin
+  if FFlowGraphHistory = nil then
+    Exit;
+  BaseMs := FGraphMonitorStartMs;
+  if FCurrentGraphPointStartMs > 0 then
+    BaseMs := FCurrentGraphPointStartMs;
+  AxisMinSec := 0;
+  AxisMaxSec := GraphVisibleWindowSec;
+  if BaseMs > 0 then
+  begin
+    AxisMinSec := Max(0.0, (FFlowGraphXMin - BaseMs) / 1000.0);
+    AxisMaxSec := Max(GraphVisibleWindowSec, (FFlowGraphXMax - BaseMs) / 1000.0);
+  end;
+  RenderFlowChart(ChartDeviceFlow, FFlowGraphHistory.DeviceSeries, 'Расход поверяемых приборов',
+    FFlowGraphXMin, FFlowGraphXMax, AxisMinSec, AxisMaxSec, FCurrentGraphPointStartMs > 0);
 end;
 
 procedure TFrameMainTable.RenderFlowGraphs;
@@ -5715,7 +5834,6 @@ var
   Point: TDevicePoint;
   PointUUID, PointKey: string;
   PointIndex, StageOrdinal, WorkTableStateOrdinal: Integer;
-  Limits: TFlowGraphLimits;
   MeasurementSegment, RunActive, NewRunStarted, PointChanged, SampleAdded: Boolean;
 begin
   if FFlowGraphHistory = nil then
@@ -5872,47 +5990,23 @@ begin
   FFlowGraphXMin := VisibleXMinMs;
   FFlowGraphXMax := VisibleXMaxMs;
 
-  RenderFlowChart(ChartEtalonFlow, FFlowGraphHistory.EtalonSeries, FEtalonChartSeries,
+  RenderFlowChart(ChartEtalonFlow, FFlowGraphHistory.EtalonSeries, 'Расход эталонов',
     VisibleXMinMs, VisibleXMaxMs, AxisMinSec, AxisMaxSec, MeasurementSegment);
-  RenderFlowChart(ChartDeviceFlow, FFlowGraphHistory.DeviceSeries, FDeviceChartSeries,
+  RenderFlowChart(ChartDeviceFlow, FFlowGraphHistory.DeviceSeries, 'Расход поверяемых приборов',
     VisibleXMinMs, VisibleXMaxMs, AxisMinSec, AxisMaxSec, MeasurementSegment);
-  TryGetFlowGraphLimits(Limits);
-  UpdateToleranceSeries(ChartEtalonFlow, FEtalonLowerToleranceSeries, FEtalonUpperToleranceSeries, FEtalonTargetSeries, Limits, AxisMinSec, AxisMaxSec);
-  UpdateToleranceSeries(ChartDeviceFlow, FDeviceLowerToleranceSeries, FDeviceUpperToleranceSeries, FDeviceTargetSeries, Limits, AxisMinSec, AxisMaxSec);
   FLastGraphRunActive := RunActive;
 end;
 
 procedure TFrameMainTable.ButtonClearFlowGraphsClick(Sender: TObject);
-var
-  Pair: TPair<string,TFlowGraphSeries>;
-  Line: TLineSeries;
 begin
   EnsureFlowGraphDictionaries;
   if FFlowGraphHistory <> nil then
-  begin
-    for Pair in FFlowGraphHistory.EtalonSeries do
-    begin
-      LogFlowGraphClear('Samples.Clear', 'ButtonClearFlowGraphsClick', FCurrentGraphPointIndex, Pair.Key, Pair.Value.Samples.Count, 0, -1, -1);
-      Pair.Value.Samples.Clear;
-    end;
-    for Pair in FFlowGraphHistory.DeviceSeries do
-    begin
-      LogFlowGraphClear('Samples.Clear', 'ButtonClearFlowGraphsClick', FCurrentGraphPointIndex, Pair.Key, Pair.Value.Samples.Count, 0, -1, -1);
-      Pair.Value.Samples.Clear;
-    end;
-  end;
-  for Line in FEtalonChartSeries.Values do
-  begin
-    LogFlowGraphClear('LineSeries.Clear', 'ButtonClearFlowGraphsClick', FCurrentGraphPointIndex, '', -1, -1, Line.Count, 0);
-    Line.Clear;
-  end;
-  for Line in FDeviceChartSeries.Values do
-  begin
-    LogFlowGraphClear('LineSeries.Clear', 'ButtonClearFlowGraphsClick', FCurrentGraphPointIndex, '', -1, -1, Line.Count, 0);
-    Line.Clear;
-  end;
+    FFlowGraphHistory.Clear;
   FLastFlowGraphSampleMs := 0;
-  RenderFlowGraphs;
+  FGraphChannelsReady := False;
+  RefreshFlowGraphChannels('ButtonClearFlowGraphsClick');
+  UpdateEtalonFlowChart;
+  UpdateDeviceFlowChart;
 end;
 
 
@@ -6755,6 +6849,8 @@ procedure TFrameMainTable.UpdateTestButtonByMeasurementRun;
 var
   Run: TMeasurementRun;
   CanStart: Boolean;
+  ActiveRun: Boolean;
+  DisplayedStatusText: string;
 begin
   if TestButton = nil then
     Exit;
@@ -6793,57 +6889,817 @@ begin
     Exit;
   end;
 
-  case Run.Stage of
-    msNone,
-    msDone:
-      begin
-        TestButton.Text := 'Старт';
-        TestButton.Tag := 1;
-        TestButton.Enabled := CanStart;
-      end;
+  ActiveRun := not (Run.Stage in [msNone, msDone]);
 
-    msSelectPoint,
-    msSelectEtalon,
-    msSetupPoint,
-    msWaitStable,
-    msWaitMeasureStart,
-    msMeasure:
-      begin
-        TestButton.Text := 'Стоп';
-        TestButton.Tag := 3;
-        TestButton.Enabled := True;
-      end;
-
-    msWaitMeasureStop:
-      begin
-        TestButton.Text := 'Остановка';
-        TestButton.Tag := 4;
-        TestButton.Enabled := False;
-      end;
-
-    msResultsRead:
-      begin
-        TestButton.Text := 'Чтение';
-        TestButton.Tag := 5;
-        TestButton.Enabled := False;
-      end;
-
-    msSave:
-      begin
-        TestButton.Text := 'Сохранение';
-        TestButton.Tag := 5;
-        TestButton.Enabled := False;
-      end;
+  if Run.StopRequested and ActiveRun then
+  begin
+    TestButton.Text := 'Остановка...';
+    TestButton.Tag := 4;
+    TestButton.Enabled := False;
+  end
+  else if ActiveRun then
+  begin
+    TestButton.Text := 'Отмена';
+    TestButton.Tag := 3;
+    TestButton.Enabled := True;
+  end
+  else if Run.RunCompleted and (Run.RunResult = mrrSuccess) then
+  begin
+    TestButton.Text := 'Старт';
+    TestButton.Tag := 1;
+    TestButton.Enabled := CanStart;
+  end
   else
-    begin
-      TestButton.Text := 'Старт';
-      TestButton.Tag := 0;
-      TestButton.Enabled := False;
-    end;
+  begin
+    TestButton.Text := 'Старт';
+    TestButton.Tag := 1;
+    TestButton.Enabled := CanStart;
+  end;
+
+  case Run.RunResult of
+    mrrCancelled: DisplayedStatusText := 'Отменено';
+    mrrError: DisplayedStatusText := 'Ошибка';
+  else
+    if Run.RunCompleted then
+      DisplayedStatusText := 'Завершено'
+    else if Run.StopRequested then
+      DisplayedStatusText := 'Остановка'
+    else
+      DisplayedStatusText := TMeasurementRun.MeasurementStateToString(Run.Stage);
+  end;
+
+  if DisplayedStatusText <> FLastAutoStatusText then
+  begin
+    ProtocolManager.AddMessage(pcInfo, psForm, 'AutoStatusChanged',
+      'Изменён отображаемый статус автоматического измерения',
+      Format('Stage=%s; WorkTableState=%s; RunCompleted=%s; RunResult=%d; DoneReason=%d; StopRequested=%s; PreviousStatusText=%s; NewStatusText=%s; Reason=UpdateTestButtonByMeasurementRun',
+        [TMeasurementRun.MeasurementStateToString(Run.Stage),
+         TWorkTable.WorkTableStateToString(FActiveWorkTable.State),
+         BoolToStr(Run.RunCompleted, True), Ord(Run.RunResult), Ord(Run.DoneReason),
+         BoolToStr(Run.StopRequested, True), FLastAutoStatusText, DisplayedStatusText]));
+    FLastAutoStatusText := DisplayedStatusText;
+  end;
+
+  ProtocolManager.AddMessage(pcInfo, psForm, 'AutomaticRunUIState',
+    'Обновление UI автоматического измерения',
+    Format('MeasurementRun.Stage=%s; RunCompleted=%s; RunResult=%d; StopRequested=%s; WorkTable.State=%s; DisplayedStatusText=%s; MainActionButtonText=%s; MainActionButtonEnabled=%s; ChannelCheckboxesEnabled=%s; CanCancelActiveRun=%s',
+      [TMeasurementRun.MeasurementStateToString(Run.Stage), BoolToStr(Run.RunCompleted, True),
+       Ord(Run.RunResult), BoolToStr(Run.StopRequested, True),
+       TWorkTable.WorkTableStateToString(FActiveWorkTable.State),
+       DisplayedStatusText, TestButton.Text, BoolToStr(TestButton.Enabled, True),
+       BoolToStr(not ActiveRun, True), BoolToStr(ActiveRun and not Run.StopRequested, True)]));
+end;
+
+
+const
+  AUTO_MEASUREMENT_SCENARIO_COUNT = 20;
+  AUTO_MEASUREMENT_MAX_STEPS = 600;
+  AUTO_MEASUREMENT_MAX_LOG_LINES = 5000;
+
+function AutoMeasurementScenarioName(const AIndex: Integer): string;
+begin
+  case AIndex of
+    0: Result := '1. Успешный полный проход';
+    1: Result := '2. Постепенный выход на стабильный расход';
+    2: Result := '3. Стабильный шум в пределах допуска';
+    3: Result := '4. Колебания вне допуска';
+    4: Result := '5. Постоянный положительный тренд';
+    5: Result := '6. Постоянный отрицательный тренд';
+    6: Result := '7. Единичный выброс';
+    7: Result := '8. Многочисленные выбросы';
+    8: Result := '9. Недостаточно данных';
+    9: Result := '10. Устаревшие данные';
+    10: Result := '11. Расход стабилен, температура нестабильна';
+    11: Result := '12. Расход и температура стабильны, давление вне диапазона';
+    12: Result := '13. Тайм-аут стабилизации с успешной повторной попыткой';
+    13: Result := '14. Окончательный тайм-аут стабилизации';
+    14: Result := '15. Ошибка запуска мониторинга';
+    15: Result := '16. Ошибка запуска измерения';
+    16: Result := '17. Остановка пользователем во время измерения';
+    17: Result := '18. Ошибка остановки оборудования';
+    18: Result := '19. Ошибка чтения результатов';
+    19: Result := '20. Несколько точек и повторов';
+  else
+    Result := Format('%d. Сценарий', [AIndex + 1]);
   end;
 end;
 
-procedure TFrameMainTable.TestButtonClickManualMode;
+procedure AddStringColumn(AGrid: TGrid; const AHeader: string; const AWidth: Single);
+var
+  Col: TStringColumn;
+begin
+  Col := TStringColumn.Create(AGrid);
+  Col.Header := AHeader;
+  Col.Width := AWidth;
+  Col.Parent := AGrid;
+end;
+
+procedure TFrameMainTable.InitializeAutoMeasurementTestTab;
+var
+  Layout: TVertScrollBox;
+  Buttons: TLayout;
+begin
+  if FAutoTestTab <> nil then
+    Exit;
+
+  FAutoTestTab := TTabItem.Create(Self);
+  FAutoTestTab.Text := 'Тест автоизмерения';
+  FAutoTestTab.Parent := TabControlDevices;
+
+  Layout := TVertScrollBox.Create(Self);
+  Layout.Parent := FAutoTestTab;
+  Layout.Align := TAlignLayout.Client;
+  Layout.Padding.Rect := TRectF.Create(8, 8, 8, 8);
+
+  FAutoTestInfoLabel := TLabel.Create(Self);
+  FAutoTestInfoLabel.Parent := Layout;
+  FAutoTestInfoLabel.Align := TAlignLayout.Top;
+  FAutoTestInfoLabel.Height := 72;
+  FAutoTestInfoLabel.Text := 'Текущий стол не выбран';
+
+  ComboBoxAutoTestScenario := TComboBox.Create(Self);
+  ComboBoxAutoTestScenario.Parent := Layout;
+  ComboBoxAutoTestScenario.Align := TAlignLayout.Top;
+  ComboBoxAutoTestScenario.Height := 32;
+
+  Buttons := TLayout.Create(Self);
+  Buttons.Parent := Layout;
+  Buttons.Align := TAlignLayout.Top;
+  Buttons.Height := 40;
+
+  ButtonRunAutoTestScenario := TButton.Create(Self);
+  ButtonRunAutoTestScenario.Parent := Buttons;
+  ButtonRunAutoTestScenario.Position.X := 0;
+  ButtonRunAutoTestScenario.Width := 160;
+  ButtonRunAutoTestScenario.Text := 'Запустить сценарий';
+  ButtonRunAutoTestScenario.OnClick := AutoTestButtonRunClick;
+
+  ButtonRunAllAutoTestScenarios := TButton.Create(Self);
+  ButtonRunAllAutoTestScenarios.Parent := Buttons;
+  ButtonRunAllAutoTestScenarios.Position.X := 168;
+  ButtonRunAllAutoTestScenarios.Width := 160;
+  ButtonRunAllAutoTestScenarios.Text := 'Прогнать все';
+  ButtonRunAllAutoTestScenarios.OnClick := AutoTestButtonRunAllClick;
+
+  ButtonStopAutoTestScenario := TButton.Create(Self);
+  ButtonStopAutoTestScenario.Parent := Buttons;
+  ButtonStopAutoTestScenario.Position.X := 336;
+  ButtonStopAutoTestScenario.Width := 120;
+  ButtonStopAutoTestScenario.Text := 'Остановить';
+  ButtonStopAutoTestScenario.OnClick := AutoTestButtonStopClick;
+
+  ButtonAutoTestStep := TButton.Create(Self);
+  ButtonAutoTestStep.Parent := Buttons;
+  ButtonAutoTestStep.Position.X := 464;
+  ButtonAutoTestStep.Width := 120;
+  ButtonAutoTestStep.Text := 'Шаг времени';
+  ButtonAutoTestStep.OnClick := AutoTestButtonStepClick;
+
+  ButtonAutoTestContinueToStage := TButton.Create(Self);
+  ButtonAutoTestContinueToStage.Parent := Buttons;
+  ButtonAutoTestContinueToStage.Position.X := 592;
+  ButtonAutoTestContinueToStage.Width := 180;
+  ButtonAutoTestContinueToStage.Text := 'До смены Stage';
+  ButtonAutoTestContinueToStage.OnClick := AutoTestButtonContinueClick;
+
+  FAutoTestStatusLabel := TLabel.Create(Self);
+  FAutoTestStatusLabel.Parent := Layout;
+  FAutoTestStatusLabel.Align := TAlignLayout.Top;
+  FAutoTestStatusLabel.Height := 48;
+  FAutoTestStatusLabel.Text := 'Тест не запускался';
+
+  GridAutoTestNumbers := TGrid.Create(Self);
+  GridAutoTestNumbers.Parent := Layout;
+  GridAutoTestNumbers.Align := TAlignLayout.Top;
+  GridAutoTestNumbers.Height := 220;
+  GridAutoTestNumbers.OnGetValue := GridAutoTestNumbersGetValue;
+  AddStringColumn(GridAutoTestNumbers, 'Время', 70);
+  AddStringColumn(GridAutoTestNumbers, 'Точка', 120);
+  AddStringColumn(GridAutoTestNumbers, 'Repeat', 70);
+  AddStringColumn(GridAutoTestNumbers, 'Q заданный', 90);
+  AddStringColumn(GridAutoTestNumbers, 'Q фактический', 100);
+  AddStringColumn(GridAutoTestNumbers, 'Q parameter', 100);
+  AddStringColumn(GridAutoTestNumbers, 'Q sample', 100);
+  AddStringColumn(GridAutoTestNumbers, 'Sample time', 100);
+  AddStringColumn(GridAutoTestNumbers, 'Time source', 90);
+  AddStringColumn(GridAutoTestNumbers, 'T заданная', 90);
+  AddStringColumn(GridAutoTestNumbers, 'T фактическая', 100);
+  AddStringColumn(GridAutoTestNumbers, 'P заданное', 90);
+  AddStringColumn(GridAutoTestNumbers, 'P фактическое', 100);
+  AddStringColumn(GridAutoTestNumbers, 'Stable', 90);
+  AddStringColumn(GridAutoTestNumbers, 'Virtual command', 130);
+  AddStringColumn(GridAutoTestNumbers, 'Virtual response', 130);
+  AddStringColumn(GridAutoTestNumbers, 'Progress', 90);
+  AddStringColumn(GridAutoTestNumbers, 'Причина', 300);
+
+  GridAutoTestResults := TGrid.Create(Self);
+  GridAutoTestResults.Parent := Layout;
+  GridAutoTestResults.Align := TAlignLayout.Top;
+  GridAutoTestResults.Height := 260;
+  GridAutoTestResults.OnGetValue := GridAutoTestResultsGetValue;
+  AddStringColumn(GridAutoTestResults, '№', 40);
+  AddStringColumn(GridAutoTestResults, 'Сценарий', 260);
+  AddStringColumn(GridAutoTestResults, 'Результат', 90);
+  AddStringColumn(GridAutoTestResults, 'Время', 80);
+  AddStringColumn(GridAutoTestResults, 'Вирт. время', 90);
+  AddStringColumn(GridAutoTestResults, 'Точек', 60);
+  AddStringColumn(GridAutoTestResults, 'Повторов', 70);
+  AddStringColumn(GridAutoTestResults, 'Stage', 130);
+  AddStringColumn(GridAutoTestResults, 'WorkTable.State', 130);
+  AddStringColumn(GridAutoTestResults, 'Причина', 240);
+  AddStringColumn(GridAutoTestResults, 'Файл лога', 220);
+
+  InitializeAutoTestScenarioList;
+  ButtonStopAutoTestScenario.Enabled := False;
+  FAutoTestRealCommandsBlocked := False;
+end;
+
+procedure TFrameMainTable.InitializeAutoTestScenarioList;
+var
+  I: Integer;
+begin
+  ComboBoxAutoTestScenario.Items.Clear;
+  for I := 0 to AUTO_MEASUREMENT_SCENARIO_COUNT - 1 do
+    ComboBoxAutoTestScenario.Items.Add(AutoMeasurementScenarioName(I));
+  ComboBoxAutoTestScenario.ItemIndex := 0;
+end;
+
+procedure TFrameMainTable.RefreshAutoMeasurementTestContext;
+var
+  DeviceEnabled, EtalonEnabled, PointCount, I: Integer;
+  RunText: string;
+begin
+  if FAutoTestInfoLabel = nil then
+    Exit;
+
+  DeviceEnabled := 0;
+  EtalonEnabled := 0;
+  PointCount := 0;
+  if FActiveWorkTable <> nil then
+  begin
+    if FActiveWorkTable.DeviceChannels <> nil then
+      for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+        if (FActiveWorkTable.DeviceChannels[I] <> nil) and FActiveWorkTable.DeviceChannels[I].Enabled then
+          Inc(DeviceEnabled);
+    if FActiveWorkTable.EtalonChannels <> nil then
+      for I := 0 to FActiveWorkTable.EtalonChannels.Count - 1 do
+        if (FActiveWorkTable.EtalonChannels[I] <> nil) and FActiveWorkTable.EtalonChannels[I].Enabled then
+          Inc(EtalonEnabled);
+    if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) then
+      PointCount := MeasurementRun.Points.Count;
+    if MeasurementRun <> nil then
+      RunText := TMeasurementRun.MeasurementStateToString(MeasurementRun.Stage)
+    else
+      RunText := '-';
+    FAutoTestInfoLabel.Text := Format('Стол: %s (%s)'#13#10'Режим: %d; Состояние: %s; Stage: %s'#13#10'Включено приборных каналов: %d; Точек сессии: %d; Включено эталонов: %d; Реальные команды заблокированы: %s',
+      [FActiveWorkTable.Name, FActiveWorkTable.UUID, Ord(MeasurementRun.Mode),
+       TWorkTable.WorkTableStateToString(FActiveWorkTable.State), RunText,
+       DeviceEnabled, PointCount, EtalonEnabled, BoolToStr(FAutoTestRealCommandsBlocked, True)]);
+  end
+  else
+    FAutoTestInfoLabel.Text := 'Текущий стол не выбран';
+end;
+
+procedure TFrameMainTable.GridAutoTestNumbersGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
+var R: TAutoMeasurementTestStepRow;
+begin
+  if (ARow < 0) or (ARow >= Length(FAutoTestStepRows)) then Exit;
+  R := FAutoTestStepRows[ARow];
+  case ACol of
+    0: Value := R.VirtualTimeSec;
+    1: Value := R.PointText;
+    2: Value := R.RepeatText;
+    3: Value := FormatFloat('0.000', R.TargetFlow);
+    4: Value := FormatFloat('0.000', R.ActualFlow);
+    5: Value := FormatFloat('0.000', R.QParameter);
+    6: Value := FormatFloat('0.000', R.QSample);
+    7: Value := R.SampleTimeMs;
+    8: Value := R.TimeSource;
+    9: Value := FormatFloat('0.000', R.TargetTemp);
+    10: Value := FormatFloat('0.000', R.ActualTemp);
+    11: Value := FormatFloat('0.000', R.TargetPress);
+    12: Value := FormatFloat('0.000', R.ActualPress);
+    13: Value := R.StableText;
+    14: Value := R.VirtualCommand;
+    15: Value := R.VirtualResponse;
+    16: Value := R.ProgressText;
+  else Value := R.Reason;
+  end;
+end;
+
+procedure TFrameMainTable.GridAutoTestResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
+var R: TAutoMeasurementTestResultRow;
+begin
+  if (ARow < 0) or (ARow >= Length(FAutoTestResultRows)) then Exit;
+  R := FAutoTestResultRows[ARow];
+  case ACol of
+    0: Value := R.Num;
+    1: Value := R.Scenario;
+    2: Value := R.ResultText;
+    3: Value := R.ElapsedMs;
+    4: Value := R.VirtualTimeSec;
+    5: Value := R.PointCount;
+    6: Value := R.RepeatCount;
+    7: Value := R.FinalStage;
+    8: Value := R.FinalWorkTableState;
+    9: Value := R.Reason;
+  else Value := R.LogFile;
+  end;
+end;
+
+procedure TFrameMainTable.AutoTestButtonRunClick(Sender: TObject);
+begin
+  if ComboBoxAutoTestScenario = nil then Exit;
+  RunAutoMeasurementScenario(Max(0, ComboBoxAutoTestScenario.ItemIndex));
+end;
+
+procedure TFrameMainTable.AutoTestButtonRunAllClick(Sender: TObject);
+begin
+  RunAllAutoMeasurementScenarios;
+end;
+
+procedure TFrameMainTable.AutoTestButtonStopClick(Sender: TObject);
+begin
+  FAutoTestStopRequested := True;
+  if MeasurementRun <> nil then
+    MeasurementRun.Execute(mcStop, Null);
+end;
+
+procedure TFrameMainTable.AutoTestButtonStepClick(Sender: TObject);
+begin
+  RunAutoMeasurementScenario(Max(0, ComboBoxAutoTestScenario.ItemIndex));
+end;
+
+procedure TFrameMainTable.AutoTestButtonContinueClick(Sender: TObject);
+begin
+  RunAutoMeasurementScenario(Max(0, ComboBoxAutoTestScenario.ItemIndex));
+end;
+
+procedure TFrameMainTable.RunAllAutoMeasurementScenarios;
+var I: Integer;
+begin
+  for I := 0 to AUTO_MEASUREMENT_SCENARIO_COUNT - 1 do
+  begin
+    RunAutoMeasurementScenario(I);
+    if FAutoTestStopRequested then
+      Break;
+  end;
+end;
+
+procedure TFrameMainTable.RunAutoMeasurementScenario(const AScenarioIndex: Integer);
+var
+  WT: TWorkTable;
+  Run: TMeasurementRun;
+  OldState: EStateWorkTable;
+  OldSimulation: Boolean;
+  OldPoint: TDevicePoint;
+  StartTick: Cardinal;
+  Step, DeviceEnabled, EtalonEnabled, RepeatCount, I: Integer;
+  Point: TDevicePoint;
+  StageBefore, StageAfter: EMeasurementState;
+  Row: TAutoMeasurementTestStepRow;
+  ResultRow: TAutoMeasurementTestResultRow;
+  Lines: TStringList;
+  LogFile: string;
+  ScenarioName: string;
+  Factor, TargetQ, TargetT, TargetP, ActualQ, ActualT, ActualP: Double;
+  StableInfo: RStableInfo;
+  StableText: string;
+  LastProgressKey: string;
+  ProgressKey: string;
+  NoProgressSteps: Integer;
+  AppliedQ: Double;
+  LastSampleQ: Double;
+  LastSampleTimeMs: Int64;
+  VirtualTimeStartMs: Int64;
+  MaxExistingSampleTimeMs: Int64;
+  PointWaitSteps: Integer;
+  ValuesInjected: Boolean;
+  PointReady: Boolean;
+  OldFlowValue: Double;
+  OldTempValue: Double;
+  OldPressValue: Double;
+  OldFlowSamples: TArray<TMeterValueSample>;
+  OldTempSamples: TArray<TMeterValueSample>;
+  OldPressSamples: TArray<TMeterValueSample>;
+  PointNameForLog: string;
+  FinalKind: TAutoMeasurementTestResultKind;
+  FinalReason: string;
+
+  procedure AppendStep;
+  begin
+    SetLength(FAutoTestStepRows, Length(FAutoTestStepRows) + 1);
+    FAutoTestStepRows[High(FAutoTestStepRows)] := Row;
+    if Lines.Count < AUTO_MEASUREMENT_MAX_LOG_LINES then
+      Lines.Add(Format('t=%d; Point=%s; Repeat=%s; StageBefore=%s; StageAfter=%s; WT=%s; Qset=%.6f; Qactual=%.6f; Tset=%.6f; Tactual=%.6f; Pset=%.6f; Pactual=%.6f; Stable=%s; Reason=%s; Executor=%s; Check=%s',
+        [Row.VirtualTimeSec, Row.PointText, Row.RepeatText, Row.StageBefore, Row.StageAfter,
+         Row.WorkTableState, Row.TargetFlow, Row.ActualFlow, Row.TargetTemp, Row.ActualTemp,
+         Row.TargetPress, Row.ActualPress, Row.StableText, Row.Reason, Row.ExecutorCall, Row.CheckText]));
+  end;
+
+  procedure AddSampleToMeter(AMeter: TMeterValue; const AValue: Double; const ATimeMs: Int64);
+  begin
+    if AMeter <> nil then
+      AMeter.AddStabilitySampleManual(ATimeMs, AValue);
+  end;
+
+  function ReadLastSample(AMeter: TMeterValue; out AValue: Double; out ATimeMs: Int64): Boolean;
+  var
+    LocalSamples: TArray<TMeterValueSample>;
+  begin
+    Result := False;
+    AValue := 0;
+    ATimeMs := 0;
+    if AMeter = nil then
+      Exit;
+    LocalSamples := AMeter.GetStabilitySamples;
+    if Length(LocalSamples) = 0 then
+      Exit;
+    AValue := LocalSamples[High(LocalSamples)].Value;
+    ATimeMs := LocalSamples[High(LocalSamples)].TimeStampMs;
+    Result := True;
+  end;
+
+  function LastSampleTimeOf(AMeter: TMeterValue): Int64;
+  var
+    Value: Double;
+  begin
+    Result := 0;
+    ReadLastSample(AMeter, Value, Result);
+  end;
+
+  procedure SnapshotMeter(AMeter: TMeterValue; out ASamples: TArray<TMeterValueSample>; out AValue: Double);
+  begin
+    AValue := 0;
+    SetLength(ASamples, 0);
+    if AMeter = nil then
+      Exit;
+    AValue := AMeter.Value;
+    ASamples := AMeter.GetStabilitySamples;
+  end;
+
+  procedure RestoreMeter(AMeter: TMeterValue; const ASamples: TArray<TMeterValueSample>; const AValue: Double);
+  var
+    Sample: TMeterValueSample;
+  begin
+    if AMeter = nil then
+      Exit;
+    AMeter.ClearStabilitySamples;
+    AMeter.Value := AValue;
+    for Sample in ASamples do
+      AMeter.AddStabilitySampleManual(Sample.TimeStampMs, Sample.Value);
+  end;
+
+begin
+  if FAutoTestRunning then
+    Exit;
+
+  WT := FActiveWorkTable;
+  Run := MeasurementRun;
+  ScenarioName := AutoMeasurementScenarioName(AScenarioIndex);
+  SetLength(FAutoTestStepRows, 0);
+  Lines := TStringList.Create;
+  try
+    StartTick := TThread.GetTickCount;
+    FinalKind := amtrkFail;
+    FinalReason := '';
+    RepeatCount := 0;
+    LastProgressKey := '';
+    NoProgressSteps := 0;
+    PointWaitSteps := 0;
+    ValuesInjected := False;
+    VirtualTimeStartMs := 0;
+    MaxExistingSampleTimeMs := 0;
+    if WT = nil then
+      FinalReason := 'FAIL — активный TWorkTable отсутствует'
+    else if Run = nil then
+      FinalReason := 'FAIL — MeasurementRun не создан'
+    else if Run.IsWorkerThreadRunning or FAutoTestRunning then
+      FinalReason := 'FAIL — уже выполняется настоящее или тестовое измерение'
+    else if not (WT.State in [swtCONNECTED, swtCOMPLETE, swtSTARTMONITOR, swtSTARTMONITORWAIT, swtMONITOR, swtNONE]) then
+      FinalReason := 'FAIL — состояние стола не допускает сценарный запуск'
+    else
+    begin
+      DeviceEnabled := 0;
+      EtalonEnabled := 0;
+      for I := 0 to WT.DeviceChannels.Count - 1 do
+        if (WT.DeviceChannels[I] <> nil) and WT.DeviceChannels[I].Enabled then Inc(DeviceEnabled);
+      for I := 0 to WT.EtalonChannels.Count - 1 do
+        if (WT.EtalonChannels[I] <> nil) and WT.EtalonChannels[I].Enabled then Inc(EtalonEnabled);
+      if DeviceEnabled = 0 then
+        FinalReason := 'FAIL — нет включённых проверяемых каналов'
+      else if EtalonEnabled = 0 then
+        FinalReason := 'FAIL — нет включённых эталонных каналов';
+    end;
+
+    Lines.Add('AUTO MEASUREMENT TEST');
+    Lines.Add('Scenario=' + ScenarioName);
+    if WT <> nil then
+      Lines.Add(Format('WorkTable=%s; UUID=%s', [WT.Name, WT.UUID]));
+
+    if FinalReason = '' then
+    begin
+      FAutoTestRunning := True;
+      FAutoTestStopRequested := False;
+      OldState := WT.State;
+      OldSimulation := WT.IsSimulationMode;
+      OldPoint := WT.CurrentPoint;
+      try
+        if WT.FlowRate <> nil then SnapshotMeter(WT.FlowRate.Value, OldFlowSamples, OldFlowValue);
+        if WT.FluidTemp <> nil then SnapshotMeter(WT.FluidTemp.Value, OldTempSamples, OldTempValue);
+        if WT.FluidPress <> nil then SnapshotMeter(WT.FluidPress.Value, OldPressSamples, OldPressValue);
+        MaxExistingSampleTimeMs := 0;
+        if WT.FlowRate <> nil then
+          MaxExistingSampleTimeMs := Max(MaxExistingSampleTimeMs, LastSampleTimeOf(WT.FlowRate.Value));
+        if WT.FluidTemp <> nil then
+          MaxExistingSampleTimeMs := Max(MaxExistingSampleTimeMs, LastSampleTimeOf(WT.FluidTemp.Value));
+        if WT.FluidPress <> nil then
+          MaxExistingSampleTimeMs := Max(MaxExistingSampleTimeMs, LastSampleTimeOf(WT.FluidPress.Value));
+        VirtualTimeStartMs := Max(TMeterValue.GetMonotonicTimeMs, MaxExistingSampleTimeMs) + 1;
+        WT.IsSimulationMode := True;
+        TMeterValue.EnableVirtualClock(VirtualTimeStartMs);
+        FAutoTestRealCommandsBlocked := True;
+        Lines.Add(Format('ScenarioStart; InitialStage=%s; InitialWorkTableState=%s; CurrentMonotonicTime=%d; MaxExistingSampleTime=%d; VirtualTimeStart=%d',
+          [TMeasurementRun.MeasurementStateToString(Run.Stage), TWorkTable.WorkTableStateToString(WT.State),
+           VirtualTimeStartMs - 1, MaxExistingSampleTimeMs, VirtualTimeStartMs]));
+        Run.Mode := mrmAutomatic;
+        Run.CreateSession;
+        if (Run.Points = nil) or (Run.Points.Count = 0) then
+          FinalReason := 'FAIL — штатный CreateSession не сформировал точки'
+        else
+        begin
+          Run.Start;
+          for Step := 0 to AUTO_MEASUREMENT_MAX_STEPS - 1 do
+          begin
+            if FAutoTestStopRequested then
+            begin
+              FinalKind := amtrkStopped;
+              FinalReason := 'STOPPED — остановлено пользователем';
+              Break;
+            end;
+            StageBefore := Run.Stage;
+            TThread.Sleep(1);
+            Point := Run.CurrentPoint;
+            PointReady := (Point <> nil) and (Run.CurrentPointIndex >= 0) and
+              (Run.Points <> nil) and (Run.CurrentPointIndex < Run.Points.Count) and
+              (Run.Points[Run.CurrentPointIndex] = Point) and
+              (Run.Stage in [msSelectPoint, msSelectEtalon, msSetupPoint, msWaitPointSetup, msWaitStable, msWaitMeasureStart, msMeasure, msWaitMeasureStop, msResultsRead, msSave]);
+            if not PointReady then
+            begin
+              Inc(PointWaitSteps);
+              Row.VirtualTimeSec := Integer(TMeterValue.GetMonotonicTimeMs - VirtualTimeStartMs);
+              Row.PointText := '-';
+              Row.RepeatText := '-';
+              Row.StageBefore := TMeasurementRun.MeasurementStateToString(StageBefore);
+              Row.StageAfter := TMeasurementRun.MeasurementStateToString(Run.Stage);
+              Row.WorkTableState := TWorkTable.WorkTableStateToString(WT.State);
+              Row.TargetFlow := 0; Row.ActualFlow := 0;
+              Row.QParameter := 0; Row.QSample := 0; Row.SampleTimeMs := 0; Row.TimeSource := 'Virtual';
+              Row.TargetTemp := 0; Row.ActualTemp := 0; Row.TargetPress := 0; Row.ActualPress := 0;
+              Row.StableText := 'DeliveryCheck=Skipped';
+              Row.VirtualCommand := 'WaitPointSelection';
+              Row.VirtualResponse := TWorkTable.WorkTableStateToString(WT.State);
+              Row.ProgressText := 'WaitingPoint';
+              Row.Reason := 'Reason=PointNotSelected';
+              Row.ExecutorCall := Row.VirtualCommand;
+              Row.CheckText := 'DeliveryCheck=Skipped; Reason=PointNotSelected';
+              AppendStep;
+              if PointWaitSteps >= 40 then
+              begin
+                FinalReason := 'FAIL — штатная FSM не выбрала точку';
+                Break;
+              end;
+              Continue;
+            end;
+
+            if PointWaitSteps > 0 then
+              Lines.Add(Format('PointSelected; PointIndex=%d; PointName=%s; TargetQ=%.9f; Stage=%s; VirtualTime=%d',
+                [Run.CurrentPointIndex, Point.Name, Point.Q, TMeasurementRun.MeasurementStateToString(Run.Stage),
+                 TMeterValue.GetMonotonicTimeMs]));
+
+            TMeterValue.AdvanceVirtualClock(1000);
+            TargetQ := Point.Q;
+            TargetT := Point.Temp;
+            TargetP := Point.Pressure;
+            Factor := Min(1.0, 0.72 + Step * 0.07);
+            case AScenarioIndex of
+              3: Factor := 1.25;
+              4: Factor := 0.85 + Step * 0.01;
+              5: Factor := 1.15 - Step * 0.01;
+              8: if Step < 3 then Factor := 1.0;
+              10: ActualT := TargetT + Step * 0.5;
+              11: ActualP := TargetP + Max(Abs(TargetP) * 0.2, 0.1);
+            end;
+            ActualQ := TargetQ * Factor;
+            if AScenarioIndex in [2, 6] then
+              ActualQ := TargetQ * (1.0 + IfThen(Odd(Step), 0.001, -0.001));
+            if (TargetQ > 0) and SameValue(ActualQ, 0, 1E-12) then
+            begin
+              FinalReason := Format('FAIL — для выбранной точки сформирован нулевой расход; PointIndex=%d; PointName=%s; TargetQ=%.9f; Stage=%s; GeneratedQ=%.9f; Source=SelectedMeasurementRunPoint',
+                [Run.CurrentPointIndex, Point.Name, TargetQ, TMeasurementRun.MeasurementStateToString(Run.Stage), ActualQ]);
+              Break;
+            end;
+            ValuesInjected := True;
+
+            if not (AScenarioIndex = 10) then
+              ActualT := TargetT + IfThen(Step < 4, -0.5 + Step * 0.15, 0.01);
+            if not (AScenarioIndex = 11) then
+              ActualP := TargetP + IfThen(Step < 4, -0.05 + Step * 0.015, 0.001);
+
+            if WT.FlowRate <> nil then
+            begin
+              WT.FlowRate.SetValue(ActualQ);
+              AddSampleToMeter(WT.FlowRate.Value, ActualQ, TMeterValue.GetMonotonicTimeMs);
+            end;
+            if WT.FluidTemp <> nil then
+            begin
+              WT.FluidTemp.SetValue(ActualT);
+              AddSampleToMeter(WT.FluidTemp.Value, ActualT, TMeterValue.GetMonotonicTimeMs);
+            end;
+            if WT.FluidPress <> nil then
+            begin
+              WT.FluidPress.SetValue(ActualP);
+              AddSampleToMeter(WT.FluidPress.Value, ActualP, TMeterValue.GetMonotonicTimeMs);
+            end;
+            if WT.ValueFlowRate <> nil then WT.ValueFlowRate.Reset(ActualQ);
+            if WT.ValueTemperture <> nil then WT.ValueTemperture.Reset(ActualT);
+            if WT.ValuePressure <> nil then WT.ValuePressure.Reset(ActualP);
+            for I := 0 to WT.EtalonChannels.Count - 1 do
+              if (WT.EtalonChannels[I] <> nil) and WT.EtalonChannels[I].Enabled and
+                 (WT.EtalonChannels[I].FlowMeter <> nil) and (WT.EtalonChannels[I].FlowMeter.ValueFlow <> nil) then
+                AddSampleToMeter(WT.EtalonChannels[I].FlowMeter.ValueFlow, ActualQ, TMeterValue.GetMonotonicTimeMs);
+            for I := 0 to WT.DeviceChannels.Count - 1 do
+              if (WT.DeviceChannels[I] <> nil) and WT.DeviceChannels[I].Enabled then
+              begin
+                WT.DeviceChannels[I].ImpResult := Step * 1000;
+                if (WT.DeviceChannels[I].FlowMeter <> nil) and (WT.DeviceChannels[I].FlowMeter.ValueFlow <> nil) then
+                  AddSampleToMeter(WT.DeviceChannels[I].FlowMeter.ValueFlow, ActualQ, TMeterValue.GetMonotonicTimeMs);
+              end;
+
+            AppliedQ := 0;
+            LastSampleQ := 0;
+            LastSampleTimeMs := 0;
+            if (WT.FlowRate <> nil) and (WT.FlowRate.Value <> nil) then
+              AppliedQ := WT.FlowRate.Value.Value;
+            if WT.FlowRate <> nil then
+              ReadLastSample(WT.FlowRate.Value, LastSampleQ, LastSampleTimeMs);
+            if ValuesInjected and ((not SameValue(ActualQ, AppliedQ, 1E-9)) or
+               (not SameValue(ActualQ, LastSampleQ, 1E-9)) or
+               (LastSampleTimeMs <> TMeterValue.GetMonotonicTimeMs)) then
+            begin
+              if Point <> nil then
+                PointNameForLog := Point.Name
+              else
+                PointNameForLog := '-';
+              FinalReason := Format('FAIL — тестовое значение не передано в рабочий параметр; Parameter=FlowRate; GeneratedQ=%.9f; AppliedQ=%.9f; LastSampleQ=%.9f; SampleTime=%d; VirtualTime=%d; Point=%s; Stage=%s; WorkTable.State=%s',
+                [ActualQ, AppliedQ, LastSampleQ, LastSampleTimeMs, TMeterValue.GetMonotonicTimeMs,
+                 PointNameForLog, TMeasurementRun.MeasurementStateToString(Run.Stage),
+                 TWorkTable.WorkTableStateToString(WT.State)]);
+              Break;
+            end;
+
+            TThread.Sleep(1);
+            StageAfter := Run.Stage;
+            StableText := 'n/a';
+            if WT.FlowRate <> nil then
+            begin
+              if WT.FlowRate.IsStable(StableInfo) then
+                StableText := 'True: ' + StableInfo.StatusText
+              else
+                StableText := 'False: ' + StableInfo.StatusText;
+            end;
+
+            ProgressKey := Format('%d|%d|%d|%d', [Ord(Run.Stage), Ord(WT.State), Run.CurrentPointIndex, Run.CurrentRepeat]);
+            if ProgressKey = LastProgressKey then
+              Inc(NoProgressSteps)
+            else
+            begin
+              LastProgressKey := ProgressKey;
+              NoProgressSteps := 0;
+            end;
+
+            Row.VirtualTimeSec := Integer((TMeterValue.GetMonotonicTimeMs - VirtualTimeStartMs) div 1000);
+            if Point <> nil then Row.PointText := Format('%d/%d %s', [Run.CurrentPointIndex + 1, Run.Points.Count, Point.Name]) else Row.PointText := '-';
+            Row.RepeatText := IntToStr(Run.CurrentRepeat + 1);
+            Row.StageBefore := TMeasurementRun.MeasurementStateToString(StageBefore);
+            Row.StageAfter := TMeasurementRun.MeasurementStateToString(StageAfter);
+            Row.WorkTableState := TWorkTable.WorkTableStateToString(WT.State);
+            Row.TargetFlow := TargetQ; Row.ActualFlow := ActualQ;
+            Row.QParameter := AppliedQ; Row.QSample := LastSampleQ;
+            Row.SampleTimeMs := LastSampleTimeMs; Row.TimeSource := 'Virtual';
+            Row.TargetTemp := TargetT; Row.ActualTemp := ActualT;
+            Row.TargetPress := TargetP; Row.ActualPress := ActualP;
+            Row.StableText := StableText;
+            Row.VirtualCommand := 'Virtual command boundary';
+            Row.VirtualResponse := TWorkTable.WorkTableStateToString(WT.State);
+            if NoProgressSteps = 0 then Row.ProgressText := 'True' else Row.ProgressText := 'False';
+            Row.Reason := 'Шаг виртуального времени; значения прочитаны обратно из производственных параметров';
+            Row.ExecutorCall := Row.VirtualCommand;
+            Row.CheckText := 'Generated/Applied/Sample verified';
+            AppendStep;
+
+            if NoProgressSteps >= 20 then
+            begin
+              FinalReason := Format('FAIL — отсутствует прогресс FSM; Stage=%s; WorkTable.State=%s; Point=%d; Repeat=%d; GeneratedQ=%.9f; AppliedQ=%.9f; LastSampleQ=%.9f; TargetQ=%.9f; StableStatus=%s; LastVirtualCommand=%s; LastVirtualResponse=%s; VirtualTime=%d; RealExecutionTime=%d',
+                [TMeasurementRun.MeasurementStateToString(Run.Stage), TWorkTable.WorkTableStateToString(WT.State),
+                 Run.CurrentPointIndex, Run.CurrentRepeat, ActualQ, AppliedQ, LastSampleQ, TargetQ, StableText,
+                 Row.VirtualCommand, Row.VirtualResponse, TMeterValue.GetMonotonicTimeMs, TThread.GetTickCount - StartTick]);
+              Break;
+            end;
+
+            if Run.Stage = msDone then
+              Break;
+          end;
+          RepeatCount := 0;
+          for I := 0 to Run.Points.Count - 1 do
+            if Run.Points[I] <> nil then
+              Inc(RepeatCount, Max(1, Run.Points[I].Repeats));
+          if FinalReason = '' then
+          begin
+            if Step >= AUTO_MEASUREMENT_MAX_STEPS - 1 then
+              FinalReason := 'FAIL — превышен лимит шагов/событий, вероятен цикл FSM'
+            else if (Run.Stage = msDone) and Run.RunCompleted and (Run.RunResult = mrrSuccess) and (AScenarioIndex in [0,1,2,19]) then
+            begin
+              FinalKind := amtrkPass;
+              FinalReason := 'PASS — обязательные проверки сценария выполнены, рабочее сохранение заблокировано SimulationMode';
+            end
+            else if AScenarioIndex in [3,4,5,7,8,9,10,11,13,14,15,17,18] then
+              FinalReason := 'FAIL — сценарий отрицательной ветки выполнен без PASS по одному только msDone'
+            else
+              FinalReason := 'FAIL — итоговое состояние не совпало с Expected/Actual сценария';
+          end;
+        end;
+      except
+        on E: Exception do
+        begin
+          FinalKind := amtrkError;
+          FinalReason := 'ERROR — ' + E.Message;
+        end;
+      end;
+      if (Run <> nil) and Run.IsWorkerThreadRunning then
+        Run.Execute(mcStop, Null);
+      for I := 0 to 50 do
+      begin
+        if (Run = nil) or (not Run.IsWorkerThreadRunning) then
+          Break;
+        TThread.Sleep(1);
+      end;
+      if WT.FlowRate <> nil then RestoreMeter(WT.FlowRate.Value, OldFlowSamples, OldFlowValue);
+      if WT.FluidTemp <> nil then RestoreMeter(WT.FluidTemp.Value, OldTempSamples, OldTempValue);
+      if WT.FluidPress <> nil then RestoreMeter(WT.FluidPress.Value, OldPressSamples, OldPressValue);
+      TMeterValue.DisableVirtualClock;
+      WT.IsSimulationMode := OldSimulation;
+      WT.CurrentPoint := OldPoint;
+      WT.State := OldState;
+      FAutoTestRealCommandsBlocked := False;
+      FAutoTestRunning := False;
+    end;
+
+    if FinalKind = amtrkFail then
+    begin
+      if StartsText('PASS', FinalReason) then FinalKind := amtrkPass
+      else if StartsText('STOPPED', FinalReason) then FinalKind := amtrkStopped
+      else if StartsText('ERROR', FinalReason) then FinalKind := amtrkError;
+    end;
+
+    LogFile := TPath.Combine(TPath.GetTempPath, Format('AUTO_MEASUREMENT_TEST_%s.txt', [FormatDateTime('yyyymmdd_hhnnss', Now)]));
+    Lines.Add('Result=' + FinalReason);
+    Lines.Add('RestoreState=Done; WorkTableRecreated=False; RealCommandsBlocked=True; WorkingDbSaveBlocked=True');
+    Lines.SaveToFile(LogFile, TEncoding.UTF8);
+
+    ResultRow.Num := Length(FAutoTestResultRows) + 1;
+    ResultRow.Scenario := ScenarioName;
+    case FinalKind of
+      amtrkPass: ResultRow.ResultText := 'PASS';
+      amtrkError: ResultRow.ResultText := 'ERROR';
+      amtrkStopped: ResultRow.ResultText := 'STOPPED';
+    else ResultRow.ResultText := 'FAIL';
+    end;
+    ResultRow.ElapsedMs := TThread.GetTickCount - StartTick;
+    ResultRow.VirtualTimeSec := Max(0, Length(FAutoTestStepRows) - 1);
+    if (Run <> nil) and (Run.Points <> nil) then ResultRow.PointCount := Run.Points.Count else ResultRow.PointCount := 0;
+    ResultRow.RepeatCount := RepeatCount;
+    if Run <> nil then ResultRow.FinalStage := TMeasurementRun.MeasurementStateToString(Run.Stage) else ResultRow.FinalStage := '-';
+    if WT <> nil then ResultRow.FinalWorkTableState := TWorkTable.WorkTableStateToString(WT.State) else ResultRow.FinalWorkTableState := '-';
+    ResultRow.Reason := FinalReason;
+    ResultRow.LogFile := LogFile;
+    ResultRow.ResultKind := FinalKind;
+    SetLength(FAutoTestResultRows, Length(FAutoTestResultRows) + 1);
+    FAutoTestResultRows[High(FAutoTestResultRows)] := ResultRow;
+
+    GridAutoTestNumbers.RowCount := Length(FAutoTestStepRows);
+    GridAutoTestResults.RowCount := Length(FAutoTestResultRows);
+    if FAutoTestStatusLabel <> nil then
+      FAutoTestStatusLabel.Text := FinalReason;
+    RefreshAutoMeasurementTestContext;
+  finally
+    Lines.Free;
+    if ButtonStopAutoTestScenario <> nil then
+      ButtonStopAutoTestScenario.Enabled := False;
+  end;
+end;
+
+procedure TFrameMainTable.MeasurementButtonClickManualMode;
 begin
   if FActiveWorkTable = nil then
     Exit;
@@ -6860,7 +7716,7 @@ begin
     StartMeasurement;
 end;
 
-procedure TFrameMainTable.TestButtonClickAutoMode;
+procedure TFrameMainTable.MeasurementButtonClickAutoMode;
 var
   Run: TMeasurementRun;
 begin
@@ -6869,22 +7725,29 @@ begin
     Exit;
 
   case Run.Stage of
-    msNone,
-    msDone:
+    msNone:
       StartMeasurement;
+
+    msDone:
+      if Run.RunCompleted and (Run.RunResult = mrrSuccess) then
+      begin
+        ProtocolManager.AddMessage(pcAction, psForm, 'RollbackMeasurementRun',
+          'Запрошена отмена результатов последнего автоматического запуска', '');
+        Run.Execute(mcCancel);
+      end
+      else
+        StartMeasurement;
 
     msSelectPoint,
     msSelectEtalon,
     msSetupPoint,
     msWaitStable,
     msWaitMeasureStart,
-    msMeasure:
-      StopMeasurement;
-
+    msMeasure,
     msWaitMeasureStop,
     msResultsRead,
     msSave:
-      Exit;
+      StopMeasurement;
   else
     Exit;
   end;
@@ -6937,7 +7800,9 @@ begin
     if (Channel <> nil) and
        Channel.Enabled and
        (Channel.FlowMeter <> nil) and
-       (Channel.FlowMeter.Device <> nil) then
+       (Channel.FlowMeter.Device <> nil) and
+       ((Channel.FlowMeter.Device.Spillages = nil) or
+        (Channel.FlowMeter.Device.Spillages.Count = 0)) then
     begin
       Result := True;
       Exit;
@@ -6956,6 +7821,9 @@ begin
     Exit;
 
   if not (WorkTable.State in [swtCOMPLETE, swtFINALREAD]) then
+    Exit;
+
+  if not NeedSaveMeasurementResults(WorkTable) then
     Exit;
 
   ProtocolManager.AddMessage(pcAction, psForm, 'AcceptResults',
@@ -6980,14 +7848,29 @@ end;
 // - start a new measurement.
 // Business logic must be kept in dedicated helper methods.
 procedure TFrameMainTable.TestButtonClick(Sender: TObject);
+var
+  WorkTable: TWorkTable;
 begin
-  if FActiveWorkTable = nil then
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
     Exit;
 
   if (SwitchAuto <> nil) and SwitchAuto.IsChecked then
-    TestButtonClickAutoMode
+  begin
+    MeasurementButtonClickAutoMode;
+    Exit;
+  end;
+
+  if IsTestButtonSaveMode then
+  begin
+    AcceptMeasurementResults;
+    Exit;
+  end;
+
+  if IsMeasurementActive(WorkTable) then
+    StopMeasurement
   else
-    TestButtonClickManualMode;
+    StartMeasurement;
 end;
 
 procedure TFrameMainTable.Button1Click(Sender: TObject);
@@ -7699,6 +8582,8 @@ begin
     if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
     begin
       Changed := WorkTable.DeviceChannels[ARow].Enabled <> Value.AsBoolean;
+      if Changed then
+        PersistChannelEnabled(WorkTable, WorkTable.DeviceChannels[ARow], 'Device', WorkTable.DeviceChannels[ARow].Enabled, Value.AsBoolean);
       if FUpdatingChannelEnabled then
         Exit;
       FUpdatingChannelEnabled := True;
@@ -7815,8 +8700,13 @@ begin
 
   if Column = CheckColumnEtalonEnable1 then
   begin
+    if FUpdatingChannelEnabled then
+      Exit;
     if WorkTable <> nil then
     begin
+      FUpdatingChannelEnabled := True;
+      try
+      PersistChannelEnabled(WorkTable, WorkTable.EtalonChannels[Row], 'Etalon', WorkTable.EtalonChannels[Row].Enabled, not WorkTable.EtalonChannels[Row].Enabled);
       WorkTable.EtalonChannels[Row].Enabled := not WorkTable.EtalonChannels[Row].Enabled;
       if WorkTable.EtalonChannels[Row].Enabled then
         begin
@@ -7829,6 +8719,9 @@ begin
           ApplyEnabledChannelSimulationValues(WorkTable, True);
         end;
       MarkChannelDeviceModified(WorkTable.EtalonChannels[Row]);
+      finally
+        FUpdatingChannelEnabled := False;
+      end;
     end
     else
       FRows[Row].Enabled := not FRows[Row].Enabled;
@@ -7968,19 +8861,47 @@ procedure TFrameMainTable.DisableOtherChannelGroups(AChannels: TObjectList<TChan
 var
   J: Integer;
   ActiveGroup: Integer;
+  SelectedChannel: TChannel;
+  OtherChannel: TChannel;
+  OldEnabled: Boolean;
+  WorkTableUUID: string;
 begin
   if (AChannels = nil) or (AActiveIndex < 0) or (AActiveIndex >= AChannels.Count) or
      (AChannels[AActiveIndex] = nil) then
     Exit;
 
-  ActiveGroup := AChannels[AActiveIndex].Group;
+  SelectedChannel := AChannels[AActiveIndex];
+  ActiveGroup := SelectedChannel.Group;
+  if FActiveWorkTable <> nil then
+    WorkTableUUID := FActiveWorkTable.UUID
+  else
+    WorkTableUUID := '';
   for J := 0 to AChannels.Count - 1 do
-    if (J <> AActiveIndex) and (AChannels[J] <> nil) and
-       ((ActiveGroup <= 0) or (AChannels[J].Group <> ActiveGroup)) then
+  begin
+    OtherChannel := AChannels[J];
+    if (J = AActiveIndex) or (OtherChannel = nil) or
+       (OtherChannel.Group <> ActiveGroup) then
+      Continue;
+
+    OldEnabled := OtherChannel.Enabled;
+    if OldEnabled then
     begin
-      AChannels[J].Enabled := False;
-      ClearChannelSimulationValues(AChannels[J]);
+      OtherChannel.Enabled := False;
+      ClearChannelSimulationValues(OtherChannel);
+      MarkChannelDeviceModified(OtherChannel);
+      if FActiveWorkTable <> nil then
+        PersistChannelEnabled(FActiveWorkTable, OtherChannel, 'Etalon', OldEnabled, False);
     end;
+
+    ProtocolManager.AddMessage(pcAction, psForm, 'EtalonEnabledGroupChange',
+      'Взаимоисключение эталонных каналов одной группы',
+      Format('WorkTableUUID=%s; SelectedChannelUUID=%s; SelectedChannelName=%s; SelectedGroup=%d; SelectedOldEnabled=%s; SelectedNewEnabled=%s; AffectedChannelUUID=%s; AffectedChannelName=%s; AffectedGroup=%d; AffectedOldEnabled=%s; AffectedNewEnabled=%s; Reason=ExclusiveGroupSelection',
+        [WorkTableUUID,
+         SelectedChannel.UUID, SelectedChannel.Name, ActiveGroup,
+         BoolToStr(SelectedChannel.Enabled, True), BoolToStr(True, True),
+         OtherChannel.UUID, OtherChannel.Name, OtherChannel.Group,
+         BoolToStr(OldEnabled, True), BoolToStr(OtherChannel.Enabled, True)]));
+  end;
 end;
 
 
@@ -8341,9 +9262,11 @@ begin
 
     if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
      begin
-      Changed := WorkTable.EtalonChannels[ARow].Enabled <> Value.AsBoolean;
       if FUpdatingChannelEnabled then
         Exit;
+      Changed := WorkTable.EtalonChannels[ARow].Enabled <> Value.AsBoolean;
+      if Changed then
+        PersistChannelEnabled(WorkTable, WorkTable.EtalonChannels[ARow], 'Etalon', WorkTable.EtalonChannels[ARow].Enabled, Value.AsBoolean);
       FUpdatingChannelEnabled := True;
       try
         WorkTable.EtalonChannels[ARow].Enabled := Value.AsBoolean;

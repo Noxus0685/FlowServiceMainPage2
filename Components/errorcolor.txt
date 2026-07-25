@@ -1,0 +1,157 @@
+object TStyleContainer
+  object TLayout
+    StyleName = 'errorindicatorstyle'
+    Align = Center
+    Padding.Top = 10.000000000000000000
+    Padding.Bottom = 10.000000000000000000
+    Size.Width = 157.600006103515600000
+    Size.Height = 132.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    object TRectangle
+      StyleName = 'background'
+      Align = Center
+      Size.Width = 136.399993896484400000
+      Size.Height = 21.999996185302730000
+      Size.PlatformDefault = False
+      Stroke.Cap = Round
+      object TRectangle
+        StyleName = 'l7barstyle'
+        Align = MostLeft
+        Fill.Color = claOrangered
+        Size.Width = 10.000000000000000000
+        Size.Height = 21.999996185302730000
+        Size.PlatformDefault = False
+      end
+      object TRectangle
+        StyleName = 'l6barstyle'
+        Align = Left
+        Fill.Color = claOrangered
+        Margins.Left = -1.000000000000000000
+        Position.X = 9.000000000000000000
+        Size.Width = 10.000000000000000000
+        Size.Height = 21.999996185302730000
+        Size.PlatformDefault = False
+      end
+      object TRectangle
+        StyleName = 'l5barstyle'
+        Align = Left
+        Fill.Color = claYellow
+        Margins.Left = -1.000000000000000000
+        Position.X = 18.000000000000000000
+        Size.Width = 10.000000000000000000
+        Size.Height = 21.999996185302730000
+        Size.PlatformDefault = False
+      end
+      object TRectangle
+        StyleName = 'l4barstyle'
+        Align = Left
+        Fill.Color = xFF66FF00
+        Margins.Left = -1.000000000000000000
+        Position.X = 27.000000000000000000
+        Size.Width = 10.000000000000000000
+        Size.Height = 21.999996185302730000
+        Size.PlatformDefault = False
+      end
+      object TRectangle
+        StyleName = 'l3barstyle'
+        Align = Left
+        Fill.Color = xFF66FF00
+        Margins.Left = -1.000000000000000000
+        Position.X = 36.000000000000000000
+        Size.Width = 10.000000000000000000
+        Size.Height = 21.999996185302730000
+        Size.PlatformDefault = False
+      end
+      object TRectangle
+        StyleName = 'left2barstyle'
+        Align = Left
+        Fill.Color = xFF66FF00
+        Margins.Left = -1.000000000000000000
+        Position.X = 45.000000000000000000
+        Size.Width = 10.000000000000000000
+        Size.Height = 21.999996185302730000
+        Size.PlatformDefault = False
+      end
+      object TRectangle
+        StyleName = 'r6barstyle'
+        Align = Right
+        Fill.Color = claOrangered
+        Margins.Right = -1.000000000000000000
+        Position.X = 117.399993896484400000
+        Size.Width = 10.000000000000000000
+        Size.Height = 21.999996185302730000
+        Size.PlatformDefault = False
+      end
+      object TRectangle
+        StyleName = 'r7barstyle'
+        Align = MostRight
+        Fill.Color = claOrangered
+        Position.X = 126.399993896484400000
+        Size.Width = 10.000000000000000000
+        Size.Height = 21.999996185302730000
+        Size.PlatformDefault = False
+      end
+      object TRectangle
+        StyleName = 'r5barstyle'
+        Align = Right
+        Fill.Color = claYellow
+        Margins.Right = -1.000000000000000000
+        Position.X = 108.399993896484400000
+        Size.Width = 10.000000000000000000
+        Size.Height = 21.999996185302730000
+        Size.PlatformDefault = False
+      end
+      object TRectangle
+        StyleName = 'r4barstyle'
+        Align = Right
+        Fill.Color = xFF66FF00
+        Margins.Right = -1.000000000000000000
+        Position.X = 99.399993896484380000
+        Size.Width = 10.000000000000000000
+        Size.Height = 21.999996185302730000
+        Size.PlatformDefault = False
+      end
+      object TRectangle
+        StyleName = 'r3barstyle'
+        Align = Right
+        Fill.Color = xFF66FF00
+        Margins.Right = -1.000000000000000000
+        Position.X = 90.399993896484380000
+        Size.Width = 10.000000000000000000
+        Size.Height = 21.999996185302730000
+        Size.PlatformDefault = False
+      end
+      object TRectangle
+        StyleName = 'r2barstyle'
+        Align = Right
+        Fill.Color = xFF66FF00
+        Margins.Right = -1.000000000000000000
+        Position.X = 81.399993896484380000
+        Size.Width = 10.000000000000000000
+        Size.Height = 21.999996185302730000
+        Size.PlatformDefault = False
+      end
+    end
+    object TRectangle
+      StyleName = 'cental_digit_style'
+      Align = Center
+      Fill.Color = xFF66FF00
+      Padding.Top = 10.000000000000000000
+      Padding.Bottom = 10.000000000000000000
+      Size.Width = 30.166664123535160000
+      Size.Height = 34.166671752929690000
+      Size.PlatformDefault = False
+      object TText
+        StyleName = 'text_value_style'
+        Align = Client
+        Size.Width = 30.166664123535160000
+        Size.Height = 14.166671752929690000
+        Size.PlatformDefault = False
+        Text = '-0,2%'
+        TextSettings.Font.Size = 10.000000000000000000
+        TextSettings.Font.StyleExt = {00070000000000000004000000}
+      end
+    end
+  end
+end

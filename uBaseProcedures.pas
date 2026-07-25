@@ -96,6 +96,7 @@ type
       msSelectPoint,        // Выбор точки измерения
       msSelectEtalon,       // Выбор эталонов для текущей точки
       msSetupPoint,         // Задание параметров точки и ограничений измерения
+      msWaitPointSetup,     // Ожидание подтверждения установки точки и запуска мониторинга
       msWaitStable,         // Ожидание стабилизации условий
 
       msWaitMeasureStart,   // Команда StartTest отдана, ожидаем фактический запуск
@@ -136,7 +137,9 @@ type
     mptsMeasureError = 13,
     mptsInterrupted = 14,
     mptsCancelled = 15,
-    mptsSaved = 16
+    mptsSaved = 16,
+    mptsStabilityError = 17,
+    mptsDevicePointMismatch = 18
   );
 
   /// <summary>One physical-value sample stored by TMeterValue for stability analysis.</summary>
@@ -153,6 +156,7 @@ type
     SourceIndex: Integer;
     TimeStampMs: Int64;
     InWindow: Boolean;
+    IsInDisplayAnalysisWindow: Boolean;
     IsInConfirmationPeriod: Boolean;
     IsOutlier: Boolean;
     IsInRange: Boolean;
@@ -164,8 +168,8 @@ type
     mvssDisabled,      // Stability analysis is intentionally disabled for this value.
     mvssNotEnoughData, // The window lacks required sample count or duration.
     mvssStaleData,     // Last sample is older than MaxSampleAgeSec.
-    mvssUnstable,      // Data is available but at least one criterion failed or confirmation is pending.
-    mvssStable         // All criteria passed continuously for ConfirmationTimeSec.
+    mvssUnstable,      // Data is available but at least one criterion failed.
+    mvssStable         // All stability criteria passed in the full analysis window.
   );
 
   /// <summary>Individual reasons why a stability analysis did not become stable.</summary>
@@ -173,7 +177,7 @@ type
     mvsfrAnalysisDisabled,
     mvsfrNoData,
     mvsfrNotEnoughSamples,  // Fewer samples than MinSampleCount are available in the active window.
-    mvsfrInsufficientWindow,// Trend cannot be calculated because timestamps have insufficient spread.
+    mvsfrWindowNotFilled,    // Active-window duration is shorter than WindowDurationSec.
     mvsfrInsufficientTimeSpread, // Timestamps are too close or identical to calculate a trend.
     mvsfrStaleData,         // Last sample age exceeds MaxSampleAgeSec.
     mvsfrVariationTooHigh,  // Max-min variation exceeds MaxVariation.
@@ -183,7 +187,9 @@ type
     mvsfrCurrentValueOutOfRange,
     mvsfrMeanValueOutOfRange,
     mvsfrForecastOutOfRange,
-    mvsfrWaitingForConfirmation,
+    mvsfrSampleBelowStabilityRange,
+    mvsfrSampleAboveStabilityRange,
+    mvsfrInvalidPointError,
     mvsfrInvalidSettings    // Settings failed validation and analysis result is not reliable.
   );
 
@@ -224,8 +230,6 @@ type
     MaxOutlierFraction: Double;
     /// <summary>Multiplier used by the outlier detector threshold.</summary>
     OutlierFactor: Double;
-    /// <summary>Seconds that all mathematical criteria must remain true before final stability.</summary>
-    ConfirmationTimeSec: Double;
     /// <summary>Multiplier for exit thresholds after stability was already confirmed.</summary>
     ExitThresholdFactor: Double;
     /// <summary>Target value in base units used by current, mean and forecast range checks.</summary>
@@ -275,7 +279,7 @@ type
     HasLastSampleAge: Boolean;
     /// <summary>True when signal stability criteria pass independently of target range.</summary>
     IsSignalStable: Boolean;
-    /// <summary>True when confirmation time has elapsed after signal stability.</summary>
+    /// <summary>Compatibility alias: true when IsSignalStable is true.</summary>
     IsStabilityConfirmed: Boolean;
     /// <summary>True when current value is inside the target range.</summary>
     IsCurrentValueInRange: Boolean;
@@ -311,17 +315,31 @@ type
     IsForecastInRange: Boolean;
     /// <summary>Actual duration in seconds between first and last samples in the active window.</summary>
     WindowDurationSec: Double;
+    WindowStartMs: Int64;
+    CurrentAnalysisTimeMs: Int64;
+    PreviousSampleTimeMs: Int64;
+    FirstWindowSampleTimeMs: Int64;
+    LastWindowSampleTimeMs: Int64;
+    RequiredSampleCount: Integer;
+    ActualWindowDurationSec: Double;
+    RequiredWindowDurationSec: Double;
+    SampleIntervalMs: Double;
+    BoundaryToleranceMs: Integer;
+    HasLeftBoundaryCoverage: Boolean;
+    HasRightBoundaryCoverage: Boolean;
     /// <summary>Age in seconds of the latest sample.</summary>
     LastSampleAgeSec: Double;
     /// <summary>OutlierCount divided by active-window sample count.</summary>
     OutlierFraction: Double;
-    /// <summary>Seconds elapsed since the signal first met all mathematical criteria.</summary>
+    /// <summary>Compatibility alias for old confirmation duration, always 0.</summary>
     StableCandidateDurationSec: Double;
-    /// <summary>True when StableCandidateDurationSec reached ConfirmationTimeSec.</summary>
+    /// <summary>Compatibility alias: true when IsSignalStable is true.</summary>
     IsConfirmed: Boolean;
     /// <summary>True when active-window sample count meets MinSampleCount.</summary>
     HasEnoughSamples: Boolean;
     /// <summary>True when active-window duration meets WindowDurationSec.</summary>
+    HasFullWindow: Boolean;
+    /// <summary>Compatibility alias for HasFullWindow.</summary>
     HasEnoughWindow: Boolean;
     /// <summary>True when latest sample age does not exceed MaxSampleAgeSec.</summary>
     IsDataActual: Boolean;
@@ -333,6 +351,14 @@ type
     IsTrendStable: Boolean;
     /// <summary>True when OutlierFraction is within MaxOutlierFraction.</summary>
     IsOutlierLevelAcceptable: Boolean;
+    PointErrorPercent: Double;
+    StabilityLowerLimit: Double;
+    StabilityUpperLimit: Double;
+    AllSamplesInRange: Boolean;
+    OutOfRangeSampleCount: Integer;
+    FirstOutOfRangeSampleIndex: Integer;
+    FirstOutOfRangeSampleTimeMs: Int64;
+    FirstOutOfRangeSampleValue: Double;
     /// <summary>Per-source-sample flags for UI grids and diagnostics.</summary>
     SampleResults: TArray<TMeterValueSampleAnalysis>;
     /// <summary>Human-readable Russian diagnostic text containing the main analysis reasons.</summary>
@@ -1261,7 +1287,7 @@ begin
     mvsfrAnalysisDisabled: Result := 'анализ стабильности отключён';
     mvsfrNoData: Result := 'нет доступных данных';
     mvsfrNotEnoughSamples: Result := 'недостаточно отсчётов';
-    mvsfrInsufficientWindow: Result := 'недостаточный временной интервал между точками для расчёта тренда';
+    mvsfrWindowNotFilled: Result := 'Набор окна стабилизации';
     mvsfrInsufficientTimeSpread: Result := 'недостаточный временной интервал между точками для расчёта тренда';
     mvsfrStaleData: Result := 'последнее значение устарело';
     mvsfrVariationTooHigh: Result := 'размах превышает допустимое значение';
@@ -1271,7 +1297,9 @@ begin
     mvsfrCurrentValueOutOfRange: Result := 'текущее значение вне диапазона';
     mvsfrMeanValueOutOfRange: Result := 'среднее значение вне диапазона';
     mvsfrForecastOutOfRange: Result := 'прогноз вне диапазона';
-    mvsfrWaitingForConfirmation: Result := 'ожидается подтверждение стабильности';
+    mvsfrSampleBelowStabilityRange: Result := 'отсчёт ниже допуска точки';
+    mvsfrSampleAboveStabilityRange: Result := 'отсчёт выше допуска точки';
+    mvsfrInvalidPointError: Result := 'некорректный допуск точки';
     mvsfrInvalidSettings: Result := 'некорректные настройки';
   else
     Result := 'неизвестная причина';

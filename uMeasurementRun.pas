@@ -113,6 +113,7 @@ interface
 uses
   System.Classes,
   System.Generics.Collections,
+  System.Generics.Defaults,
   System.IniFiles,
   System.Math,
   System.StrUtils,
@@ -202,7 +203,23 @@ type
     msrError,
     msrCancelledBeforeStart,
     msrEmergency,
-    msrExternalCommand
+    msrExternalCommand,
+    msrUserRollback
+  );
+
+  TMeasurementRunResult = (
+    mrrNone,
+    mrrSuccess,
+    mrrCancelled,
+    mrrError
+  );
+
+  TMeasurementRunDoneReason = (
+    mdrNone,
+    mdrEndOfPointList,
+    mdrUserCancelled,
+    mdrUserRollback,
+    mdrError
   );
 
 
@@ -258,13 +275,33 @@ type
     FLastResultsPerDevice: string;
     FLastRouteStopDiagnosticKey: string;
     FStableSinceMs: UInt64;
-    FDeviceStableSinceMs: UInt64;
+    FDevicesStableSinceMs: UInt64;
     FLastDeviceStableStateKnown: Boolean;
     FLastDeviceStableState: Boolean;
     FRequireAutoStabilization: Boolean;
-    FRequiredStabilizationSec: Double;
+    FRequiredDeviceStabilizationSec: Double;
     FLastStableProgressSecond: Int64;
     FStableTimerResetReason: string;
+    FLastDeviceStabilityLogText: string;
+    FLastDeviceStabilityLogTick: UInt64;
+    FLastStabilityCheckSecond: Int64;
+    FWaitStableStartedMs: Int64;
+    FPointSetupCommandSent: Boolean;
+    FSetupPointUUID: string;
+    FSetupPointIndex: Integer;
+    FSetupTargetFlowLS: Double;
+    FSetupStartedMs: Int64;
+    FStabilityDataStartMs: Int64;
+    FLastWaitPointSetupLogMs: Int64;
+    FLastWaitPointSetupLogState: EStateWorkTable;
+    FRunCompleted: Boolean;
+    FRunResult: TMeasurementRunResult;
+    FDoneReason: TMeasurementRunDoneReason;
+    FRequestStopCalled: Boolean;
+    FFinalized: Boolean;
+
+    procedure ResetRuntimeContext;
+    procedure FinalizeMeasurementRun(AResult: TMeasurementRunResult; AReason: TMeasurementRunDoneReason);
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
     procedure SetStage(const ANewStage: EMeasurementState);
@@ -274,6 +311,7 @@ type
     procedure EnterSelectPoint;
     procedure EnterSelectEtalon;
     procedure EnterSetupPoint;
+    procedure EnterWaitPointSetup;
     procedure EnterWaitStable;
     procedure LoadRequiredStabilization(APoint: TDevicePoint);
     procedure EnterWaitMeasureStart;
@@ -301,6 +339,7 @@ type
     procedure ProcessSelectPoint;
     procedure ProcessSelectEtalon;
     procedure ProcessSetupPoint;
+    procedure ProcessWaitPointSetup;
     procedure ProcessWaitStable;
     procedure ProcessWaitMeasureStart;
     procedure ProcessMeasure;
@@ -332,11 +371,22 @@ type
     function ShouldWaitStable: Boolean;
     function ShouldSelectEtalon: Boolean;
     function CreateSingleSessionPoint(AWithConditions: Boolean): TDevicePoint;
+    function GetRuntimeTargetFlowLS: Double;
+    function GetSelectedEtalonUUID: string;
+    function IsSetupPointSynchronized(out AReason: string): Boolean;
+    function HasNewStabilityDataSince(const ATimeStampMs: Int64; out AFirstSampleTimeMs: Int64): Boolean;
+    function BuildPointSetupIdentityLog: string;
+    function CalcStableTimeoutSec: Integer;
+    procedure ResetPointSetupState;
+    procedure StartNewStabilityAttempt;
 
     procedure RunThreadProc;
     function IsThreadRunning: Boolean;
 
     function IsStable(out StableInfo: RStableInfo): Boolean;
+    function IsEtalonStable(out StableInfo: RStableInfo): Boolean;
+    function IsConditionsStable(out StableInfo: RStableInfo): Boolean;
+    function IsDevicesStable(out StableInfo: RStableInfo): Boolean;
     procedure AddDiagnosticEvent(const AText: string);
     procedure AddWorkTableStateDiagnosticEvent;
     function CheckFlowStable(out StableInfo: RStableInfo): Boolean;
@@ -387,6 +437,10 @@ type
     property Attempt: Integer read FAttempt;
     property MaxAttemptCount: Integer read FMaxAttemptCount;
     property IsWorkerThreadRunning: Boolean read IsThreadRunning;
+    property RunCompleted: Boolean read FRunCompleted;
+    property RunResult: TMeasurementRunResult read FRunResult;
+    property DoneReason: TMeasurementRunDoneReason read FDoneReason;
+    property RequestStopCalled: Boolean read FRequestStopCalled;
 
     property ManualFlowRate: Double read FManualFlowRate write FManualFlowRate;
     property ManualFluidTemp: Double read FManualFluidTemp write FManualFluidTemp;
@@ -396,6 +450,7 @@ type
   end;
 
 function GetMeasurementStopControlMode(APoint: TDevicePoint): TMeasurementStopControlMode;
+function AccuracyToRange(const AAccuracy: string; out AMin, AMax: Double): Boolean;
 
 implementation
 
@@ -668,13 +723,25 @@ begin
   FLastResultsPerDevice := '';
   FLastRouteStopDiagnosticKey := '';
   FStableSinceMs := 0;
-  FDeviceStableSinceMs := 0;
+  FDevicesStableSinceMs := 0;
   FLastDeviceStableStateKnown := False;
   FLastDeviceStableState := False;
   FRequireAutoStabilization := False;
-  FRequiredStabilizationSec := 0;
+  FRequiredDeviceStabilizationSec := 0;
   FLastStableProgressSecond := -1;
   FStableTimerResetReason := '';
+  FLastDeviceStabilityLogText := '';
+  FLastDeviceStabilityLogTick := 0;
+  FLastStabilityCheckSecond := -1;
+  FWaitStableStartedMs := 0;
+  FPointSetupCommandSent := False;
+  FSetupPointUUID := '';
+  FSetupPointIndex := -1;
+  FSetupTargetFlowLS := 0;
+  FSetupStartedMs := 0;
+  FStabilityDataStartMs := 0;
+  FLastWaitPointSetupLogMs := 0;
+  FLastWaitPointSetupLogState := swtNONE;
 end;
 
 function TMeasurementRun.BuildPointSelectionLog(APoint: TDevicePoint): string;
@@ -769,7 +836,9 @@ begin
     msSelectEtalon:
       Result := ANewStage in [msSetupPoint, msSelectPoint, msDone, msNone];
     msSetupPoint:
-      Result := ANewStage in [msWaitStable, msWaitMeasureStart, msSelectPoint, msDone, msNone];
+      Result := ANewStage in [msWaitPointSetup, msWaitStable, msWaitMeasureStart, msSelectPoint, msDone, msNone];
+    msWaitPointSetup:
+      Result := ANewStage in [msWaitStable, msWaitMeasureStart, msSetupPoint, msSelectPoint, msDone, msNone];
     msWaitStable:
       Result := ANewStage in [msWaitMeasureStart, msSetupPoint, msSelectPoint, msDone, msNone];
     msWaitMeasureStart:
@@ -796,7 +865,7 @@ begin
   if FCurrentStage = ANewStage then
     Exit;
 
-  FWaitStartedTick := TThread.GetTickCount64;
+  FWaitStartedTick := TMeterValue.GetMonotonicTimeMs;
 
   OldStage := FCurrentStage;
   TransitionText := Format('%s -> %s', [MeasurementStateToString(OldStage),
@@ -815,7 +884,7 @@ begin
   FCurrentStage := ANewStage;
 
   ProtocolManager.AddMessage(pcState, psMeasurement, 'SetStage',
-    'Переход этапа измерения, тайм аут: ' +inttostr(TThread.GetTickCount64 - FWaitStartedTick)+'; ', TransitionText);
+    'Переход этапа измерения, тайм аут: ' +inttostr(TMeterValue.GetMonotonicTimeMs - FWaitStartedTick)+'; ', TransitionText);
   AddDiagnosticEvent('Stage ' + MeasurementStateToString(OldStage) + ' -> ' + MeasurementStateToString(ANewStage));
   if FWorkTable <> nil then
     FWorkTable.MeasurementRunStateChanged(Self, ANewStage);
@@ -834,10 +903,10 @@ end;
 
 procedure TMeasurementRun.DoEnterStage(AOldStage, ANewStage: EMeasurementState);
 begin
-  FWaitStartedTick := TThread.GetTickCount64;
+  FWaitStartedTick := TMeterValue.GetMonotonicTimeMs;
   if ANewStage in [msNone, msSelectPoint, msSetupPoint, msDone] then
   begin
-    FDeviceStableSinceMs := 0;
+    FDevicesStableSinceMs := 0;
     FLastDeviceStableStateKnown := False;
     FLastDeviceStableState := False;
   end;
@@ -845,6 +914,7 @@ begin
     msSelectPoint: EnterSelectPoint;
     msSelectEtalon: EnterSelectEtalon;
     msSetupPoint: EnterSetupPoint;
+    msWaitPointSetup: EnterWaitPointSetup;
     msWaitStable: EnterWaitStable;
     msWaitMeasureStart: EnterWaitMeasureStart;
     msMeasure: EnterMeasure;
@@ -920,6 +990,8 @@ var
   // выбрать, проверить или применить указанную точку измерения.
   Error: TErrorInfo;
 begin
+  ResetPointSetupState;
+
   // Начинаем обработку новой точки с нулевого номера попытки.
   //
   // FAttempt обычно используется стадиями ожидания или выполнения команд
@@ -1046,7 +1118,10 @@ begin
     if FMode = mrmAutomatic then
       EnterSelectPoint
     else
+    begin
+      SetStopReason(msrError);
       SetStage(msDone);
+    end;
   end;
 end;
 
@@ -1129,42 +1204,79 @@ begin
 
   FireEvent(mePointSet);
   if ShouldWaitStable then
-    SetStage(msWaitStable)
+    SetStage(msWaitPointSetup)
   else
     SetStage(msWaitMeasureStart);
+end;
+
+procedure TMeasurementRun.EnterWaitPointSetup;
+begin
+  SetCurrentPointStatus(mptsSetupPoint);
+  if FWorkTable = nil then
+    Exit;
+  AddDiagnosticEvent(Format(
+    'PointSetupWaitStarted: PointIndex=%d; PointUUID=%s; TargetFlowLS=%.6f; SelectedEtalonUUID=%s; WorkTableState=%s; Attempt=%d; CommandSent=%s',
+    [FSetupPointIndex, FSetupPointUUID, FSetupTargetFlowLS, GetSelectedEtalonUUID,
+     TWorkTable.WorkTableStateToString(FWorkTable.State), FAttempt, BoolToStr(FPointSetupCommandSent, True)]));
+  if (FWorkTable <> nil) and (FWorkTable.State <> swtMONITOR) then
+    FWorkTable.StartMonitor;
 end;
 
 
 procedure TMeasurementRun.LoadRequiredStabilization(APoint: TDevicePoint);
 begin
   FRequireAutoStabilization := False;
-  FRequiredStabilizationSec := 0;
+  FRequiredDeviceStabilizationSec := 0;
   if APoint = nil then
     Exit;
 
   // Runtime-поля session-точки рассчитываются при MergePointParams:
   // Auto хранится отдельно от максимального числового Pause.
   FRequireAutoStabilization := APoint.RequireAutoStabilization or (APoint.Pause < 0);
-  FRequiredStabilizationSec := Max(0.0, APoint.RequiredStabilizationSec);
-  if (not FRequireAutoStabilization) and (FRequiredStabilizationSec = 0) and (APoint.Pause > 0) then
-    FRequiredStabilizationSec := APoint.Pause;
+  FRequiredDeviceStabilizationSec := Max(0.0, APoint.RequiredStabilizationSec);
+  if (not FRequireAutoStabilization) and (FRequiredDeviceStabilizationSec = 0) and (APoint.Pause > 0) then
+    FRequiredDeviceStabilizationSec := APoint.Pause;
 end;
 
 procedure TMeasurementRun.EnterWaitStable;
+var
+  I: Integer;
+  Channel: TChannel;
 begin
   SetCurrentPointStatus(mptsWaitStable);
 
   // Начать новый период публикации состояния стабилизации.
   // Первое промежуточное сообщение появится через 2 секунды.
-  FLastStableProtocolTick := TThread.GetTickCount64;
+  FLastStableProtocolTick := TMeterValue.GetMonotonicTimeMs;
   FStableSinceMs := 0;
-  FDeviceStableSinceMs := 0;
+  FDevicesStableSinceMs := 0;
   FLastDeviceStableStateKnown := False;
   FLastDeviceStableState := False;
   FStableTimerResetReason := '';
   FLastStableProgressSecond := -1;
+  FLastStabilityCheckSecond := -1;
+  FWaitStableStartedMs := TMeterValue.GetMonotonicTimeMs;
+  if FStabilityDataStartMs <= 0 then
+    FStabilityDataStartMs := FWaitStableStartedMs;
+
+  if (FWorkTable <> nil) and (FWorkTable.EtalonChannels <> nil) then
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.EtalonChannels[I];
+      if (Channel <> nil) and (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+        Channel.FlowMeter.ValueFlow.ResetStabilityRuntimeState;
+    end;
+
+  if (FWorkTable <> nil) and (FWorkTable.DeviceChannels <> nil) then
+    for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.DeviceChannels[I];
+      if (Channel <> nil) and (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+        Channel.FlowMeter.ValueFlow.ResetStabilityRuntimeState;
+    end;
+
   LoadRequiredStabilization(GetCurrentPoint);
-  AddDiagnosticEvent(Format('RequiredStabilizationSec=%.3f; RequireAutoStabilization=%s; RequiredStabilizationSource=TDevicePoint runtime', [FRequiredStabilizationSec, BoolToStr(FRequireAutoStabilization, True)]));
+  AddDiagnosticEvent(Format('RequiredStabilizationSec=%.3f; RequireAutoStabilization=%s; RequiredStabilizationSource=TDevicePoint runtime', [FRequiredDeviceStabilizationSec, BoolToStr(FRequireAutoStabilization, True)]));
 
   if IsStopRequested then
     Exit;
@@ -1174,11 +1286,6 @@ begin
     SetStage(msWaitMeasureStart);
     Exit;
   end;
-
-  if ShouldWaitStable and
-     (FWorkTable <> nil) and
-     not (FWorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE]) then
-    FWorkTable.StartMonitor;
 end;
 
 procedure TMeasurementRun.EnterWaitMeasureStart;
@@ -1330,10 +1437,10 @@ begin
     FireEvent(mePointDone);
     if FMode = mrmManual then
       FNextStageAfterSave := msDone
+    else if FindNextEnabledPointIndex(FCurrentPointIndex + 1) < 0 then
+      FNextStageAfterSave := msDone
     else
-    begin
       FNextStageAfterSave := msSelectPoint;
-    end;
   end
   else
     FNextStageAfterSave := msWaitMeasureStart;
@@ -1347,10 +1454,125 @@ end;
 
 procedure TMeasurementRun.EnterDone;
 begin
+  if FFinalized then
+    Exit;
+
+  if FStopRequested or (FStopReason in [msrUserStop, msrCancelledBeforeStart]) then
+    FinalizeMeasurementRun(mrrCancelled, mdrUserCancelled)
+  else if FStopReason in [msrError, msrEmergency] then
+    FinalizeMeasurementRun(mrrError, mdrError)
+  else
+    FinalizeMeasurementRun(mrrSuccess, mdrEndOfPointList);
+end;
+
+procedure TMeasurementRun.ResetRuntimeContext;
+begin
+  FCurrentPointIndex := -1;
+  FCurrentRepeat := 0;
+  FForceNextPoint := -1;
+  FAttempt := 0;
+  FMeasureTimeout := 0;
+  FPhysicalMeasureStarted := False;
+  FPhysicalStopRequested := False;
+  FActualStopEventFired := False;
+  FNextStageAfterSave := msNone;
+  FWaitStartedTick := 0;
+  FStableSinceMs := 0;
+  FDevicesStableSinceMs := 0;
+  FLastDeviceStableStateKnown := False;
+  FLastDeviceStableState := False;
+  FRequireAutoStabilization := False;
+  FRequiredDeviceStabilizationSec := 0;
+  FLastStableProgressSecond := -1;
+  FStableTimerResetReason := '';
+  ResetPointSetupState;
+  if FWorkTable <> nil then
+  begin
+    FWorkTable.CurrentPoint := nil;
+    if (FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.ValueSet <> nil) then
+      FWorkTable.FlowRate.ValueSet.Value := 0;
+    FWorkTable.TimeResult := 0;
+  end;
+end;
+
+procedure TMeasurementRun.FinalizeMeasurementRun(AResult: TMeasurementRunResult;
+  AReason: TMeasurementRunDoneReason);
+var
+  PreviousStage: EMeasurementState;
+  PreviousWorkTableState: EStateWorkTable;
+  CurrentPointIndexBefore: Integer;
+  NextStageAfterSaveBefore: EMeasurementState;
+  DisplayedStatusText: string;
+  FinalWorkTableStateText: string;
+begin
+  if FFinalized then
+    Exit;
+
+  PreviousStage := FCurrentStage;
+  if FWorkTable <> nil then
+    PreviousWorkTableState := FWorkTable.State
+  else
+    PreviousWorkTableState := swtNONE;
+  CurrentPointIndexBefore := FCurrentPointIndex;
+  NextStageAfterSaveBefore := FNextStageAfterSave;
+
+  FFinalized := True;
+
   if (GetCurrentPoint <> nil) and (GetCurrentPoint.Status = mptsResultsRead) then
     SetCurrentPointStatus(mptsDone);
-  AddDiagnosticEvent('meAllDone');
-  FireEvent(meAllDone);
+
+  FRunCompleted := True;
+  FRunResult := AResult;
+  FDoneReason := AReason;
+  FCurrentStage := msDone;
+  if AResult = mrrSuccess then
+  begin
+    FStopRequested := False;
+    FStopReason := msrNone;
+  end
+  else if AResult = mrrCancelled then
+  begin
+    FStopReason := msrUserStop;
+    if GetCurrentPoint <> nil then
+      SetCurrentPointStatus(mptsCancelled);
+  end;
+
+  ResetRuntimeContext;
+  if FWorkTable <> nil then
+    FWorkTable.State := swtNONE;
+
+  case FRunResult of
+    mrrCancelled: DisplayedStatusText := 'Отменено';
+    mrrError: DisplayedStatusText := 'Ошибка';
+  else
+    if FRunCompleted and (FRunResult = mrrSuccess) then
+      DisplayedStatusText := 'Завершено'
+    else if FStopRequested then
+      DisplayedStatusText := 'Остановка'
+    else
+      DisplayedStatusText := MeasurementStateToString(FCurrentStage);
+  end;
+
+  if FWorkTable <> nil then
+    FinalWorkTableStateText := TWorkTable.WorkTableStateToString(FWorkTable.State)
+  else
+    FinalWorkTableStateText := TWorkTable.WorkTableStateToString(swtNONE);
+
+  AddDiagnosticEvent(Format('FinalizeMeasurementRun: PreviousStage=%s; FinalStage=%s; PreviousWorkTableState=%s; FinalWorkTableState=%s; RunCompleted=%s; RunResult=%s; DoneReason=%s; StopRequested=%s; CurrentPointIndexBefore=%d; CurrentPointIndexAfter=%d; NextStageAfterSaveBefore=%s; NextStageAfterSaveAfter=%s; DisplayedStatusText=%s',
+    [MeasurementStateToString(PreviousStage), MeasurementStateToString(FCurrentStage),
+     TWorkTable.WorkTableStateToString(PreviousWorkTableState), FinalWorkTableStateText,
+     BoolToStr(FRunCompleted, True), GetEnumName(TypeInfo(TMeasurementRunResult), Ord(FRunResult)),
+     GetEnumName(TypeInfo(TMeasurementRunDoneReason), Ord(FDoneReason)), BoolToStr(FStopRequested, True),
+     CurrentPointIndexBefore, FCurrentPointIndex, MeasurementStateToString(NextStageAfterSaveBefore),
+     MeasurementStateToString(FNextStageAfterSave), DisplayedStatusText]));
+
+  if AResult = mrrSuccess then
+  begin
+    AddDiagnosticEvent('meAllDone');
+    FireEvent(meAllDone);
+  end;
+
+  Notify(Integer(meStateChanged), nil);
   if FThread <> nil then
     FThread.Terminate;
 end;
@@ -1415,44 +1637,38 @@ end;
 
 function TMeasurementRun.IsStable(out StableInfo: RStableInfo): Boolean;
 var
-  Point: TDevicePoint;
-  ParamInfo: RStableInfo;
+  EtalonInfo, ConditionsInfo, DevicesInfo: RStableInfo;
+  EtalonStable, ConditionsStable, DevicesStable: Boolean;
   DiagnosticText: string;
   DiagnosticSecond: Int64;
 begin
-  Result := False;
-  StableInfo.Status := sNONE;
-  StableInfo.StatusText := '';
-  StableInfo.CurrentValue := 0;
-  Point := GetCurrentPoint;
+  StableInfo := Default(RStableInfo);
+  EtalonStable := IsEtalonStable(EtalonInfo);
+  ConditionsStable := IsConditionsStable(ConditionsInfo);
+  DevicesStable := IsDevicesStable(DevicesInfo);
+  Result := EtalonStable and ConditionsStable and DevicesStable;
 
-  if (FWorkTable = nil) or (Point = nil) then
-    Exit;
+  if not EtalonStable then
+    StableInfo := EtalonInfo
+  else if not ConditionsStable then
+    StableInfo := ConditionsInfo
+  else if not DevicesStable then
+    StableInfo := DevicesInfo
+  else
+    StableInfo.Status := sOk;
 
-  Result := True;
-  if (FWorkTable.FlowRate <> nil) and (Point.Q >= 0) then
-  begin
-    Result := CheckFlowStable(ParamInfo) and Result;
-    if ParamInfo.Status <> sOk then
-      StableInfo := ParamInfo;
-  end;
 
-  if (FWorkTable.FluidTemp <> nil) and (Point.Temp > 0) then
-  begin
-    Result := FWorkTable.FluidTemp.IsStable(ParamInfo) and Result;
-    if ParamInfo.Status <> sOk then
-      StableInfo := ParamInfo;
-  end;
+    { TODO -oAndrey -cВажно, не срочно :
+При неуспехе раз в 2 секунды пишет диагностику WaitEtalonStable;
+после 30 секунд выполняет повтор настройки точки до FMaxAttemptCount, затем фиксирует
+ошибку стабилизации
+сделать настройку для общего времени стабилизации }
 
-  if (FWorkTable.FluidPress <> nil) and (Point.Pressure > 0) then
-  begin
-    Result := FWorkTable.FluidPress.IsStable(ParamInfo) and Result;
-    if ParamInfo.Status <> sOk then
-      StableInfo := ParamInfo;
-  end;
 
-  DiagnosticSecond := Trunc((TThread.GetTickCount64 - FWaitStartedTick) / 1000);
-  DiagnosticText := Format('IsStable=%s; Reason=%s', [BoolToStr(Result, True), StableInfo.StatusText]);
+  DiagnosticSecond := Trunc((TMeterValue.GetMonotonicTimeMs - FWaitStartedTick) / 1000);
+  DiagnosticText := Format('IsStable=%s; EtalonStable=%s; ConditionsStable=%s; DevicesStable=%s; ReadyToMeasure=%s; Reason=%s',
+    [BoolToStr(Result, True), BoolToStr(EtalonStable, True), BoolToStr(ConditionsStable, True),
+     BoolToStr(DevicesStable, True), BoolToStr(Result, True), StableInfo.StatusText]);
   if (DiagnosticText <> FLastDiagnosticIsStableText) or
      (DiagnosticSecond <> FLastDiagnosticIsStableSecond) then
   begin
@@ -1462,6 +1678,427 @@ begin
   end;
 end;
 
+function TMeasurementRun.IsEtalonStable(out StableInfo: RStableInfo): Boolean;
+begin
+  Result := CheckFlowStable(StableInfo);
+  AddDiagnosticEvent('EtalonStable=' + BoolToStr(Result, True) + '; Reason=' + StableInfo.StatusText);
+end;
+
+function TMeasurementRun.IsConditionsStable(out StableInfo: RStableInfo): Boolean;
+var
+  Point: TDevicePoint;
+  ParamInfo: RStableInfo;
+  TemperatureStable, PressureStable: Boolean;
+begin
+  StableInfo := Default(RStableInfo);
+  Point := GetCurrentPoint;
+  if (FWorkTable = nil) or (Point = nil) then
+    Exit(False);
+
+  TemperatureStable := True;
+  if (FWorkTable.FluidTemp <> nil) and (Point.Temp > 0) then
+  begin
+    TemperatureStable := FWorkTable.FluidTemp.IsStable(ParamInfo);
+    AddDiagnosticEvent(Format('TemperatureStable=%s; Actual=%.6f; Target=%.6f; Lower=%.6f; Upper=%.6f; Reason=%s',
+      [BoolToStr(TemperatureStable, True), ParamInfo.CurrentValue, ParamInfo.TargetValue,
+       ParamInfo.LowerLimit, ParamInfo.UpperLimit, ParamInfo.StatusText]));
+    if not TemperatureStable then
+      StableInfo := ParamInfo;
+  end
+  else
+    AddDiagnosticEvent('TemperatureStable=True; NotRequired=True');
+
+  PressureStable := True;
+  if (FWorkTable.FluidPress <> nil) and (Point.Pressure > 0) then
+  begin
+    PressureStable := FWorkTable.FluidPress.IsStable(ParamInfo);
+    AddDiagnosticEvent(Format('PressureStable=%s; Actual=%.6f; Target=%.6f; Lower=%.6f; Upper=%.6f; Reason=%s',
+      [BoolToStr(PressureStable, True), ParamInfo.CurrentValue, ParamInfo.TargetValue,
+       ParamInfo.LowerLimit, ParamInfo.UpperLimit, ParamInfo.StatusText]));
+    if PressureStable = False then
+      StableInfo := ParamInfo;
+  end
+  else
+    AddDiagnosticEvent('PressureStable=True; NotRequired=True');
+
+  Result := TemperatureStable and PressureStable;
+  if Result then
+  begin
+    StableInfo.Status := sOk;
+    StableInfo.StatusText := 'ConditionsStable=True';
+  end;
+  AddDiagnosticEvent('ConditionsStable=' + BoolToStr(Result, True));
+end;
+
+function TMeasurementRun.IsDevicesStable(out StableInfo: RStableInfo): Boolean;
+var
+  I, J: Integer;
+  Channel: TChannel;
+  ValueFlow: TMeterValue;
+  Settings: TMeterValueStabilitySettings;
+  SignalInfo: TMeterValueStabilityInfo;
+  CheckedCount, ReadySecCount, TotalSecCount, ReadyAutoCount, TotalAutoCount: Integer;
+  ActualValue: Double;
+  EtalonTargetValue: Double;
+  DeviceQmaxLS: Double;
+  DeviceTargetValue: Double;
+  TargetValue: Double;
+  TargetSource: string;
+  PointMatchSource: string;
+  CurrentPoint: TDevicePoint;
+  DevicePoint: TDevicePoint;
+  BestPoint: TDevicePoint;
+  BestDistance, Distance: Double;
+  ErrorPercent, AllowedDeviation: Double;
+  StableReady, RangeReady, Ready, RequireRange: Boolean;
+  CurrentInRange, MeanInRange, ForecastInRange: Boolean;
+  Reason, LogText, CurrentPointName, DeviceUUID, DevicePointUUID, MatchedPointName, ModeText: string;
+  CurrentPointQ, CurrentPointFlowRate, MatchedPointQ, MatchedDistance: Double;
+  FlowRateDistance, BestFlowRateDistance: Double;
+  CurrentTick: UInt64;
+  Participant: TMeasurementPointParticipant;
+  ParticipantFound: Boolean;
+  TargetDifferenceToPhysicalPoint, MergeToleranceLS: Double;
+
+  function IsValidFlowValue(const AValue: Double): Boolean;
+  begin
+    Result := (not IsNan(AValue)) and (not IsInfinite(AValue));
+  end;
+
+  function M3H(const ALS: Double): Double;
+  begin
+    Result := ALS * 3.6;
+  end;
+
+  function IsAutomaticDeviceMode: Boolean;
+  begin
+    Result := Assigned(CurrentPoint) and (CurrentPoint.SpillageType = Ord(stWithStop));
+  end;
+
+  function NormalizePointName(const AName: string): string;
+  begin
+    Result := LowerCase(Trim(AName));
+    Result := StringReplace(Result, ' ', '', [rfReplaceAll]);
+  end;
+
+  function IsSameFlowRate(APoint: TDevicePoint): Boolean;
+  begin
+    Result := Assigned(CurrentPoint) and Assigned(APoint) and
+      IsValidFlowValue(CurrentPoint.FlowRate) and IsValidFlowValue(APoint.FlowRate) and
+      SameValue(APoint.FlowRate, CurrentPoint.FlowRate, 1E-6);
+  end;
+
+  function IsSamePointName(APoint: TDevicePoint): Boolean;
+  begin
+    Result := Assigned(CurrentPoint) and Assigned(APoint) and
+      (NormalizePointName(APoint.Name) <> '') and
+      (NormalizePointName(APoint.Name) = NormalizePointName(CurrentPoint.Name));
+  end;
+
+  function FlowMergeTolerance(const AQ1, AQ2: Double): Double;
+  begin
+    Result := Max(1E-6, Max(Abs(AQ1), Abs(AQ2)) * 1E-4);
+  end;
+
+  function CheckRangeRequirements(const ASettings: TMeterValueStabilitySettings;
+    const AInfo: TMeterValueStabilityInfo): Boolean;
+  begin
+    Result := True;
+    if ASettings.RequireCurrentValueInRange then
+      Result := Result and AInfo.IsCurrentValueInRange;
+    if ASettings.RequireMeanValueInRange then
+      Result := Result and AInfo.IsMeanValueInRange;
+    if ASettings.RequireForecastInRange then
+      Result := Result and AInfo.IsForecastInRange;
+  end;
+
+  procedure PublishDeviceLog(const AText: string);
+  begin
+    CurrentTick := TMeterValue.GetMonotonicTimeMs;
+    if (AText <> FLastDeviceStabilityLogText) or
+       (FLastDeviceStabilityLogTick = 0) or
+       (CurrentTick - FLastDeviceStabilityLogTick >= 5000) then
+    begin
+      AddDiagnosticEvent(AText);
+      FLastDeviceStabilityLogText := AText;
+      FLastDeviceStabilityLogTick := CurrentTick;
+    end;
+  end;
+
+begin
+  StableInfo := Default(RStableInfo);
+  Result := True;
+  CurrentPoint := GetCurrentPoint;
+
+  if (FWorkTable = nil) or (FWorkTable.DeviceChannels = nil) then
+  begin
+    StableInfo.Status := sRun_NN;
+    StableInfo.StatusText := 'NoSelectedDeviceChannels';
+    Exit(False);
+  end;
+
+  CheckedCount := 0;
+  ReadySecCount := 0;
+  TotalSecCount := 0;
+  ReadyAutoCount := 0;
+  TotalAutoCount := 0;
+  for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.DeviceChannels[I];
+    if (Channel = nil) or (not Channel.Enabled) or (Channel.State = osDeleted) or
+       (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) then
+      Continue;
+
+    ValueFlow := Channel.FlowMeter.ValueFlow;
+    ActualValue := ValueFlow.GetDoubleValue;
+    Settings := ValueFlow.StabilitySettings;
+
+    EtalonTargetValue := 0;
+    if Assigned(CurrentPoint) and IsValidFlowValue(CurrentPoint.Q) then
+      EtalonTargetValue := CurrentPoint.Q;
+    DeviceQmaxLS := 0;
+    if (Channel.FlowMeter.Device <> nil) and IsValidFlowValue(Channel.FlowMeter.Device.Qmax) then
+      DeviceQmaxLS := Channel.FlowMeter.Device.Qmax;
+    DeviceTargetValue := 0;
+    if Assigned(CurrentPoint) and IsValidFlowValue(CurrentPoint.FlowRate) and
+       (CurrentPoint.FlowRate > 0) and (DeviceQmaxLS > 0) then
+      DeviceTargetValue := DeviceQmaxLS * CurrentPoint.FlowRate;
+    TargetValue := DeviceTargetValue;
+    TargetSource := 'DeviceQmaxLS*MeasurementPointFlowRate';
+    PointMatchSource := '<none>';
+    Reason := '';
+    BestPoint := nil;
+    BestDistance := MaxDouble;
+    BestFlowRateDistance := MaxDouble;
+    ErrorPercent := 0;
+    AllowedDeviation := 0;
+    CurrentInRange := False;
+    MeanInRange := True;
+    ForecastInRange := True;
+    StableReady := False;
+    RangeReady := True;
+    Ready := False;
+    SignalInfo := Default(TMeterValueStabilityInfo);
+    DeviceUUID := Channel.DeviceUUID;
+    if DeviceUUID = '' then
+      DeviceUUID := Channel.FlowMeter.DeviceUUID;
+    CurrentPointQ := 0;
+    CurrentPointFlowRate := 0;
+    if CurrentPoint <> nil then
+    begin
+      CurrentPointName := CurrentPoint.Name;
+      CurrentPointQ := CurrentPoint.Q;
+      CurrentPointFlowRate := CurrentPoint.FlowRate;
+    end
+    else
+      CurrentPointName := '<none>';
+    MatchedPointName := '<none>';
+    DevicePointUUID := '';
+    MatchedPointQ := 0;
+    MatchedDistance := 0;
+    Participant := Default(TMeasurementPointParticipant);
+    ParticipantFound := False;
+    TargetDifferenceToPhysicalPoint := 0;
+    MergeToleranceLS := 0;
+
+    if Assigned(CurrentPoint) then
+      for J := 0 to High(CurrentPoint.Participants) do
+        if (SameText(CurrentPoint.Participants[J].DeviceUUID, DeviceUUID) or
+            ((Channel.FlowMeter.Device <> nil) and SameText(CurrentPoint.Participants[J].DeviceUUID, Channel.FlowMeter.Device.UUID))) and
+           ((CurrentPoint.Participants[J].DeviceChannelUUID = '') or SameText(CurrentPoint.Participants[J].DeviceChannelUUID, Channel.UUID)) then
+        begin
+          Participant := CurrentPoint.Participants[J];
+          ParticipantFound := True;
+          Break;
+        end;
+
+    if not ParticipantFound then
+    begin
+      AddDiagnosticEvent(Format('DeviceChannelReadiness: ChannelIndex=%d; ChannelUUID=%s; ChannelName=%s; DeviceUUID=%s; MeasurementPointQLS=%.6f; ParticipantFound=False; ParticipatesInCurrentPoint=False; SkipReason=ParticipantNotAssigned; ActualLS=%.6f; ActualM3H=%.6f',
+        [I, Channel.UUID, Channel.Name, DeviceUUID, CurrentPointQ, ActualValue, M3H(ActualValue)]));
+      Continue;
+    end;
+
+    Inc(CheckedCount);
+    RequireRange := not IsAutomaticDeviceMode;
+    if RequireRange then
+    begin
+      Inc(TotalSecCount);
+      ModeText := 'секундный'
+    end
+    else
+    begin
+      Inc(TotalAutoCount);
+      ModeText := 'автоматический';
+    end;
+
+    TargetValue := Participant.SelectedSourceTargetQLS;
+    DeviceTargetValue := TargetValue;
+    TargetSource := 'MeasurementPoint.Participant.SelectedSourceTargetQLS';
+    DevicePointUUID := Participant.SourcePointUUID;
+    MatchedPointName := Participant.SourcePointName;
+    ErrorPercent := Abs(Participant.SourceErrorPercent);
+    TargetDifferenceToPhysicalPoint := Abs(TargetValue - CurrentPointQ);
+    MergeToleranceLS := FlowMergeTolerance(TargetValue, CurrentPointQ);
+    if TargetDifferenceToPhysicalPoint > MergeToleranceLS then
+      Reason := 'ParticipantTargetDoesNotMatchPhysicalPoint';
+
+    if (not Assigned(CurrentPoint)) or (not IsValidFlowValue(CurrentPoint.Q)) or
+       (CurrentPoint.Q <= 0) then
+      Reason := 'TargetNotAssigned';
+
+    if Reason = '' then
+    begin
+      BestPoint := nil;
+      if (Channel.FlowMeter.Device <> nil) and (Channel.FlowMeter.Device.Points <> nil) then
+      begin
+        for J := 0 to Channel.FlowMeter.Device.Points.Count - 1 do
+        begin
+          DevicePoint := Channel.FlowMeter.Device.Points[J];
+          if (DevicePoint = nil) or (DevicePoint.State = osDeleted) or (not DevicePoint.Enabled) then
+            Continue;
+
+          if (Participant.SourcePointUUID <> '') and SameText(DevicePoint.UUID, Participant.SourcePointUUID) then
+          begin
+            BestPoint := DevicePoint;
+            PointMatchSource := 'Participant.SourcePointUUID';
+            Break;
+          end;
+        end;
+        if BestPoint = nil then
+          for J := 0 to Channel.FlowMeter.Device.Points.Count - 1 do
+          begin
+            DevicePoint := Channel.FlowMeter.Device.Points[J];
+            if (DevicePoint = nil) or (DevicePoint.State = osDeleted) or (not DevicePoint.Enabled) or
+               (not IsValidFlowValue(DevicePoint.Q)) then
+              Continue;
+            if Abs(DevicePoint.Q - TargetValue) <= MergeToleranceLS then
+            begin
+              BestPoint := DevicePoint;
+              PointMatchSource := 'Participant.AbsoluteQFallback';
+              Break;
+            end;
+          end;
+      end;
+
+      if BestPoint = nil then
+        Reason := 'DevicePointNotFound'
+    end;
+
+    if Reason = '' then
+    begin
+      if IsNan(Participant.SourceErrorPercent) or IsInfinite(Participant.SourceErrorPercent) or
+         (Participant.SourceErrorPercent < 0) then
+        Reason := 'InvalidDevicePointError'
+      else
+      begin
+        ErrorPercent := Abs(Participant.SourceErrorPercent);
+        AllowedDeviation := Abs(TargetValue) * ErrorPercent / 100.0;
+        StableInfo.LowerLimit := TargetValue - AllowedDeviation;
+        StableInfo.UpperLimit := TargetValue + AllowedDeviation;
+
+        Settings := ValueFlow.StabilitySettings;
+        ValueFlow.AnalyzePointStabilityForMeasurement(FStabilityDataStartMs,
+          Max(0.001, FRequiredDeviceStabilizationSec), Settings.MinSampleCount,
+          Settings.MaxSampleAgeSec, TargetValue, ErrorPercent, SignalInfo);
+        StableInfo.LowerLimit := SignalInfo.StabilityLowerLimit;
+        StableInfo.UpperLimit := SignalInfo.StabilityUpperLimit;
+        CurrentInRange := SignalInfo.IsCurrentValueInRange;
+        MeanInRange := True;
+        ForecastInRange := True;
+        StableReady := SignalInfo.IsSignalStable;
+        RangeReady := True;
+        Ready := StableReady;
+      end;
+    end;
+
+    if Reason <> '' then
+    begin
+      StableReady := False;
+      RangeReady := False;
+      Ready := False;
+      CurrentInRange := False;
+      MeanInRange := False;
+      ForecastInRange := False;
+    end;
+
+    StableInfo.CurrentValue := ActualValue;
+    StableInfo.TargetValue := TargetValue;
+    StableInfo.SignalInfo := SignalInfo;
+    StableInfo.MeanValue := SignalInfo.MeanValue;
+    StableInfo.ForecastValue := SignalInfo.ForecastValue;
+    StableInfo.IsCurrentInRange := CurrentInRange;
+    StableInfo.IsSignalStable := StableReady;
+    StableInfo.IsMeanInRange := MeanInRange;
+    StableInfo.IsForecastInRange := ForecastInRange;
+    StableInfo.IsTargetConditionPassed := RangeReady;
+    StableInfo.IsReadyForMeasurement := Ready;
+
+    if Reason = '' then
+    begin
+      if Ready then
+        Reason := 'Ready'
+      else if not StableReady then
+        Reason := SignalInfo.StatusText
+      else if RequireRange and not RangeReady then
+        Reason := 'StableButOutOfRequiredRange'
+      else
+        Reason := 'Stable; RangeDiagnosticOnly';
+    end;
+
+    if BestPoint <> nil then
+    begin
+      MatchedPointName := BestPoint.Name;
+      DevicePointUUID := BestPoint.UUID;
+      MatchedPointQ := BestPoint.Q;
+      MatchedDistance := Abs(BestPoint.Q - TargetValue);
+    end;
+
+    LogText := Format('DeviceChannelReadiness: ChannelIndex=%d; ChannelUUID=%s; ChannelName=%s; DeviceUUID=%s; DevicePointUUID=%s; DevicePointName=%s; MeasurementMode=%s; MeasurementPointQLS=%.6f; ParticipantFound=%s; ParticipantSourcePointUUID=%s; ParticipantSourceTargetQLS=%.6f; DeviceTargetValue=%.6f; TargetDifferenceToPhysicalPointLS=%.9f; MergeToleranceLS=%.9f; ParticipatesInCurrentPoint=%s; DevicePointErrorPercent=%.6f; StabilityLower=%.6f; StabilityUpper=%.6f; UsedSampleCount=%d; RequiredSampleCount=%d; ActualWindowDurationSec=%.3f; RequiredWindowDurationSec=%.3f; HasEnoughSamples=%s; HasFullWindow=%s; IsDataActual=%s; OutOfRangeSampleCount=%d; FirstOutOfRangeValue=%.6f; FirstOutOfRangeTimeMs=%d; StableReady=%s; Ready=%s; Reason=%s; TargetSource=%s; DevicePointMatchSource=%s; ActualLS=%.6f; ActualM3H=%.6f',
+      [I, Channel.UUID, Channel.Name, DeviceUUID, DevicePointUUID, MatchedPointName,
+       ModeText, CurrentPointQ, BoolToStr(ParticipantFound, True), Participant.SourcePointUUID,
+       Participant.SelectedSourceTargetQLS, TargetValue, TargetDifferenceToPhysicalPoint, MergeToleranceLS,
+       BoolToStr(ParticipantFound and (Reason <> 'ParticipantTargetDoesNotMatchPhysicalPoint'), True),
+       ErrorPercent, SignalInfo.StabilityLowerLimit, SignalInfo.StabilityUpperLimit,
+       SignalInfo.UsedSampleCount, Settings.MinSampleCount, SignalInfo.WindowDurationSec,
+       Max(0.001, FRequiredDeviceStabilizationSec), BoolToStr(SignalInfo.HasEnoughSamples, True),
+       BoolToStr(SignalInfo.HasFullWindow, True), BoolToStr(SignalInfo.IsDataActual, True),
+       SignalInfo.OutOfRangeSampleCount, SignalInfo.FirstOutOfRangeSampleValue,
+       SignalInfo.FirstOutOfRangeSampleTimeMs, BoolToStr(StableReady, True),
+       BoolToStr(Ready, True), Reason, TargetSource, PointMatchSource, ActualValue, M3H(ActualValue)]);
+    PublishDeviceLog(LogText);
+
+    if Ready then
+    begin
+      if RequireRange then
+        Inc(ReadySecCount)
+      else
+        Inc(ReadyAutoCount);
+    end
+    else
+    begin
+      Result := False;
+      StableInfo.Status := sRun_NN;
+      StableInfo.StatusText := Format('Device channel is not ready: UUID=%s; Name=%s; Mode=%s; Reason=%s', [Channel.UUID, Channel.Name, ModeText, Reason]);
+    end;
+  end;
+
+  AddDiagnosticEvent(Format('DeviceReadinessSummary: SecondsDevicesReadyCount=%d; AutomaticDevicesReadyCount=%d; TotalRequiredDevices=%d',
+    [ReadySecCount, ReadyAutoCount, TotalSecCount + TotalAutoCount]));
+
+  if CheckedCount = 0 then
+  begin
+    StableInfo.Status := sRun_NN;
+    StableInfo.StatusText := 'NoSelectedDeviceChannels';
+    Exit(False);
+  end;
+
+  if Result then
+  begin
+    StableInfo.Status := sOk;
+    StableInfo.StatusText := 'DevicesReady=True';
+  end;
+end;
 
 function TMeasurementRun.CheckFlowStable(out StableInfo: RStableInfo): Boolean;
 var
@@ -1473,229 +2110,172 @@ var
   Point: TDevicePoint;
   TargetValue: Double;
   ActualValue: Double;
-  MinPercent: Double;
-  MaxPercent: Double;
-  AllowedMinus: Double;
-  AllowedPlus: Double;
-  ToleranceSource: string;
-  FlowReached: Boolean;
-  HistoryStable: Boolean;
-  AllDeviceSignalsStable: Boolean;
-  ParticipatingDeviceCount: Integer;
-  SampleBeforeCount: Integer;
-  SampleAfterCount: Integer;
-  SampleTimeMs: Int64;
-  MeterValueId: string;
-  DeviceUUID: string;
-  MeterUUID: string;
-  DeviceDetails: TStringList;
-
-  function MeterValueRuntimeId(const AValue: TMeterValue): string;
-  begin
-    if AValue = nil then
-      Exit('nil');
-    Result := '0x' + IntToHex(NativeUInt(AValue), SizeOf(NativeUInt) * 2);
-  end;
-
-  function TrendDirectionText(const ADirection: TMeterValueTrendDirection): string;
-  begin
-    Result := GetEnumName(TypeInfo(TMeterValueTrendDirection), Ord(ADirection));
-  end;
-
-  function DiagnosticFloat(const AValue: Double): string;
-  begin
-    Result := FloatToStrF(AValue, ffFixed, 18, 9);
-  end;
-
+  MinPercent, MaxPercent, AllowedMinus, AllowedPlus: Double;
+  PointErrorPercent: Double;
+  ToleranceSource, Reason, ChannelReason: string;
+  GroupFlows: TDictionary<Integer, Double>;
+  Pair: TPair<Integer, Double>;
+  GroupKey: Integer;
+  HasEtalonValue: Boolean;
+  GroupFlowReached, AllChannelsStable, ChannelStable: Boolean;
 begin
   StableInfo := Default(RStableInfo);
   Result := False;
-
   Point := GetCurrentPoint;
   if (FWorkTable = nil) or (FWorkTable.FlowRate = nil) or (Point = nil) then
-    Exit;
-
-  StableValue := nil;
-  if FWorkTable.EtalonChannels <> nil then
-    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
-    begin
-      Channel := FWorkTable.EtalonChannels[I];
-      if (Channel <> nil) and Channel.Enabled and
-         (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
-      begin
-        StableValue := Channel.FlowMeter.ValueFlow;
-        Break;
-      end;
-    end;
-
-  if StableValue = nil then
-    StableValue := FWorkTable.FlowRate.Value;
-  if StableValue = nil then
     Exit;
 
   TargetValue := Point.Q;
   if (TargetValue < 0) and (FWorkTable.FlowRate.ValueSet <> nil) then
     TargetValue := FWorkTable.FlowRate.ValueSet.Value;
 
-  ActualValue := StableValue.GetDoubleValue;
-  Settings := StableValue.StabilitySettings;
-
+  ActualValue := 0;
+  HasEtalonValue := False;
+  AllChannelsStable := True;
+  Reason := '';
+  PointErrorPercent := 0;
+  Settings := Default(TMeterValueStabilitySettings);
   ToleranceSource := 'Point.FlowAccuracy';
   if AccuracyToRange(Point.FlowAccuracy, MinPercent, MaxPercent) then
   begin
     AllowedMinus := Abs(TargetValue) * Abs(MinPercent) / 100.0;
     AllowedPlus := Abs(TargetValue) * Abs(MaxPercent) / 100.0;
-    StableInfo.LowerLimit := TargetValue - AllowedMinus;
-    StableInfo.UpperLimit := TargetValue + AllowedPlus;
   end
   else
   begin
     ToleranceSource := 'TMeterValue.StabilitySettings';
-    AllowedMinus := Max(Abs(TargetValue) * Abs(Settings.TargetAccuracyMinusPercent) / 100.0,
-      Settings.TargetToleranceAbsolute);
-    AllowedPlus := Max(Abs(TargetValue) * Abs(Settings.TargetAccuracyPlusPercent) / 100.0,
-      Settings.TargetToleranceAbsolute);
-    if SameValue(AllowedMinus, 0) and SameValue(AllowedPlus, 0) then
+    AllowedMinus := 0;
+    AllowedPlus := 0;
+  end;
+  if SameValue(AllowedMinus, 0) and SameValue(AllowedPlus, 0) then
+  begin
+    ToleranceSource := 'IsFlowFit default accuracy';
+    AllowedMinus := Abs(TargetValue) * 10.0 / 100.0;
+    AllowedPlus := AllowedMinus;
+  end;
+  StableInfo.TargetValue := TargetValue;
+  StableInfo.LowerLimit := TargetValue - AllowedMinus;
+  StableInfo.UpperLimit := TargetValue + AllowedPlus;
+  if IsNan(Point.Error) or IsInfinite(Point.Error) or (Point.Error < 0) then
+    Reason := Format('InvalidPointError: PointUUID=%s; PointName=%s; Error=%.6f', [Point.UUID, Point.Name, Point.Error])
+  else
+    PointErrorPercent := Abs(Point.Error);
+  GroupFlows := TDictionary<Integer, Double>.Create;
+  try
+    if FWorkTable.EtalonChannels <> nil then
+      for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+      begin
+        Channel := FWorkTable.EtalonChannels[I];
+        if (Channel = nil) or (not Channel.Enabled) or (Channel.State = osDeleted) or
+           (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) then
+          Continue;
+
+        StableValue := Channel.FlowMeter.ValueFlow;
+        HasEtalonValue := True;
+        GroupKey := Channel.Group;
+        ActualValue := StableValue.GetDoubleValue;
+        if GroupFlows.ContainsKey(GroupKey) then
+          GroupFlows[GroupKey] := GroupFlows[GroupKey] + ActualValue
+        else
+          GroupFlows.Add(GroupKey, ActualValue);
+
+        Settings := StableValue.StabilitySettings;
+        if Reason = '' then
+          StableValue.AnalyzePointStabilityForMeasurement(FStabilityDataStartMs,
+            Max(0.001, FRequiredDeviceStabilizationSec), Settings.MinSampleCount,
+            Settings.MaxSampleAgeSec, TargetValue, PointErrorPercent, SignalInfo)
+        else
+          SignalInfo := Default(TMeterValueStabilityInfo);
+        ChannelStable := (Reason = '') and SignalInfo.IsSignalStable;
+
+        AllChannelsStable := AllChannelsStable and ChannelStable;
+        if Reason <> '' then
+          ChannelReason := Reason
+        else
+          ChannelReason := SignalInfo.StatusText;
+        AddDiagnosticEvent(Format('EtalonChannelReady=%s; ChannelUUID=%s; ChannelName=%s; TargetValue=%.6f; PointErrorPercent=%.6f; StabilityLower=%.6f; StabilityUpper=%.6f; FlowAccuracy=%s; FlowReachedLower=%.6f; FlowReachedUpper=%.6f; UsedSampleCount=%d; RequiredSampleCount=%d; ActualWindowDurationSec=%.3f; RequiredWindowDurationSec=%.3f; HasEnoughSamples=%s; HasFullWindow=%s; IsDataActual=%s; OutOfRangeSampleCount=%d; MinSampleValue=%.6f; MaxSampleValue=%.6f; StableReady=%s; FlowReached=%s; Ready=%s; Reason=%s',
+          [BoolToStr(ChannelStable, True), Channel.UUID, Channel.Name, TargetValue, PointErrorPercent,
+           SignalInfo.StabilityLowerLimit, SignalInfo.StabilityUpperLimit, Point.FlowAccuracy,
+           StableInfo.LowerLimit, StableInfo.UpperLimit, SignalInfo.UsedSampleCount,
+           Settings.MinSampleCount, SignalInfo.WindowDurationSec, Max(0.001, FRequiredDeviceStabilizationSec),
+           BoolToStr(SignalInfo.HasEnoughSamples, True), BoolToStr(SignalInfo.HasFullWindow, True),
+           BoolToStr(SignalInfo.IsDataActual, True), SignalInfo.OutOfRangeSampleCount,
+           SignalInfo.MinValue, SignalInfo.MaxValue, BoolToStr(ChannelStable, True),
+           BoolToStr((ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit), True),
+           BoolToStr(ChannelStable and ((ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit)), True),
+           ChannelReason]));
+      end;
+
+    if HasEtalonValue then
     begin
-      ToleranceSource := 'IsFlowFit default accuracy';
-      AllowedMinus := Abs(TargetValue) * 10.0 / 100.0;
-      AllowedPlus := AllowedMinus;
+      ActualValue := 0;
+      for Pair in GroupFlows do
+      begin
+        AddDiagnosticEvent(Format('EtalonGroupFlow: Group=%d; Sum=%.6f', [Pair.Key, Pair.Value]));
+        ActualValue := Max(ActualValue, Pair.Value);
+      end;
+      AddDiagnosticEvent(Format('EtalonGroupFlowSelectedMax=%.6f', [ActualValue]));
+    end
+    else
+    begin
+      StableValue := FWorkTable.FlowRate.Value;
+      if StableValue = nil then
+        Exit;
+      ActualValue := StableValue.GetDoubleValue;
+      Settings := StableValue.StabilitySettings;
+      AddDiagnosticEvent(Format('EtalonFlowFallback=True; Source=FWorkTable.FlowRate.Value; Actual=%.6f', [ActualValue]));
     end;
-    StableInfo.LowerLimit := TargetValue - AllowedMinus;
-    StableInfo.UpperLimit := TargetValue + AllowedPlus;
+  finally
+    GroupFlows.Free;
   end;
 
   StableInfo.TargetValue := TargetValue;
   StableInfo.CurrentValue := ActualValue;
-  StableInfo.IsCurrentInRange := (ActualValue >= StableInfo.LowerLimit) and
-    (ActualValue <= StableInfo.UpperLimit);
+  StableInfo.IsCurrentInRange := (ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit);
   StableInfo.IsMeanInRange := True;
   StableInfo.IsForecastInRange := True;
-  FlowReached := StableInfo.IsCurrentInRange;
-
-  AllDeviceSignalsStable := True;
-  ParticipatingDeviceCount := 0;
-  DeviceDetails := TStringList.Create;
-  try
-    if FWorkTable.DeviceChannels <> nil then
-      for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
-      begin
-        Channel := FWorkTable.DeviceChannels[I];
-        if (Channel = nil) or (not Channel.Enabled) or
-           (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) then
-          Continue;
-
-        Inc(ParticipatingDeviceCount);
-        StableValue := Channel.FlowMeter.ValueFlow;
-        Settings := StableValue.StabilitySettings;
-        ActualValue := StableValue.GetDoubleValue;
-        MeterValueId := MeterValueRuntimeId(StableValue);
-        DeviceUUID := Channel.DeviceUUID;
-        MeterUUID := StableValue.Hash;
-        SampleBeforeCount := Length(StableValue.GetStabilitySamples);
-
-        HistoryStable := False;
-        SignalInfo := Default(TMeterValueStabilityInfo);
-        if Settings.Enabled then
-        begin
-          SampleTimeMs := TMeterValue.GetMonotonicTimeMs;
-          StableValue.AddSample(ActualValue);
-          SampleAfterCount := Length(StableValue.GetStabilitySamples);
-          HistoryStable := StableValue.AnalyzeStability(SignalInfo);
-        end
-        else
-        begin
-          SampleTimeMs := TMeterValue.GetMonotonicTimeMs;
-          SampleAfterCount := SampleBeforeCount;
-          SignalInfo.Status := mvssDisabled;
-          SignalInfo.StatusText := 'Анализ стабильности расхода поверяемого канала отключён.';
-          Include(SignalInfo.FailReasons, mvsfrAnalysisDisabled);
-        end;
-
-        AllDeviceSignalsStable := AllDeviceSignalsStable and SignalInfo.IsSignalStable;
-        if not SignalInfo.IsSignalStable then
-          HistoryStable := False;
-
-        DeviceDetails.Add('FlowStabilitySampleAdded: DeviceFlow[' + IntToStr(I) + ']: '
-          + 'DeviceUUID=' + DeviceUUID
-          + '; ChannelIndex=' + IntToStr(Channel.ID)
-          + '; MeterValuePtr=' + MeterValueId
-          + '; MeterUUID=' + MeterUUID
-          + '; Parameter=ValueFlow'
-          + '; CurrentValue=' + DiagnosticFloat(ActualValue)
-          + '; HistoryAnalysisEnabled=' + BoolToStr(Settings.Enabled, True)
-          + '; SampleAdded=' + BoolToStr(Settings.Enabled and (SampleAfterCount <> SampleBeforeCount), True)
-          + '; TimeStampMs=' + IntToStr(SampleTimeMs)
-          + '; HistoryCountBefore=' + IntToStr(SampleBeforeCount)
-          + '; HistoryCountAfter=' + IntToStr(SampleAfterCount)
-          + '; UsedSampleCount=' + IntToStr(SignalInfo.UsedSampleCount)
-          + '; WindowDurationSec=' + DiagnosticFloat(SignalInfo.WindowDurationSec)
-          + '; LastSampleAgeSec=' + DiagnosticFloat(SignalInfo.LastSampleAgeSec)
-          + '; TrendRate=' + DiagnosticFloat(SignalInfo.TrendRate)
-          + '; TrendRateUnit=value/s'
-          + '; MaxTrendRate=' + DiagnosticFloat(Settings.MaxTrendRate)
-          + '; MaxTrendRateUnit=value/s'
-          + '; TrendExceeded=' + BoolToStr((not SignalInfo.IsTrendStable) and SignalInfo.HasTrend, True)
-          + '; TrendDirection=' + TrendDirectionText(SignalInfo.TrendDirection)
-          + '; Variation=' + DiagnosticFloat(SignalInfo.Variation)
-          + '; StdDeviation=' + DiagnosticFloat(SignalInfo.StdDeviation)
-          + '; OutlierFraction=' + DiagnosticFloat(SignalInfo.OutlierFraction)
-          + '; IsSignalStable=' + BoolToStr(SignalInfo.IsSignalStable, True)
-          + '; IsStabilityConfirmed=' + BoolToStr(SignalInfo.IsStabilityConfirmed, True)
-          + '; IsSuitableForMeasurement=' + BoolToStr(SignalInfo.IsSuitableForMeasurement, True)
-          + '; Result=' + BoolToStr(HistoryStable, True)
-          + '; Reason=' + SignalInfo.StatusText);
-
-        if StableInfo.SignalInfo.Status = mvssUnknown then
-          StableInfo.SignalInfo := SignalInfo;
-      end;
-
-    if ParticipatingDeviceCount = 0 then
-    begin
-      AllDeviceSignalsStable := False;
-      StableInfo.StatusText := 'NoParticipatingDeviceChannels.';
-    end;
-
-    StableInfo.IsSignalStable := AllDeviceSignalsStable;
-    StableInfo.IsTargetConditionPassed := FlowReached;
-    StableInfo.IsReadyForMeasurement := FlowReached and AllDeviceSignalsStable;
-    Result := StableInfo.IsReadyForMeasurement;
-
-    if Result then
-      StableInfo.Status := sOk
-    else
-      StableInfo.Status := sRun_NN;
-
-    StableInfo.StatusText := StableInfo.StatusText + Format(' FlowReached=%s; HistoryAnalysisEnabled=%s; DeviceSignalStable=%s; ParticipatingDeviceCount=%d; '
-      + 'ToleranceSource=%s; Target=%.6f; ActualFlowSource=EtalonOrAggregate; Actual=%.6f; FlowMin=%.6f; FlowMax=%.6f; '
-      + 'AllowedDeviationLS=%.6f/%.6f; ActualDeviationLS=%.6f; ActualDeviationPercent=%.6f; Result=%s',
-      [BoolToStr(FlowReached, True), BoolToStr(ParticipatingDeviceCount > 0, True),
-       BoolToStr(AllDeviceSignalsStable, True), ParticipatingDeviceCount,
-       ToleranceSource, TargetValue, StableInfo.CurrentValue, StableInfo.LowerLimit, StableInfo.UpperLimit,
-       AllowedMinus, AllowedPlus, Abs(StableInfo.CurrentValue - TargetValue),
-       IfThen(not SameValue(TargetValue, 0), Abs(StableInfo.CurrentValue - TargetValue) / Abs(TargetValue) * 100.0, 0.0),
-       BoolToStr(Result, True)]);
-
-    if DeviceDetails.Count > 0 then
-      StableInfo.StatusText := StableInfo.StatusText + '; ' + StringReplace(DeviceDetails.Text.Trim, sLineBreak, '; ', [rfReplaceAll]);
-  finally
-    DeviceDetails.Free;
-  end;
+  StableInfo.IsSignalStable := AllChannelsStable;
+  GroupFlowReached := StableInfo.IsCurrentInRange;
+  StableInfo.IsTargetConditionPassed := GroupFlowReached;
+  StableInfo.IsReadyForMeasurement := GroupFlowReached and AllChannelsStable;
+  Result := StableInfo.IsReadyForMeasurement;
+  if Result then StableInfo.Status := sOk else StableInfo.Status := sRun_NN;
+  StableInfo.StatusText := Format('EtalonFlowStable=%s; GroupFlowReached=%s; AllSelectedEtalonChannelsStable=%s; ToleranceSource=%s; Target=%.6f; Actual=%.6f; Lower=%.6f; Upper=%.6f',
+    [BoolToStr(Result, True), BoolToStr(GroupFlowReached, True), BoolToStr(AllChannelsStable, True),
+     ToleranceSource, TargetValue, ActualValue, StableInfo.LowerLimit, StableInfo.UpperLimit]);
 end;
 
 procedure TMeasurementRun.ContinueAfterPointError(const AStatus: EMeasurementPointStatus;
   AEvent: EMeasurementEvent; const AError: TErrorInfo);
 begin
   AddDiagnosticEvent('Point error: Status=' + GetEnumName(TypeInfo(EMeasurementPointStatus), Ord(AStatus)) + '; Event=' + MeasurementEventToString(AEvent) + '; Error=' + AError.Msg);
+  FLastProcessedPointIndex := FCurrentPointIndex;
+  if GetCurrentPoint <> nil then
+    FLastProcessedPointName := GetCurrentPoint.Name;
   SetCurrentPointStatus(AStatus);
   FireEvent(AEvent, AError);
   FCurrentRepeat := 0;
-  SetStopReason(msrError);
 
-  if FMode = mrmAutomatic then
-    SetStage(msSelectPoint)
+  if (FMode = mrmAutomatic) and (AStatus = mptsSetupError) then
+  begin
+    if FAttempt < FMaxAttemptCount then
+    begin
+      Inc(FAttempt);
+      AddDiagnosticEvent(Format('Retry setup point: Attempt=%d of %d; %s', [FAttempt, FMaxAttemptCount, BuildPointSetupIdentityLog]));
+      ResetPointSetupState;
+      SetStage(msSetupPoint);
+    end
+    else
+    begin
+      SetStopReason(msrError);
+      SetStage(msDone);
+    end;
+  end
   else
+  begin
+    SetStopReason(msrError);
     SetStage(msDone);
+  end;
 end;
 
 
@@ -1839,10 +2419,10 @@ begin
 
     WaitStableSec := 0;
     if FCurrentStage = msWaitStable then
-      WaitStableSec := (TThread.GetTickCount64 - FWaitStartedTick) / 1000;
+      WaitStableSec := (TMeterValue.GetMonotonicTimeMs - FWaitStartedTick) / 1000;
     MeasureSec := 0;
     if FCurrentStage = msMeasure then
-      MeasureSec := (TThread.GetTickCount64 - FWaitStartedTick) / 1000;
+      MeasureSec := (TMeterValue.GetMonotonicTimeMs - FWaitStartedTick) / 1000;
 
     if FCurrentStage = msDone then
       NextIndex := -1
@@ -1904,7 +2484,10 @@ begin
     Lines.Add('MeasurementRun.Stage=' + MeasurementStateToString(FCurrentStage));
     Lines.Add('WorkerThreadRunning=' + SBool(IsThreadRunning));
     Lines.Add('StopRequested=' + SBool(FStopRequested));
-    Lines.Add('RunCompleted=' + SBool(FCurrentStage = msDone));
+    Lines.Add('RunCompleted=' + SBool(FRunCompleted));
+    Lines.Add('RunResult=' + GetEnumName(TypeInfo(TMeasurementRunResult), Ord(FRunResult)));
+    Lines.Add('DoneReason=' + GetEnumName(TypeInfo(TMeasurementRunDoneReason), Ord(FDoneReason)));
+    Lines.Add('RequestStopCalled=' + SBool(FRequestStopCalled));
     Lines.Add('LastProcessedPointIndex=' + IntToStr(FLastProcessedPointIndex));
     if FLastProcessedPointName <> '' then
       Lines.Add('LastProcessedPointName=' + FLastProcessedPointName)
@@ -1926,6 +2509,15 @@ begin
       Lines.Add('Enabled=' + SBool(Point.Enabled));
       Lines.Add('State=' + GetEnumName(TypeInfo(TObjectState), Ord(Point.State)));
       Lines.Add('Status=' + GetEnumName(TypeInfo(EMeasurementPointStatus), Ord(Point.Status)));
+      if FStopReason <> msrNone then
+      begin
+        Lines.Add('ErrorStage=' + MeasurementStateToString(FCurrentStage));
+        Lines.Add('ErrorPointIndex=' + IntToStr(FCurrentPointIndex));
+        Lines.Add('ErrorPointUUID=' + Point.UUID);
+        Lines.Add('ErrorPointName=' + Point.Name);
+        Lines.Add('ErrorStatus=' + GetEnumName(TypeInfo(EMeasurementPointStatus), Ord(Point.Status)));
+        Lines.Add('ErrorReason=' + MeasurementStopReasonToString(FStopReason));
+      end;
       Lines.Add('FlowRate=' + SFloat(Point.FlowRate));
       Lines.Add('Q=' + SFloat(Point.Q));
       Lines.Add('StopCriteria=' + StopCriteriaToLogString(Point.StopCriteria));
@@ -1965,20 +2557,20 @@ begin
     Lines.Add('IsStable=' + SBool(IsStableResult));
     Lines.Add('Reason=' + Reason);
     Lines.Add('RequireAutoStabilization=' + SBool(FRequireAutoStabilization));
-    Lines.Add('RequiredStabilizationSec=' + SFloat(FRequiredStabilizationSec));
+    Lines.Add('RequiredStabilizationSec=' + SFloat(FRequiredDeviceStabilizationSec));
     Lines.Add('StableSinceMs=' + UIntToStr(FStableSinceMs));
-    Lines.Add('DeviceStableSinceMs=' + UIntToStr(FDeviceStableSinceMs));
-    if FDeviceStableSinceMs <> 0 then
+    Lines.Add('DevicesStableSinceMs=' + UIntToStr(FDevicesStableSinceMs));
+    if FDevicesStableSinceMs <> 0 then
     begin
-      Lines.Add('DeviceStableDurationSec=' + SFloat((TThread.GetTickCount64 - FDeviceStableSinceMs) / 1000));
-      Lines.Add('DeviceStableRemainingSec=' + SFloat(Max(0.0, FRequiredStabilizationSec - ((TThread.GetTickCount64 - FDeviceStableSinceMs) / 1000))));
-      Lines.Add('DeviceStableTimerRunning=True');
+      Lines.Add('DevicesStableDurationSec=' + SFloat((TMeterValue.GetMonotonicTimeMs - FDevicesStableSinceMs) / 1000));
+      Lines.Add('DevicesStableRemainingSec=' + SFloat(Max(0.0, FRequiredDeviceStabilizationSec - ((TMeterValue.GetMonotonicTimeMs - FDevicesStableSinceMs) / 1000))));
+      Lines.Add('DevicesStableTimerRunning=True');
     end
     else
     begin
-      Lines.Add('DeviceStableDurationSec=0');
-      Lines.Add('DeviceStableRemainingSec=' + SFloat(FRequiredStabilizationSec));
-      Lines.Add('DeviceStableTimerRunning=False');
+      Lines.Add('DevicesStableDurationSec=0');
+      Lines.Add('DevicesStableRemainingSec=' + SFloat(FRequiredDeviceStabilizationSec));
+      Lines.Add('DevicesStableTimerRunning=False');
     end;
     if FStableTimerResetReason <> '' then
       Lines.Add('StableTimerResetReason=' + FStableTimerResetReason)
@@ -1990,7 +2582,7 @@ begin
       Lines.Add('DeviceStabilizationValues=<нет данных>');
     Lines.Add('Attempt=' + IntToStr(FAttempt));
     Lines.Add('MaxAttemptCount=' + IntToStr(FMaxAttemptCount));
-    Lines.Add('TimeoutSec=' + IntToStr(STABLE_TIMEOUT_SEC));
+    Lines.Add('TimeoutSec=' + IntToStr(CalcStableTimeoutSec));
     Lines.Add('');
     Lines.Add('[ИЗМЕРЕНИЕ]');
     Lines.Add('MeasureStageSec=' + SFloat(MeasureSec));
@@ -2005,7 +2597,7 @@ begin
     end;
     Lines.Add('StopCriteriaReached=' + SBool(IsCommandStopLimitReached(Reason)));
     Lines.Add('StopReason=' + MeasurementStopReasonToString(FStopReason));
-    Lines.Add('RequestStopCalled=' + SBool(FStopRequested));
+    Lines.Add('RequestStopCalled=' + SBool(FRequestStopCalled));
     Lines.Add('RouteStopInWorker=<см. события>');
     Lines.Add('');
     Lines.Add('[ПЕРЕХОД]');
@@ -2023,10 +2615,7 @@ begin
       Lines.Add('NextPointReason=<следующая включенная точка не найдена>');
     Lines.Add('CurrentStage=' + MeasurementStateToString(FCurrentStage));
     Lines.Add('NextStageAfterSave=' + MeasurementStateToString(FNextStageAfterSave));
-    if FCurrentStage = msDone then
-      Lines.Add('DoneReason=EndOfPointList')
-    else
-      Lines.Add('DoneReason=<см. события>');
+    Lines.Add('DoneReason=' + GetEnumName(TypeInfo(TMeasurementRunDoneReason), Ord(FDoneReason)));
     Lines.Add('');
     Lines.Add('[СОХРАНЕНИЕ]');
     Lines.Add('SaveMeasurementResultsCalled=' + SBool(FLastSaveMeasurementResultsCalled));
@@ -2055,8 +2644,7 @@ procedure TMeasurementRun.CreateSession;
 var
   Point: TDevicePoint;
 begin
-  if FPoints.Count<=0 then
-    FPoints.Clear;
+  FPoints.Clear;
   if FWorkTable = nil then
     Exit;
 
@@ -2169,63 +2757,349 @@ begin
 end;
 
 procedure TMeasurementRun.CreateSessionPoints;
+const
+  QmaxMismatchRelativeTolerance = 1E-3;
 var
   Channel: TChannel;
   Device: TDevice;
+  RepoDevice: TDevice;
+  Repo: TDeviceRepository;
   SourcePoint: TDevicePoint;
   SessionPoint: TDevicePoint;
   ExistingPoint: TDevicePoint;
+  Participant: TMeasurementPointParticipant;
+  StoredQLS, CalculatedQLS, TargetQLS, MergeTolerance: Double;
+  DerivedQmaxLS, EffectiveDeviceQmaxLS, PointQValidationToleranceLS, RelativeQmaxDiff: Double;
+  ProcessingDeviceCount, ProcessingDevicePointCount, ParticipantCount: Integer;
+  I, J, DuplicateParticipantCount, LostSourcePointCount: Integer;
+  TotalDeviceChannelCount, EnabledDeviceChannelCount, DisabledDeviceChannelCount: Integer;
+  ResolvedUniqueDeviceCount, DistinctDeviceQmaxCount: Integer;
+  DeviceSourcePointCount, DeviceAddedParticipantCount, DeviceCreatedPointCount, DeviceMergedParticipantCount: Integer;
+  ChannelIndex: Integer;
+  IncludedInAutomaticSession: Boolean;
+  QmaxMismatch: Boolean;
+  SkipReason, DeviceResolveSource: string;
+  Action, Reason, PointName: string;
+  ChannelUUIDText, ChannelDeviceUUIDText, ChannelDeviceNameText: string;
+  SelectedDeviceUUIDText, SelectedDeviceNameText, RepoDeviceUUIDText: string;
+  ChannelDeviceQmax, SelectedDeviceQmax, RepoDeviceQmax: Double;
+  IsDistinctQmax: Boolean;
+  DeviceUUIDs: TArray<string>;
+  DeviceQmaxValues: TArray<Double>;
+  DevicePointers: TArray<NativeUInt>;
+
+  function IsValidFlowValue(const AValue: Double): Boolean;
+  begin
+    Result := (not IsNan(AValue)) and (not IsInfinite(AValue)) and (AValue > 0);
+  end;
+
+  function FlowMergeTolerance(const AQ1, AQ2: Double): Double;
+  begin
+    Result := Max(1E-6, Max(Abs(AQ1), Abs(AQ2)) * 1E-4);
+  end;
+
+  function PtrText(AObject: TObject): string;
+  begin
+    if AObject = nil then
+      Result := 'nil'
+    else
+      Result := '$' + IntToHex(NativeUInt(Pointer(AObject)), SizeOf(Pointer) * 2);
+  end;
+
+
+  function ChannelDevice(AChannel: TChannel): TDevice;
+  begin
+    Result := nil;
+    if (AChannel <> nil) and (AChannel.FlowMeter <> nil) then
+      Result := AChannel.FlowMeter.Device;
+  end;
+
+  function BoolText(const AValue: Boolean): string;
+  begin
+    if AValue then
+      Result := 'True'
+    else
+      Result := 'False';
+  end;
+
+  function DeviceStateText(ADevice: TDevice): string;
+  begin
+    if ADevice = nil then
+      Result := 'nil'
+    else
+      Result := GetEnumName(TypeInfo(TObjectState), Ord(ADevice.State));
+  end;
+
+  procedure AddUniqueDeviceInfo(ADevice: TDevice);
+  var
+    K: Integer;
+  begin
+    if ADevice = nil then
+      Exit;
+    for K := 0 to High(DeviceUUIDs) do
+      if SameText(DeviceUUIDs[K], ADevice.UUID) then
+        Exit;
+    K := Length(DeviceUUIDs);
+    SetLength(DeviceUUIDs, K + 1);
+    SetLength(DeviceQmaxValues, K + 1);
+    SetLength(DevicePointers, K + 1);
+    DeviceUUIDs[K] := ADevice.UUID;
+    DeviceQmaxValues[K] := ADevice.Qmax;
+    DevicePointers[K] := NativeUInt(Pointer(ADevice));
+  end;
+
+
+  function EnabledSourcePointCount(ADevice: TDevice): Integer;
+  var
+    P: TDevicePoint;
+  begin
+    Result := 0;
+    if (ADevice = nil) or (ADevice.Points = nil) then
+      Exit;
+    for P in ADevice.Points do
+      if (P <> nil) and P.Enabled and (P.State <> osDeleted) then
+        Inc(Result);
+  end;
+
+  function ParticipantExists(APoint: TDevicePoint; const AParticipant: TMeasurementPointParticipant): Boolean;
+  var
+    K: Integer;
+  begin
+    Result := False;
+    if APoint = nil then
+      Exit;
+    for K := 0 to High(APoint.Participants) do
+      if SameText(APoint.Participants[K].DeviceUUID, AParticipant.DeviceUUID) and
+         SameText(APoint.Participants[K].DeviceChannelUUID, AParticipant.DeviceChannelUUID) and
+         SameText(APoint.Participants[K].SourcePointUUID, AParticipant.SourcePointUUID) then
+        Exit(True);
+  end;
+
+  procedure AddParticipant(APoint: TDevicePoint; const AParticipant: TMeasurementPointParticipant);
+  var
+    N: Integer;
+  begin
+    if ParticipantExists(APoint, AParticipant) then
+      Exit;
+    N := Length(APoint.Participants);
+    SetLength(APoint.Participants, N + 1);
+    APoint.Participants[N] := AParticipant;
+    APoint.SourcePointCount := Length(APoint.Participants);
+    Inc(ParticipantCount);
+  end;
+
+  procedure RefreshSessionPointParams(APoint: TDevicePoint);
+  var
+    K: Integer;
+    SameNames: Boolean;
+    FirstName: string;
+  begin
+    if (APoint = nil) or (Length(APoint.Participants) = 0) then
+      Exit;
+
+    APoint.RequireAutoStabilization := False;
+    APoint.RequiredStabilizationSec := 0;
+    FirstName := APoint.Participants[0].SourcePointName;
+    SameNames := True;
+    for K := 0 to High(APoint.Participants) do
+    begin
+      if APoint.Participants[K].SourcePauseSec < 0 then
+        APoint.RequireAutoStabilization := True
+      else
+        APoint.RequiredStabilizationSec := Max(APoint.RequiredStabilizationSec, APoint.Participants[K].SourcePauseSec);
+      SameNames := SameNames and SameText(FirstName, APoint.Participants[K].SourcePointName);
+    end;
+    if APoint.RequireAutoStabilization then
+      APoint.Pause := -1
+    else
+      APoint.Pause := Round(APoint.RequiredStabilizationSec);
+    if SameNames and (Trim(FirstName) <> '') then
+      APoint.Name := FirstName
+    else
+      APoint.Name := Format('Q=%.6f л/с', [APoint.Q]);
+  end;
+
 begin
   if FPoints = nil then
     FPoints := TObjectList<TDevicePoint>.Create(True);
-  if FPoints.Count<=0 then
-    FPoints.Clear;
+  FPoints.Clear;
   if FWorkTable = nil then
     Exit;
 
+  ProcessingDeviceCount := 0;
+  ProcessingDevicePointCount := 0;
+  ParticipantCount := 0;
+  DuplicateParticipantCount := 0;
+  LostSourcePointCount := 0;
+  TotalDeviceChannelCount := 0;
+  EnabledDeviceChannelCount := 0;
+  DisabledDeviceChannelCount := 0;
+
   if FWorkTable.DeviceChannels.Count = 0 then
-    FWorkTable.AddDeviceChannel(
-      True,
-      -1,
-      TWorkTable.BuildChannelDefaultText(1),
-      '',
-      '-',
-      ''
-    );
+    FWorkTable.AddDeviceChannel(True, -1, TWorkTable.BuildChannelDefaultText(1), '', '-', '');
 
-  for Channel in FWorkTable.DeviceChannels do
+  TotalDeviceChannelCount := FWorkTable.DeviceChannels.Count;
+
+  for ChannelIndex := 0 to FWorkTable.DeviceChannels.Count - 1 do
   begin
-    if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
+    Channel := FWorkTable.DeviceChannels[ChannelIndex];
+    Device := nil;
+    RepoDevice := nil;
+    DeviceResolveSource := 'None';
+    SkipReason := '';
+
+    Device := ChannelDevice(Channel);
+    if Device <> nil then
+      DeviceResolveSource := 'Channel.FlowMeter.Device';
+
+    if Channel = nil then
+      SkipReason := 'ChannelNil'
+    else if not Channel.Enabled then
+      SkipReason := 'ChannelDisabled'
+    else if Channel.State = osDeleted then
+      SkipReason := 'ChannelDeleted'
+    else if Channel.FlowMeter = nil then
+      SkipReason := 'FlowMeterNotAssigned'
+    else if Device = nil then
+      SkipReason := 'DeviceNotAssigned'
+    else if Device.State = osDeleted then
+      SkipReason := 'DeviceDeleted';
+
+    IncludedInAutomaticSession := SkipReason = '';
+
+    if (Device <> nil) and (Trim(Device.UUID) <> '') and (DataManager <> nil) then
+      RepoDevice := DataManager.FindDevice(Device.UUID, Repo);
+    if (RepoDevice <> nil) and not SameText(RepoDevice.UUID, Device.UUID) then
+      RepoDevice := nil;
+
+    if IncludedInAutomaticSession then
+    begin
+      if ((Device.Points = nil) or (Device.Points.Count = 0)) and
+         (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
+      begin
+        RepoDevice := DataManager.FindDevice(Device.UUID, Repo);
+        if (RepoDevice <> nil) and SameText(RepoDevice.UUID, Device.UUID) then
+        begin
+          Device := RepoDevice;
+          DeviceResolveSource := 'RepositoryByUUID';
+        end;
+      end;
+      if EnabledSourcePointCount(Device) = 0 then
+      begin
+        SkipReason := 'NoEnabledSourcePoints';
+        IncludedInAutomaticSession := False;
+      end;
+    end;
+
+    if IncludedInAutomaticSession then
+      Inc(EnabledDeviceChannelCount)
+    else
+      Inc(DisabledDeviceChannelCount);
+
+    ChannelUUIDText := '';
+    if Channel <> nil then
+      ChannelUUIDText := Channel.UUID;
+    ChannelDeviceUUIDText := '';
+    ChannelDeviceNameText := '';
+    ChannelDeviceQmax := 0;
+    if ChannelDevice(Channel) <> nil then
+    begin
+      ChannelDeviceUUIDText := ChannelDevice(Channel).UUID;
+      ChannelDeviceNameText := ChannelDevice(Channel).Name;
+      ChannelDeviceQmax := ChannelDevice(Channel).Qmax;
+    end;
+    RepoDeviceUUIDText := '';
+    RepoDeviceQmax := 0;
+    if RepoDevice <> nil then
+    begin
+      RepoDeviceUUIDText := RepoDevice.UUID;
+      RepoDeviceQmax := RepoDevice.Qmax;
+    end;
+    SelectedDeviceUUIDText := '';
+    SelectedDeviceNameText := '';
+    SelectedDeviceQmax := 0;
+    if Device <> nil then
+    begin
+      SelectedDeviceUUIDText := Device.UUID;
+      SelectedDeviceNameText := Device.Name;
+      SelectedDeviceQmax := Device.Qmax;
+    end;
+
+    AddDiagnosticEvent(Format('CreateSessionChannelResolve: ChannelIndex=%d; ChannelUUID=%s; ChannelEnabled=%s; ChannelDevicePointer=%s; ChannelDeviceUUID=%s; ChannelDeviceName=%s; ChannelDeviceQmaxLS=%.6f; RepositoryDevicePointer=%s; RepositoryDeviceUUID=%s; RepositoryDeviceQmaxLS=%.6f; SelectedDevicePointer=%s; SelectedDeviceUUID=%s; SelectedDeviceQmaxLS=%.6f; DeviceResolveSource=%s',
+      [ChannelIndex, ChannelUUIDText, BoolText((Channel <> nil) and Channel.Enabled), PtrText(ChannelDevice(Channel)), ChannelDeviceUUIDText, ChannelDeviceNameText, ChannelDeviceQmax, PtrText(RepoDevice), RepoDeviceUUIDText, RepoDeviceQmax, PtrText(Device), SelectedDeviceUUIDText, SelectedDeviceQmax, DeviceResolveSource]));
+    AddDiagnosticEvent(Format('CreateSessionChannelInclude: ChannelIndex=%d; ChannelUUID=%s; ChannelEnabled=%s; FlowMeterEnabled=%s; DeviceEnabled=%s; DeviceState=%s; IncludedInAutomaticSession=%s; SkipReason=%s',
+      [ChannelIndex, ChannelUUIDText, BoolText((Channel <> nil) and Channel.Enabled), 'n/a', BoolText((Device <> nil) and Device.Enabled), DeviceStateText(Device), BoolText(IncludedInAutomaticSession), SkipReason]));
+
+    if not IncludedInAutomaticSession then
       Continue;
 
-    Device := Channel.FlowMeter.Device;
-    if ((Device = nil) or (Device.Points = nil) or (Device.Points.Count = 0)) and
-       (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
-      Device := TDeviceCreationService.EnsureDeviceForChannel(
-        Channel,
-        FWorkTable,
-        DataManager.ActiveDeviceRepo,
-        dcmMeasurementPromoted,
-        nil,
-        FWorkTable.CurrentPoint
-      );
-
-    if (Device = nil) or (Device.Points = nil) then
-      Continue;
-
+    AddUniqueDeviceInfo(Device);
+    Inc(ProcessingDeviceCount);
+    DeviceSourcePointCount := 0;
+    DeviceAddedParticipantCount := 0;
+    DeviceCreatedPointCount := 0;
+    DeviceMergedParticipantCount := 0;
     for SourcePoint in Device.Points do
     begin
       if (SourcePoint = nil) or (not SourcePoint.Enabled) or (SourcePoint.State = osDeleted) then
         Continue;
+      Inc(ProcessingDevicePointCount);
+      Inc(DeviceSourcePointCount);
 
-      AddDiagnosticEvent(Format(
-        'SourcePointStabilization: DeviceUUID=%s; DeviceName=%s; PointName=%s; Enabled=%s; Pause=%d; Mode=%s',
-        [Device.UUID, Device.Name, SourcePoint.Name, BoolToStr(SourcePoint.Enabled, True), SourcePoint.Pause,
-         IfThen(SourcePoint.Pause < 0, 'Auto', 'Time')]));
+      StoredQLS := SourcePoint.Q;
+      CalculatedQLS := 0;
+      DerivedQmaxLS := 0;
+      EffectiveDeviceQmaxLS := Device.Qmax;
+      if IsValidFlowValue(SourcePoint.FlowRate) and IsValidFlowValue(StoredQLS) then
+        DerivedQmaxLS := StoredQLS / SourcePoint.FlowRate;
+      QmaxMismatch := False;
+      RelativeQmaxDiff := 0;
+      if IsValidFlowValue(DerivedQmaxLS) and IsValidFlowValue(Device.Qmax) then
+      begin
+        RelativeQmaxDiff := Abs(Device.Qmax - DerivedQmaxLS) / Max(Abs(DerivedQmaxLS), 1E-12);
+        QmaxMismatch := RelativeQmaxDiff > QmaxMismatchRelativeTolerance;
+      end;
+      if QmaxMismatch and IsValidFlowValue(DerivedQmaxLS) then
+        EffectiveDeviceQmaxLS := DerivedQmaxLS;
+      if IsValidFlowValue(EffectiveDeviceQmaxLS) and IsValidFlowValue(SourcePoint.FlowRate) then
+        CalculatedQLS := EffectiveDeviceQmaxLS * SourcePoint.FlowRate;
+      AddDiagnosticEvent(Format('SessionSourcePointQmaxValidation: ChannelDeviceUUID=%s; SelectedDeviceUUID=%s; SelectedDeviceQmaxLS=%.6f; EffectiveDeviceQmaxLS=%.6f; SourcePointQLS=%.6f; SourcePointFlowRate=%.9f; DerivedQmaxLS=%.6f; QmaxMismatch=%s',
+        [ChannelDeviceUUIDText, Device.UUID, Device.Qmax, EffectiveDeviceQmaxLS, StoredQLS, SourcePoint.FlowRate, DerivedQmaxLS, BoolText(QmaxMismatch)]));
+      if QmaxMismatch then
+        AddDiagnosticEvent(Format('DeviceQmaxBindingCorrectedFromSourcePoint: ChannelUUID=%s; DeviceUUID=%s; StoredQmax=%.6f; DerivedQmax=%.6f; SourcePointUUID=%s; StoredPointQLS=%.6f; SourceFlowRate=%.9f; CalculatedTargetQLS=%.6f; RelativeQmaxDiff=%.9f',
+          [Channel.UUID, Device.UUID, Device.Qmax, DerivedQmaxLS, SourcePoint.UUID, StoredQLS, SourcePoint.FlowRate, CalculatedQLS, RelativeQmaxDiff]));
+      if not IsValidFlowValue(CalculatedQLS) then
+      begin
+        AddDiagnosticEvent(Format('SessionSourcePoint: DeviceUUID=%s; DeviceChannelUUID=%s; SourcePointUUID=%s; SourcePointName=%s; SourceFlowRate=%.9f; DeviceQmaxLS=%.6f; StoredPointQLS=%.6f; CalculatedTargetQLS=%.6f; DerivedQmaxLS=%.6f; SelectedTargetQLS=0; MatchedSessionPointUUID=; MatchedSessionPointQLS=0; MergeToleranceLS=0; Action=Skipped; Reason=InvalidCalculatedTargetQLS',
+          [Device.UUID, Channel.UUID, SourcePoint.UUID, SourcePoint.Name, SourcePoint.FlowRate, EffectiveDeviceQmaxLS, StoredQLS, CalculatedQLS, DerivedQmaxLS]));
+        Continue;
+      end;
+
+      TargetQLS := CalculatedQLS;
+      PointQValidationToleranceLS := Max(1E-6, Abs(StoredQLS) * 1E-4);
+      if IsValidFlowValue(StoredQLS) and (Abs(StoredQLS - CalculatedQLS) <= PointQValidationToleranceLS) then
+        TargetQLS := StoredQLS
+      else if IsValidFlowValue(StoredQLS) then
+        AddDiagnosticEvent(Format('SourcePointQMismatch: CurrentDeviceUUID=%s; CurrentDeviceQmaxLS=%.6f; SourcePointQLS=%.6f; SourcePointFlowRate=%.9f; CalculatedTargetQLS=%.6f; DerivedQmaxLS=%.6f',
+          [Device.UUID, EffectiveDeviceQmaxLS, StoredQLS, SourcePoint.FlowRate, CalculatedQLS, DerivedQmaxLS]));
+
+      Participant := Default(TMeasurementPointParticipant);
+      Participant.DeviceUUID := Device.UUID;
+      Participant.DeviceChannelUUID := Channel.UUID;
+      Participant.SourcePointUUID := SourcePoint.UUID;
+      Participant.SourcePointName := SourcePoint.Name;
+      Participant.SourceFlowRate := SourcePoint.FlowRate;
+      Participant.SourceDeviceQmaxLS := EffectiveDeviceQmaxLS;
+      Participant.StoredSourcePointQLS := StoredQLS;
+      Participant.CalculatedSourceTargetQLS := CalculatedQLS;
+      Participant.SelectedSourceTargetQLS := TargetQLS;
+      Participant.SourceTargetQLS := TargetQLS;
+      Participant.SourceErrorPercent := SourcePoint.Error;
+      Participant.SourcePauseSec := SourcePoint.Pause;
 
       ExistingPoint := nil;
       for SessionPoint in FPoints do
-        if IsPointEquivalent(SessionPoint, SourcePoint) then
+        if Abs(SessionPoint.Q - TargetQLS) <= FlowMergeTolerance(SessionPoint.Q, TargetQLS) then
         begin
           ExistingPoint := SessionPoint;
           Break;
@@ -2235,27 +3109,129 @@ begin
       begin
         SessionPoint := TDevicePoint.Create(0);
         SessionPoint.Assign(SourcePoint, True);
-        SessionPoint.RequireAutoStabilization := SourcePoint.Pause < 0;
-        if SourcePoint.Pause >= 0 then
-          SessionPoint.RequiredStabilizationSec := SourcePoint.Pause
-        else
-          SessionPoint.RequiredStabilizationSec := 0;
+        SetLength(SessionPoint.Participants, 0);
+        SessionPoint.SourcePointCount := 0;
+        SessionPoint.Q := TargetQLS;
+        SessionPoint.DeviceUUID := '';
         SessionPoint.Status := mptsNone;
         SessionPoint.RepeatsCompleted := 0;
+        AddParticipant(SessionPoint, Participant);
+        RefreshSessionPointParams(SessionPoint);
         FPoints.Add(SessionPoint);
+        MergeTolerance := FlowMergeTolerance(SessionPoint.Q, TargetQLS);
+        Inc(DeviceAddedParticipantCount);
+        Inc(DeviceCreatedPointCount);
+        Action := 'Created';
+        Reason := 'NewPhysicalPoint';
       end
       else
+      begin
         MergePointParams(ExistingPoint, SourcePoint);
+        if ParticipantExists(ExistingPoint, Participant) then
+        begin
+          Inc(DuplicateParticipantCount);
+          Action := 'Skipped';
+          Reason := 'DuplicateParticipant';
+        end
+        else
+        begin
+          AddParticipant(ExistingPoint, Participant);
+          Inc(DeviceAddedParticipantCount);
+          Inc(DeviceMergedParticipantCount);
+          Action := 'Merged';
+          Reason := 'MergedByAbsoluteQ';
+        end;
+        RefreshSessionPointParams(ExistingPoint);
+        SessionPoint := ExistingPoint;
+        MergeTolerance := FlowMergeTolerance(SessionPoint.Q, TargetQLS);
+      end;
 
-      if ExistingPoint <> nil then
-        AddDiagnosticEvent(Format(
-          'MergedStabilization: SessionPointName=%s; SourcePointCount=%d; AutoRequired=%s; MaxStabilizationSec=%.3f',
-          [ExistingPoint.Name, 0, BoolToStr(ExistingPoint.RequireAutoStabilization, True), ExistingPoint.RequiredStabilizationSec]))
-      else
-        AddDiagnosticEvent(Format(
-          'MergedStabilization: SessionPointName=%s; SourcePointCount=%d; AutoRequired=%s; MaxStabilizationSec=%.3f',
-          [SessionPoint.Name, 1, BoolToStr(SessionPoint.RequireAutoStabilization, True), SessionPoint.RequiredStabilizationSec]));
+      AddDiagnosticEvent(Format('SessionSourcePoint: DeviceUUID=%s; DeviceChannelUUID=%s; SourcePointUUID=%s; SourcePointName=%s; SourceFlowRate=%.9f; DeviceQmaxLS=%.6f; StoredPointQLS=%.6f; CalculatedTargetQLS=%.6f; DerivedQmaxLS=%.6f; SelectedTargetQLS=%.6f; MatchedSessionPointUUID=%s; MatchedSessionPointQLS=%.6f; MergeToleranceLS=%.9f; Action=%s; Reason=%s',
+        [Device.UUID, Channel.UUID, SourcePoint.UUID, SourcePoint.Name, SourcePoint.FlowRate,
+         EffectiveDeviceQmaxLS, StoredQLS, CalculatedQLS, DerivedQmaxLS, TargetQLS, SessionPoint.UUID, SessionPoint.Q,
+         MergeTolerance, Action, Reason]));
     end;
+    AddDiagnosticEvent(Format('CreateSessionDeviceSummary: DeviceUUID=%s; DeviceName=%s; DeviceQmaxLS=%.6f; EnabledSourcePointCount=%d; AddedParticipantCount=%d; CreatedPhysicalPointCount=%d; MergedParticipantCount=%d',
+      [Device.UUID, Device.Name, Device.Qmax, DeviceSourcePointCount, DeviceAddedParticipantCount,
+       DeviceCreatedPointCount, DeviceMergedParticipantCount]));
+  end;
+
+  ResolvedUniqueDeviceCount := Length(DeviceUUIDs);
+  DistinctDeviceQmaxCount := 0;
+  for I := 0 to High(DeviceQmaxValues) do
+  begin
+    IsDistinctQmax := True;
+    for J := 0 to I - 1 do
+      if Abs(DeviceQmaxValues[I] - DeviceQmaxValues[J]) <= FlowMergeTolerance(DeviceQmaxValues[I], DeviceQmaxValues[J]) then
+      begin
+        IsDistinctQmax := False;
+        Break;
+      end;
+    if IsDistinctQmax then
+      Inc(DistinctDeviceQmaxCount);
+  end;
+
+  if ResolvedUniqueDeviceCount > 1 then
+  begin
+    for I := 0 to High(DevicePointers) do
+      for J := I + 1 to High(DevicePointers) do
+        if DevicePointers[I] = DevicePointers[J] then
+        begin
+          PointName := 'DeviceChannelBindingMismatch: different DeviceUUID values resolve to the same DevicePointer';
+          AddDiagnosticEvent(PointName);
+          ProtocolManager.AddMessage(pcError, psMeasurement, 'DeviceChannelBindingMismatch', 'Некорректная привязка каналов приборов', PointName);
+          raise Exception.Create(PointName);
+        end;
+  end;
+
+  FPoints.Sort(TComparer<TDevicePoint>.Construct(
+    function(const Left, Right: TDevicePoint): Integer
+    begin
+      Result := CompareValue(Left.Q, Right.Q, 1E-12);
+      if Result = 0 then
+        Result := CompareText(Left.Name, Right.Name);
+      if Result = 0 then
+        Result := CompareText(Left.UUID, Right.UUID);
+    end));
+
+  for I := 0 to FPoints.Count - 1 do
+  begin
+    FPoints[I].Num := I + 1;
+    RefreshSessionPointParams(FPoints[I]);
+    AddDiagnosticEvent(Format('SessionPointFinal: SessionPointIndex=%d; SessionPointUUID=%s; SessionPointName=%s; PhysicalTargetQLS=%.6f; Participants.Count=%d',
+      [I, FPoints[I].UUID, FPoints[I].Name, FPoints[I].Q, Length(FPoints[I].Participants)]));
+    for J := 0 to High(FPoints[I].Participants) do
+      AddDiagnosticEvent(Format('SessionPointFinalParticipant: SessionPointIndex=%d; DeviceUUID=%s; DeviceChannelUUID=%s; SourcePointUUID=%s; SourcePointName=%s; SelectedSourceTargetQLS=%.6f',
+        [I, FPoints[I].Participants[J].DeviceUUID, FPoints[I].Participants[J].DeviceChannelUUID,
+         FPoints[I].Participants[J].SourcePointUUID, FPoints[I].Participants[J].SourcePointName,
+         FPoints[I].Participants[J].SelectedSourceTargetQLS]));
+  end;
+
+  for I := 0 to FPoints.Count - 1 do
+    for J := 0 to High(FPoints[I].Participants) do
+      if Abs(FPoints[I].Participants[J].SelectedSourceTargetQLS - FPoints[I].Q) >
+         FlowMergeTolerance(FPoints[I].Participants[J].SelectedSourceTargetQLS, FPoints[I].Q) then
+        Inc(LostSourcePointCount);
+
+  AddDiagnosticEvent(Format('CreateSessionSummary: TotalDeviceChannelCount=%d; EnabledDeviceChannelCount=%d; DisabledDeviceChannelCount=%d; ResolvedUniqueDeviceCount=%d; DistinctDeviceQmaxCount=%d; ProcessingDeviceCount=%d; ProcessingDevicePointCount=%d; SessionPointCount=%d; ParticipantCount=%d; UniqueParticipantCount=%d; DuplicateParticipantCount=%d; LostSourcePointCount=%d',
+    [TotalDeviceChannelCount, EnabledDeviceChannelCount, DisabledDeviceChannelCount,
+     ResolvedUniqueDeviceCount, DistinctDeviceQmaxCount, ProcessingDeviceCount,
+     ProcessingDevicePointCount, FPoints.Count, ParticipantCount, ParticipantCount,
+     DuplicateParticipantCount, LostSourcePointCount]));
+
+  if FPoints.Count = 0 then
+  begin
+    PointName := 'NoAutomaticMeasurementPoints: Points.Count=0';
+    ProtocolManager.AddMessage(pcError, psMeasurement, 'NoAutomaticMeasurementPoints', 'Не сформированы точки автоматической сессии', PointName);
+    raise Exception.Create(PointName);
+  end;
+
+  if (LostSourcePointCount > 0) or (ParticipantCount <> ProcessingDevicePointCount) then
+  begin
+    PointName := Format('InvalidMeasurementSession: ProcessingDevicePointCount=%d; ParticipantCount=%d; LostSourcePointCount=%d',
+      [ProcessingDevicePointCount, ParticipantCount, LostSourcePointCount]);
+    ProtocolManager.AddMessage(pcError, psMeasurement, 'InvalidMeasurementSession', 'Некорректная сессия измерения', PointName);
+    raise Exception.Create(PointName);
   end;
 end;
 
@@ -2356,13 +3332,18 @@ begin
     FLastResultsPerDevice := '';
     FLastRouteStopDiagnosticKey := '';
     FStableSinceMs := 0;
-    FDeviceStableSinceMs := 0;
+    FDevicesStableSinceMs := 0;
     FLastDeviceStableStateKnown := False;
     FLastDeviceStableState := False;
     FRequireAutoStabilization := False;
-    FRequiredStabilizationSec := 0;
+    FRequiredDeviceStabilizationSec := 0;
     FLastStableProgressSecond := -1;
     FStableTimerResetReason := '';
+    FRunCompleted := False;
+    FRunResult := mrrNone;
+    FDoneReason := mdrNone;
+    FRequestStopCalled := False;
+    FFinalized := False;
 
     case Mode of
       mrmAutomatic:
@@ -2574,7 +3555,11 @@ begin
     else
     begin
       Duplicate := False;
+      FRequestStopCalled := True;
       FStopRequested := True;
+      FRunResult := mrrCancelled;
+      FDoneReason := mdrUserCancelled;
+      ResetPointSetupState;
       FIsPaused := False;
       if FStopReason in [msrNone, msrNormalComplete] then
         FStopReason := msrUserStop;
@@ -2600,7 +3585,11 @@ begin
 
   AddDiagnosticEvent('RequestStop called');
   if StageSnapshot in [msWaitMeasureStart, msMeasure] then
+  begin
     SetStage(msWaitMeasureStop);
+  end
+  else if not (StageSnapshot in [msNone, msDone, msSave, msResultsRead, msWaitMeasureStop]) then
+    SetStage(msDone);
   FireEvent(meStopRequested);
 end;
 
@@ -2654,6 +3643,7 @@ begin
     mcReset:
       begin
         RequestStop;
+        ResetPointSetupState;
         FCurrentPointIndex := -1;
         Start;
       end;
@@ -2852,6 +3842,8 @@ begin
   begin
 
     FCurrentRepeat := Point.RepeatsCompleted;
+    if FWorkTable <> nil then
+      FWorkTable.MeasurementRunPointChanged(Self, Point, FCurrentPointIndex);
     AddDiagnosticEvent('SetPoint success: ' + BuildPointSelectionLog(Point));
 
   end else
@@ -2873,7 +3865,16 @@ begin
 
   Result := FWorkTable.SelectEtalons(APoint.Q, AError);
   if not Result then
-    Exit;
+  begin
+    if GetSelectedEtalonUUID <> '' then
+    begin
+      AddDiagnosticEvent('SelectEtalons warning suppressed: existing selected etalon is valid; SelectedEtalonUUID=' + GetSelectedEtalonUUID + '; Error=' + AError.Msg);
+      AError := TErrorInfo.Empty(Integer(msSelectEtalon));
+      Result := True;
+    end
+    else
+      Exit;
+  end;
 
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcAction, psMeasurement, 'EtalonSelected',
@@ -2935,6 +3936,30 @@ begin
     AError := BuildError(1201, 'Невозможно задать параметры точки');
     Exit;
   end;
+
+  if FPointSetupCommandSent then
+  begin
+    AddDiagnosticEvent(Format('SetupPoint skipped: command already sent; PointIndex=%d; PointUUID=%s; TargetFlowLS=%.6f',
+      [FSetupPointIndex, FSetupPointUUID, FSetupTargetFlowLS]));
+    Exit(True);
+  end;
+
+  if FAttempt <= 0 then
+    FAttempt := 1;
+
+  FSetupPointUUID := APoint.UUID;
+  FSetupPointIndex := FCurrentPointIndex;
+  FSetupTargetFlowLS := APoint.Q;
+  FSetupStartedMs := TMeterValue.GetMonotonicTimeMs;
+  FPointSetupCommandSent := True;
+  FWorkTable.InstalledMeasurementPointUUID := FSetupPointUUID;
+  FWorkTable.InstalledMeasurementPointIndex := FSetupPointIndex;
+  FWorkTable.InstalledMeasurementTargetFlowLS := FSetupTargetFlowLS;
+
+  AddDiagnosticEvent(Format(
+    'SetupPoint command: PointIndex=%d; MeasurementPointUUID=%s; PointName=%s; TargetFlowLS=%.6f; SelectedEtalonUUID=%s; WorkTableState=%s; Attempt=%d; CommandSent=%s; %s',
+    [FSetupPointIndex, FSetupPointUUID, APoint.Name, FSetupTargetFlowLS, GetSelectedEtalonUUID,
+     TWorkTable.WorkTableStateToString(FWorkTable.State), FAttempt, BoolToStr(FPointSetupCommandSent, True), BuildPointSetupIdentityLog]));
 
   if (APoint.Q >= 0) and (FWorkTable.FlowRate <> nil) then
   begin
@@ -2999,13 +4024,225 @@ begin
 
 end;
 
+
+function TMeasurementRun.GetRuntimeTargetFlowLS: Double;
+begin
+  Result := 0;
+  if (FWorkTable <> nil) and (FWorkTable.FlowRate <> nil) and
+     (FWorkTable.FlowRate.ValueSet <> nil) then
+    Result := FWorkTable.FlowRate.ValueSet.Value;
+end;
+
+function TMeasurementRun.GetSelectedEtalonUUID: string;
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  Result := '';
+  if (FWorkTable = nil) or (FWorkTable.EtalonChannels = nil) then
+    Exit;
+  for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.EtalonChannels[I];
+    if (Channel <> nil) and Channel.Enabled and (Channel.State <> osDeleted) then
+      Exit(Channel.UUID);
+  end;
+end;
+
+function TMeasurementRun.IsSetupPointSynchronized(out AReason: string): Boolean;
+var
+  Point: TDevicePoint;
+  RuntimeTarget: Double;
+begin
+  Result := False;
+  AReason := '';
+  Point := GetCurrentPoint;
+  if Point = nil then
+    AReason := 'MeasurementRunPoint=nil'
+  else if FWorkTable = nil then
+    AReason := 'WorkTable=nil'
+  else if not FPointSetupCommandSent then
+    AReason := 'PointSetupCommandNotSent'
+  else if FWorkTable.State <> swtMONITOR then
+    AReason := 'WorkTableState=' + TWorkTable.WorkTableStateToString(FWorkTable.State)
+  else if FCurrentPointIndex <> FSetupPointIndex then
+    AReason := Format('MeasurementRunPointIndex=%d; SetupPointIndex=%d', [FCurrentPointIndex, FSetupPointIndex])
+  else if Point.UUID <> FSetupPointUUID then
+    AReason := Format('MeasurementRunPointUUID=%s; SetupPointUUID=%s', [Point.UUID, FSetupPointUUID])
+  else if FWorkTable.InstalledMeasurementPointIndex <> FSetupPointIndex then
+    AReason := Format('InstalledMeasurementPointIndex=%d; SetupPointIndex=%d', [FWorkTable.InstalledMeasurementPointIndex, FSetupPointIndex])
+  else if FWorkTable.InstalledMeasurementPointUUID <> FSetupPointUUID then
+    AReason := Format('InstalledMeasurementPointUUID=%s; SetupPointUUID=%s', [FWorkTable.InstalledMeasurementPointUUID, FSetupPointUUID])
+  else if not SameValue(FWorkTable.InstalledMeasurementTargetFlowLS, FSetupTargetFlowLS, 1E-6) then
+    AReason := Format('InstalledMeasurementTargetFlowLS=%.6f; SetupTargetFlowLS=%.6f', [FWorkTable.InstalledMeasurementTargetFlowLS, FSetupTargetFlowLS])
+  else begin
+    RuntimeTarget := GetRuntimeTargetFlowLS;
+    if not SameValue(RuntimeTarget, FSetupTargetFlowLS, 1E-6) then
+      AReason := Format('TargetFlowRuntimeLS=%.6f; TargetFlowSetupLS=%.6f', [RuntimeTarget, FSetupTargetFlowLS])
+    else
+      Result := True;
+  end;
+
+  if AReason <> '' then
+    AReason := AReason + '; ' + BuildPointSetupIdentityLog;
+end;
+
+function TMeasurementRun.BuildPointSetupIdentityLog: string;
+var
+  Point: TDevicePoint;
+  MeasurementUUID: string;
+  RuntimeUUID: string;
+  InstalledUUID: string;
+  InstalledIndex: Integer;
+  WorkTableStateText: string;
+begin
+  Point := GetCurrentPoint;
+  MeasurementUUID := '';
+  if Point <> nil then
+    MeasurementUUID := Point.UUID;
+
+  RuntimeUUID := '';
+  InstalledUUID := '';
+  InstalledIndex := -1;
+  WorkTableStateText := '<nil>';
+  if FWorkTable <> nil then
+  begin
+    InstalledUUID := FWorkTable.InstalledMeasurementPointUUID;
+    InstalledIndex := FWorkTable.InstalledMeasurementPointIndex;
+    WorkTableStateText := TWorkTable.WorkTableStateToString(FWorkTable.State);
+    if FWorkTable.CurrentPoint <> nil then
+      RuntimeUUID := FWorkTable.CurrentPoint.UUID;
+  end;
+
+  Result := Format('MeasurementRunPointIndex=%d; MeasurementRunPointUUID=%s; SetupPointIndex=%d; SetupPointUUID=%s; InstalledMeasurementPointIndex=%d; InstalledMeasurementPointUUID=%s; WorkTableRuntimePointUUID=%s; TargetFlowSetupLS=%.6f; TargetFlowRuntimeLS=%.6f; WorkTableState=%s',
+    [FCurrentPointIndex, MeasurementUUID, FSetupPointIndex, FSetupPointUUID,
+     InstalledIndex, InstalledUUID, RuntimeUUID, FSetupTargetFlowLS,
+     GetRuntimeTargetFlowLS, WorkTableStateText]);
+end;
+
+function TMeasurementRun.HasNewStabilityDataSince(const ATimeStampMs: Int64;
+  out AFirstSampleTimeMs: Int64): Boolean;
+var
+  I, J: Integer;
+  Channel: TChannel;
+  Samples: TArray<TMeterValueSample>;
+begin
+  Result := False;
+  AFirstSampleTimeMs := 0;
+  if (FWorkTable = nil) or (FWorkTable.EtalonChannels = nil) then
+    Exit;
+  for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.EtalonChannels[I];
+    if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) or
+       (Channel.FlowMeter.ValueFlow = nil) then
+      Continue;
+    Samples := Channel.FlowMeter.ValueFlow.GetStabilitySamples;
+    for J := 0 to High(Samples) do
+      if Samples[J].TimeStampMs > ATimeStampMs then
+      begin
+        AFirstSampleTimeMs := Samples[J].TimeStampMs;
+        Exit(True);
+      end;
+  end;
+end;
+
+procedure TMeasurementRun.ResetPointSetupState;
+begin
+  FPointSetupCommandSent := False;
+  FSetupPointUUID := '';
+  FSetupPointIndex := -1;
+  FSetupTargetFlowLS := 0;
+  FSetupStartedMs := 0;
+  FStabilityDataStartMs := 0;
+  FLastWaitPointSetupLogMs := 0;
+  FLastWaitPointSetupLogState := swtNONE;
+end;
+
+procedure TMeasurementRun.StartNewStabilityAttempt;
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  FStabilityDataStartMs := TMeterValue.GetMonotonicTimeMs;
+  FLastStabilityCheckSecond := -1;
+  FStableSinceMs := 0;
+  FDevicesStableSinceMs := 0;
+  FLastDeviceStableStateKnown := False;
+  FLastDeviceStableState := False;
+  FLastStableProgressSecond := -1;
+  if (FWorkTable <> nil) and (FWorkTable.EtalonChannels <> nil) then
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.EtalonChannels[I];
+      if (Channel <> nil) and (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+        Channel.FlowMeter.ValueFlow.ResetStabilityRuntimeState;
+    end;
+  if (FWorkTable <> nil) and (FWorkTable.DeviceChannels <> nil) then
+    for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.DeviceChannels[I];
+      if (Channel <> nil) and (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+        Channel.FlowMeter.ValueFlow.ResetStabilityRuntimeState;
+    end;
+end;
+
+function TMeasurementRun.CalcStableTimeoutSec: Integer;
+const
+  SETUP_MARGIN_SEC = 5;
+var
+  I: Integer;
+  Channel: TChannel;
+  Settings: TMeterValueStabilitySettings;
+  MinHistorySec, NeedSec: Double;
+
+  procedure IncludeMeterValue(const AMeterValue: TMeterValue);
+  begin
+    if AMeterValue = nil then
+      Exit;
+    Settings := AMeterValue.StabilitySettings;
+    MinHistorySec := Max(0.001, Settings.WindowDurationSec);
+    NeedSec := Ceil(MinHistorySec) + 1 + SETUP_MARGIN_SEC;
+    if FRequiredDeviceStabilizationSec > 0 then
+      NeedSec := NeedSec + FRequiredDeviceStabilizationSec;
+    Result := Max(Result, Ceil(NeedSec));
+  end;
+begin
+  Result := Ceil(Max(0.001, FRequiredDeviceStabilizationSec)) + 1 + SETUP_MARGIN_SEC;
+  if FWorkTable = nil then
+    Exit;
+
+  if FWorkTable.EtalonChannels <> nil then
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.EtalonChannels[I];
+      if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) then
+        IncludeMeterValue(Channel.FlowMeter.ValueFlow);
+    end;
+
+  if FWorkTable.DeviceChannels <> nil then
+    for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.DeviceChannels[I];
+      if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) then
+        IncludeMeterValue(Channel.FlowMeter.ValueFlow);
+    end;
+end;
+
 procedure TMeasurementRun.ProcessStage;
 begin
   AddWorkTableStateDiagnosticEvent;
+  if IsStopRequested and not (FCurrentStage in [msWaitMeasureStop, msResultsRead, msSave, msDone]) then
+  begin
+    RouteStopInWorker;
+    if FCurrentStage = msDone then
+      Exit;
+  end;
   case FCurrentStage of
     msSelectPoint: ProcessSelectPoint;
     msSelectEtalon: ProcessSelectEtalon;
     msSetupPoint: ProcessSetupPoint;
+    msWaitPointSetup: ProcessWaitPointSetup;
     msWaitStable: ProcessWaitStable;
     msWaitMeasureStart: ProcessWaitMeasureStart;
     msMeasure: ProcessMeasure;
@@ -3031,9 +4268,72 @@ begin
   // Point and measurement setup are performed once in EnterSetupPoint.
 end;
 
+
+procedure TMeasurementRun.ProcessWaitPointSetup;
+const
+  SETUP_TIMEOUT_S = 30;
+var
+  Reason: string;
+  FirstSampleTimeMs: Int64;
+  CurrentMs: Int64;
+begin
+  if FMode = mrmManual then
+  begin
+    SetStage(msWaitMeasureStart);
+    Exit;
+  end;
+
+  if FWorkTable = nil then
+  begin
+    ContinueAfterPointError(mptsSetupError, mePointNotSet, BuildError(1210, 'Рабочий стол не назначен'));
+    Exit;
+  end;
+
+  if FWorkTable.State <> swtMONITOR then
+  begin
+    CurrentMs := TMeterValue.GetMonotonicTimeMs;
+    if (FSetupStartedMs > 0) and (CurrentMs - FSetupStartedMs > SETUP_TIMEOUT_S * 1000) then
+      ContinueAfterPointError(mptsSetupError, mePointNotSet, BuildError(1211,
+        'Мониторинг не запустился после установки точки'))
+    else
+      if (FLastWaitPointSetupLogState <> FWorkTable.State) or (CurrentMs - FLastWaitPointSetupLogMs >= 1000) then
+      begin
+        FLastWaitPointSetupLogState := FWorkTable.State;
+        FLastWaitPointSetupLogMs := CurrentMs;
+        AddDiagnosticEvent('WaitPointSetup: waiting swtMONITOR; ' + BuildPointSetupIdentityLog);
+      end;
+    Exit;
+  end;
+
+  if not IsSetupPointSynchronized(Reason) then
+  begin
+    AddDiagnosticEvent('PointSetup desync: ' + Reason);
+    ContinueAfterPointError(mptsSetupError, mePointNotSet, BuildError(1212,
+      'Рассинхронизация установленной точки: ' + Reason));
+    Exit;
+  end;
+
+  if not HasNewStabilityDataSince(FSetupStartedMs, FirstSampleTimeMs) then
+  begin
+    CurrentMs := TMeterValue.GetMonotonicTimeMs;
+    if CurrentMs - FLastWaitPointSetupLogMs >= 1000 then
+    begin
+      FLastWaitPointSetupLogMs := CurrentMs;
+      AddDiagnosticEvent('WaitPointSetup: history is not updated yet; ' + BuildPointSetupIdentityLog);
+    end;
+    Exit;
+  end;
+
+  StartNewStabilityAttempt;
+  AddDiagnosticEvent(Format(
+    'PointSetupConfirmed: WaitMs=%d; ActualFlowLS=%.6f; WorkTableState=%s; FirstSampleTimeMs=%d; StabilityDataStartMs=%d',
+    [TMeterValue.GetMonotonicTimeMs - FSetupStartedMs, GetRuntimeTargetFlowLS,
+     TWorkTable.WorkTableStateToString(FWorkTable.State), FirstSampleTimeMs, FStabilityDataStartMs]));
+  SetStage(msWaitStable);
+end;
+
 procedure TMeasurementRun.ProcessWaitStable;
 const
-  DEFAULT_STABLE_TIMEOUT_S = 30;
   STABLE_PROTOCOL_INTERVAL_MS = 2000;
 var
   Point: TDevicePoint;
@@ -3041,9 +4341,12 @@ var
   CurrentTick: UInt64;
   DeviceElapsedSec: Double;
   DeviceElapsedSecond: Int64;
-  DeviceStable: Boolean;
+  DevicesStable: Boolean;
   ReadyToMeasure: Boolean;
   StableStatus: string;
+  CurrentSecond: Int64;
+  StableTimeoutSec: Integer;
+  StableElapsedMs: Int64;
 begin
   if FMode = mrmManual then
   begin
@@ -3059,7 +4362,35 @@ begin
     Exit;
   end;
 
-  CurrentTick := TThread.GetTickCount64;
+  CurrentTick := TMeterValue.GetMonotonicTimeMs;
+  StableTimeoutSec := CalcStableTimeoutSec;
+  if FWaitStableStartedMs > 0 then
+  begin
+    StableElapsedMs := TMeterValue.GetMonotonicTimeMs - FWaitStableStartedMs;
+    if StableElapsedMs < 0 then
+      StableElapsedMs := 0;
+  end
+  else
+    StableElapsedMs := 0;
+
+  if (FWorkTable <> nil) and (FWorkTable.State <> swtMONITOR) then
+  begin
+    AddWorkTableStateDiagnosticEvent;
+    Exit;
+  end;
+
+  if not IsSetupPointSynchronized(StableStatus) then
+  begin
+    AddDiagnosticEvent('WaitStable desync: ' + StableStatus);
+    ContinueAfterPointError(mptsSetupError, meMeasureError, BuildError(1302,
+      'Рассинхронизация установленной точки: ' + StableStatus));
+    Exit;
+  end;
+
+  CurrentSecond := TMeterValue.GetMonotonicTimeMs div 1000;
+  if CurrentSecond = FLastStabilityCheckSecond then
+    Exit;
+  FLastStabilityCheckSecond := CurrentSecond;
 
   // До первого успешного IsStable ожидаем отдельную стабилизацию эталона.
   if FStableSinceMs = 0 then
@@ -3076,108 +4407,104 @@ begin
           'Ожидание стабилизации эталона', StableInfo.StatusText);
       end;
 
-      if (((CurrentTick - FWaitStartedTick) / 1000) > DEFAULT_STABLE_TIMEOUT_S) then
+      if ((StableElapsedMs / 1000) > StableTimeoutSec) then
       begin
-        Inc(FAttempt);
-        if FAttempt < FMaxAttemptCount then
-        begin
-          ProtocolManager.AddMessage(pcWarning, psMeasurement, 'StableTimeout',
-            'Таймаут установки параметров измерения',
-            Format('Попытка выхода на параметры: %d из %d', [FAttempt, FMaxAttemptCount]));
-          FireEvent(meStableRetry);
-          SetStage(msSetupPoint);
-          Exit;
-        end;
-
         ProtocolManager.AddMessage(pcError, psMeasurement, 'StableFailed',
           'Не удалось установить параметры измерения', StableInfo.StatusText);
-        FireEvent(meStableTimeout, BuildError(1301, 'Стабилизация не достигнута'));
-        if FMode = mrmAutomatic then
-          ContinueAfterPointError(mptsSetupError, meStableTimeout, BuildError(1301, 'Стабилизация не достигнута'))
+        if Pos('DevicePoint', StableInfo.StatusText) > 0 then
+          ContinueAfterPointError(mptsDevicePointMismatch, meStableTimeout, BuildError(1301, 'Точка прибора не сопоставлена: ' + StableInfo.StatusText))
         else
-          SetStage(msDone);
+          ContinueAfterPointError(mptsStabilityError, meStableTimeout, BuildError(1301, 'Стабилизация не достигнута: ' + StableInfo.StatusText));
       end;
       Exit;
     end;
 
     FStableSinceMs := CurrentTick;
-    FDeviceStableSinceMs := 0;
+    FDevicesStableSinceMs := 0;
     FLastDeviceStableStateKnown := False;
     FLastDeviceStableState := False;
     FLastStableProgressSecond := -1;
     AddDiagnosticEvent(Format(
-      'EtalonStable: AutoRequired=%s; RequiredDeviceStabilizationSec=%.3f; DeviceStableSinceMsReset=True',
-      [BoolToStr(FRequireAutoStabilization, True), FRequiredStabilizationSec]));
+      'EtalonStable: AutoRequired=%s; RequiredDeviceStabilizationSec=%.3f; DevicesStableSinceMsReset=True',
+      [BoolToStr(FRequireAutoStabilization, True), FRequiredDeviceStabilizationSec]));
     ProtocolManager.AddMessage(pcInfo, psMeasurement, 'EtalonStable',
       'Эталон стабилизирован; проверка стабилизации приборов',
-      Format('AutoRequired=%s; RequiredDeviceStabilizationSec=%.3f; DeviceStableSinceMsReset=True',
-        [BoolToStr(FRequireAutoStabilization, True), FRequiredStabilizationSec]));
+      Format('AutoRequired=%s; RequiredDeviceStabilizationSec=%.3f; DevicesStableSinceMsReset=True',
+        [BoolToStr(FRequireAutoStabilization, True), FRequiredDeviceStabilizationSec]));
   end;
 
   StableInfo := Default(RStableInfo);
-  DeviceStable := True;
+  DevicesStable := True;
   ReadyToMeasure := False;
   DeviceElapsedSec := 0;
   DeviceElapsedSecond := 0;
   StableStatus := 'NotRequired';
 
-  if (not FRequireAutoStabilization) and (FRequiredStabilizationSec <= 0) then
+  if (not FRequireAutoStabilization) and (FRequiredDeviceStabilizationSec <= 0) then
     ReadyToMeasure := True
   else
   begin
-    DeviceStable := IsStable(StableInfo);
-    StableStatus := BoolToStr(DeviceStable, True);
-    if not DeviceStable then
+    DevicesStable := IsStable(StableInfo);
+    StableStatus := BoolToStr(DevicesStable, True);
+    if not DevicesStable then
     begin
-      if (FDeviceStableSinceMs <> 0) or (not FLastDeviceStableStateKnown) or FLastDeviceStableState then
+      if (FDevicesStableSinceMs <> 0) or (not FLastDeviceStableStateKnown) or FLastDeviceStableState then
       begin
         AddDiagnosticEvent(Format(
           'DeviceStabilizationState: IsStable=False; StableSinceMs=0; ElapsedStableSec=0; RequiredSec=%.3f; TimerReset=True; Reason=%s',
-          [FRequiredStabilizationSec, StableInfo.StatusText]));
+          [FRequiredDeviceStabilizationSec, StableInfo.StatusText]));
         ProtocolManager.AddMessage(pcWarning, psMeasurement, 'DeviceStabilizationReset',
           'Ожидание стабилизации приборов', StableInfo.StatusText);
       end;
-      FDeviceStableSinceMs := 0;
+      FDevicesStableSinceMs := 0;
       FLastStableProgressSecond := -1;
       FStableTimerResetReason := StableInfo.StatusText;
       FLastDeviceStableStateKnown := True;
       FLastDeviceStableState := False;
+      if ((StableElapsedMs / 1000) > StableTimeoutSec) then
+      begin
+        ProtocolManager.AddMessage(pcError, psMeasurement, 'StableFailed',
+          'Не удалось стабилизировать приборы', StableInfo.StatusText);
+        if Pos('DevicePoint', StableInfo.StatusText) > 0 then
+          ContinueAfterPointError(mptsDevicePointMismatch, meStableTimeout, BuildError(1301, 'Точка прибора не сопоставлена: ' + StableInfo.StatusText))
+        else
+          ContinueAfterPointError(mptsStabilityError, meStableTimeout, BuildError(1301, 'Стабилизация приборов не достигнута: ' + StableInfo.StatusText));
+      end;
       Exit;
     end;
 
-    if (not FLastDeviceStableStateKnown) or (not FLastDeviceStableState) or (FDeviceStableSinceMs = 0) then
+    if (not FLastDeviceStableStateKnown) or (not FLastDeviceStableState) or (FDevicesStableSinceMs = 0) then
     begin
-      FDeviceStableSinceMs := CurrentTick;
+      FDevicesStableSinceMs := CurrentTick;
       FLastStableProgressSecond := -1;
       FStableTimerResetReason := '';
       AddDiagnosticEvent(Format(
         'DeviceStabilizationStarted: IsStable=True; StableSinceMs=%s; RequiredSec=%.3f',
-        [UIntToStr(FDeviceStableSinceMs), FRequiredStabilizationSec]));
+        [UIntToStr(FDevicesStableSinceMs), FRequiredDeviceStabilizationSec]));
     end;
 
     FLastDeviceStableStateKnown := True;
     FLastDeviceStableState := True;
 
-    if FRequiredStabilizationSec > 0 then
-      DeviceElapsedSec := (CurrentTick - FDeviceStableSinceMs) / 1000;
-    ReadyToMeasure := DeviceElapsedSec >= FRequiredStabilizationSec;
+    DeviceElapsedSec := (CurrentTick - FDevicesStableSinceMs) / 1000;
+    ReadyToMeasure := DevicesStable;
     DeviceElapsedSecond := Trunc(DeviceElapsedSec);
 
-    if (FRequiredStabilizationSec > 0) and (DeviceElapsedSecond <> FLastStableProgressSecond) then
+    if (FRequiredDeviceStabilizationSec > 0) and (DeviceElapsedSecond <> FLastStableProgressSecond) then
     begin
       FLastStableProgressSecond := DeviceElapsedSecond;
       AddDiagnosticEvent(Format(
         'DeviceStabilizationProgress: IsStable=True; ElapsedStableSec=%.3f; RequiredSec=%.3f',
-        [DeviceElapsedSec, FRequiredStabilizationSec]));
+        [DeviceElapsedSec, FRequiredDeviceStabilizationSec]));
     end;
 
     if CurrentTick - FLastStableProtocolTick >= STABLE_PROTOCOL_INTERVAL_MS then
     begin
       FLastStableProtocolTick := CurrentTick;
-      if FRequiredStabilizationSec > 0 then
+      if FRequiredDeviceStabilizationSec > 0 then
         ProtocolManager.AddMessage(pcInfo, psMeasurement, 'DeviceStabilization',
           Format('Стабилизация приборов: прошло %.0f из %.0f с',
-            [DeviceElapsedSec, FRequiredStabilizationSec]), StableInfo.StatusText)
+            [DeviceElapsedSec, FRequiredDeviceStabilizationSec]), StableInfo.StatusText)
       else
         ProtocolManager.AddMessage(pcInfo, psMeasurement, 'DeviceStabilization',
           'Автоматическая стабилизация приборов', StableInfo.StatusText);
@@ -3189,7 +4516,7 @@ begin
 
   AddDiagnosticEvent(Format(
     'DeviceStabilizationCompleted: IsStable=%s; ElapsedStableSec=%.3f; RequiredSec=%.3f; AutoRequired=%s',
-    [StableStatus, DeviceElapsedSec, FRequiredStabilizationSec, BoolToStr(FRequireAutoStabilization, True)]));
+    [StableStatus, DeviceElapsedSec, FRequiredDeviceStabilizationSec, BoolToStr(FRequireAutoStabilization, True)]));
   FireEvent(meStableReached);
   SetStage(msWaitMeasureStart);
 end;
@@ -3222,7 +4549,7 @@ begin
         Exit;
       end;
   end;
-   timeout := (TThread.GetTickCount64 - FWaitStartedTick)/1000;
+   timeout := (TMeterValue.GetMonotonicTimeMs - FWaitStartedTick)/1000;
   if timeout > DEFAULT_START_TIMEOUT_S then
   begin
     ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1403, 'Таймаут ожидания запуска измерения'));
@@ -3451,7 +4778,7 @@ begin
     end;
   end;
 
-  if Int64(TThread.GetTickCount64 - FWaitStartedTick) > Int64(FMeasureTimeout) * 1000 then
+  if Int64(TMeterValue.GetMonotonicTimeMs - FWaitStartedTick) > Int64(FMeasureTimeout) * 1000 then
   begin
     SetStopReason(msrError);
     FireEvent(meMeasureTimeout, BuildError(1401, 'Таймаут измерения'));
@@ -3480,6 +4807,11 @@ begin
             MeasurementStopReasonToString(GetStopReason));
           MarkInterruptedPointIfNeeded;
         end;
+        if IsStopRequested then
+        begin
+          FinalizeMeasurementRun(mrrCancelled, mdrUserCancelled);
+          Exit;
+        end;
         SetStage(msSave);
         Exit;
       end;
@@ -3501,7 +4833,7 @@ begin
       end;
   end;
 
-  if (TThread.GetTickCount64 - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
+  if (TMeterValue.GetMonotonicTimeMs - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
   begin
     ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1406, 'Таймаут ожидания остановки измерения'));
   end;
@@ -3528,6 +4860,8 @@ begin
             'Результат прерванного измерения прочитан',
             MeasurementStopReasonToString(GetStopReason));
           MarkInterruptedPointIfNeeded;
+          FinalizeMeasurementRun(mrrCancelled, mdrUserCancelled);
+          Exit;
         end;
         SetStage(msSave);
         Exit;
@@ -3545,7 +4879,7 @@ begin
       end;
   end;
 
-  if (TThread.GetTickCount64 - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
+  if (TMeterValue.GetMonotonicTimeMs - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
   begin
     ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1411, 'Таймаут чтения результатов'));
   end;
@@ -3677,6 +5011,9 @@ begin
   if (S = 'установка точки') or (S = 'mssetuppoint') then
     Exit(msSetupPoint);
 
+  if (S = 'ожидание установки точки') or (S = 'mswaitpointsetup') then
+    Exit(msWaitPointSetup);
+
   if (S = 'стабилизация') or (S = 'ожидание стабилизации') or (S = 'mswaitstable') then
     Exit(msWaitStable);
 
@@ -3711,6 +5048,7 @@ begin
     msSelectPoint:      Result := 'Выбор точки';
     msSelectEtalon:     Result := 'Выбор эталона';
     msSetupPoint:       Result := 'Установка точки';
+    msWaitPointSetup:   Result := 'Ожидание установки точки';
     msWaitStable:       Result := 'Стабилизация';
     msWaitMeasureStart: Result := 'Ожидание запуска измерения';
     msMeasure:          Result := 'Измерение';
@@ -3768,6 +5106,7 @@ begin
     msrCancelledBeforeStart: Result := 'отмена до начала измерения';
     msrEmergency: Result := 'аварийное завершение';
     msrExternalCommand: Result := 'внешняя команда';
+    msrUserRollback: Result := 'отмена результатов пользователем';
   else
     Result := 'неизвестная причина';
   end;

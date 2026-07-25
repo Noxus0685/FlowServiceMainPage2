@@ -449,6 +449,7 @@ type
     FState: EStateWorkTable;
     FAction: EActionWorkTable;
     FIsActive: Boolean;
+    FIsSimulationMode: Boolean;
 
     FTimeSet : Integer;
     FLimitImpSet: Integer;
@@ -614,6 +615,9 @@ type
   private
 
   FCurrentPoint:  TDevicePoint;
+  FInstalledMeasurementPointUUID: string;
+  FInstalledMeasurementPointIndex: Integer;
+  FInstalledMeasurementTargetFlowLS: Double;
   FParameterObserver: IEventObserver;
 
   procedure SetState(const ANewState: EStateWorkTable);
@@ -626,7 +630,7 @@ type
   function ResolveParameterStateEvent(AParameters: TParameter): ENotifyEvent;
   function ResolveParameterActionEvent(AParameters: TParameter; AParameterAction: EActionParameter): ENotifyEvent;
 
-  procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
+
   function CreateActionNotification(AAction: EActionWorkTable; const ASourceName: string;
     const ADescription: string): TActionNotification;
   procedure FireAction(AAction: EActionWorkTable; const ASourceName: string; const ADescription: string);
@@ -668,7 +672,7 @@ type
       AWorkTables: TObjectList<TWorkTable>); static;
 
   procedure Rebind;
-
+  procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
   function AddPump(const APumpName: string): TPump; overload;
   function AddPump(APump: TPump): Boolean; overload;
   procedure RemovePump(const APumpUUID: string); overload;
@@ -726,6 +730,9 @@ type
     property LimitImpSet: Integer read FLimitImpSet write FLimitImpSet;
     property LimitVolumeSet: Double read FLimitVolumeSet write FLimitVolumeSet;
     property CurrentPoint:  TDevicePoint read FCurrentPoint write FCurrentPoint;
+    property InstalledMeasurementPointUUID: string read FInstalledMeasurementPointUUID write FInstalledMeasurementPointUUID;
+    property InstalledMeasurementPointIndex: Integer read FInstalledMeasurementPointIndex write FInstalledMeasurementPointIndex;
+    property InstalledMeasurementTargetFlowLS: Double read FInstalledMeasurementTargetFlowLS write FInstalledMeasurementTargetFlowLS;
 
     property Repeats: Integer read FRepeats write FRepeats;
     property &Repeat: Integer read FRepeat write FRepeat;
@@ -843,6 +850,7 @@ type
   procedure StopMonitor;
   procedure SaveMeasurementResults;
 
+  property IsSimulationMode: Boolean read FIsSimulationMode write FIsSimulationMode;
 
   end;
 
@@ -2061,6 +2069,9 @@ begin
   FSimulationTargetFlowBase := 0;
   FDeviceSimulationFlowRate := 0;
   FHasDeviceSimulationFlowRate := False;
+  FInstalledMeasurementPointUUID := '';
+  FInstalledMeasurementPointIndex := -1;
+  FInstalledMeasurementTargetFlowLS := 0;
 
   FCurrentPoint := TDevicePoint.Create(0);
   FCurrentPoint.LimitTime := -1;
@@ -3213,7 +3224,6 @@ begin
       //
       // В групповой поиск включаются только те каналы, которые прошли
       // IsChannelValidForSelection.
-      if Channel.Group > 0 then
       begin
         if not Groups.TryGetValue(Channel.Group, GroupChannels) then
         begin
@@ -3572,15 +3582,10 @@ begin
       if QmaxBase <= 0 then
         Continue;
 
-      if Channel.Group > 0 then
-      begin
-        if GroupSums.TryGetValue(Channel.Group, GroupSum) then
-          GroupSums[Channel.Group] := GroupSum + QmaxBase
-        else
-          GroupSums.Add(Channel.Group, QmaxBase);
-      end
-      else if QmaxBase > Result then
-        Result := QmaxBase;
+      if GroupSums.TryGetValue(Channel.Group, GroupSum) then
+        GroupSums[Channel.Group] := GroupSum + QmaxBase
+      else
+        GroupSums.Add(Channel.Group, QmaxBase);
     end;
 
     for Pair in GroupSums do
@@ -5315,6 +5320,18 @@ end;
 procedure TWorkTable.MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint;
   APointIndex: Integer);
 begin
+  FInstalledMeasurementPointIndex := APointIndex;
+  if APoint <> nil then
+  begin
+    FInstalledMeasurementPointUUID := APoint.UUID;
+    FInstalledMeasurementTargetFlowLS := APoint.Q;
+  end
+  else
+  begin
+    FInstalledMeasurementPointUUID := '';
+    FInstalledMeasurementTargetFlowLS := 0;
+  end;
+
   if (FCurrentPoint <> nil) and (APoint <> nil) then
     FCurrentPoint.Assign(APoint, True);
 
@@ -5416,12 +5433,70 @@ var
   MeterValueCoef: TMeterValue;
   MeasuredDim: TMeasuredDimension;
   CurrentCoef: Double;
-  CurrentPointQmax: Double;
   Device: TDevice;
   SourceDevice: TDevice;
   DevicePoint: TDevicePoint;
   MatchedPoint: TDevicePoint;
+  BeforePointCount: Integer;
+  AfterPointCount: Integer;
+  BeforePointUUIDs: string;
+
+
+  function BoolText(const AValue: Boolean): string;
+  begin
+    if AValue then
+      Result := 'True'
+    else
+      Result := 'False';
+  end;
+
+  function DevicePointUUIDList(ADevice: TDevice): string;
+  var
+    P: TDevicePoint;
+  begin
+    Result := '';
+    if (ADevice = nil) or (ADevice.Points = nil) then
+      Exit;
+    for P in ADevice.Points do
+      if P <> nil then
+      begin
+        if Result <> '' then
+          Result := Result + ',';
+        Result := Result + P.UUID;
+      end;
+  end;
+
+  procedure LogDevicePointsForSave(const ACaption: string; ADevice: TDevice);
+  var
+    P: TDevicePoint;
+    PointCount: Integer;
+  begin
+    PointCount := 0;
+    if (ADevice <> nil) and (ADevice.Points <> nil) then
+      PointCount := ADevice.Points.Count;
+    if ADevice = nil then
+    begin
+      LogMKS('DBG SP 1100', ACaption, 'Device=nil; PointCount=0');
+      Exit;
+    end;
+    LogMKS('DBG SP 1100', ACaption,
+      Format('DeviceUUID=%s; DeviceName=%s; PointCount=%d', [ADevice.UUID, ADevice.Name, PointCount]));
+    if ADevice.Points <> nil then
+      for P in ADevice.Points do
+        if P <> nil then
+          LogMKS('DBG SP 1101', ACaption + ' POINT',
+            Format('PointUUID=%s; PointName=%s; FlowRate=%.9f; Q=%.6f; Enabled=%s; State=%s',
+              [P.UUID, P.Name, P.FlowRate, P.Q, BoolText(P.Enabled),
+               GetEnumName(TypeInfo(TObjectState), Ord(P.State))]));
+  end;
 begin
+
+  if IsSimulationMode then
+  begin
+    ProtocolManager.AddMessage(pcInfo, psWorkTable, 'SaveMeasurementResults',
+      'Сценарный тест: рабочее сохранение результатов заблокировано', Name);
+    Exit;
+  end;
 
   DeviceRepo := nil;
   if DataManager <> nil then
@@ -5457,16 +5532,7 @@ begin
     if Device = nil then
       Continue;
 
-    if (CurrentPoint <> nil) and (CurrentPoint.FlowRate > 0) and
-       (CurrentPoint.Q > 0) then
-    begin
-      CurrentPointQmax := CurrentPoint.Q / CurrentPoint.FlowRate;
-      if CurrentPointQmax > 0 then
-      begin
-        Device.Qmax := CurrentPointQmax;
-        TDeviceCreationService.RecalcDevicePointQ(Device);
-      end;
-    end;
+
 
     Session := Device.GetActiveSessionSpillage;
     if Session = nil then
@@ -5583,7 +5649,6 @@ begin
 
       if Device <> nil then
       begin
-        TDeviceCreationService.RecalcDevicePointQ(Device);
         LogMKS('DBG SP 1001', 'SaveMeasurementResults BEFORE AnalyseDataPoint',
           Format('Device=%s UUID=%s | %s', [Device.Name, Device.UUID, DumpSpillage(Point)]));
         Point.Valid := Device.AnalyseDataPoint(Point);
@@ -5608,7 +5673,22 @@ begin
           [Device.Name, Device.UUID, Device.Spillages.Count, Device.Sessions.Count]));
 
       if Assigned(DeviceRepo) then
-        DeviceRepo.SaveDevice(Device);
+      begin
+        BeforePointCount := 0;
+        if Device.Points <> nil then
+          BeforePointCount := Device.Points.Count;
+        BeforePointUUIDs := DevicePointUUIDList(Device);
+        LogDevicePointsForSave('BeforeSaveDevicePoints', Device);
+        DeviceRepo.SaveDeviceResults(Device);
+        LogDevicePointsForSave('AfterSaveDevicePoints', Device);
+        AfterPointCount := 0;
+        if Device.Points <> nil then
+          AfterPointCount := Device.Points.Count;
+        if BeforePointCount <> AfterPointCount then
+          LogMKS('DBG SP 1102', 'DevicePointsChangedDuringSave',
+            Format('DeviceUUID=%s; OldCount=%d; NewCount=%d; RemovedPointsUUID=%s',
+              [Device.UUID, BeforePointCount, AfterPointCount, BeforePointUUIDs]));
+      end;
     finally
       Point.Free;
     end;
@@ -5618,6 +5698,16 @@ end;
 
 procedure TWorkTable.StartTest;
 begin
+  if IsSimulationMode then
+  begin
+    ResetMeasurementValues;
+    CaptureEnvironmentSimulationBase;
+    State := swtEXECUTE;
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartTest',
+      'Сценарный тест: реальный запуск измерения заблокирован, состояние swtEXECUTE установлено имитатором', Name);
+    Exit;
+  end;
+
   if State in [swtSTARTMONITOR, swtSTARTMONITORWAIT, swtMONITOR] then
     ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
       'Переход из режима монитора к измерению без промежуточной остановки', Name);
@@ -5634,6 +5724,15 @@ end;
 
 procedure TWorkTable.StartTestRepeat;
 begin
+  if IsSimulationMode then
+  begin
+    ResetSpillageRuntimeValues;
+    State := swtEXECUTE;
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartTestRepeat',
+      'Сценарный тест: реальный повторный запуск измерения заблокирован, состояние swtEXECUTE установлено имитатором', Name);
+    Exit;
+  end;
+
   ResetSpillageRuntimeValues;
   State := swtSTARTTEST;
 
@@ -5645,6 +5744,16 @@ end;
 
 procedure TWorkTable.StartMonitor;
 begin
+  if IsSimulationMode then
+  begin
+    ResetMeasurementValues;
+    CaptureEnvironmentSimulationBase;
+    State := swtMONITOR;
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMonitor',
+      'Сценарный тест: реальный запуск мониторинга заблокирован, состояние swtMONITOR установлено имитатором', Name);
+    Exit;
+  end;
+
   ResetMeasurementValues;
   CaptureEnvironmentSimulationBase;
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartMonitor',
@@ -5654,11 +5763,27 @@ end;
 
 procedure TWorkTable.StopTest;
 begin
+  if IsSimulationMode then
+  begin
+    State := swtCOMPLETE;
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopTest',
+      'Сценарный тест: реальная остановка измерения заблокирована, состояние swtCOMPLETE установлено имитатором', Name);
+    Exit;
+  end;
+
   FireAction(awtStopTest, 'StopTest', 'Запрошена остановка теста');
 end;
 
 procedure TWorkTable.StopMonitor;
 begin
+  if IsSimulationMode then
+  begin
+    State := swtCONNECTED;
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopMonitor',
+      'Сценарный тест: реальная остановка мониторинга заблокирована, состояние swtCONNECTED установлено имитатором', Name);
+    Exit;
+  end;
+
   DoStopMonitor;
   FireAction(awtStopMonitor, 'StopMonitor', 'Запрошена остановка мониторинга');
 end;
@@ -6480,8 +6605,7 @@ begin
     begin
       for J := 0 to AChannels.Count - 1 do
         if (AChannels[J] <> nil) and AChannels[J].Enabled and
-           (((GroupKey > 0) and (AChannels[J].Group = GroupKey)) or
-            ((GroupKey <= 0) and (J = I))) and
+           (AChannels[J].Group = GroupKey) and
            (AChannels[J].FlowMeter <> nil) and (AChannels[J].FlowMeter.Device <> nil) then
           SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[J].FlowMeter.Device.Qmax, 4);
 
@@ -7003,8 +7127,7 @@ begin
 
   for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
     if IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I]) and
-       (((GroupKey > 0) and (AWorkTable.EtalonChannels[I].Group = GroupKey)) or
-        ((GroupKey <= 0) and (I = ActiveEtalonIndex))) then
+       (AWorkTable.EtalonChannels[I].Group = GroupKey) then
     begin
       ChannelCoef := GetChannelFlowCoef(AWorkTable.EtalonChannels[I]);
       if ChannelCoef > 0 then

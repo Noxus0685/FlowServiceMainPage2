@@ -1,0 +1,104 @@
+object Form1: TForm1
+  Left = 0
+  Top = 0
+  Caption = 'TLogViewer'
+  ClientHeight = 480
+  ClientWidth = 640
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  DesignerMasterStyle = 0
+  object lyt1: TLayout
+    Align = Bottom
+    Padding.Left = 5.000000000000000000
+    Padding.Top = 5.000000000000000000
+    Padding.Right = 5.000000000000000000
+    Padding.Bottom = 5.000000000000000000
+    Position.Y = 440.000000000000000000
+    Size.Width = 640.000000000000000000
+    Size.Height = 40.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 2
+    object btn_add_many_lines: TButton
+      Align = Right
+      Margins.Left = 5.000000000000000000
+      Position.X = 532.000000000000000000
+      Position.Y = 5.000000000000000000
+      Size.Width = 103.000000000000000000
+      Size.Height = 30.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      Text = '+100000 lines'
+      OnClick = btn_add_many_linesClick
+    end
+    object btn_add_line: TButton
+      Align = Right
+      Position.X = 297.000000000000000000
+      Position.Y = 5.000000000000000000
+      Size.Width = 80.000000000000000000
+      Size.Height = 30.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 1
+      Text = '+1 line'
+      OnClick = btn_add_lineClick
+    end
+    object btn_clear: TButton
+      Align = Left
+      Margins.Left = 5.000000000000000000
+      Position.X = 92.000000000000000000
+      Position.Y = 5.000000000000000000
+      Size.Width = 80.000000000000000000
+      Size.Height = 30.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 2
+      Text = 'Clear'
+      OnClick = btn_clearClick
+    end
+    object btn_copy: TButton
+      Align = Left
+      Position.X = 5.000000000000000000
+      Position.Y = 5.000000000000000000
+      Size.Width = 82.000000000000000000
+      Size.Height = 30.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 3
+      Text = 'Copy'
+      OnClick = btn_copyClick
+    end
+    object btn_add_random_lines: TButton
+      Align = Right
+      Margins.Left = 5.000000000000000000
+      Position.X = 382.000000000000000000
+      Position.Y = 5.000000000000000000
+      Size.Width = 145.000000000000000000
+      Size.Height = 30.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 4
+      Text = '+5000 random lines'
+      OnClick = btn_add_random_linesClick
+    end
+  end
+  object lyt2: TLayout
+    Align = Client
+    Size.Width = 640.000000000000000000
+    Size.Height = 440.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 4
+    object lgm1: TLogViewer
+      Align = Client
+      ClipParent = True
+      Size.Width = 640.000000000000000000
+      Size.Height = 440.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      ItemIndex = -1
+      ToItemIndex = -1
+      ItemHeight = 20.000000000000000000
+      ItemIndexColor = claSilver
+      LineLength = 150
+      ReleasedItems = True
+      MaxCount = 20000
+      ReleaseCount = 15000
+    end
+  end
+end

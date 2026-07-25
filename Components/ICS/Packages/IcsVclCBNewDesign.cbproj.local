@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2024/01/24 18:36:44.000.435,C:\DelphiComp\ics\Packages\IcsVclCB110Design.cbproj=C:\DelphiComp\ics\Packages\IcsVclCBNewDesign.cbproj</Transaction>
+    <Transaction>2024/01/24 18:36:49.000.883,C:\DelphiComp\ics\Packages\IcsVclCBNewDesign.cbproj=C:\DelphiComp\ics\Packages\IcsVclCBNewDesign.cbproj</Transaction>
+    <Transaction>2024/01/24 18:48:28.000.909,C:\DelphiComp\ics\Source\Ics.Vcl.OverbyteIcsReg.pas=</Transaction>
+    <Transaction>2024/01/24 18:48:28.000.918,C:\DelphiComp\ics\Source\OverByteIcsWSocketE.pas=</Transaction>
+  </Transactions>
+</BorlandProject>
