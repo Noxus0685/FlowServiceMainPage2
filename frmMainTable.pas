@@ -7638,21 +7638,35 @@ begin
       end;
       if (Run <> nil) and Run.IsWorkerThreadRunning then
         Run.Execute(mcStop, Null);
-      for I := 0 to 50 do
+      for I := 0 to 5000 do
       begin
         if (Run = nil) or (not Run.IsWorkerThreadRunning) then
           Break;
         TThread.Sleep(1);
       end;
-      if WT.FlowRate <> nil then RestoreMeter(WT.FlowRate.Value, OldFlowSamples, OldFlowValue);
-      if WT.FluidTemp <> nil then RestoreMeter(WT.FluidTemp.Value, OldTempSamples, OldTempValue);
-      if WT.FluidPress <> nil then RestoreMeter(WT.FluidPress.Value, OldPressSamples, OldPressValue);
-      TMeterValue.DisableVirtualClock;
-      WT.IsSimulationMode := OldSimulation;
-      WT.CurrentPoint := OldPoint;
-      WT.State := OldState;
-      FAutoTestRealCommandsBlocked := False;
-      FAutoTestRunning := False;
+      if (Run = nil) or (not Run.IsWorkerThreadRunning) then
+      begin
+        if WT.FlowRate <> nil then RestoreMeter(WT.FlowRate.Value, OldFlowSamples, OldFlowValue);
+        if WT.FluidTemp <> nil then RestoreMeter(WT.FluidTemp.Value, OldTempSamples, OldTempValue);
+        if WT.FluidPress <> nil then RestoreMeter(WT.FluidPress.Value, OldPressSamples, OldPressValue);
+        TMeterValue.DisableVirtualClock;
+        WT.IsSimulationMode := OldSimulation;
+        WT.CurrentPoint := OldPoint;
+        WT.State := OldState;
+        FAutoTestRealCommandsBlocked := False;
+        FAutoTestRunning := False;
+      end
+      else
+      begin
+        { A timed-out asynchronous cancellation must remain isolated from real
+          equipment.  The runner deliberately keeps both guards enabled; a
+          later owner-level finalizer may restore them only after the worker
+          has actually terminated. }
+        WT.IsSimulationMode := True;
+        FAutoTestRealCommandsBlocked := True;
+        FinalKind := amtrkError;
+        FinalReason := 'ERROR — рабочий поток не завершился; SimulationMode сохранён для блокировки реального оборудования';
+      end;
     end;
 
     if FinalKind = amtrkFail then
