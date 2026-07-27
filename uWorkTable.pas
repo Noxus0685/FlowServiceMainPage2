@@ -208,6 +208,7 @@ type
   /// The object contains configuration only; it never advances the measurement FSM.
   TSimulationScenarioMode = (ssmNormal, ssmFactor, ssmNoPulses,
     ssmNoise, ssmDelayedFactor);
+  TSimulationTestVerdict = (stvNotRun, stvRunning, stvPass, stvFail, stvStopped);
 
   TSimulationTestScenario = class
   private
@@ -221,6 +222,9 @@ type
     FNoisePercent: Double;
     FStartDelaySec: Double;
     FDurationSec: Double;
+    FOverallTimeoutSec: Double;
+    FExpectedError: Double;
+    FErrorTolerance: Double;
     FStartedAtMs: Double;
     FActivatedLogged: Boolean;
     FLastAdjustmentLogMs: Double;
@@ -242,6 +246,9 @@ type
     property NoisePercent: Double read FNoisePercent write FNoisePercent;
     property StartDelaySec: Double read FStartDelaySec write FStartDelaySec;
     property DurationSec: Double read FDurationSec write FDurationSec;
+    property OverallTimeoutSec: Double read FOverallTimeoutSec write FOverallTimeoutSec;
+    property ExpectedError: Double read FExpectedError write FExpectedError;
+    property ErrorTolerance: Double read FErrorTolerance write FErrorTolerance;
   end;
 
   TDeviceCreateMode = (
@@ -908,6 +915,11 @@ type
     FSimulationTestScenario: TSimulationTestScenario;
     FSimulationTestRunning: Boolean;
     FSimulationModeBeforeTest: Boolean;
+    FSimulationTestStartedTick: UInt64;
+    FSimulationTestLastLogTick: UInt64;
+    FSimulationTestVerdict: TSimulationTestVerdict;
+    FSimulationTestReason: string;
+    FSimulationTestMeasuredError: Double;
 
   public
     constructor Create(const AIniFileName: string);
@@ -933,6 +945,7 @@ type
     const ASplitByEnabledGroup: Boolean = False): TArray<Double>;
     procedure StartSimulationMeasurementTest;
     procedure StopSimulationMeasurementTest(const AStopMeasurement: Boolean = True);
+    procedure TickSimulationMeasurementTest;
 
     property WorkTables: TObjectList<TWorkTable> read FWorkTables;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
@@ -940,6 +953,9 @@ type
     property IsSimulationMode:Boolean read FIsSimulationMode  write FIsSimulationMode;
     property SimulationTestScenario: TSimulationTestScenario read FSimulationTestScenario;
     property SimulationTestRunning: Boolean read FSimulationTestRunning;
+    property SimulationTestVerdict: TSimulationTestVerdict read FSimulationTestVerdict;
+    property SimulationTestReason: string read FSimulationTestReason;
+    property SimulationTestMeasuredError: Double read FSimulationTestMeasuredError;
     procedure UpdateSimulation;
 
   end;
@@ -986,6 +1002,9 @@ begin
   FNoisePercent := 0;
   FStartDelaySec := 0;
   FDurationSec := 0;
+  FOverallTimeoutSec := 600;
+  FExpectedError := 0;
+  FErrorTolerance := 0.1;
   FStartedAtMs := 0;
   FActivatedLogged := False;
   FLastAdjustmentLogMs := 0;
@@ -5812,16 +5831,6 @@ end;
 
 procedure TWorkTable.StartTest;
 begin
-  if IsSimulationMode then
-  begin
-    ResetMeasurementValues;
-    CaptureEnvironmentSimulationBase;
-    State := swtEXECUTE;
-    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartTest',
-      'Сценарный тест: реальный запуск измерения заблокирован, состояние swtEXECUTE установлено имитатором', Name);
-    Exit;
-  end;
-
   if State in [swtSTARTMONITOR, swtSTARTMONITORWAIT, swtMONITOR] then
     ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
       'Переход из режима монитора к измерению без промежуточной остановки', Name);
@@ -5838,15 +5847,6 @@ end;
 
 procedure TWorkTable.StartTestRepeat;
 begin
-  if IsSimulationMode then
-  begin
-    ResetSpillageRuntimeValues;
-    State := swtEXECUTE;
-    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartTestRepeat',
-      'Сценарный тест: реальный повторный запуск измерения заблокирован, состояние swtEXECUTE установлено имитатором', Name);
-    Exit;
-  end;
-
   ResetSpillageRuntimeValues;
   State := swtSTARTTEST;
 
@@ -5858,16 +5858,6 @@ end;
 
 procedure TWorkTable.StartMonitor;
 begin
-  if IsSimulationMode then
-  begin
-    ResetMeasurementValues;
-    CaptureEnvironmentSimulationBase;
-    State := swtMONITOR;
-    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMonitor',
-      'Сценарный тест: реальный запуск мониторинга заблокирован, состояние swtMONITOR установлено имитатором', Name);
-    Exit;
-  end;
-
   ResetMeasurementValues;
   CaptureEnvironmentSimulationBase;
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartMonitor',
@@ -5877,27 +5867,11 @@ end;
 
 procedure TWorkTable.StopTest;
 begin
-  if IsSimulationMode then
-  begin
-    State := swtCOMPLETE;
-    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopTest',
-      'Сценарный тест: реальная остановка измерения заблокирована, состояние swtCOMPLETE установлено имитатором', Name);
-    Exit;
-  end;
-
   FireAction(awtStopTest, 'StopTest', 'Запрошена остановка теста');
 end;
 
 procedure TWorkTable.StopMonitor;
 begin
-  if IsSimulationMode then
-  begin
-    State := swtCONNECTED;
-    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopMonitor',
-      'Сценарный тест: реальная остановка мониторинга заблокирована, состояние swtCONNECTED установлено имитатором', Name);
-    Exit;
-  end;
-
   DoStopMonitor;
   FireAction(awtStopMonitor, 'StopMonitor', 'Запрошена остановка мониторинга');
 end;
@@ -6316,12 +6290,21 @@ begin
   FSimulationModeBeforeTest := FIsSimulationMode;
   FIsSimulationMode := True;
   FSimulationTestRunning := True;
+  FSimulationTestStartedTick := TThread.GetTickCount64;
+  FSimulationTestLastLogTick := 0;
+  FSimulationTestVerdict := stvRunning;
+  FSimulationTestReason := '';
+  FSimulationTestMeasuredError := 0;
   FSimulationTestScenario.Enabled := True;
-  FSimulationTestScenario.BeginTest(Now * MSecsPerDay);
+  FSimulationTestScenario.BeginTest(FSimulationTestStartedTick);
   if ProtocolManager <> nil then
   begin
-    ProtocolManager.AddMessage(pcAction, psWorkTable, 'SimulationTestStarted',
-      'Simulation measurement test started', FSimulationTestScenario.TargetWorkTable.Name);
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'ScenarioTestStarted',
+      'Real-time simulation measurement test started',
+      Format('RealTick=%d SimulationMode=True WorkTable=%s Channel=%d Factor=%.6f',
+        [FSimulationTestStartedTick, FSimulationTestScenario.TargetWorkTable.Name,
+         FSimulationTestScenario.TargetWorkTable.DeviceChannels.IndexOf(
+           FSimulationTestScenario.TargetDeviceChannel), FSimulationTestScenario.Factor]));
     ProtocolManager.AddMessage(pcState, psWorkTable, 'SimulationModeEnabled',
       'Existing work table simulation enabled by test',
       System.SysUtils.BoolToStr(FSimulationModeBeforeTest, True));
@@ -6351,6 +6334,11 @@ var
 begin
   if not FSimulationTestRunning then
     Exit;
+  if FSimulationTestVerdict = stvRunning then
+  begin
+    FSimulationTestVerdict := stvStopped;
+    FSimulationTestReason := 'Stopped by user';
+  end;
   Target := FSimulationTestScenario.TargetWorkTable;
   if AStopMeasurement and (Target <> nil) and (Target.MeasurementRun <> nil) then
   begin
@@ -6364,6 +6352,81 @@ begin
   if ProtocolManager <> nil then
     ProtocolManager.AddMessage(pcAction, psWorkTable, 'SimulationTestStopped',
       'Simulation measurement test stopped and scenario cleared', '');
+end;
+
+procedure TWorkTableManager.TickSimulationMeasurementTest;
+var
+  CurrentTick, ElapsedMs: UInt64;
+  Target: TWorkTable;
+  Channel: TChannel;
+  Run: TMeasurementRun;
+  StageText, RunResultText: string;
+begin
+  if not FSimulationTestRunning then
+    Exit;
+
+  CurrentTick := TThread.GetTickCount64;
+  ElapsedMs := CurrentTick - FSimulationTestStartedTick;
+  Target := FSimulationTestScenario.TargetWorkTable;
+  Channel := FSimulationTestScenario.TargetDeviceChannel;
+  if (Target = nil) or (Channel = nil) or (Target.MeasurementRun = nil) then
+  begin
+    FSimulationTestVerdict := stvFail;
+    FSimulationTestReason := 'Test target was removed';
+    StopSimulationMeasurementTest(False);
+    Exit;
+  end;
+
+  Run := TMeasurementRun(Target.MeasurementRun);
+  StageText := TMeasurementRun.MeasurementStateToString(Run.Stage);
+  if (FSimulationTestLastLogTick = 0) or
+     (CurrentTick - FSimulationTestLastLogTick >= 1000) then
+  begin
+    FSimulationTestLastLogTick := CurrentTick;
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcState, psWorkTable, 'ScenarioTestTick',
+        'Real-time simulation test observer tick',
+        Format('RealTick=%d ElapsedMs=%d MeasurementStage=%s WorkTableState=%s BaseImpSec=%.6f AppliedImpSec=%.6f ImpResult=%.6f',
+          [CurrentTick, ElapsedMs, StageText, TWorkTable.WorkTableStateToString(Target.State),
+           Channel.SimulationTargetImpSec, Channel.ImpSec, Channel.ImpResult]));
+  end;
+
+  if Run.RunCompleted then
+  begin
+    FSimulationTestMeasuredError := Channel.ValueResult;
+    RunResultText := GetEnumName(TypeInfo(TMeasurementRunResult), Ord(Run.RunResult));
+    if (Run.RunResult = mrrSuccess) and
+       (Abs(FSimulationTestMeasuredError - FSimulationTestScenario.ExpectedError) <=
+        FSimulationTestScenario.ErrorTolerance) then
+    begin
+      FSimulationTestVerdict := stvPass;
+      FSimulationTestReason := 'Measured error is within tolerance';
+    end
+    else
+    begin
+      FSimulationTestVerdict := stvFail;
+      if Run.RunResult <> mrrSuccess then
+        FSimulationTestReason := 'Production measurement did not complete successfully'
+      else
+        FSimulationTestReason := 'Measured error is outside tolerance';
+    end;
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcState, psWorkTable, 'ScenarioMeasurementCompleted',
+        'Production measurement completed; simulation test evaluated result',
+        Format('RealElapsedMs=%d RunResult=%s MeasuredError=%.6f Verdict=%s Reason=%s',
+          [ElapsedMs, RunResultText, FSimulationTestMeasuredError,
+           IfThen(FSimulationTestVerdict = stvPass, 'PASS', 'FAIL'), FSimulationTestReason]));
+    StopSimulationMeasurementTest(False);
+    Exit;
+  end;
+
+  if (FSimulationTestScenario.OverallTimeoutSec > 0) and
+     (ElapsedMs >= Round(FSimulationTestScenario.OverallTimeoutSec * 1000)) then
+  begin
+    FSimulationTestVerdict := stvFail;
+    FSimulationTestReason := 'Real-time test timeout';
+    StopSimulationMeasurementTest(True);
+  end;
 end;
 
 { Loads managed work tables from configured INI file. }
@@ -7063,7 +7126,7 @@ end;
 
 function GetCurrentTimeMs: Double;
 begin
-  Result := Now * MSecsPerDay;
+  Result := TThread.GetTickCount64;
 end;
 
 function CalculateRampDurationByFlowDelta(const AStartFlowLS, ATargetFlowLS: Double): Double;
@@ -7473,8 +7536,11 @@ begin
           if not Scenario.FActivatedLogged then
           begin
             Scenario.FActivatedLogged := True;
-            ProtocolManager.AddMessage(pcState, psWorkTable, 'ScenarioActivated',
-              'Simulation test scenario activated', AWorkTable.Name);
+            ProtocolManager.AddMessage(pcState, psWorkTable, 'ScenarioImpactActivated',
+              'Simulation test scenario impact activated',
+              Format('RealElapsedMs=%d Channel=%d Factor=%.6f',
+                [Round(Scenario.GetElapsedSec(ACurrentTimeMs) * 1000),
+                 AWorkTable.DeviceChannels.IndexOf(Channel), Scenario.FFactor]));
           end;
           if (Scenario.FLastAdjustmentLogMs = 0) or
              (ACurrentTimeMs - Scenario.FLastAdjustmentLogMs >= 1000) then
@@ -7740,6 +7806,9 @@ begin
 end;
 
 begin
+
+  if not FIsSimulationMode then
+    Exit;
 
      for WorkTable in WorkTableManager.WorkTables do
    begin
