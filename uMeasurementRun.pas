@@ -3068,20 +3068,31 @@ begin
       if QmaxMismatch then
         AddDiagnosticEvent(Format('DeviceQmaxBindingCorrectedFromSourcePoint: ChannelUUID=%s; DeviceUUID=%s; StoredQmax=%.6f; DerivedQmax=%.6f; SourcePointUUID=%s; StoredPointQLS=%.6f; SourceFlowRate=%.9f; CalculatedTargetQLS=%.6f; RelativeQmaxDiff=%.9f',
           [Channel.UUID, Device.UUID, Device.Qmax, DerivedQmaxLS, SourcePoint.UUID, StoredQLS, SourcePoint.FlowRate, CalculatedQLS, RelativeQmaxDiff]));
-      if not IsValidFlowValue(CalculatedQLS) then
+      if (not IsValidFlowValue(StoredQLS)) and
+         (not IsValidFlowValue(CalculatedQLS)) then
       begin
         AddDiagnosticEvent(Format('SessionSourcePoint: DeviceUUID=%s; DeviceChannelUUID=%s; SourcePointUUID=%s; SourcePointName=%s; SourceFlowRate=%.9f; DeviceQmaxLS=%.6f; StoredPointQLS=%.6f; CalculatedTargetQLS=%.6f; DerivedQmaxLS=%.6f; SelectedTargetQLS=0; MatchedSessionPointUUID=; MatchedSessionPointQLS=0; MergeToleranceLS=0; Action=Skipped; Reason=InvalidCalculatedTargetQLS',
-          [Device.UUID, Channel.UUID, SourcePoint.UUID, SourcePoint.Name, SourcePoint.FlowRate, EffectiveDeviceQmaxLS, StoredQLS, CalculatedQLS, DerivedQmaxLS]));
+          [Device.UUID, Channel.UUID, SourcePoint.UUID, SourcePoint.Name,
+           SourcePoint.FlowRate, EffectiveDeviceQmaxLS, StoredQLS,
+           CalculatedQLS, DerivedQmaxLS]));
         Continue;
       end;
 
-      TargetQLS := CalculatedQLS;
-      PointQValidationToleranceLS := Max(1E-6, Abs(StoredQLS) * 1E-4);
-      if IsValidFlowValue(StoredQLS) and (Abs(StoredQLS - CalculatedQLS) <= PointQValidationToleranceLS) then
+      // MAIN groups the program by the persisted absolute point flow and its
+      // configured accuracy, not by a per-device Qmax recalculation. Qmax may
+      // differ between instruments (or be stale) even though the requested
+      // physical table mode is the same. Keep the recalculated value only as
+      // a diagnostic/fallback for legacy points without an absolute Q.
+      if IsValidFlowValue(StoredQLS) then
         TargetQLS := StoredQLS
-      else if IsValidFlowValue(StoredQLS) then
-        AddDiagnosticEvent(Format('SourcePointQMismatch: CurrentDeviceUUID=%s; CurrentDeviceQmaxLS=%.6f; SourcePointQLS=%.6f; SourcePointFlowRate=%.9f; CalculatedTargetQLS=%.6f; DerivedQmaxLS=%.6f',
-          [Device.UUID, EffectiveDeviceQmaxLS, StoredQLS, SourcePoint.FlowRate, CalculatedQLS, DerivedQmaxLS]));
+      else
+        TargetQLS := CalculatedQLS;
+      PointQValidationToleranceLS := Max(1E-6, Abs(TargetQLS) * 1E-4);
+      if IsValidFlowValue(StoredQLS) and IsValidFlowValue(CalculatedQLS) and
+         (Abs(StoredQLS - CalculatedQLS) > PointQValidationToleranceLS) then
+        AddDiagnosticEvent(Format('SourcePointQMismatch: CurrentDeviceUUID=%s; CurrentDeviceQmaxLS=%.6f; SourcePointQLS=%.6f; SourcePointFlowRate=%.9f; CalculatedTargetQLS=%.6f; DerivedQmaxLS=%.6f; SelectedTargetSource=StoredSourcePointQ',
+          [Device.UUID, EffectiveDeviceQmaxLS, StoredQLS, SourcePoint.FlowRate,
+           CalculatedQLS, DerivedQmaxLS]));
 
       Participant := Default(TMeasurementPointParticipant);
       Participant.DeviceUUID := Device.UUID;
@@ -3099,7 +3110,10 @@ begin
 
       ExistingPoint := nil;
       for SessionPoint in FPoints do
-        if Abs(SessionPoint.Q - TargetQLS) <= FlowMergeTolerance(SessionPoint.Q, TargetQLS) then
+        // Preserve MAIN's proven equivalence rule: absolute base-unit flow is
+        // compared through FlowAccuracy and temperature compatibility. The
+        // modern Participants array retains every device/source identity.
+        if IsPointEquivalent(SessionPoint, SourcePoint) then
         begin
           ExistingPoint := SessionPoint;
           Break;
@@ -3139,7 +3153,7 @@ begin
           Inc(DeviceAddedParticipantCount);
           Inc(DeviceMergedParticipantCount);
           Action := 'Merged';
-          Reason := 'MergedByAbsoluteQ';
+          Reason := 'MergedByMainPointEquivalence';
         end;
         RefreshSessionPointParams(ExistingPoint);
         SessionPoint := ExistingPoint;
