@@ -6244,6 +6244,10 @@ begin
       raise EInvalidOpException.Create('A simulation scenario is already running');
     if FActiveWorkTable = nil then
       raise EInvalidOpException.Create('An active work table is required');
+    if FActiveWorkTable.MeasurementRun = nil then
+      raise EInvalidOpException.Create('The active work table has no measurement run');
+    if TMeasurementRun(FActiveWorkTable.MeasurementRun).IsWorkerThreadRunning then
+      raise EInvalidOpException.Create('An automatic measurement is already running');
 
     FPreviousIsSimulationMode := FIsSimulationMode;
     FPreviousSimulationMode := FSimulationMode;
@@ -7493,7 +7497,8 @@ begin
     DeltaTimeSec := EnsureRange((CurrentTimeMs - AWorkTable.SimulationLastUpdateTimeMs) / 1000.0,
       0.0, MAX_DELTA_TIME_SEC)
   else
-    DeltaTimeSec := 1.0;
+    // The first call establishes the time origin. A call is not one second.
+    DeltaTimeSec := 0.0;
   AWorkTable.SimulationLastUpdateTimeMs := CurrentTimeMs;
   AWorkTable.Time := AWorkTable.Time + DeltaTimeSec;
 
@@ -7537,6 +7542,14 @@ begin
     AccumulateSimulationChannelImpResult(AWorkTable.DeviceChannels, DeltaTimeSec);
   end;
   ResetDisabledSimulationChannels(AWorkTable);
+
+  // Hardware input processing is followed by this same production
+  // recalculation path. Keep FlowRate.Value (used by IsStable) synchronized
+  // with the aggregate meter and let SetValue append the real-time sample.
+  AWorkTable.RecalculateAllMeterValues;
+  if (AWorkTable.FlowRate <> nil) and (AWorkTable.FlowRate.Value <> nil) and
+     (AWorkTable.ValueFlowRate <> nil) then
+    AWorkTable.FlowRate.Value.SetValue(AWorkTable.ValueFlowRate.GetDoubleValue);
 end;
 
 begin
@@ -7551,6 +7564,8 @@ begin
     end;
      for WorkTable in FWorkTables do
    begin
+  if (FSimulationMode = smScenario) and (WorkTable <> FActiveWorkTable) then
+    Continue;
 
   // ============================================================
   // 2. Эмуляция физического процесса (стенд)
