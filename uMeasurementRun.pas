@@ -3096,6 +3096,10 @@ begin
       Participant.SourceTargetQLS := TargetQLS;
       Participant.SourceErrorPercent := SourcePoint.Error;
       Participant.SourcePauseSec := SourcePoint.Pause;
+      Participant.SourcePoint := SourcePoint;
+      Participant.RepeatsRequired := Max(SourcePoint.Repeats, 1);
+      Participant.RepeatsCompleted := 0;
+      Participant.Status := mptsNone;
 
       ExistingPoint := nil;
       for SessionPoint in FPoints do
@@ -4974,6 +4978,15 @@ begin
         WorkTableManager.Save;
 
       Point.RepeatsCompleted := Min(RepeatsTarget, FCurrentRepeat + 1);
+      for I := 0 to High(Point.Participants) do
+      begin
+        Point.Participants[I].RepeatsCompleted :=
+          Min(Point.Participants[I].RepeatsRequired, FCurrentRepeat + 1);
+        if Point.Participants[I].RepeatsCompleted >= Point.Participants[I].RepeatsRequired then
+          Point.Participants[I].Status := mptsSaved
+        else
+          Point.Participants[I].Status := mptsProcessed;
+      end;
       Point.DateTime := Now;
       FLastSaveMeasurementResultsResult := 'success';
       AddDiagnosticEvent(Format('SaveMeasurementResults success; ResultsAdded=%d; %s',
