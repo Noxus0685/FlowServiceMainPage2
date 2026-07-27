@@ -279,7 +279,6 @@
         <DCCReference Include="uMKSDebug.pas"/>
         <DCCReference Include="uFlowMeter.pas"/>
         <DCCReference Include="uMeasurementRun.pas"/>
-        <DCCReference Include="uAutoMeasurementTestRunner.pas"/>
         <DCCReference Include="uMeterValue.pas"/>
         <DCCReference Include="uObservable.pas"/>
         <DCCReference Include="uParameter.pas"/>

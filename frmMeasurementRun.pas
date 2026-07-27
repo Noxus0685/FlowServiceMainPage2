@@ -28,7 +28,6 @@ uses
   uDeviceClass,
   uDataManager,
   uMeasurementRun,
-  uAutoMeasurementTestRunner,
   uObservable,
   uRepositories,
   uWorkTable;
@@ -52,19 +51,6 @@ type
     StringColumnLimitTime: TStringColumn;
     StringColumnLimitImp: TStringColumn;
     StringColumnLimitVolume: TStringColumn;
-    LayoutAutoTests: TLayout;
-    ComboBoxAutoTestScenario: TComboBox;
-    ButtonRunAutoTestScenario: TButton;
-    ButtonRunAllAutoTestScenarios: TButton;
-    LabelAutoTestResult: TLabel;
-    GridAutoTestResults: TGrid;
-    StringColumnAutoTestNo: TStringColumn;
-    StringColumnAutoTestScenario: TStringColumn;
-    StringColumnAutoTestResult: TStringColumn;
-    StringColumnAutoTestTime: TStringColumn;
-    StringColumnAutoTestStage: TStringColumn;
-    StringColumnAutoTestWorkTableState: TStringColumn;
-    StringColumnAutoTestReason: TStringColumn;
     procedure GridMeasurmentRunGetValue(Sender: TObject; const ACol,
       ARow: Integer; var Value: TValue);
     procedure GridMeasurmentRunDrawColumnCell(Sender: TObject;
@@ -78,18 +64,9 @@ type
     procedure SpeedButtonPointDeleteClick(Sender: TObject);
     procedure SpeedButtonPointNextClick(Sender: TObject);
     procedure SpeedButtonPointPrevClick(Sender: TObject);
-    procedure ButtonRunAutoTestScenarioClick(Sender: TObject);
-    procedure ButtonRunAllAutoTestScenariosClick(Sender: TObject);
-    procedure GridAutoTestResultsGetValue(Sender: TObject; const ACol,
-      ARow: Integer; var Value: TValue);
-    procedure GridAutoTestResultsDrawColumnCell(Sender: TObject;
-      const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
-      const Row: Integer; const Value: TValue; const State: TGridDrawStates);
   private
     FActiveWorkTable: TWorkTable;
     FInvalidPointIndexes: TList<Integer>;
-    FAutoTestResults: TList<TAutoMeasurementTestResult>;
-    FAutoTestRunning: Boolean;
     function GetMeasurementRun: TMeasurementRun;
     function GetStopCriteriaText(APoint: TDevicePoint): string;
 
@@ -105,9 +82,6 @@ type
     procedure UpdateStopCriteriaColumns;
     function IsPointInvalid(APoint: TDevicePoint): Boolean;
     function GetRowColor(const ARow: Integer): TAlphaColor;
-    procedure SetAutoTestControlsEnabled(const AEnabled: Boolean);
-    procedure AddAutoTestResult(const AResult: TAutoMeasurementTestResult);
-    procedure RunAutoTests(const ARunAll: Boolean);
      procedure UpdateGridMesurmentRun;
 
   public
@@ -128,25 +102,17 @@ constructor TFrameMeasurementRun.Create(AOwner: TComponent);
 begin
   inherited;
   FInvalidPointIndexes := TList<Integer>.Create;
-  FAutoTestResults := TList<TAutoMeasurementTestResult>.Create;
   SpeedButtonPointPrev.OnClick := SpeedButtonPointPrevClick;
   SpeedButtonPointNext.OnClick := SpeedButtonPointNextClick;
   SpeedButtonPause.OnClick := SpeedButtonPauseClick;
   SpeedButtonPointDelete.OnClick := SpeedButtonPointDeleteClick;
   SpeedButtonCreatePoints.OnClick := SpeedButtonCreatePointsClick;
-  ButtonRunAutoTestScenario.OnClick := ButtonRunAutoTestScenarioClick;
-  ButtonRunAllAutoTestScenarios.OnClick := ButtonRunAllAutoTestScenariosClick;
-  GridAutoTestResults.OnGetValue := GridAutoTestResultsGetValue;
-  GridAutoTestResults.OnDrawColumnCell := GridAutoTestResultsDrawColumnCell;
-  TAutoMeasurementTestRunner.FillScenarioNames(ComboBoxAutoTestScenario.Items);
-  ComboBoxAutoTestScenario.ItemIndex := 0;
   GridMeasurmentRun.ShowHint := True;
   GridMeasurmentRun.OnCellClick := GridMeasurmentRunCellClick;
 end;
 
 destructor TFrameMeasurementRun.Destroy;
 begin
-    FreeAndNil(FAutoTestResults);
     FreeAndNil(FInvalidPointIndexes);
     inherited;
 end;
@@ -527,122 +493,6 @@ end;
 
 
 
-
-procedure TFrameMeasurementRun.SetAutoTestControlsEnabled(const AEnabled: Boolean);
-begin
-  FAutoTestRunning := not AEnabled;
-  ComboBoxAutoTestScenario.Enabled := AEnabled;
-  ButtonRunAutoTestScenario.Enabled := AEnabled;
-  ButtonRunAllAutoTestScenarios.Enabled := AEnabled;
-end;
-
-procedure TFrameMeasurementRun.AddAutoTestResult(const AResult: TAutoMeasurementTestResult);
-begin
-  FAutoTestResults.Add(AResult);
-  GridAutoTestResults.RowCount := FAutoTestResults.Count;
-  GridAutoTestResults.Repaint;
-  LabelAutoTestResult.Text := TAutoMeasurementTestRunner.StatusToString(AResult.Status) + ': ' + AResult.ScenarioName;
-end;
-
-procedure TFrameMeasurementRun.RunAutoTests(const ARunAll: Boolean);
-var
-  ScenarioIndex: Integer;
-begin
-  if FAutoTestRunning then
-    Exit;
-  ScenarioIndex := ComboBoxAutoTestScenario.ItemIndex + 1;
-  if ScenarioIndex < 1 then
-    ScenarioIndex := 1;
-  FAutoTestResults.Clear;
-  GridAutoTestResults.RowCount := 0;
-  LabelAutoTestResult.Text := 'RUNNING';
-  SetAutoTestControlsEnabled(False);
-  TTask.Run(
-    procedure
-    var
-      Log: TStringList;
-      LogFileName: string;
-      R: TAutoMeasurementTestResult;
-    begin
-      Log := TStringList.Create;
-      try
-        LogFileName := TAutoMeasurementTestRunner.CreateLogFileName;
-        if ARunAll then
-          TAutoMeasurementTestRunner.RunAll(Log,
-            procedure(const AResult: TAutoMeasurementTestResult)
-            begin
-              TThread.Queue(nil,
-                procedure
-                begin
-                  AddAutoTestResult(AResult);
-                end);
-            end)
-        else
-        begin
-          R := TAutoMeasurementTestRunner.RunScenario(ScenarioIndex, Log);
-          TThread.Queue(nil,
-            procedure
-            begin
-              AddAutoTestResult(R);
-            end);
-        end;
-        Log.SaveToFile(LogFileName, TEncoding.UTF8);
-      finally
-        Log.Free;
-        TThread.Queue(nil,
-          procedure
-          begin
-            SetAutoTestControlsEnabled(True);
-          end);
-      end;
-    end);
-end;
-
-procedure TFrameMeasurementRun.ButtonRunAutoTestScenarioClick(Sender: TObject);
-begin
-  RunAutoTests(False);
-end;
-
-procedure TFrameMeasurementRun.ButtonRunAllAutoTestScenariosClick(Sender: TObject);
-begin
-  RunAutoTests(True);
-end;
-
-procedure TFrameMeasurementRun.GridAutoTestResultsGetValue(Sender: TObject; const ACol,
-  ARow: Integer; var Value: TValue);
-var
-  R: TAutoMeasurementTestResult;
-begin
-  if (ARow < 0) or (ARow >= FAutoTestResults.Count) then
-    Exit;
-  R := FAutoTestResults[ARow];
-  case ACol of
-    0: Value := R.Index;
-    1: Value := R.ScenarioName;
-    2: Value := TAutoMeasurementTestRunner.StatusToString(R.Status);
-    3: Value := IntToStr(R.DurationMs) + ' ms';
-    4: Value := R.StageText;
-    5: Value := R.WorkTableStateText;
-    6: Value := R.Reason;
-  end;
-end;
-
-procedure TFrameMeasurementRun.GridAutoTestResultsDrawColumnCell(Sender: TObject;
-  const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
-  const Row: Integer; const Value: TValue; const State: TGridDrawStates);
-var
-  C: TAlphaColor;
-begin
-  C := COLOR_NONE;
-  if (Row >= 0) and (Row < FAutoTestResults.Count) then
-    case FAutoTestResults[Row].Status of
-      amtsPass: C := COLOR_COMPLETED;
-      amtsFail, amtsStopped: C := COLOR_WARNING;
-      amtsError: C := COLOR_INVALID;
-    end;
-  Canvas.Fill.Color := C;
-  Canvas.FillRect(Bounds, 0, 0, [], 1);
-end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointPrevClick(Sender: TObject);
 begin

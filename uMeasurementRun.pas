@@ -860,13 +860,14 @@ procedure TMeasurementRun.SetStage(const ANewStage: EMeasurementState);
 var
   OldStage: EMeasurementState;
   TransitionText: string;
+  PreviousStageStartedTick, CurrentTick, StageElapsedMs: Int64;
 begin
 
   if FCurrentStage = ANewStage then
     Exit;
 
-  FWaitStartedTick := TMeterValue.GetMonotonicTimeMs;
-
+  CurrentTick := TMeterValue.GetMonotonicTimeMs;
+  PreviousStageStartedTick := FWaitStartedTick;
   OldStage := FCurrentStage;
   TransitionText := Format('%s -> %s', [MeasurementStateToString(OldStage),
     MeasurementStateToString(ANewStage)]);
@@ -882,9 +883,14 @@ begin
 
   DoExitStage(OldStage, ANewStage);
   FCurrentStage := ANewStage;
+  if (PreviousStageStartedTick > 0) and (CurrentTick >= PreviousStageStartedTick) then
+    StageElapsedMs := CurrentTick - PreviousStageStartedTick
+  else
+    StageElapsedMs := 0;
+  FWaitStartedTick := CurrentTick;
 
   ProtocolManager.AddMessage(pcState, psMeasurement, 'SetStage',
-    'Переход этапа измерения, тайм аут: ' +inttostr(TMeterValue.GetMonotonicTimeMs - FWaitStartedTick)+'; ', TransitionText);
+    'Переход этапа измерения; StageElapsedMs=' + IntToStr(StageElapsedMs), TransitionText);
   AddDiagnosticEvent('Stage ' + MeasurementStateToString(OldStage) + ' -> ' + MeasurementStateToString(ANewStage));
   if FWorkTable <> nil then
     FWorkTable.MeasurementRunStateChanged(Self, ANewStage);
