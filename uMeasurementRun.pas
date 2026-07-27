@@ -2001,7 +2001,7 @@ begin
 
         Settings := ValueFlow.StabilitySettings;
         ValueFlow.AnalyzePointStabilityForMeasurement(FStabilityDataStartMs,
-          Max(0.001, FRequiredDeviceStabilizationSec), Settings.MinSampleCount,
+          Settings.MinSampleCount,
           Settings.MaxSampleAgeSec, TargetValue, ErrorPercent, SignalInfo);
         StableInfo.LowerLimit := SignalInfo.StabilityLowerLimit;
         StableInfo.UpperLimit := SignalInfo.StabilityUpperLimit;
@@ -2201,7 +2201,7 @@ begin
         Settings := StableValue.StabilitySettings;
         if Reason = '' then
           StableValue.AnalyzePointStabilityForMeasurement(FStabilityDataStartMs,
-            Max(0.001, FRequiredDeviceStabilizationSec), Settings.MinSampleCount,
+            Settings.MinSampleCount,
             Settings.MaxSampleAgeSec, TargetValue, PointErrorPercent, SignalInfo)
         else
           SignalInfo := Default(TMeterValueStabilityInfo);
@@ -4227,7 +4227,7 @@ var
     if AMeterValue = nil then
       Exit;
     Settings := AMeterValue.StabilitySettings;
-    MinHistorySec := Max(0.001, Settings.WindowDurationSec);
+    MinHistorySec := Max(1, Settings.MinSampleCount);
     NeedSec := Ceil(MinHistorySec) + 1 + SETUP_MARGIN_SEC;
     if FRequiredDeviceStabilizationSec > 0 then
       NeedSec := NeedSec + FRequiredDeviceStabilizationSec;
