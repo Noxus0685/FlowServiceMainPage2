@@ -1253,7 +1253,6 @@ var
   Sample: TMeterValueSample;
   LastSample: TMeterValueSample;
   LastIndex: Integer;
-  MaxHistorySamples: Integer;
 begin
   Sample.TimeStampMs := ATimeStampMs;
   Sample.Value := AValue;
@@ -1281,9 +1280,6 @@ begin
     if FActiveStabilityStartMs <= 0 then
       FActiveStabilityStartMs := ATimeStampMs;
     FSamples.Add(Sample);
-    MaxHistorySamples := Max(FStabilitySettings.MinSampleCount * 2, 2);
-    while FSamples.Count > MaxHistorySamples do
-      FSamples.Delete(0);
   finally
     FSampleLock.Leave;
   end;
@@ -1296,7 +1292,6 @@ var
   Sample: TMeterValueSample;
   LastIndex: Integer;
   InsertIndex: Integer;
-  MaxHistorySamples: Integer;
 begin
   CurrentBucket := ATimeStampMs div 1000;
   FSampleLock.Enter;
@@ -1342,12 +1337,6 @@ begin
       (FSamples[InsertIndex].TimeStampMs < ATimeStampMs) do
       Inc(InsertIndex);
     FSamples.Insert(InsertIndex, Sample);
-    MaxHistorySamples := Max(FStabilitySettings.MinSampleCount * 2, 2);
-    while FSamples.Count > MaxHistorySamples do
-    begin
-      FSamples.Delete(0);
-      Dec(InsertIndex);
-    end;
 
     FAutomaticSampleBucket := CurrentBucket;
     if (InsertIndex >= 0) and (InsertIndex < FSamples.Count) and
@@ -1660,23 +1649,12 @@ function TMeterValue.AnalyzeStabilityForMeasurement(const AMinTimeStampMs: Int64
   const ASettings: TMeterValueStabilitySettings; out AInfo: TMeterValueStabilityInfo): Boolean;
 var
   SourceSamples: TArray<TMeterValueSample>;
-  Samples: TArray<TMeterValueSample>;
   Settings: TMeterValueStabilitySettings;
   CurrentMs: Int64;
   LowerLimit, UpperLimit: Double;
-  I, Count: Integer;
 begin
   CurrentMs := GetMonotonicTimeMs;
   SourceSamples := GetSamples;
-  SetLength(Samples, Length(SourceSamples));
-  Count := 0;
-  for I := 0 to High(SourceSamples) do
-    if SourceSamples[I].TimeStampMs >= AMinTimeStampMs then
-    begin
-      Samples[Count] := SourceSamples[I];
-      Inc(Count);
-    end;
-  SetLength(Samples, Count);
 
   Settings := ASettings;
   Settings.Enabled := True;
@@ -1684,7 +1662,7 @@ begin
     Settings.TargetAccuracyPlusPercent,
     Settings.TargetAccuracyMinusPercent,
     Settings.TargetToleranceAbsolute, LowerLimit, UpperLimit);
-  Result := AnalyzeStabilitySequence(Samples, Settings, AMinTimeStampMs, CurrentMs,
+  Result := AnalyzeStabilitySequence(SourceSamples, Settings, AMinTimeStampMs, CurrentMs,
     Settings.TargetValue, LowerLimit, UpperLimit, AInfo);
   FSampleLock.Enter;
   try
@@ -1798,7 +1776,7 @@ begin
   AInfo.WindowStartMs := -1;
   AInfo.FirstWindowSampleTimeMs := -1;
   AInfo.LastWindowSampleTimeMs := -1;
-  AInfo.SampleCount := 0;
+  AInfo.SampleCount := Length(ASamples);
   SetLength(AInfo.SampleResults, Length(ASamples));
   for I := 0 to High(ASamples) do
   begin
@@ -1837,7 +1815,6 @@ begin
   for I := 0 to High(ASamples) do
     if ASamples[I].TimeStampMs <= ACurrentMs then
     begin
-      Inc(AInfo.SampleCount);
       if (LastSampleTimeMs = Low(Int64)) or (ASamples[I].TimeStampMs > LastSampleTimeMs) then
         LastSampleTimeMs := ASamples[I].TimeStampMs;
     end;

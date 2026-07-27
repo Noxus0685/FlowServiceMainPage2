@@ -1235,14 +1235,8 @@ begin
     ClearTestAnalysis;
     MemoConclusion.Lines.Text := 'В рабочей истории нет данных';
   end
-  else if CheckBoxAutoAnalyze.IsChecked then
-    AnalyzeDisplayedSamples(True, True)
   else
-  begin
-    ClearTestAnalysis;
-    MemoConclusion.Lines.Text := 'История обновлена. Выполните пересчёт.';
-    RefreshSamplesGrid(False);
-  end;
+    AnalyzeDisplayedSamples(False, True, False);
 
   if FMeterValue <> nil then
     AfterSamples := FMeterValue.GetStabilitySamples

@@ -285,7 +285,7 @@ type
     IsMeanValueInRange: Boolean;
     /// <summary>True when all mandatory stability and range checks passed.</summary>
     IsSuitableForMeasurement: Boolean;
-    /// <summary>Total source samples whose timestamp is not in the future.</summary>
+    /// <summary>Total number of source samples passed to the analysis.</summary>
     SampleCount: Integer;
     /// <summary>Number of samples selected into the active analysis window before outlier removal.</summary>
     UsedSampleCount: Integer;
