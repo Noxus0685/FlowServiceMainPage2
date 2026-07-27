@@ -11,11 +11,14 @@ scenario = frm[start:end]
 editing_start = frm.index('procedure TFrameMainTable.GridDevicesEditingDone')
 editing_end = frm.index('function TFrameMainTable.GetDisplayFlowText', editing_start)
 editing_done = frm[editing_start:editing_end]
+flow_props_start = frm.index('procedure TFrameMainTable.UpdateFlowMeterPropertiesFrame')
+flow_props_end = frm.index('procedure ', flow_props_start + len('procedure '))
+flow_props = frm[flow_props_start:flow_props_end]
 
 checks = {
     'scenario uses the production start entry point': 'WT.StartMeasurementRun;' in scenario,
     'scenario rejects simulation mode': all(x in scenario for x in [
-        'FWorkTableManager.IsSimulationMode', 'WT.IsSimulationMode then'
+        'WorkTableManager.IsSimulationMode', 'WT.IsSimulationMode then'
     ]),
     'scenario does not generate or inject meter data': not any(x in scenario for x in [
         '.SetValue(', '.Reset(', 'AddStabilitySampleManual', 'ActualQ :=',
@@ -50,6 +53,11 @@ checks = {
         'if not IsSimulationMode then\n    Exit;\n\n  for WorkTable in FWorkTables do' in work,
     'legacy simulation timer is disabled in real mode':
         '(FWorkTableManager = nil) or (not FWorkTableManager.IsSimulationMode)' in legacy_form,
+    'flow-meter property channel is locally declared': all(x in flow_props for x in [
+        'Channel: TChannel;', 'Channel := nil;'
+    ]),
+    'observer uses the available global manager':
+        'FWorkTableManager.IsSimulationMode' not in scenario,
 }
 
 failed = [name for name, ok in checks.items() if not ok]

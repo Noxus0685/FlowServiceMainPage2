@@ -7345,7 +7345,7 @@ begin
       FinalReason := 'FAIL — MeasurementRun не создан'
     else if Run.IsWorkerThreadRunning then
       FinalReason := 'FAIL — измерение уже выполняется'
-    else if ((FWorkTableManager <> nil) and FWorkTableManager.IsSimulationMode) or
+    else if ((WorkTableManager <> nil) and WorkTableManager.IsSimulationMode) or
             WT.IsSimulationMode then
       FinalReason := 'FAIL — автоматический тест запрещён в SimulationMode';
 
