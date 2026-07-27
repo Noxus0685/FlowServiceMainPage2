@@ -1571,7 +1571,8 @@ begin
   SyncWorkTableObservers;
   UpdateInstrumentNameEdit;
 
-  FWorkTableManager.UpdateSimulation;
+  if FWorkTableManager.IsSimulationMode then
+    FWorkTableManager.UpdateSimulation;
 end;
 
 

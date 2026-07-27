@@ -31,6 +31,7 @@ type
   );
 
   TPointSpillage = class;
+  TDevicePoint = class;
 
   TSessionSpillage = class(TTypeEntity)
   public
@@ -112,6 +113,10 @@ type
     SourceTargetQLS: Double;
     SourceErrorPercent: Double;
     SourcePauseSec: Double;
+    SourcePoint: TDevicePoint;
+    RepeatsRequired: Integer;
+    RepeatsCompleted: Integer;
+    Status: EMeasurementPointStatus;
   end;
 
 
@@ -259,6 +264,10 @@ type
 
     SessionID: Integer;          // Сессия, к которой относится измерение (FK → TSessionSpillage.ID)
     DeviceUUID: string;          // Прибор, к которому относится измерение (стабильная связь по UUID)
+    DeviceChannelUUID: string;   // Канал, участвовавший в общем физическом режиме
+    SourcePointUUID: string;     // Исходная точка программы (не имя и не ближайший расход)
+    PhysicalModeUUID: string;    // Общая режимная точка сессии
+    RepeatNumber: Integer;       // Номер физического повтора, начиная с 1
     DeviceTypeUUID: string;   // UUID шаблонной точки типа (опционально)
     EtalonName: string;
     EtalonUUID: string;
@@ -2091,6 +2100,10 @@ begin
 
   SessionID := ASource.SessionID;
   DeviceUUID := ASource.DeviceUUID;
+  DeviceChannelUUID := ASource.DeviceChannelUUID;
+  SourcePointUUID := ASource.SourcePointUUID;
+  PhysicalModeUUID := ASource.PhysicalModeUUID;
+  RepeatNumber := ASource.RepeatNumber;
   DeviceTypeUUID := ASource.DeviceTypeUUID;
   EtalonName := ASource.EtalonName;
   EtalonUUID := ASource.EtalonUUID;
@@ -3099,10 +3112,6 @@ begin
 end;
 
 end.
-
-
-
-
 
 
 
