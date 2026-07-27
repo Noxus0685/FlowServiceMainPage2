@@ -1361,8 +1361,11 @@ begin
       FPhysicalStopRequested := True;
       ProtocolManager.AddMessage(pcAction, psMeasurement, 'StopTest',
         'Отдана команда остановки измерения',
-        Format('Stage=%s; Reason=%s', [MeasurementStateToString(FCurrentStage),
-          MeasurementStopReasonToString(GetStopReason)]));
+        Format('Stage=%s; Reason=%s; StopCommandTime=%d; StopCommandRequired=True; StopCommandSent=True; ControllerState=%s',
+          [MeasurementStateToString(FCurrentStage),
+           MeasurementStopReasonToString(GetStopReason),
+           TMeterValue.GetMonotonicTimeMs,
+           TWorkTable.WorkTableStateToString(FWorkTable.State)]));
       AddDiagnosticEvent('StopTest called');
       FWorkTable.StopTest;
     end
@@ -1392,6 +1395,7 @@ var
   RepeatsTarget: Integer;
   IsLastRepeat: Boolean;
   SavedRepeat: Integer;
+  I, ExpectedDevicePointCount, SavedDevicePointCount: Integer;
 begin
   FNextStageAfterSave := msDone;
   SetCurrentPointStatus(mptsSave);
@@ -1450,6 +1454,20 @@ begin
     [IfThen(Point <> nil, Point.Name, '<none>'), SavedRepeat, RepeatsTarget,
      BoolToStr(IsLastRepeat, True), MeasurementStateToString(FNextStageAfterSave),
      BoolToStr(FNextStageAfterSave = msWaitMeasureStart, True)]));
+
+  ExpectedDevicePointCount := 0;
+  SavedDevicePointCount := 0;
+  for I := 0 to FPoints.Count - 1 do
+    if (FPoints[I] <> nil) and FPoints[I].Enabled and
+       (FPoints[I].State <> osDeleted) then
+    begin
+      Inc(ExpectedDevicePointCount);
+      if FPoints[I].Status = mptsSaved then
+        Inc(SavedDevicePointCount);
+    end;
+  AddDiagnosticEvent(Format('SessionProgress: SessionModeCount=%d; ExpectedDevicePointCount=%d; ProcessedDevicePointCount=%d; SavedDevicePointCount=%d; NextStage=%s',
+    [FPoints.Count, ExpectedDevicePointCount, SavedDevicePointCount,
+     SavedDevicePointCount, MeasurementStateToString(FNextStageAfterSave)]));
 end;
 
 procedure TMeasurementRun.EnterDone;
@@ -3046,6 +3064,17 @@ begin
       Inc(ProcessingDevicePointCount);
       Inc(DeviceSourcePointCount);
 
+      if (Trim(Device.UUID) = '') or (Trim(Channel.UUID) = '') or
+         (Trim(SourcePoint.UUID) = '') then
+      begin
+        PointName := Format('DevicePointIdentityMissing: DeviceUUID=%s; DeviceChannelUUID=%s; SourcePointUUID=%s; SourcePointName=%s',
+          [Device.UUID, Channel.UUID, SourcePoint.UUID, SourcePoint.Name]);
+        AddDiagnosticEvent(PointName);
+        ProtocolManager.AddMessage(pcError, psMeasurement,
+          'DevicePointIdentityMissing', 'Не задана идентичность точки прибора', PointName);
+        raise Exception.Create(PointName);
+      end;
+
       StoredQLS := SourcePoint.Q;
       CalculatedQLS := 0;
       DerivedQmaxLS := 0;
@@ -3097,9 +3126,12 @@ begin
       Participant.SourceErrorPercent := SourcePoint.Error;
       Participant.SourcePauseSec := SourcePoint.Pause;
 
+      // A session point represents one concrete source point of one concrete
+      // device channel. Equal hydraulic conditions do not make device points
+      // identical and must not reduce the number of expected results.
       ExistingPoint := nil;
       for SessionPoint in FPoints do
-        if Abs(SessionPoint.Q - TargetQLS) <= FlowMergeTolerance(SessionPoint.Q, TargetQLS) then
+        if ParticipantExists(SessionPoint, Participant) then
         begin
           ExistingPoint := SessionPoint;
           Break;
@@ -3139,7 +3171,7 @@ begin
           Inc(DeviceAddedParticipantCount);
           Inc(DeviceMergedParticipantCount);
           Action := 'Merged';
-          Reason := 'MergedByAbsoluteQ';
+          Reason := 'MergedByExactDeviceChannelSourceIdentity';
         end;
         RefreshSessionPointParams(ExistingPoint);
         SessionPoint := ExistingPoint;
@@ -3213,10 +3245,11 @@ begin
          FlowMergeTolerance(FPoints[I].Participants[J].SelectedSourceTargetQLS, FPoints[I].Q) then
         Inc(LostSourcePointCount);
 
-  AddDiagnosticEvent(Format('CreateSessionSummary: TotalDeviceChannelCount=%d; EnabledDeviceChannelCount=%d; DisabledDeviceChannelCount=%d; ResolvedUniqueDeviceCount=%d; DistinctDeviceQmaxCount=%d; ProcessingDeviceCount=%d; ProcessingDevicePointCount=%d; SessionPointCount=%d; ParticipantCount=%d; UniqueParticipantCount=%d; DuplicateParticipantCount=%d; LostSourcePointCount=%d',
+  AddDiagnosticEvent(Format('CreateSessionSummary: TotalDeviceChannelCount=%d; EnabledDeviceChannelCount=%d; DisabledDeviceChannelCount=%d; ResolvedUniqueDeviceCount=%d; DistinctDeviceQmaxCount=%d; ProcessingDeviceCount=%d; ProcessingDevicePointCount=%d; SessionModeCount=%d; ExpectedDevicePointCount=%d; ProcessedDevicePointCount=0; SavedDevicePointCount=0; ParticipantCount=%d; UniqueParticipantCount=%d; DuplicateParticipantCount=%d; LostSourcePointCount=%d',
     [TotalDeviceChannelCount, EnabledDeviceChannelCount, DisabledDeviceChannelCount,
      ResolvedUniqueDeviceCount, DistinctDeviceQmaxCount, ProcessingDeviceCount,
-     ProcessingDevicePointCount, FPoints.Count, ParticipantCount, ParticipantCount,
+     ProcessingDevicePointCount, FPoints.Count, ProcessingDevicePointCount,
+     ParticipantCount, ParticipantCount,
      DuplicateParticipantCount, LostSourcePointCount]));
 
   if FPoints.Count = 0 then
@@ -3226,11 +3259,14 @@ begin
     raise Exception.Create(PointName);
   end;
 
-  if (LostSourcePointCount > 0) or (ParticipantCount <> ProcessingDevicePointCount) then
+  if (LostSourcePointCount > 0) or (ParticipantCount <> ProcessingDevicePointCount) or
+     (FPoints.Count <> ProcessingDevicePointCount) then
   begin
-    PointName := Format('InvalidMeasurementSession: ProcessingDevicePointCount=%d; ParticipantCount=%d; LostSourcePointCount=%d',
-      [ProcessingDevicePointCount, ParticipantCount, LostSourcePointCount]);
-    ProtocolManager.AddMessage(pcError, psMeasurement, 'InvalidMeasurementSession', 'Некорректная сессия измерения', PointName);
+    PointName := Format('SessionPointLost: ExpectedDevicePointCount=%d; SessionModeCount=%d; ParticipantCount=%d; LostSourcePointCount=%d; DuplicateParticipantCount=%d',
+      [ProcessingDevicePointCount, FPoints.Count, ParticipantCount,
+       LostSourcePointCount, DuplicateParticipantCount]);
+    ProtocolManager.AddMessage(pcError, psMeasurement, 'SessionPointLost',
+      'Потеряна или продублирована точка прибора при создании сессии', PointName);
     raise Exception.Create(PointName);
   end;
 end;
@@ -4715,17 +4751,16 @@ begin
   if not Assigned(APoint) then
     Exit;
 
-  Result := Format('%s; StopCriteria=%s; CurrentTime=%.3f; CurrentImpulse=%d; CurrentVolume=%.6f; '
-    + 'LimitTime=%.3f; LimitImp=%d; LimitVolume=%.6f; StopControlMode=%s; NextStage=%s',
-    [AReason,
-     StopCriteriaToLogString(APoint.StopCriteria),
-     GetCurrentStopTimeValue,
-     GetCurrentStopImpulseValue,
-     GetCurrentStopVolumeValue,
-     APoint.LimitTime,
-     APoint.LimitImp,
-     APoint.LimitVolume,
-     MeasurementStopControlModeToString(scmCommand),
+  Result := Format('StopControlMode=%s; ActiveStopCriteria=%s; ConfiguredTimeLimit=%.3f; '
+    + 'ActualMeasurementTime=%.3f; CurrentImpulse=%d; CurrentVolume=%.6f; '
+    + 'LimitImp=%d; LimitVolume=%.6f; LimitReached=True; LimitReachedReason=%s; '
+    + 'LimitReachedTime=%d; StopCommandRequired=True; StopCommandSent=False; ControllerState=%s; NextStage=%s',
+    [MeasurementStopControlModeToString(scmCommand),
+     StopCriteriaToLogString(APoint.StopCriteria), APoint.LimitTime,
+     GetCurrentStopTimeValue, GetCurrentStopImpulseValue,
+     GetCurrentStopVolumeValue, APoint.LimitImp, APoint.LimitVolume,
+     AReason, TMeterValue.GetMonotonicTimeMs,
+     TWorkTable.WorkTableStateToString(FWorkTable.State),
      MeasurementStateToString(msWaitMeasureStop)]);
 end;
 
@@ -4812,7 +4847,11 @@ begin
           FinalizeMeasurementRun(mrrCancelled, mdrUserCancelled);
           Exit;
         end;
-        SetStage(msSave);
+        // COMPLETE means the controller has completed and its result is ready.
+        // Reading has priority; never skip result acquisition or issue another
+        // stop command for an already completed controller.
+        AddDiagnosticEvent('ControllerCompleted: ResultsReady=True; StopCommandRequired=False; NextStage=msResultsRead');
+        SetStage(msResultsRead);
         Exit;
       end;
 
