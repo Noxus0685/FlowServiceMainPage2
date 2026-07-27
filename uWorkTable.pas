@@ -4,9 +4,11 @@ interface
 
 uses
   System.Classes,
+  System.Diagnostics,
   System.Generics.Collections,
   System.IniFiles,
   System.Math,
+  System.SyncObjs,
   System.StrUtils,
   System.SysUtils,
   System.TypInfo,
@@ -26,6 +28,20 @@ uses
 
 
 type
+
+  TSimulationMode = (smStandard, smScenario);
+
+  TSimulationScenarioProfile = record
+    TargetFlowFactor: Double;
+    NoiseAmplitudePercent: Double;
+    RampRate: Double;
+    SignalEnabled: Boolean;
+    FreezeImpulseCounter: Boolean;
+    StartEquipmentResult: Boolean;
+    StopEquipmentResult: Boolean;
+    TimeoutSec: Double;
+    class function Standard: TSimulationScenarioProfile; static;
+  end;
 
   // Используем общий тип уведомлений из uObservable
   EWorkTableNotifyEvent = ENotifyEvent;
@@ -865,6 +881,14 @@ type
     FWorkTables: TObjectList<TWorkTable>;
     FIsSimulationMode :Boolean;
     FActiveWorkTable  :TWorkTable;
+    FSimulationMode: TSimulationMode;
+    FScenarioProfile: TSimulationScenarioProfile;
+    FScenarioName: string;
+    FScenarioRunning: Boolean;
+    FPreviousSimulationMode: TSimulationMode;
+    FPreviousIsSimulationMode: Boolean;
+    FScenarioLock: TCriticalSection;
+    FSimulationUpdateInProgress: Integer;
 
   public
     constructor Create(const AIniFileName: string);
@@ -893,6 +917,11 @@ type
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
     property IniFileName: string read FIniFileName write FIniFileName;
     property IsSimulationMode:Boolean read FIsSimulationMode  write FIsSimulationMode;
+    property SimulationMode: TSimulationMode read FSimulationMode;
+    property ScenarioRunning: Boolean read FScenarioRunning;
+    property ActiveScenarioName: string read FScenarioName;
+    procedure StartScenario(const AName: string; const AProfile: TSimulationScenarioProfile);
+    procedure FinishScenario;
     procedure UpdateSimulation;
 
   end;
@@ -910,6 +939,18 @@ uses
 const
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
   DEVICE_FLOW_RATE_DIM_INDEX = 4;
+
+class function TSimulationScenarioProfile.Standard: TSimulationScenarioProfile;
+begin
+  Result.TargetFlowFactor := 1.0;
+  Result.NoiseAmplitudePercent := 1.0;
+  Result.RampRate := 0.666667;
+  Result.SignalEnabled := True;
+  Result.FreezeImpulseCounter := False;
+  Result.StartEquipmentResult := True;
+  Result.StopEquipmentResult := True;
+  Result.TimeoutSec := 120.0;
+end;
 
   {$REGION 'HELPERS'}
 
@@ -4076,6 +4117,13 @@ begin
     Channel.SetValues;
   end;
 
+  // FlowRate.Value is the production parameter inspected by
+  // TMeasurementRun.IsStable. Feed it from the calculated aggregate here so
+  // hardware and simulation use the same recalculation/sample-history path.
+  if (FFlowRate <> nil) and (FFlowRate.Value <> nil) and
+     (ValueFlowRate <> nil) then
+    FFlowRate.Value.SetValue(ValueFlowRate.GetDoubleValue);
+
 
 end;
 
@@ -6156,10 +6204,10 @@ begin
 
     Channel.CurSec := ACurSec;
     Channel.ImpSec := ChannelImpSec;
-    if AImpResult > 0 then
-      Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
-    else
-      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+    // Applying an input sample must never have the hidden side effect of
+    // accumulating a one-second impulse interval. Simulation accumulation is
+    // performed once, with its measured delta time, by UpdateSimulation.
+    Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12);
   end;
 end;
 
@@ -6176,14 +6224,100 @@ begin
   FWorkTables := TObjectList<TWorkTable>.Create(True);
   TPump.Pumps := TObjectList<TPump>.Create(True);
   TWeight.Weights := TObjectList<TWeight>.Create(True);
+  FSimulationMode := smStandard;
+  FScenarioProfile := TSimulationScenarioProfile.Standard;
+  FScenarioLock := TCriticalSection.Create;
 end;
 
 { Frees managed work table collection and manager resources. }
 destructor TWorkTableManager.Destroy;
 begin
+  FinishScenario;
+  FScenarioLock.Free;
   FWorkTables.Free;
   FreeAndNil(TWeight.Weights);
   inherited;
+end;
+
+procedure TWorkTableManager.StartScenario(const AName: string;
+  const AProfile: TSimulationScenarioProfile);
+var
+  WorkTable: TWorkTable;
+begin
+  WorkTable := nil;
+  FScenarioLock.Acquire;
+  try
+    if FScenarioRunning then
+      raise EInvalidOpException.Create('A simulation scenario is already running');
+    if FActiveWorkTable = nil then
+      raise EInvalidOpException.Create('An active work table is required');
+    if FActiveWorkTable.MeasurementRun = nil then
+      raise EInvalidOpException.Create('The active work table has no measurement run');
+    if TMeasurementRun(FActiveWorkTable.MeasurementRun).IsWorkerThreadRunning then
+      raise EInvalidOpException.Create('An automatic measurement is already running');
+
+    FPreviousIsSimulationMode := FIsSimulationMode;
+    FPreviousSimulationMode := FSimulationMode;
+    FScenarioName := AName;
+    FScenarioProfile := AProfile;
+    FScenarioRunning := True;
+    FIsSimulationMode := True;
+    FSimulationMode := smScenario;
+    FActiveWorkTable.IsSimulationMode := True;
+    FActiveWorkTable.SimulationLastUpdateTimeMs := 0;
+    WorkTable := FActiveWorkTable;
+  finally
+    FScenarioLock.Release;
+  end;
+  try
+    // Use the production automatic measurement FSM. Scenario updates only
+    // provide its physical inputs via the regular UpdateSimulation call.
+    WorkTable.StartMeasurementRun(Ord(mrmAutomatic));
+  except
+    FinishScenario;
+    raise;
+  end;
+end;
+
+procedure TWorkTableManager.FinishScenario;
+var
+  WorkTable: TWorkTable;
+  StopActiveRun: Boolean;
+begin
+  if FScenarioLock = nil then
+    Exit;
+  FScenarioLock.Acquire;
+  try
+    if not FScenarioRunning then
+      Exit;
+    WorkTable := FActiveWorkTable;
+    StopActiveRun := (WorkTable <> nil) and (WorkTable.MeasurementRun <> nil) and
+      TMeasurementRun(WorkTable.MeasurementRun).IsWorkerThreadRunning and
+      not ((TMeasurementRun(WorkTable.MeasurementRun).Stage = msDone) and
+           TMeasurementRun(WorkTable.MeasurementRun).RunCompleted);
+  finally
+    FScenarioLock.Release;
+  end;
+
+  // A normally completed series must never receive a second stop command.
+  // This route is used only for operator cancel, timeout, exception or teardown.
+  if StopActiveRun then
+    WorkTable.StopMeasurementRun;
+
+  FScenarioLock.Acquire;
+  try
+    FScenarioRunning := False;
+    FScenarioName := '';
+    FSimulationMode := FPreviousSimulationMode;
+    FIsSimulationMode := FPreviousIsSimulationMode;
+    if WorkTable <> nil then
+    begin
+      WorkTable.IsSimulationMode := FPreviousIsSimulationMode;
+      WorkTable.SimulationLastUpdateTimeMs := 0;
+    end;
+  finally
+    FScenarioLock.Release;
+  end;
 end;
 
 { Loads managed work tables from configured INI file. }
@@ -6640,12 +6774,7 @@ end;
 procedure TWorkTableManager.UpdateSimulation;
 
  var
-  I : Integer;
- CurrentImp:Double;
- CurrentVolume:Double;
  WorkTable:TWorkTable;
- HasLimits: Boolean;
- LimitReached: Boolean;   // Флаг: достигнут хотя бы один критерий остановки
 
 
 function PressureRandomAroundBase(const ABaseValue: Double;
@@ -6883,7 +7012,9 @@ end;
 
 function GetCurrentTimeMs: Double;
 begin
-  Result := Now * MSecsPerDay;
+  // TStopwatch uses the platform's monotonic high-resolution counter and is
+  // available to all FMX targets supported by RAD Studio 12.
+  Result := TStopwatch.GetTimeStamp * 1000.0 / TStopwatch.Frequency;
 end;
 
 function CalculateRampDurationByFlowDelta(const AStartFlowLS, ATargetFlowLS: Double): Double;
@@ -6893,12 +7024,16 @@ const
   SIMULATION_RAMP_FLOW_SPEED_LS_PER_SEC = 0.666667;
 var
   FlowDeltaLS: Double;
+  RampRate: Double;
 begin
   FlowDeltaLS := Abs(ATargetFlowLS - AStartFlowLS);
-  if SIMULATION_RAMP_FLOW_SPEED_LS_PER_SEC <= 0 then
+  RampRate := SIMULATION_RAMP_FLOW_SPEED_LS_PER_SEC;
+  if (FSimulationMode = smScenario) and (FScenarioProfile.RampRate > 0) then
+    RampRate := FScenarioProfile.RampRate;
+  if RampRate <= 0 then
     Result := SIMULATION_RAMP_MAX_DURATION_SEC
   else
-    Result := FlowDeltaLS / SIMULATION_RAMP_FLOW_SPEED_LS_PER_SEC;
+    Result := FlowDeltaLS / RampRate;
   Result := EnsureRange(Result, MIN_SIMULATION_RAMP_DURATION_SEC,
     SIMULATION_RAMP_MAX_DURATION_SEC);
 end;
@@ -7027,7 +7162,14 @@ begin
 
   BeforeImpSec := AChannel.ImpSec;
   AllowedDelta := EnsureRange(Abs(TargetImpSec) * ANoisePercent / 100.0, 0.1, 30.0);
-  RandomStep := (Random * 2.0 - 1.0) * AllowedDelta;
+  if FSimulationMode = smScenario then
+  begin
+    AllowedDelta := EnsureRange(Abs(TargetImpSec) *
+      FScenarioProfile.NoiseAmplitudePercent / 100.0, 0.0, 30.0);
+    RandomStep := Sin(ACurrentTimeMs / 1000.0) * AllowedDelta;
+  end
+  else
+    RandomStep := (Random * 2.0 - 1.0) * AllowedDelta;
   AfterImpSec := EnsureRange(BeforeImpSec + RandomStep,
     Max(0.0, TargetImpSec - AllowedDelta), TargetImpSec + AllowedDelta);
   AChannel.ImpSec := AfterImpSec;
@@ -7376,11 +7518,18 @@ begin
     DeltaTimeSec := EnsureRange((CurrentTimeMs - AWorkTable.SimulationLastUpdateTimeMs) / 1000.0,
       0.0, MAX_DELTA_TIME_SEC)
   else
-    DeltaTimeSec := 1.0;
+    // The first call establishes the time origin. A call is not one second.
+    DeltaTimeSec := 0.0;
   AWorkTable.SimulationLastUpdateTimeMs := CurrentTimeMs;
   AWorkTable.Time := AWorkTable.Time + DeltaTimeSec;
 
   TargetFlow := AWorkTable.FlowRate.ValueSet.Value;
+  if FSimulationMode = smScenario then
+  begin
+    if not FScenarioRunning then
+      Exit;
+    TargetFlow := Max(0.0, TargetFlow * FScenarioProfile.TargetFlowFactor);
+  end;
   OldTargetFlow := AWorkTable.SimulationTargetFlowBase;
   LogSimulationFlowUnitsDiagnostic(AWorkTable, TargetFlow);
   EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
@@ -7398,153 +7547,66 @@ begin
   end;
 
   UpdateDeviceChannelSignals(AWorkTable, TargetFlow, OldTargetFlow, CurrentTimeMs);
-  AWorkTable.SimulationTargetFlowBase := TargetFlow;
-  AccumulateSimulationChannelImpResult(AWorkTable.EtalonChannels, DeltaTimeSec);
-  AccumulateSimulationChannelImpResult(AWorkTable.DeviceChannels, DeltaTimeSec);
-  ResetDisabledSimulationChannels(AWorkTable);
-end;
-
-procedure ResetDisabledChannelSignals(const AWorkTable: TWorkTable);
-var
-  I: Integer;
-begin
-  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
-    if (AWorkTable.EtalonChannels[I] <> nil) and
-       (not IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I])) then
-      ResetChannelSimulation(AWorkTable.EtalonChannels[I], True);
-end;
-
-procedure AccumulateChannelImpResult(const AChannels: TObjectList<TChannel>; const ADeltaTimeSec: Double);
-var
-  I: Integer;
-  Channel: TChannel;
-begin
-  if AChannels = nil then
-    Exit;
-
-  for I := 0 to AChannels.Count - 1 do
+  if (FSimulationMode = smScenario) and (not FScenarioProfile.SignalEnabled) then
   begin
-    Channel := AChannels[I];
-    if IsSimulationChannelEnabled(Channel) then
-      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec * ADeltaTimeSec, 0.0, 1.0E12);
-  end;
-end;
-
-procedure LogFlowUnitsDiagnostic(const AWorkTable: TWorkTable; const ABaseTargetFlowLS: Double);
-const
-  TARGET_EPSILON = 1E-6;
-var
-  UnitName: string;
-  DisplayedSetValue: Double;
-  EtalonValueFlowLS: Double;
-  DeviceValueFlowLS: Double;
-  DisplayedEtalonFlow: Double;
-  DisplayedDeviceFlow: Double;
-begin
-  if (AWorkTable = nil) or (AWorkTable.ValueFlowRate = nil) or (ProtocolManager = nil) then
-    Exit;
-
-  if SameValue(AWorkTable.SimulationLastFlowUnitsLogTarget, ABaseTargetFlowLS, TARGET_EPSILON) then
-    Exit;
-
-  AWorkTable.SimulationLastFlowUnitsLogTarget := ABaseTargetFlowLS;
-  UnitName := AWorkTable.ValueFlowRate.GetDimName;
-  DisplayedSetValue := AWorkTable.ValueFlowRate.GetDoubleNum(ABaseTargetFlowLS,
-    AWorkTable.ValueFlowRate.CurrentDimIndex);
-
-  EtalonValueFlowLS := 0;
-  if (AWorkTable.EtalonChannels.Count > 0) and (AWorkTable.EtalonChannels[0] <> nil) and
-     (AWorkTable.EtalonChannels[0].FlowMeter <> nil) and
-     (AWorkTable.EtalonChannels[0].FlowMeter.ValueFlow <> nil) then
-    EtalonValueFlowLS := AWorkTable.EtalonChannels[0].FlowMeter.ValueFlow.GetDoubleValue;
-
-  DeviceValueFlowLS := 0;
-  if (AWorkTable.DeviceChannels.Count > 0) and (AWorkTable.DeviceChannels[0] <> nil) and
-     (AWorkTable.DeviceChannels[0].FlowMeter <> nil) and
-     (AWorkTable.DeviceChannels[0].FlowMeter.ValueFlow <> nil) then
-    DeviceValueFlowLS := AWorkTable.DeviceChannels[0].FlowMeter.ValueFlow.GetDoubleValue;
-
-  DisplayedEtalonFlow := AWorkTable.ValueFlowRate.GetDoubleNum(EtalonValueFlowLS,
-    AWorkTable.ValueFlowRate.CurrentDimIndex);
-  DisplayedDeviceFlow := AWorkTable.ValueFlowRate.GetDoubleNum(DeviceValueFlowLS,
-    AWorkTable.ValueFlowRate.CurrentDimIndex);
-
-  ProtocolManager.AddMessage(pcState, psWorkTable, 'FlowUnitsDiagnostic',
-    'Flow unit conversion diagnostic',
-    Format('DisplayedSetValue=%.6f SelectedUnit=%s BaseTargetFlowLS=%.6f EtalonValueFlowLS=%.6f DisplayedEtalonFlow=%.6f DeviceValueFlowLS=%.6f DisplayedDeviceFlow=%.6f',
-      [DisplayedSetValue, UnitName, ABaseTargetFlowLS, EtalonValueFlowLS,
-       DisplayedEtalonFlow, DeviceValueFlowLS, DisplayedDeviceFlow]));
-end;
-
-
-procedure UpdateChannelSimulation(const AWorkTable: TWorkTable);
-const
-  MAX_DELTA_TIME_SEC = 1.0;
-var
-  I: Integer;
-  CurrentTimeMs: Double;
-  DeltaTimeSec: Double;
-  TargetFlow: Double;
-  OldTargetFlow: Double;
-  EnabledEtalonChannels: TObjectList<TChannel>;
-  EtalonTargetImpSecValues: TArray<Double>;
-begin
-  if (AWorkTable = nil) or (AWorkTable.FlowRate = nil) or (not AWorkTable.FlowRate.IsRunning) then
-    Exit;
-
-  CurrentTimeMs := GetCurrentTimeMs;
-  if AWorkTable.SimulationLastUpdateTimeMs > 0 then
-    DeltaTimeSec := EnsureRange((CurrentTimeMs - AWorkTable.SimulationLastUpdateTimeMs) / 1000.0,
-      0.0, MAX_DELTA_TIME_SEC)
-  else
-    DeltaTimeSec := 1.0;
-  AWorkTable.SimulationLastUpdateTimeMs := CurrentTimeMs;
-  AWorkTable.Time := AWorkTable.Time + DeltaTimeSec;
-
-  TargetFlow := AWorkTable.FlowRate.ValueSet.Value;
-  OldTargetFlow := AWorkTable.SimulationTargetFlowBase;
-  LogFlowUnitsDiagnostic(AWorkTable, TargetFlow);
-  EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
-  try
     for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
-      if IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I]) then
-        EnabledEtalonChannels.Add(AWorkTable.EtalonChannels[I]);
-
-    EtalonTargetImpSecValues := CalculateEtalonTargetImpSecValues(AWorkTable,
-      EnabledEtalonChannels, TargetFlow);
-    UpdateEtalonChannelSignals(AWorkTable, EnabledEtalonChannels,
-      EtalonTargetImpSecValues, CurrentTimeMs, TargetFlow, OldTargetFlow);
-  finally
-    EnabledEtalonChannels.Free;
+      if AWorkTable.EtalonChannels[I] <> nil then
+        AWorkTable.EtalonChannels[I].ImpSec := 0;
+    for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
+      if AWorkTable.DeviceChannels[I] <> nil then
+        AWorkTable.DeviceChannels[I].ImpSec := 0;
   end;
-
-  UpdateDeviceChannelSignals(AWorkTable, TargetFlow, OldTargetFlow, CurrentTimeMs);
   AWorkTable.SimulationTargetFlowBase := TargetFlow;
-  AccumulateChannelImpResult(AWorkTable.EtalonChannels, DeltaTimeSec);
-  AccumulateChannelImpResult(AWorkTable.DeviceChannels, DeltaTimeSec);
-  ResetDisabledChannelSignals(AWorkTable);
+  if (FSimulationMode <> smScenario) or (not FScenarioProfile.FreezeImpulseCounter) then
+  begin
+    AccumulateSimulationChannelImpResult(AWorkTable.EtalonChannels, DeltaTimeSec);
+    AccumulateSimulationChannelImpResult(AWorkTable.DeviceChannels, DeltaTimeSec);
+  end;
+  ResetDisabledSimulationChannels(AWorkTable);
+
+  // Hardware input processing is followed by this same production
+  // recalculation path. It updates FlowRate.Value and its stability history.
+  AWorkTable.RecalculateAllMeterValues;
 end;
 
 begin
-
-     for WorkTable in WorkTableManager.WorkTables do
+  if TInterlocked.CompareExchange(FSimulationUpdateInProgress, 1, 0) <> 0 then
+    Exit;
+  try
+    case FSimulationMode of
+      smStandard: ; // Preserve the established random profile.
+      smScenario:
+        if not FScenarioRunning then
+          Exit;
+    end;
+     for WorkTable in FWorkTables do
    begin
+  if (FSimulationMode = smScenario) and (WorkTable <> FActiveWorkTable) then
+    Continue;
 
   // ============================================================
   // 2. Эмуляция физического процесса (стенд)
   // ============================================================
 
   // Обновление частоты насоса (имитация работы)
-  UpdateRandomFreq(WorkTable);
-
-  // Обновление климатических параметров (температура и др.)
-  UpdateRandomTemp(WorkTable);
-
-  // Обновление давления
-  UpdateRandomPress(WorkTable);
+  if FSimulationMode = smStandard then
+  begin
+    UpdateRandomFreq(WorkTable);
+    UpdateRandomTemp(WorkTable);
+    UpdateRandomPress(WorkTable);
+  end;
 
   // Перенос runtime-значений климата в TMeterValue до UI/сохранения.
   SyncEnvironmentMeterValues(WorkTable);
+
+  // In scenario mode the manager owns input signals only. TMeasurementRun and
+  // TWorkTable production methods exclusively own all state transitions.
+  if FSimulationMode = smScenario then
+  begin
+    if WorkTable.State in [swtMONITOR, swtEXECUTE] then
+      RunChannelSimulationCycle(WorkTable);
+    Continue;
+  end;
 
 
   // ============================================================
@@ -7608,7 +7670,10 @@ begin
     // Ожидание старта → переход к выполнению
     // ------------------------------------------------------------
     swtSTARTWAIT:
-      WorkTable.State := swtEXECUTE;
+      if (FSimulationMode <> smScenario) or FScenarioProfile.StartEquipmentResult then
+        WorkTable.State := swtEXECUTE
+      else
+        WorkTable.State := swtFAILURE;
 
 
     // ============================================================
@@ -7620,87 +7685,10 @@ begin
       RunChannelSimulationCycle(WorkTable);
 
 
-      // ----------------------------------------------------------
-      // 4.1 Расчёт текущих импульсов
-      // ----------------------------------------------------------
-
-      CurrentImp := 0;
-
-      for I := 0 to WorkTable.EtalonChannels.Count - 1 do
-      begin
-        // Пропускаем неинициализированные или отключённые каналы
-        if (WorkTable.EtalonChannels[I] = nil) or
-           (not WorkTable.EtalonChannels[I].Enabled) then
-          Continue;
-
-        // Берём максимальное значение импульсов среди эталонов
-        // (используется как репрезентативное значение)
-        CurrentImp := Max(CurrentImp,
-                          WorkTable.EtalonChannels[I].ImpResult);
-      end;
-
-
-      // ----------------------------------------------------------
-      // 4.2 Получение текущего объёма/массы
-      // ----------------------------------------------------------
-
-      CurrentVolume := 0;
-
-      // ValueQuantity — агрегированное значение измеренного количества
-      if WorkTable.ValueQuantity <> nil then
-        CurrentVolume := WorkTable.ValueQuantity.GetDoubleValue;
-
-
-      // ----------------------------------------------------------
-      // 4.3 Проверка наличия критериев остановки
-      // ----------------------------------------------------------
-
-      HasLimits :=
-        (WorkTable.CurrentPoint <> nil) and
-        (
-          // Ограничение по времени
-          ((scTime in WorkTable.CurrentPoint.StopCriteria) and
-           (WorkTable.CurrentPoint.LimitTime > 0)) or
-
-          // Ограничение по импульсам
-          ((scImpulse in WorkTable.CurrentPoint.StopCriteria) and
-           (WorkTable.CurrentPoint.LimitImp > 0)) or
-
-          // Ограничение по объёму/массе
-          ((scVolume in WorkTable.CurrentPoint.StopCriteria) and
-           (WorkTable.CurrentPoint.LimitVolume > 0))
-        );
-
-
-      // ----------------------------------------------------------
-      // 4.4 Проверка достижения критериев остановки
-      // ----------------------------------------------------------
-
-      LimitReached :=
-        (WorkTable.CurrentPoint <> nil) and
-        (
-          // По времени
-          ((scTime in WorkTable.CurrentPoint.StopCriteria) and
-           (WorkTable.Time >= WorkTable.CurrentPoint.LimitTime)) or
-
-          // По импульсам
-          ((scImpulse in WorkTable.CurrentPoint.StopCriteria) and
-           (CurrentImp >= WorkTable.CurrentPoint.LimitImp)) or
-
-          // По объёму/массе
-          ((scVolume in WorkTable.CurrentPoint.StopCriteria) and
-           (CurrentVolume >= WorkTable.CurrentPoint.LimitVolume))
-        );
-
-
-      // ----------------------------------------------------------
-      // 4.5 Завершение измерения
-      // ----------------------------------------------------------
-
-      // Если заданы ограничения и хотя бы одно достигнуто
-      // → инициируем остановку теста
-      if HasLimits and LimitReached then
-        WorkTable.State := swtSTOPTEST;
+      // Stop criteria belong exclusively to the production TMeasurementRun.
+      // The simulator only supplies primary channel signals and virtual
+      // equipment acknowledgements; it must not duplicate or short-circuit
+      // the production FSM (especially its combined-criteria AND semantics).
     end;
 
 
@@ -7715,7 +7703,10 @@ begin
     // Ожидание полной остановки
     // ------------------------------------------------------------
     swtSTOPWAIT:
-      WorkTable.State := swtFINALREAD   ;
+      if (FSimulationMode <> smScenario) or FScenarioProfile.StopEquipmentResult then
+        WorkTable.State := swtFINALREAD
+      else
+        WorkTable.State := swtFAILURE;
 
 
     // ------------------------------------------------------------
@@ -7724,8 +7715,10 @@ begin
     swtFINALREAD:
       WorkTable.State := swtCOMPLETE;
 
+    end;
   end;
-
+  finally
+    TInterlocked.Exchange(FSimulationUpdateInProgress, 0);
   end;
 
   end;
