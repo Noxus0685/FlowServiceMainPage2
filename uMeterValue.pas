@@ -1718,7 +1718,6 @@ var
   Window: TArray<TMeterValueSample>;
   CurrentMs, RequiredWindowMs, WindowStartMs, FirstMs, LastMs, LastSampleTimeMs: Int64;
   I, Count, IntervalCount: Integer;
-  LastOutOfRangeTimeMs: Int64;
   AllowedDeviation, SampleIntervalMs, IntervalSum, RangeEpsilon: Double;
   Msg: string;
 begin
@@ -1782,31 +1781,6 @@ begin
     end;
   end;
   SetLength(Window, Count);
-  LastOutOfRangeTimeMs := Low(Int64);
-  RangeEpsilon := Max(1E-9, Abs(ATargetValue) * 1E-9);
-  for I := 0 to Count - 1 do
-    if (Window[I].Value < AInfo.StabilityLowerLimit - RangeEpsilon) or
-       (Window[I].Value > AInfo.StabilityUpperLimit + RangeEpsilon) then
-      LastOutOfRangeTimeMs := Window[I].TimeStampMs;
-  if LastOutOfRangeTimeMs <> Low(Int64) then
-  begin
-    WindowStartMs := LastOutOfRangeTimeMs + 1;
-    AInfo.WindowStartMs := WindowStartMs;
-    Count := 0;
-    for I := 0 to High(SourceSamples) do
-    begin
-      AInfo.SampleResults[I].InWindow := False;
-      AInfo.SampleResults[I].IsInDisplayAnalysisWindow := False;
-      if (SourceSamples[I].TimeStampMs >= WindowStartMs) and (SourceSamples[I].TimeStampMs <= CurrentMs) then
-      begin
-        Window[Count] := SourceSamples[I];
-        AInfo.SampleResults[I].InWindow := True;
-        AInfo.SampleResults[I].IsInDisplayAnalysisWindow := True;
-        Inc(Count);
-      end;
-    end;
-    SetLength(Window, Count);
-  end;
   AInfo.SampleCount := Length(SourceSamples);
   AInfo.UsedSampleCount := Count;
   if IntervalCount > 0 then
