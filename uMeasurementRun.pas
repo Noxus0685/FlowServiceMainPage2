@@ -2126,7 +2126,7 @@ var
   ActualValue: Double;
   MinPercent, MaxPercent, AllowedMinus, AllowedPlus: Double;
   PointErrorPercent: Double;
-  ToleranceSource, Reason, ChannelReason: string;
+  ToleranceSource, Reason, ChannelReason, FirstChannelFailureReason: string;
   GroupFlows: TDictionary<Integer, Double>;
   Pair: TPair<Integer, Double>;
   GroupKey: Integer;
@@ -2147,6 +2147,7 @@ begin
   HasEtalonValue := False;
   AllChannelsStable := True;
   Reason := '';
+  FirstChannelFailureReason := '';
   PointErrorPercent := 0;
   Settings := Default(TMeterValueStabilitySettings);
   ToleranceSource := 'Point.FlowAccuracy';
@@ -2207,14 +2208,20 @@ begin
           ChannelReason := Reason
         else
           ChannelReason := SignalInfo.StatusText;
-        AddDiagnosticEvent(Format('EtalonChannelReady=%s; ChannelUUID=%s; ChannelName=%s; TargetValue=%.6f; PointErrorPercent=%.6f; StabilityLower=%.6f; StabilityUpper=%.6f; FlowAccuracy=%s; FlowReachedLower=%.6f; FlowReachedUpper=%.6f; UsedSampleCount=%d; RequiredSampleCount=%d; ActualWindowDurationSec=%.3f; RequiredWindowDurationSec=%.3f; HasEnoughSamples=%s; HasFullWindow=%s; IsDataActual=%s; OutOfRangeSampleCount=%d; MinSampleValue=%.6f; MaxSampleValue=%.6f; StableReady=%s; FlowReached=%s; Ready=%s; Reason=%s',
+        if (not ChannelStable) and (FirstChannelFailureReason = '') then
+          FirstChannelFailureReason := ChannelReason;
+        AddDiagnosticEvent(Format('EtalonChannelReady=%s; ChannelUUID=%s; ChannelName=%s; TargetValue=%.6f; PointErrorPercent=%.6f; StabilityLower=%.6f; StabilityUpper=%.6f; FlowAccuracy=%s; FlowReachedLower=%.6f; FlowReachedUpper=%.6f; UsedSampleCount=%d; RequiredSampleCount=%d; ActualWindowDurationSec=%.3f; RequiredWindowDurationSec=%.3f; HasEnoughSamples=%s; HasFullWindow=%s; IsDataActual=%s; OutOfRangeSampleCount=%d; MinSampleValue=%.6f; MaxSampleValue=%.6f; Variation=%.9f; MaxVariation=%.9f; IsVariationStable=%s; StdDeviation=%.9f; MaxStdDeviation=%.9f; IsDeviationStable=%s; TrendRate=%.9f; MaxTrendRate=%.9f; IsTrendStable=%s; StableReady=%s; FlowReached=%s; Ready=%s; Reason=%s',
           [BoolToStr(ChannelStable, True), Channel.UUID, Channel.Name, TargetValue, PointErrorPercent,
            SignalInfo.StabilityLowerLimit, SignalInfo.StabilityUpperLimit, Point.FlowAccuracy,
            StableInfo.LowerLimit, StableInfo.UpperLimit, SignalInfo.UsedSampleCount,
            Settings.MinSampleCount, SignalInfo.WindowDurationSec, Max(0.001, FRequiredDeviceStabilizationSec),
            BoolToStr(SignalInfo.HasEnoughSamples, True), BoolToStr(SignalInfo.HasFullWindow, True),
            BoolToStr(SignalInfo.IsDataActual, True), SignalInfo.OutOfRangeSampleCount,
-           SignalInfo.MinValue, SignalInfo.MaxValue, BoolToStr(ChannelStable, True),
+           SignalInfo.MinValue, SignalInfo.MaxValue,
+           SignalInfo.Variation, Settings.MaxVariation, BoolToStr(SignalInfo.IsVariationStable, True),
+           SignalInfo.StdDeviation, Settings.MaxStdDeviation, BoolToStr(SignalInfo.IsDeviationStable, True),
+           SignalInfo.TrendRate, Settings.MaxTrendRate, BoolToStr(SignalInfo.IsTrendStable, True),
+           BoolToStr(ChannelStable, True),
            BoolToStr((ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit), True),
            BoolToStr(ChannelStable and ((ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit)), True),
            ChannelReason]));
@@ -2254,9 +2261,10 @@ begin
   StableInfo.IsReadyForMeasurement := GroupFlowReached and AllChannelsStable;
   Result := StableInfo.IsReadyForMeasurement;
   if Result then StableInfo.Status := sOk else StableInfo.Status := sRun_NN;
-  StableInfo.StatusText := Format('EtalonFlowStable=%s; GroupFlowReached=%s; AllSelectedEtalonChannelsStable=%s; ToleranceSource=%s; Target=%.6f; Actual=%.6f; Lower=%.6f; Upper=%.6f',
+  StableInfo.StatusText := Format('EtalonFlowStable=%s; GroupFlowReached=%s; AllSelectedEtalonChannelsStable=%s; ToleranceSource=%s; Target=%.6f; Actual=%.6f; Lower=%.6f; Upper=%.6f; FailureReason=%s',
     [BoolToStr(Result, True), BoolToStr(GroupFlowReached, True), BoolToStr(AllChannelsStable, True),
-     ToleranceSource, TargetValue, ActualValue, StableInfo.LowerLimit, StableInfo.UpperLimit]);
+     ToleranceSource, TargetValue, ActualValue, StableInfo.LowerLimit, StableInfo.UpperLimit,
+     FirstChannelFailureReason]);
 end;
 
 procedure TMeasurementRun.ContinueAfterPointError(const AStatus: EMeasurementPointStatus;
