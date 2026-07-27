@@ -6324,7 +6324,7 @@ begin
       'Simulation measurement test started', FSimulationTestScenario.TargetWorkTable.Name);
     ProtocolManager.AddMessage(pcState, psWorkTable, 'SimulationModeEnabled',
       'Existing work table simulation enabled by test',
-      BoolToStr(FSimulationModeBeforeTest, True));
+      System.SysUtils.BoolToStr(FSimulationModeBeforeTest, True));
   end;
 
   { Use only the production public entry point. }

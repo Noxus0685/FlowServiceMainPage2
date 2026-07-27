@@ -56,6 +56,9 @@ checks = {
             "FSimulationTestScenario.Clear",
         )
     ),
+    "RTL boolean formatter is not shadowed by FmxHelper": (
+        "System.SysUtils.BoolToStr(FSimulationModeBeforeTest, True)" in source
+    ),
 }
 
 failed = [name for name, passed in checks.items() if not passed]
