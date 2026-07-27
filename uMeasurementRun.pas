@@ -1753,6 +1753,7 @@ var
   StableReady, RangeReady, Ready, RequireRange: Boolean;
   CurrentInRange, MeanInRange, ForecastInRange: Boolean;
   Reason, LogText, CurrentPointName, DeviceUUID, DevicePointUUID, MatchedPointName, ModeText: string;
+  FirstNotReadyStatusText: string;
   CurrentPointQ, CurrentPointFlowRate, MatchedPointQ, MatchedDistance: Double;
   FlowRateDistance, BestFlowRateDistance: Double;
   CurrentTick: UInt64;
@@ -1842,6 +1843,7 @@ begin
   TotalSecCount := 0;
   ReadyAutoCount := 0;
   TotalAutoCount := 0;
+  FirstNotReadyStatusText := '';
   for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
   begin
     Channel := FWorkTable.DeviceChannels[I];
@@ -2077,13 +2079,25 @@ begin
     end
     else
     begin
+      // Do not stop or overwrite the aggregate result here. Every enabled
+      // participant is analyzed during the same IsDevicesStable call, so all
+      // channel windows advance simultaneously. Preserve only the first
+      // failure for the user-facing status.
       Result := False;
-      StableInfo.Status := sRun_NN;
-      StableInfo.StatusText := Format('Device channel is not ready: UUID=%s; Name=%s; Mode=%s; Reason=%s', [Channel.UUID, Channel.Name, ModeText, Reason]);
+      if FirstNotReadyStatusText = '' then
+        FirstNotReadyStatusText := Format(
+          'Device channel is not ready: UUID=%s; Name=%s; Mode=%s; Reason=%s',
+          [Channel.UUID, Channel.Name, ModeText, Reason]);
     end;
   end;
 
-  AddDiagnosticEvent(Format('DeviceReadinessSummary: SecondsDevicesReadyCount=%d; AutomaticDevicesReadyCount=%d; TotalRequiredDevices=%d',
+  if not Result then
+  begin
+    StableInfo.Status := sRun_NN;
+    StableInfo.StatusText := FirstNotReadyStatusText;
+  end;
+
+  AddDiagnosticEvent(Format('DeviceReadinessSummary: SecondsDevicesReadyCount=%d; AutomaticDevicesReadyCount=%d; TotalRequiredDevices=%d; AllChannelsCheckedSimultaneously=True',
     [ReadySecCount, ReadyAutoCount, TotalSecCount + TotalAutoCount]));
 
   if CheckedCount = 0 then
