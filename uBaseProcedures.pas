@@ -177,7 +177,7 @@ type
     mvsfrAnalysisDisabled,
     mvsfrNoData,
     mvsfrNotEnoughSamples,  // Fewer samples than MinSampleCount are available in the active window.
-    mvsfrWindowNotFilled,    // Active-window duration is shorter than WindowDurationSec.
+    mvsfrWindowNotFilled,    // Kept for binary/source compatibility; no longer emitted.
     mvsfrInsufficientTimeSpread, // Timestamps are too close or identical to calculate a trend.
     mvsfrStaleData,         // Last sample age exceeds MaxSampleAgeSec.
     mvsfrVariationTooHigh,  // Max-min variation exceeds MaxVariation.
@@ -212,10 +212,8 @@ type
   TMeterValueStabilitySettings = record
     /// <summary>Enables mathematical stability analysis; disabled values never auto-confirm readiness.</summary>
     Enabled: Boolean;
-    /// <summary>Minimum number of samples required inside the active time window.</summary>
+    /// <summary>Exact number of the latest eligible samples in the analysis window.</summary>
     MinSampleCount: Integer;
-    /// <summary>Required active-window duration in seconds.</summary>
-    WindowDurationSec: Double;
     /// <summary>Maximum allowed age in seconds for the latest sample.</summary>
     MaxSampleAgeSec: Double;
     /// <summary>Maximum allowed max-min spread in physical units.</summary>
@@ -287,7 +285,7 @@ type
     IsMeanValueInRange: Boolean;
     /// <summary>True when all mandatory stability and range checks passed.</summary>
     IsSuitableForMeasurement: Boolean;
-    /// <summary>Total sample count currently stored in stability history.</summary>
+    /// <summary>Total source samples whose timestamp is not in the future.</summary>
     SampleCount: Integer;
     /// <summary>Number of samples selected into the active analysis window before outlier removal.</summary>
     UsedSampleCount: Integer;
@@ -337,7 +335,7 @@ type
     IsConfirmed: Boolean;
     /// <summary>True when active-window sample count meets MinSampleCount.</summary>
     HasEnoughSamples: Boolean;
-    /// <summary>True when active-window duration meets WindowDurationSec.</summary>
+    /// <summary>Compatibility alias for HasEnoughSamples.</summary>
     HasFullWindow: Boolean;
     /// <summary>Compatibility alias for HasFullWindow.</summary>
     HasEnoughWindow: Boolean;
