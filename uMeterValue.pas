@@ -89,6 +89,8 @@ type
     FSampleLock: TCriticalSection;
     /// <summary>Initializes every stability setting with safe backward-compatible defaults.</summary>
     procedure InitStabilitySettings;
+    procedure SetStabilitySettings(const AValue: TMeterValueStabilitySettings);
+    procedure TrimStabilityHistory;
     /// <summary>Clears last analysis and runtime confirmation flags without touching settings.</summary>
     procedure ResetStabilityInfo;
     /// <summary>Adds a physical-value sample with an externally provided monotonic timestamp.</summary>
@@ -392,7 +394,7 @@ type
     class function GetInitDensity: Double; static;
     class procedure SetInitDensity(const AValue: Double); static;
     /// <summary>Single source of truth for this signal's stability and target-range settings.</summary>
-    property StabilitySettings: TMeterValueStabilitySettings read FStabilitySettings write FStabilitySettings;
+    property StabilitySettings: TMeterValueStabilitySettings read FStabilitySettings write SetStabilitySettings;
     /// <summary>Last analysis result; useful for UI/status code that should avoid immediate recalculation.</summary>
     property LastStabilityInfo: TMeterValueStabilityInfo read FLastStabilityInfo;
   end;
@@ -1213,6 +1215,40 @@ begin
   FStabilitySettings.ChartToleranceLineWidth := 1.0;
 end;
 
+procedure TMeterValue.TrimStabilityHistory;
+var
+  HistoryLimit: Integer;
+  I: Integer;
+begin
+  HistoryLimit := Max(1, FStabilitySettings.MinSampleCount);
+  while FSamples.Count > HistoryLimit do
+    FSamples.Delete(0);
+
+  FAutomaticSampleIndex := -1;
+  if FAutomaticSampleBucket >= 0 then
+    for I := FSamples.Count - 1 downto 0 do
+      if FSamples[I].TimeStampMs div 1000 = FAutomaticSampleBucket then
+      begin
+        FAutomaticSampleIndex := I;
+        Break;
+      end;
+  if FAutomaticSampleIndex < 0 then
+    FAutomaticSampleBucket := -1;
+end;
+
+procedure TMeterValue.SetStabilitySettings(
+  const AValue: TMeterValueStabilitySettings);
+begin
+  FSampleLock.Enter;
+  try
+    FStabilitySettings := AValue;
+    TrimStabilityHistory;
+    ResetStabilityInfo;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
+
 procedure TMeterValue.ResetStabilityInfo;
 begin
   FLastStabilityInfo := Default(TMeterValueStabilityInfo);
@@ -1280,6 +1316,7 @@ begin
     if FActiveStabilityStartMs <= 0 then
       FActiveStabilityStartMs := ATimeStampMs;
     FSamples.Add(Sample);
+    TrimStabilityHistory;
   finally
     FSampleLock.Leave;
   end;
@@ -1337,16 +1374,8 @@ begin
       (FSamples[InsertIndex].TimeStampMs < ATimeStampMs) do
       Inc(InsertIndex);
     FSamples.Insert(InsertIndex, Sample);
-
     FAutomaticSampleBucket := CurrentBucket;
-    if (InsertIndex >= 0) and (InsertIndex < FSamples.Count) and
-       (FSamples[InsertIndex].TimeStampMs div 1000 = CurrentBucket) then
-      FAutomaticSampleIndex := InsertIndex
-    else
-    begin
-      FAutomaticSampleBucket := -1;
-      FAutomaticSampleIndex := -1;
-    end;
+    TrimStabilityHistory;
   finally
     FSampleLock.Leave;
   end;
@@ -1823,16 +1852,18 @@ begin
     AInfo.HasLastSampleAge := True;
     AInfo.LastSampleAgeSec := Max(0.0, (ACurrentMs - LastSampleTimeMs) / 1000.0);
   end;
+  AInfo.IsDataActual := AInfo.HasLastSampleAge and
+    ((ASettings.MaxSampleAgeSec <= 0) or
+     (AInfo.LastSampleAgeSec <= ASettings.MaxSampleAgeSec));
 
   AInfo.CurrentAnalysisTimeMs := ACurrentMs;
   AInfo.RequiredSampleCount := ASettings.MinSampleCount;
   AInfo.RequiredWindowDurationSec := 0;
   SetLength(Window, 0);
-  for I := 0 to High(ASamples) do
-    if (ASamples[I].TimeStampMs <= ACurrentMs) and
-       ((ASettings.MaxSampleAgeSec <= 0) or
-        (ACurrentMs - ASamples[I].TimeStampMs <= Round(ASettings.MaxSampleAgeSec * 1000.0))) then
-      AddWindowSample(I, ASamples[I]);
+  if AInfo.IsDataActual then
+    for I := 0 to High(ASamples) do
+      if ASamples[I].TimeStampMs <= ACurrentMs then
+        AddWindowSample(I, ASamples[I]);
 
   EligibleCount := Length(Window);
   if EligibleCount > ASettings.MinSampleCount then
@@ -1865,8 +1896,6 @@ begin
   AInfo.HasEnoughSamples := N >= ASettings.MinSampleCount;
   AInfo.HasFullWindow := AInfo.HasEnoughSamples;
   AInfo.HasEnoughWindow := AInfo.HasFullWindow;
-  AInfo.IsDataActual := AInfo.HasLastSampleAge and
-    ((ASettings.MaxSampleAgeSec <= 0) or (AInfo.LastSampleAgeSec <= ASettings.MaxSampleAgeSec));
   if not AInfo.HasEnoughSamples then Include(AInfo.FailReasons, mvsfrNotEnoughSamples);
   if AInfo.HasLastSampleAge and not AInfo.IsDataActual then Include(AInfo.FailReasons, mvsfrStaleData);
 
