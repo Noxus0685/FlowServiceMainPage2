@@ -53,9 +53,8 @@ checks = {
         'if not IsSimulationMode then\n    Exit;\n\n  for WorkTable in FWorkTables do' in work,
     'legacy simulation timer is disabled in real mode':
         '(FWorkTableManager = nil) or (not FWorkTableManager.IsSimulationMode)' in legacy_form,
-    'flow-meter property channel is locally declared': all(x in flow_props for x in [
-        'Channel: TChannel;', 'Channel := nil;'
-    ]),
+    'flow-meter property selection avoids a malformed local var section':
+        'FFlowMeterPropertiesChannel := nil;' in flow_props and '\nvar\n' not in flow_props,
     'observer uses the available global manager':
         'FWorkTableManager.IsSimulationMode' not in scenario,
 }

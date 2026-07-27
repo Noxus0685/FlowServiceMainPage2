@@ -5833,7 +5833,7 @@ begin
 
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMeasurementRun.Enter',
     'Начало штатной подготовки запуска',
-    Format('SimulationMode=%s; State=%s', [BoolToStr(IsSimulationMode, True),
+    Format('SimulationMode=%s; State=%s', [System.SysUtils.BoolToStr(IsSimulationMode, True),
       WorkTableStateToString(State)]));
 
   ResetMeasurementValues;

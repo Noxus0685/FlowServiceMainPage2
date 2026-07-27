@@ -1201,12 +1201,11 @@ end;
 
 procedure TFrameMainTable.UpdateFlowMeterPropertiesFrame(ARow: Integer = -1;
   AEtalon: Boolean = False);
-var
 begin
   if FFrameFlowMeterProperties = nil then
     Exit;
 
-  Channel := nil;
+  FFlowMeterPropertiesChannel := nil;
   if FActiveWorkTable <> nil then
   begin
     if AEtalon then
@@ -1216,7 +1215,7 @@ begin
 
       if (FActiveWorkTable.EtalonChannels <> nil) and
          (ARow >= 0) and (ARow < FActiveWorkTable.EtalonChannels.Count) then
-        Channel := FActiveWorkTable.EtalonChannels[ARow];
+        FFlowMeterPropertiesChannel := FActiveWorkTable.EtalonChannels[ARow];
     end
     else
     begin
@@ -1225,13 +1224,12 @@ begin
 
       if (FActiveWorkTable.DeviceChannels <> nil) and
          (ARow >= 0) and (ARow < FActiveWorkTable.DeviceChannels.Count) then
-        Channel := FActiveWorkTable.DeviceChannels[ARow];
+        FFlowMeterPropertiesChannel := FActiveWorkTable.DeviceChannels[ARow];
     end;
   end;
 
-  FFlowMeterPropertiesChannel := Channel;
-  if Channel <> nil then
-    FFrameFlowMeterProperties.FlowMeter := Channel.FlowMeter
+  if FFlowMeterPropertiesChannel <> nil then
+    FFrameFlowMeterProperties.FlowMeter := FFlowMeterPropertiesChannel.FlowMeter
   else
     FFrameFlowMeterProperties.FlowMeter := nil;
 end;
