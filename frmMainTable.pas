@@ -1202,7 +1202,6 @@ end;
 procedure TFrameMainTable.UpdateFlowMeterPropertiesFrame(ARow: Integer = -1;
   AEtalon: Boolean = False);
 var
-  Channel: TChannel;
 begin
   if FFrameFlowMeterProperties = nil then
     Exit;
