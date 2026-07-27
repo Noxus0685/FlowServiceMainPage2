@@ -932,6 +932,11 @@ var
   I: Integer;
 begin
 
+  { This legacy form timer is a simulator.  It must never write generated
+    values or advance TWorkTable states during a real measurement. }
+  if (FWorkTableManager = nil) or (not FWorkTableManager.IsSimulationMode) then
+    Exit;
+
   // ============================================================
   // 1. Получение рабочей таблицы
   // ============================================================
