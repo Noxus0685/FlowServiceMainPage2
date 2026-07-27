@@ -105,7 +105,6 @@ type
     ButtonGenerateAppend: TButton;
     CheckBoxStabilityEnabled: TCheckBox;
     EditMinSampleCount: TEdit;
-    EditWindowDurationSec: TEdit;
     EditMaxSampleAgeSec: TEdit;
     EditExitThresholdFactor: TEdit;
     EditMaxVariation: TEdit;
@@ -484,7 +483,6 @@ begin
   EditAnalysisTime.OnExit := EditAnalysisTimeExit;
   CheckBoxStabilityEnabled.OnChange := HandleSettingsChange;
   EditMinSampleCount.OnExit := HandleSettingsChange;
-  EditWindowDurationSec.OnExit := HandleSettingsChange;
   EditMaxSampleAgeSec.OnExit := HandleSettingsChange;
   EditExitThresholdFactor.OnExit := HandleSettingsChange;
   EditMaxVariation.OnExit := HandleSettingsChange;
@@ -533,8 +531,7 @@ begin
   InitializeScenarioList;
   SetHintFor('LabelStabilityDisplayUnit', 'Единица, выбранная для отображения текущего TMeterValue. Все размерные значения результатов и соответствующие настройки показываются в этой единице. Внутреннее хранение может выполняться в базовой единице.');
   SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения по заданным критериям.');
-  SetHintFor('LabelMinSampleCount', 'Минимальное количество отсчётов в окне анализа для достоверного результата.');
-  SetHintFor('LabelWindowDurationSec', 'Для стабильности одновременно требуется полная длительность окна и не меньше указанного количества отсчётов.');
+  SetHintFor('LabelMinSampleCount', 'Точный размер окна анализа: используются последние подходящие отсчёты.');
   SetHintFor('LabelMaxSampleAgeSec', 'Максимально допустимый возраст последнего отсчёта относительно текущего времени анализа.');
   SetHintFor('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности, задающий гистерезис выхода.');
   SetHintFor('LabelMaxVariation', 'Максимально допустимый размах значений в окне анализа.');
@@ -925,8 +922,8 @@ begin
   SetLabelText('LabelGeneratorTrend', 'Тренд, ' + UnitName + '/с');
   SetLabelText('LabelGeneratorNoise', 'Шум ±, ' + UnitName);
   SetLabelText('LabelGeneratorOutlierAmplitude', 'Амплитуда выброса, ' + UnitName);
-  SetLabelText('LabelMinSampleCount', 'Минимальное количество отсчётов, шт.');
-  SetLabelText('LabelWindowDurationSec', 'Длительность стабилизации, с');
+  SetLabelText('LabelMinSampleCount', 'Количество отсчётов в окне, шт.');
+  SetLabelText('LabelResultWindowDuration', 'Количество отсчётов в окне');
   SetLabelText('LabelMaxSampleAgeSec', 'Максимальный возраст данных, с');
   SetLabelText('LabelMaxVariation', 'Максимальный размах, ' + UnitName);
   SetLabelText('LabelMaxStdDeviation', 'Максимальное стандартное отклонение, ' + UnitName);
@@ -969,9 +966,8 @@ begin
   SetHintFor('LabelStabilityDisplayUnit', 'Единица, выбранная для отображения текущего TMeterValue. Все размерные значения результатов и соответствующие настройки показываются в этой единице. Внутреннее хранение может выполняться в базовой единице.');
   SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения. При отключении анализ не подтверждает готовность измерения.');
   SetHintFor('ComboBoxSampleSource', 'Выбирает массив для preview-анализа. История TMeterValue использует рабочую историю текущего значения. Тестовый массив не изменяет рабочую историю.');
-  SetLabelHint('LabelMinSampleCount', 'Минимальное число отсчётов в текущем окне, необходимое для расчёта статистики; проверяется независимо от длительности окна. Единица: шт.');
-  SetLabelHint('LabelWindowDurationSec', 'Полная длительность непрерывной стабилизации. Для стабильности одновременно требуется заполнить это окно по времени и иметь не меньше минимального количества отсчётов. Единица: с.');
-  SetLabelHint('LabelMaxSampleAgeSec', 'Максимально допустимое время с момента последней точки до текущего времени анализа. Если последняя точка старше указанного значения, данные считаются устаревшими. Единица: с.');
+  SetLabelHint('LabelMinSampleCount', 'Точный размер окна анализа: используются последние подходящие отсчёты. Единица: шт.');
+  SetLabelHint('LabelMaxSampleAgeSec', 'Максимально допустимый возраст каждой точки относительно текущего времени анализа. При значении не больше нуля фильтрация по возрасту отключена. Единица: с.');
   SetLabelHint('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности. Большее значение создаёт гистерезис и снижает частые переключения, меньшее быстрее снимает подтверждение. Безразмерная величина.');
   SetLabelHint('LabelMaxVariation', 'Максимально допустимый размах между минимумом и максимумом в использованных точках. Единица: ' + UnitName + '. Чем меньше порог, тем строже проверка стабильности.');
   SetLabelHint('LabelMaxStdDeviation', 'Стандартное отклонение характеризует абсолютный разброс значений и имеет ту же физическую единицу, что и измеряемая величина. Это не процент, если отдельно не указано относительное стандартное отклонение. Единица: ' + UnitName + '.');
@@ -1853,8 +1849,7 @@ var
     FTestSettings := EntrySettings;
     FTestTargetValue := EntryTargetValue;
     if not FTestSettings.Enabled then FTestSettings.Enabled := True;
-    if FTestSettings.MinSampleCount < 2 then FTestSettings.MinSampleCount := 10;
-    if FTestSettings.WindowDurationSec <= 0 then FTestSettings.WindowDurationSec := 10;
+    if FTestSettings.MinSampleCount < 1 then FTestSettings.MinSampleCount := 10;
     if FTestSettings.MaxSampleAgeSec <= 0 then FTestSettings.MaxSampleAgeSec := 3;
     if FTestSettings.ExitThresholdFactor < 1 then FTestSettings.ExitThresholdFactor := 1.2;
     if FTestSettings.OutlierFactor <= 0 then FTestSettings.OutlierFactor := 3.5;
@@ -1947,9 +1942,7 @@ begin
       mtsManyOutliers:
         begin
           FTestSettings.MaxOutlierFraction := 0.10;
-          WindowPointCount := Floor(FTestSettings.WindowDurationSec /
-            (StepMs / 1000.0)) + 1;
-          WindowPointCount := EnsureRange(WindowPointCount, 1, Count);
+          WindowPointCount := EnsureRange(FTestSettings.MinSampleCount, 1, Count);
           RequiredOutlierCount := Floor(WindowPointCount *
             FTestSettings.MaxOutlierFraction) + 1;
           RequiredOutlierCount := EnsureRange(RequiredOutlierCount, 2,
@@ -1974,8 +1967,7 @@ begin
           for I := 0 to Count - 1 do
             AddSamplePoint(I, BaseValue);
           FTestCurrentTimeMs := FTestSamples[FTestSamples.Count - 1].TimeStampMs +
-            Round((FTestSettings.WindowDurationSec +
-            FTestSettings.MaxSampleAgeSec + 10.0) * 1000.0);
+            Round((FTestSettings.MaxSampleAgeSec + 10.0) * 1000.0);
         end;
       mtsForecastAboveRange:
         begin
@@ -2450,7 +2442,7 @@ begin
   EditResultUsedSampleCount.Text := IntToStr(AInfo.UsedSampleCount);
   EditResultOutlierCount.Text := IntToStr(AInfo.OutlierCount);
   EditResultOutlierFraction.Text := FormatInfoFloat(AInfo.OutlierFraction * 100, AInfo.UsedSampleCount > 0, 2);
-  EditResultWindowDuration.Text := FormatInfoFloat(AInfo.WindowDurationSec, AInfo.UsedSampleCount > 0, 2);
+  EditResultWindowDuration.Text := IntToStr(AInfo.UsedSampleCount);
   EditResultLastSampleAge.Text := FormatInfoFloat(AInfo.LastSampleAgeSec, AInfo.HasLastSampleAge, 2);
   EditResultCurrentValue.Text := FormatBaseInfo(AInfo.CurrentValue, AInfo.HasCurrentValue);
   EditResultMeanValue.Text := FormatBaseInfo(AInfo.MeanValue, AInfo.HasStatistics);
@@ -2632,9 +2624,9 @@ begin
           TrendSeries.Color := TAlphaColors.Purple;
           TrendSeries.Thickness := 1.5;
           TrendSeries.ShowMarkers := False;
-          TrendSeries.AddPoint(Max(MinActualTimeSec, MaxActualTimeSec - FTestStabilityInfo.WindowDurationSec),
+          TrendSeries.AddPoint(((FTestStabilityInfo.FirstWindowSampleTimeMs - BaseTimeMs) / 1000),
             ValueToCurrentDimension(FTestStabilityInfo.ForecastValue - FTestStabilityInfo.TrendRate * FTestSettings.ForecastHorizonSec -
-              FTestStabilityInfo.TrendRate * (MaxActualTimeSec - Max(MinActualTimeSec, MaxActualTimeSec - FTestStabilityInfo.WindowDurationSec))));
+              FTestStabilityInfo.TrendRate * (MaxActualTimeSec - ((FTestStabilityInfo.FirstWindowSampleTimeMs - BaseTimeMs) / 1000))));
           TrendSeries.AddPoint(MaxActualTimeSec,
             ValueToCurrentDimension(FTestStabilityInfo.ForecastValue - FTestStabilityInfo.TrendRate * FTestSettings.ForecastHorizonSec));
         end;
@@ -2656,7 +2648,7 @@ begin
         UpperSeries.AddPoint(MinActualTimeSec, UpperLimit);
         UpperSeries.AddPoint(MaxActualTimeSec, UpperLimit);
       end;
-      if (FTestStabilityInfo.WindowStartMs > 0) and
+      if (FTestStabilityInfo.WindowStartMs >= 0) and
          (FTestStabilityInfo.WindowStartMs >= BaseTimeMs) then
       begin
         AnalysisStartSec := (FTestStabilityInfo.WindowStartMs - BaseTimeMs) / 1000;
@@ -2780,7 +2772,6 @@ begin
     CheckBoxStabilityEnabled.IsChecked := FTestSettings.Enabled;
     CheckBoxAutoAnalyze.IsChecked := FTestSettings.AutoAnalyze;
     EditMinSampleCount.Text := IntToStr(FTestSettings.MinSampleCount);
-    EditWindowDurationSec.Text := FormatFloat('0.########', FTestSettings.WindowDurationSec);
     EditMaxSampleAgeSec.Text := FormatFloat('0.########', FTestSettings.MaxSampleAgeSec);
     EditExitThresholdFactor.Text := FormatFloat('0.########', FTestSettings.ExitThresholdFactor);
     EditMaxVariation.Text := BaseDeltaToDisplayText(FTestSettings.MaxVariation);
@@ -2829,7 +2820,6 @@ begin
   ASettings.Enabled := CheckBoxStabilityEnabled.IsChecked;
   ASettings.AutoAnalyze := CheckBoxAutoAnalyze.IsChecked;
   TryReadInteger(EditMinSampleCount.Text, ASettings.MinSampleCount);
-  TryReadFloat(EditWindowDurationSec.Text, ASettings.WindowDurationSec);
   TryReadFloat(EditMaxSampleAgeSec.Text, ASettings.MaxSampleAgeSec);
   TryReadFloat(EditExitThresholdFactor.Text, ASettings.ExitThresholdFactor);
   ASettings.MaxVariation := DisplayDeltaToBase(EditMaxVariation.Text);
@@ -2859,7 +2849,6 @@ function TFrameMeterValueEdit.StabilitySettingsEqual(const ALeft,
 begin
   Result := (ALeft.Enabled = ARight.Enabled) and
     (ALeft.MinSampleCount = ARight.MinSampleCount) and
-    SameValue(ALeft.WindowDurationSec, ARight.WindowDurationSec, 1E-9) and
     SameValue(ALeft.MaxSampleAgeSec, ARight.MaxSampleAgeSec, 1E-9) and
     SameValue(ALeft.MaxVariation, ARight.MaxVariation, 1E-9) and
     SameValue(ALeft.MaxStdDeviation, ARight.MaxStdDeviation, 1E-9) and
@@ -2963,8 +2952,7 @@ begin
   Result := False;
   AErrorText := '';
 
-  if (EditMinSampleCount = nil) or (EditWindowDurationSec = nil) or
-     (EditMaxSampleAgeSec = nil) or
+  if (EditMinSampleCount = nil) or (EditMaxSampleAgeSec = nil) or
      (EditExitThresholdFactor = nil) or (EditMaxVariation = nil) or
      (EditMaxStdDeviation = nil) or (EditMaxTrendRate = nil) or
      (EditMaxOutlierFractionPercent = nil) or (EditOutlierFactor = nil) or
@@ -2977,13 +2965,11 @@ begin
   end;
 
   if not TryReadInteger(EditMinSampleCount.Text, IntValue) then
-    AErrorText := 'Некорректное минимальное количество отсчётов.'
+    AErrorText := 'Некорректное количество отсчётов в окне.'
   else if IntValue < 1 then
-    AErrorText := 'Минимальное количество отсчётов должно быть не меньше 1.'
-  else if (not TryReadFloat(EditWindowDurationSec.Text, DoubleValue)) or (DoubleValue <= 0) then
-    AErrorText := 'Длительность стабилизации должна быть положительным числом.'
-  else if (not TryReadFloat(EditMaxSampleAgeSec.Text, DoubleValue)) or (DoubleValue < 0) then
-    AErrorText := 'Максимальный возраст данных не может быть отрицательным.'
+    AErrorText := 'Количество отсчётов в окне должно быть не меньше 1.'
+  else if not TryReadFloat(EditMaxSampleAgeSec.Text, DoubleValue) then
+    AErrorText := 'Максимальный возраст данных должен быть корректным числом.'
   else if (not TryReadFloat(EditExitThresholdFactor.Text, DoubleValue)) or (DoubleValue < 1) then
     AErrorText := 'Коэффициент порога выхода должен быть не меньше 1.'
   else if (not TryReadFloat(EditMaxVariation.Text, DoubleValue)) or (DoubleValue < 0) then
