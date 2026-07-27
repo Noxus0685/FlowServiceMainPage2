@@ -24,8 +24,16 @@ checks = {
     "impulses have one timed accumulation site": work_table.count("Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec * ADeltaTimeSec") == 1,
     "ApplyChannelValues does not accumulate": "Channel.ImpResult + Channel.ImpSec;" not in work_table,
     "production values are recalculated": "AWorkTable.RecalculateAllMeterValues;" in work_table,
-    "stability meter receives calculated samples": "AWorkTable.FlowRate.Value.SetValue(AWorkTable.ValueFlowRate.GetDoubleValue);" in work_table,
+    "stability meter receives calculated samples": "FFlowRate.Value.SetValue(ValueFlowRate.GetDoubleValue);" in work_table,
     "scenario does not force FSM stages": ".SetStage(" not in runner,
+    "automatic measurement starts exactly once": runner.count("WorkTableManager.StartScenario(ScenarioName, Profile)") == 1,
+    "scenario does not assign work-table state": ".State :=" not in runner,
+    "scenario does not assign point status": ".Status :=" not in runner,
+    "scenario does not save points": "SaveMeasurementResults" not in runner,
+    "scenario success path does not request stop": "RequestStop(" not in runner and "Execute(mcStop" not in runner,
+    "PASS requires complete point set": "ProcessedPointCount <> ExpectedPointCount" in runner,
+    "msDone without result is rejected": "MeasurementRunResultMissing" in runner,
+    "automatic mode suppresses manual save UI": "(Run.Mode = mrmAutomatic)" in main_form and "UpdateTestButtonByMeasurementRun" in main_form,
 }
 
 # The integration formula must be invariant to update frequency.

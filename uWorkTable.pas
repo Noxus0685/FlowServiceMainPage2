@@ -4117,6 +4117,13 @@ begin
     Channel.SetValues;
   end;
 
+  // FlowRate.Value is the production parameter inspected by
+  // TMeasurementRun.IsStable. Feed it from the calculated aggregate here so
+  // hardware and simulation use the same recalculation/sample-history path.
+  if (FFlowRate <> nil) and (FFlowRate.Value <> nil) and
+     (ValueFlowRate <> nil) then
+    FFlowRate.Value.SetValue(ValueFlowRate.GetDoubleValue);
+
 
 end;
 
@@ -6275,6 +6282,7 @@ end;
 procedure TWorkTableManager.FinishScenario;
 var
   WorkTable: TWorkTable;
+  StopActiveRun: Boolean;
 begin
   if FScenarioLock = nil then
     Exit;
@@ -6283,6 +6291,21 @@ begin
     if not FScenarioRunning then
       Exit;
     WorkTable := FActiveWorkTable;
+    StopActiveRun := (WorkTable <> nil) and (WorkTable.MeasurementRun <> nil) and
+      TMeasurementRun(WorkTable.MeasurementRun).IsWorkerThreadRunning and
+      not ((TMeasurementRun(WorkTable.MeasurementRun).Stage = msDone) and
+           TMeasurementRun(WorkTable.MeasurementRun).RunCompleted);
+  finally
+    FScenarioLock.Release;
+  end;
+
+  // A normally completed series must never receive a second stop command.
+  // This route is used only for operator cancel, timeout, exception or teardown.
+  if StopActiveRun then
+    WorkTable.StopMeasurementRun;
+
+  FScenarioLock.Acquire;
+  try
     FScenarioRunning := False;
     FScenarioName := '';
     FSimulationMode := FPreviousSimulationMode;
@@ -6295,8 +6318,6 @@ begin
   finally
     FScenarioLock.Release;
   end;
-  if (WorkTable <> nil) and (WorkTable.MeasurementRun <> nil) then
-    WorkTable.StopMeasurementRun;
 end;
 
 { Loads managed work tables from configured INI file. }
@@ -7544,12 +7565,8 @@ begin
   ResetDisabledSimulationChannels(AWorkTable);
 
   // Hardware input processing is followed by this same production
-  // recalculation path. Keep FlowRate.Value (used by IsStable) synchronized
-  // with the aggregate meter and let SetValue append the real-time sample.
+  // recalculation path. It updates FlowRate.Value and its stability history.
   AWorkTable.RecalculateAllMeterValues;
-  if (AWorkTable.FlowRate <> nil) and (AWorkTable.FlowRate.Value <> nil) and
-     (AWorkTable.ValueFlowRate <> nil) then
-    AWorkTable.FlowRate.Value.SetValue(AWorkTable.ValueFlowRate.GetDoubleValue);
 end;
 
 begin
@@ -7581,6 +7598,15 @@ begin
 
   // Перенос runtime-значений климата в TMeterValue до UI/сохранения.
   SyncEnvironmentMeterValues(WorkTable);
+
+  // In scenario mode the manager owns input signals only. TMeasurementRun and
+  // TWorkTable production methods exclusively own all state transitions.
+  if FSimulationMode = smScenario then
+  begin
+    if WorkTable.State in [swtMONITOR, swtEXECUTE] then
+      RunChannelSimulationCycle(WorkTable);
+    Continue;
+  end;
 
 
   // ============================================================

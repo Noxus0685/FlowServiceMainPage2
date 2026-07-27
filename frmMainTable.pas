@@ -776,6 +776,7 @@ type
   FAutoTestScenarioIndex: Integer;
   FAutoTestStartTickMs: Int64;
   FAutoTestLastLogTickMs: Int64;
+  FAutoTestMeasurementStartCount: Integer;
 
     FFlowMeters: TObjectList<TFlowMeter>;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
@@ -6700,11 +6701,18 @@ end;
 
 
 procedure TFrameMainTable.UpdateTestButton;
+var
+  Run: TMeasurementRun;
 begin
   if TestButton = nil then
     Exit;
 
-  if (SwitchAuto <> nil) and SwitchAuto.IsChecked then
+  Run := MeasurementRun;
+  // The active production run mode is authoritative. A stale UI switch must
+  // not expose the manual "Save?" action between points of an automatic run.
+  if ((SwitchAuto <> nil) and SwitchAuto.IsChecked) or
+     ((Run <> nil) and (Run.Mode = mrmAutomatic) and
+      (Run.IsWorkerThreadRunning or (Run.Stage <> msNone) or Run.RunCompleted)) then
     UpdateTestButtonByMeasurementRun
   else
     UpdateTestButtonByWorkTableState;
@@ -7233,8 +7241,6 @@ end;
 procedure TFrameMainTable.AutoTestButtonStopClick(Sender: TObject);
 begin
   FAutoTestStopRequested := True;
-  if MeasurementRun <> nil then
-    MeasurementRun.Execute(mcStop, Null);
 end;
 
 procedure TFrameMainTable.AutoTestButtonStepClick(Sender: TObject);
@@ -7293,11 +7299,13 @@ begin
   FAutoTestStartTickMs := TMeterValue.GetMonotonicTimeMs;
   FAutoTestLastLogTickMs := 0;
   FAutoTestStopRequested := False;
+  FAutoTestMeasurementStartCount := 0;
   FAutoTestRealCommandsBlocked := True;
   SetLength(FAutoTestStepRows, 0);
   try
     WorkTableManager.ActiveWorkTable := FActiveWorkTable;
     WorkTableManager.StartScenario(ScenarioName, Profile);
+    Inc(FAutoTestMeasurementStartCount);
     FAutoTestRunning := True;
     if ButtonRunAutoTestScenario <> nil then ButtonRunAutoTestScenario.Enabled := False;
     if ButtonRunAllAutoTestScenarios <> nil then ButtonRunAllAutoTestScenarios.Enabled := False;
@@ -7329,6 +7337,8 @@ var
   ResultKind: TAutoMeasurementTestResultKind;
   Reason, FailureCategory, LogFile: string;
   Lines: TStringList;
+  I, ExpectedPointCount, ProcessedPointCount: Integer;
+  MeasurementDataAvailable: Boolean;
 begin
   if not FAutoTestRunning then
     Exit;
@@ -7343,6 +7353,25 @@ begin
   ResultKind := amtrkFail;
   FailureCategory := '';
   Reason := '';
+  ExpectedPointCount := 0;
+  ProcessedPointCount := 0;
+  MeasurementDataAvailable := WT <> nil;
+  if (Run <> nil) and (Run.Points <> nil) then
+    for I := 0 to Run.Points.Count - 1 do
+      if (Run.Points[I] <> nil) and Run.Points[I].Enabled and
+         (Run.Points[I].State <> osDeleted) then
+      begin
+        Inc(ExpectedPointCount);
+        if Run.Points[I].Status = mptsSaved then
+          Inc(ProcessedPointCount);
+      end;
+  if WT <> nil then
+    for I := 0 to WT.DeviceChannels.Count - 1 do
+      if (WT.DeviceChannels[I] <> nil) and WT.DeviceChannels[I].Enabled and
+         ((WT.DeviceChannels[I].FlowMeter = nil) or
+          (WT.DeviceChannels[I].FlowMeter.ValueFlow = nil) or
+          (WT.DeviceChannels[I].FlowMeter.ValueVolume = nil)) then
+        MeasurementDataAvailable := False;
 
   if FAutoTestStopRequested then
   begin
@@ -7365,15 +7394,51 @@ begin
   else if Run.Stage = msDone then
   begin
     Finished := True;
-    if Run.RunCompleted and (Run.RunResult = mrrSuccess) then
+    if not Run.RunCompleted or (Run.RunResult = mrrNone) then
     begin
-      ResultKind := amtrkPass;
-      Reason := 'PASS — производственный TMeasurementRun штатно завершён';
+      FailureCategory := 'MeasurementRunResultMissing';
+      Reason := 'msDone установлен без итогового результата всей серии';
+    end
+    else if Run.RunResult <> mrrSuccess then
+    begin
+      FailureCategory := 'MeasurementFinishedWithoutSuccess';
+      Reason := 'производственный результат не равен mrrSuccess';
+    end
+    else if Run.Mode <> mrmAutomatic then
+    begin
+      FailureCategory := 'MeasurementRunFailed';
+      Reason := 'измерение завершено не в режиме mrmAutomatic';
+    end
+    else if FAutoTestMeasurementStartCount <> 1 then
+    begin
+      FailureCategory := 'DuplicateMeasurementStart';
+      Reason := Format('MeasurementStartCount=%d, ожидалось 1', [FAutoTestMeasurementStartCount]);
+    end
+    else if Run.RequestStopCalled then
+    begin
+      FailureCategory := 'UnexpectedMeasurementStop';
+      Reason := 'в успешном сценарии зарегистрирован RequestStop';
+    end
+    else if Run.DoneReason <> mdrEndOfPointList then
+    begin
+      FailureCategory := 'PrematureSeriesCompletion';
+      Reason := 'серия завершена не по окончанию списка точек';
+    end
+    else if (ExpectedPointCount = 0) or (ProcessedPointCount <> ExpectedPointCount) then
+    begin
+      FailureCategory := 'NotAllPointsProcessed';
+      Reason := Format('ProcessedPoints=%d; ExpectedPoints=%d',
+        [ProcessedPointCount, ExpectedPointCount]);
+    end
+    else if not MeasurementDataAvailable then
+    begin
+      FailureCategory := 'MeasurementDataMissing';
+      Reason := 'не все включённые приборы содержат производственные результаты расхода и объёма';
     end
     else
     begin
-      FailureCategory := 'WorkTableFailure';
-      Reason := 'TMeasurementRun завершён без mrrSuccess';
+      ResultKind := amtrkPass;
+      Reason := 'PASS — производственный TMeasurementRun штатно завершён';
     end;
   end
   else if Elapsed >= SCENARIO_TIMEOUT_MS then
@@ -7438,6 +7503,9 @@ begin
     Row.ProgressText := 'Samples=' + IntToStr(Length(Samples));
     Row.Reason := Format('RealTick=%d; ScenarioElapsedSec=%.3f; MeasurementStage=%s',
       [Tick, Elapsed / 1000.0, Row.StageAfter]);
+    Row.CheckText := Format('MeasurementStartCount=%d; MeasurementMode=%d; StageChangedBy=TMeasurementRun; WorkTableStateChangedBy=TWorkTable; RequestStopCalled=%s; ScenarioAction=ReadMeasurementState; ProcessedPoints=%d; ExpectedPoints=%d',
+      [FAutoTestMeasurementStartCount, Ord(Run.Mode),
+       BoolToStr(Run.RequestStopCalled, True), ProcessedPointCount, ExpectedPointCount]);
     SetLength(FAutoTestStepRows, Length(FAutoTestStepRows) + 1);
     FAutoTestStepRows[High(FAutoTestStepRows)] := Row;
     GridAutoTestNumbers.RowCount := Length(FAutoTestStepRows);
@@ -7460,6 +7528,10 @@ begin
       [Elapsed / 1000.0, Elapsed / 1000.0]));
     Lines.Add('FailureCategory=' + FailureCategory);
     Lines.Add('FailureDetails=' + Reason);
+    Lines.Add(Format('MeasurementStartCount=%d; MeasurementMode=%d; RequestStopCalled=%s; ProcessedPoints=%d; ExpectedPoints=%d; ScenarioAction=ReadMeasurementResults',
+      [FAutoTestMeasurementStartCount, IfThen(Run <> nil, Ord(Run.Mode), -1),
+       BoolToStr((Run <> nil) and Run.RequestStopCalled, True),
+       ProcessedPointCount, ExpectedPointCount]));
     if Run <> nil then Lines.Add('MeasurementFinalStage=' + TMeasurementRun.MeasurementStateToString(Run.Stage));
     if WT <> nil then Lines.Add('WorkTableFinalState=' + TWorkTable.WorkTableStateToString(WT.State));
     LogFile := TPath.Combine(TPath.GetTempPath,
@@ -7489,6 +7561,7 @@ begin
   if Run <> nil then ResultRow.FinalStage := TMeasurementRun.MeasurementStateToString(Run.Stage);
   if WT <> nil then ResultRow.FinalWorkTableState := TWorkTable.WorkTableStateToString(WT.State);
   ResultRow.Reason := Reason;
+  ResultRow.PointCount := ExpectedPointCount;
   ResultRow.LogFile := LogFile;
   SetLength(FAutoTestResultRows, Length(FAutoTestResultRows) + 1);
   FAutoTestResultRows[High(FAutoTestResultRows)] := ResultRow;
