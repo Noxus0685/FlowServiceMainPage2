@@ -5437,6 +5437,9 @@ var
   SourceDevice: TDevice;
   DevicePoint: TDevicePoint;
   MatchedPoint: TDevicePoint;
+  Participant: TMeasurementPointParticipant;
+  ParticipantFound: Boolean;
+  ParticipantIndex: Integer;
   BeforePointCount: Integer;
   AfterPointCount: Integer;
   BeforePointUUIDs: string;
@@ -5532,6 +5535,26 @@ begin
     if Device = nil then
       Continue;
 
+    { An automatic session point is a physical mode.  Only channels explicitly
+      listed as participants receive a result, and their source point is
+      resolved by its stable UUID.  Manual/legacy points have no Participants
+      and retain the MAIN behaviour below. }
+    ParticipantFound := False;
+    Participant := Default(TMeasurementPointParticipant);
+    if (CurrentPoint <> nil) and (Length(CurrentPoint.Participants) > 0) then
+    begin
+      for ParticipantIndex := 0 to High(CurrentPoint.Participants) do
+        if SameText(CurrentPoint.Participants[ParticipantIndex].DeviceUUID, Device.UUID) and
+           SameText(CurrentPoint.Participants[ParticipantIndex].DeviceChannelUUID, DeviceChannel.UUID) then
+        begin
+          Participant := CurrentPoint.Participants[ParticipantIndex];
+          ParticipantFound := True;
+          Break;
+        end;
+      if not ParticipantFound then
+        Continue;
+    end;
+
 
 
     Session := Device.GetActiveSessionSpillage;
@@ -5554,12 +5577,29 @@ begin
       Point.Name := 'Измерение #' + IntToStr(Point.Num);
       Point.SessionID := Session.ID;
       Point.DeviceUUID := Device.UUID;
+      Point.DeviceChannelUUID := DeviceChannel.UUID;
+      if ParticipantFound then
+        Point.SourcePointUUID := Participant.SourcePointUUID
+      else
+        Point.SourcePointUUID := '';
+      if CurrentPoint <> nil then
+        Point.PhysicalModeUUID := CurrentPoint.UUID
+      else
+        Point.PhysicalModeUUID := '';
+      Point.RepeatNumber := Max(Self.&Repeat + 1, 1);
       Point.DateTime := Now;
       Point.SpillTime := ValueTime.GetDoubleValue;
       Point.QavgEtalon := ValueFlowRate.GetDoubleValue;
 
       MatchedPoint := nil;
-      if (CurrentPoint <> nil) and (Device.Points <> nil) then
+      if ParticipantFound and (Device.Points <> nil) then
+        for DevicePoint in Device.Points do
+          if (DevicePoint <> nil) and SameText(DevicePoint.UUID, Participant.SourcePointUUID) then
+          begin
+            MatchedPoint := DevicePoint;
+            Break;
+          end;
+      if (not ParticipantFound) and (CurrentPoint <> nil) and (Device.Points <> nil) then
         for DevicePoint in Device.Points do
           if (DevicePoint <> nil) and
              (((CurrentPoint.ID <> 0) and (DevicePoint.ID = CurrentPoint.ID)) or
@@ -5791,6 +5831,11 @@ end;
 procedure TWorkTable.StartMeasurementRun;
 begin
 
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMeasurementRun.Enter',
+    'Начало штатной подготовки запуска',
+    Format('SimulationMode=%s; State=%s', [System.SysUtils.BoolToStr(IsSimulationMode, True),
+      WorkTableStateToString(State)]));
+
   ResetMeasurementValues;
 
   RecalculateAllMeterValues;
@@ -5800,6 +5845,10 @@ begin
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMeasurementRun',
     'Запуск измерения', Format('Mode=%d', [Ord(MeasurementMode)]));
   TMeasurementRun(FMeasurementRun).Execute(mcStart);
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMeasurementRun.Exit',
+    'Команда mcStart передана TMeasurementRun',
+    Format('State=%s; Stage=%s', [WorkTableStateToString(State),
+      TMeasurementRun.MeasurementStateToString(TMeasurementRun(FMeasurementRun).Stage)]));
 
 end;
 
@@ -7527,7 +7576,12 @@ end;
 
 begin
 
-     for WorkTable in WorkTableManager.WorkTables do
+  { Second-level safety boundary: callers cannot accidentally mix generated
+    values/state transitions with the physical module polling chain. }
+  if not IsSimulationMode then
+    Exit;
+
+  for WorkTable in FWorkTables do
    begin
 
   // ============================================================

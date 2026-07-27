@@ -3096,6 +3096,10 @@ begin
       Participant.SourceTargetQLS := TargetQLS;
       Participant.SourceErrorPercent := SourcePoint.Error;
       Participant.SourcePauseSec := SourcePoint.Pause;
+      Participant.SourcePoint := SourcePoint;
+      Participant.RepeatsRequired := Max(SourcePoint.Repeats, 1);
+      Participant.RepeatsCompleted := 0;
+      Participant.Status := mptsNone;
 
       ExistingPoint := nil;
       for SessionPoint in FPoints do
@@ -3269,6 +3273,8 @@ end;
 
 procedure TMeasurementRun.Start;
 begin
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'Start.Enter',
+    'Вход в TMeasurementRun.Start', Format('Mode=%d', [Ord(FMode)]));
   FCriticalSection.Acquire;
   try
     if IsThreadRunning then
@@ -3281,7 +3287,11 @@ begin
     FPhysicalMeasureStarted := False;
     FPhysicalStopRequested := False;
     FActualStopEventFired := False;
+    ProtocolManager.AddMessage(pcAction, psMeasurement, 'CreateSession.Enter',
+      'Начало формирования сессии', '');
     CreateSession;
+    ProtocolManager.AddMessage(pcAction, psMeasurement, 'CreateSession.Exit',
+      'Формирование сессии завершено', Format('Points=%d', [FPoints.Count]));
     if FWorkTable = nil then
     begin
       ProtocolManager.AddMessage(pcWarning, psMeasurement, 'Start',
@@ -3383,7 +3393,11 @@ begin
 );
 
   FThread.FreeOnTerminate := False;
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'ThreadStart.Enter',
+    'Запуск рабочего потока TMeasurementRun', '');
   FThread.Start;
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'ThreadStart.Exit',
+    'Рабочий поток TMeasurementRun запущен', '');
 
 
    // if not FStopRequested then
@@ -4974,6 +4988,19 @@ begin
         WorkTableManager.Save;
 
       Point.RepeatsCompleted := Min(RepeatsTarget, FCurrentRepeat + 1);
+      for I := 0 to High(Point.Participants) do
+      begin
+        Point.Participants[I].RepeatsCompleted :=
+          Min(Point.Participants[I].RepeatsRequired, FCurrentRepeat + 1);
+        if Point.Participants[I].RepeatsCompleted >= Point.Participants[I].RepeatsRequired then
+          Point.Participants[I].Status := mptsSaved
+        else
+          { A repeat was persisted, but the participant is not complete yet.
+            mptsSave is the existing persisted status for this state; do not
+            introduce a new enum member because status ordinals are stored in
+            the database. }
+          Point.Participants[I].Status := mptsSave;
+      end;
       Point.DateTime := Now;
       FLastSaveMeasurementResultsResult := 'success';
       AddDiagnosticEvent(Format('SaveMeasurementResults success; ResultsAdded=%d; %s',
