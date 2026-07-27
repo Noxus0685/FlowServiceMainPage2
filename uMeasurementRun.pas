@@ -1396,6 +1396,10 @@ var
   IsLastRepeat: Boolean;
   SavedRepeat: Integer;
   I, ExpectedDevicePointCount, SavedDevicePointCount: Integer;
+  J, K: Integer;
+  Participant: TMeasurementPointParticipant;
+  Channel: TChannel;
+  SourcePoint: TDevicePoint;
 begin
   FNextStageAfterSave := msDone;
   SetCurrentPointStatus(mptsSave);
@@ -1434,6 +1438,29 @@ begin
       FLastProcessedPointIndex := FCurrentPointIndex;
       FLastProcessedPointName := Point.Name;
       SetCurrentPointStatus(mptsSaved);
+      if FWorkTable <> nil then
+        for J := 0 to High(Point.Participants) do
+        begin
+        Participant := Point.Participants[J];
+        for K := 0 to FWorkTable.DeviceChannels.Count - 1 do
+        begin
+          Channel := FWorkTable.DeviceChannels[K];
+          if (Channel = nil) or (Channel.FlowMeter = nil) or
+             (Channel.FlowMeter.Device = nil) or
+             not SameText(Channel.UUID, Participant.DeviceChannelUUID) or
+             not SameText(Channel.FlowMeter.Device.UUID, Participant.DeviceUUID) then
+            Continue;
+          for SourcePoint in Channel.FlowMeter.Device.Points do
+            if (SourcePoint <> nil) and
+               SameText(SourcePoint.UUID, Participant.SourcePointUUID) then
+            begin
+              SourcePoint.Status := mptsSaved;
+              SourcePoint.RepeatsCompleted := RepeatsTarget;
+              Break;
+            end;
+          Break;
+        end;
+        end;
     end;
     FCurrentRepeat := 0;
     FLastPointDoneEventSent := True;
@@ -1461,9 +1488,9 @@ begin
     if (FPoints[I] <> nil) and FPoints[I].Enabled and
        (FPoints[I].State <> osDeleted) then
     begin
-      Inc(ExpectedDevicePointCount);
+      Inc(ExpectedDevicePointCount, Length(FPoints[I].Participants));
       if FPoints[I].Status = mptsSaved then
-        Inc(SavedDevicePointCount);
+        Inc(SavedDevicePointCount, Length(FPoints[I].Participants));
     end;
   AddDiagnosticEvent(Format('SessionProgress: SessionModeCount=%d; ExpectedDevicePointCount=%d; ProcessedDevicePointCount=%d; SavedDevicePointCount=%d; NextStage=%s',
     [FPoints.Count, ExpectedDevicePointCount, SavedDevicePointCount,
@@ -2816,6 +2843,81 @@ var
     Result := Max(1E-6, Max(Abs(AQ1), Abs(AQ2)) * 1E-4);
   end;
 
+  function PointsAreCompatible(AModePoint, ASourcePoint: TDevicePoint;
+    const ATargetQLS: Double; out AReason: string): Boolean;
+  begin
+    Result := False;
+    if (AModePoint = nil) or (ASourcePoint = nil) then
+    begin
+      AReason := 'PointMissing';
+      Exit;
+    end;
+    if Abs(AModePoint.Q - ATargetQLS) >
+       FlowMergeTolerance(AModePoint.Q, ATargetQLS) then
+    begin
+      AReason := 'DifferentTargetFlow';
+      Exit;
+    end;
+    if not SameValue(AModePoint.Temp, ASourcePoint.Temp, 1E-6) then
+    begin
+      AReason := 'DifferentTemperature';
+      Exit;
+    end;
+    if not SameValue(AModePoint.Pressure, ASourcePoint.Pressure, 1E-6) then
+    begin
+      AReason := 'DifferentPressure';
+      Exit;
+    end;
+    if AModePoint.StopCriteria <> ASourcePoint.StopCriteria then
+    begin
+      AReason := 'DifferentStopCriteria';
+      Exit;
+    end;
+    if not SameValue(AModePoint.LimitTime, ASourcePoint.LimitTime, 1E-6) or
+       (AModePoint.LimitImp <> ASourcePoint.LimitImp) or
+       not SameValue(AModePoint.LimitVolume, ASourcePoint.LimitVolume, 1E-9) then
+    begin
+      AReason := 'DifferentStopLimits';
+      Exit;
+    end;
+    if Max(AModePoint.Repeats, 1) <> Max(ASourcePoint.Repeats, 1) then
+    begin
+      AReason := 'DifferentRepeatCount';
+      Exit;
+    end;
+    if (AModePoint.SpillageType <> ASourcePoint.SpillageType) or
+       (AModePoint.EtalonType <> ASourcePoint.EtalonType) or
+       (AModePoint.FlowSorceType <> ASourcePoint.FlowSorceType) then
+    begin
+      AReason := 'DifferentMeasurementConfiguration';
+      Exit;
+    end;
+    if (AModePoint.Pause <> ASourcePoint.Pause) or
+       (AModePoint.RepeatsProtocol <> ASourcePoint.RepeatsProtocol) then
+    begin
+      AReason := 'DifferentStabilizationOrProtocolRepeats';
+      Exit;
+    end;
+    AReason := 'CompatiblePhysicalMode';
+    Result := True;
+  end;
+
+  function ModeAcceptsParticipant(AModePoint: TDevicePoint;
+    const AParticipant: TMeasurementPointParticipant): Boolean;
+  var
+    K: Integer;
+  begin
+    Result := AModePoint <> nil;
+    if not Result then
+      Exit;
+    for K := 0 to High(AModePoint.Participants) do
+      if SameText(AModePoint.Participants[K].DeviceUUID, AParticipant.DeviceUUID) and
+         SameText(AModePoint.Participants[K].DeviceChannelUUID,
+           AParticipant.DeviceChannelUUID) then
+        Exit(False);
+  end;
+
+
   function PtrText(AObject: TObject): string;
   begin
     if AObject = nil then
@@ -3126,12 +3228,12 @@ begin
       Participant.SourceErrorPercent := SourcePoint.Error;
       Participant.SourcePauseSec := SourcePoint.Pause;
 
-      // A session point represents one concrete source point of one concrete
-      // device channel. Equal hydraulic conditions do not make device points
-      // identical and must not reduce the number of expected results.
+      // A session point is one physical table mode. Compatible source device
+      // points share that mode while retaining separate participant identity.
       ExistingPoint := nil;
       for SessionPoint in FPoints do
-        if ParticipantExists(SessionPoint, Participant) then
+        if PointsAreCompatible(SessionPoint, SourcePoint, TargetQLS, Reason) and
+           ModeAcceptsParticipant(SessionPoint, Participant) then
         begin
           ExistingPoint := SessionPoint;
           Break;
@@ -3171,7 +3273,7 @@ begin
           Inc(DeviceAddedParticipantCount);
           Inc(DeviceMergedParticipantCount);
           Action := 'Merged';
-          Reason := 'MergedByExactDeviceChannelSourceIdentity';
+          Reason := 'MergedCompatibleDevicePointIntoPhysicalMode';
         end;
         RefreshSessionPointParams(ExistingPoint);
         SessionPoint := ExistingPoint;
@@ -3230,13 +3332,15 @@ begin
   begin
     FPoints[I].Num := I + 1;
     RefreshSessionPointParams(FPoints[I]);
-    AddDiagnosticEvent(Format('SessionPointFinal: SessionPointIndex=%d; SessionPointUUID=%s; SessionPointName=%s; PhysicalTargetQLS=%.6f; Participants.Count=%d',
-      [I, FPoints[I].UUID, FPoints[I].Name, FPoints[I].Q, Length(FPoints[I].Participants)]));
+    AddDiagnosticEvent(Format('SessionPointFinal: ModeID=%s; SessionPointIndex=%d; TargetFlow=%.6f; RepeatCount=%d; DevicePointCount=%d; GroupingReason=CompatiblePhysicalMode; CompatibilityParameters=Flow,Temperature,Pressure,StopCriteria,StopLimits,Repeats',
+      [FPoints[I].UUID, I, FPoints[I].Q, Max(FPoints[I].Repeats, 1),
+       Length(FPoints[I].Participants)]));
     for J := 0 to High(FPoints[I].Participants) do
-      AddDiagnosticEvent(Format('SessionPointFinalParticipant: SessionPointIndex=%d; DeviceUUID=%s; DeviceChannelUUID=%s; SourcePointUUID=%s; SourcePointName=%s; SelectedSourceTargetQLS=%.6f',
-        [I, FPoints[I].Participants[J].DeviceUUID, FPoints[I].Participants[J].DeviceChannelUUID,
-         FPoints[I].Participants[J].SourcePointUUID, FPoints[I].Participants[J].SourcePointName,
-         FPoints[I].Participants[J].SelectedSourceTargetQLS]));
+      AddDiagnosticEvent(Format('SessionPointFinalParticipant: ModeID=%s; SessionPointIndex=%d; DevicePointID=%s; DeviceID=%s; ChannelID=%s; SourcePointName=%s; SourceFlow=%.6f; AssignedModeID=%s',
+        [FPoints[I].UUID, I, FPoints[I].Participants[J].SourcePointUUID,
+         FPoints[I].Participants[J].DeviceUUID, FPoints[I].Participants[J].DeviceChannelUUID,
+         FPoints[I].Participants[J].SourcePointName,
+         FPoints[I].Participants[J].SelectedSourceTargetQLS, FPoints[I].UUID]));
   end;
 
   for I := 0 to FPoints.Count - 1 do
@@ -3245,7 +3349,7 @@ begin
          FlowMergeTolerance(FPoints[I].Participants[J].SelectedSourceTargetQLS, FPoints[I].Q) then
         Inc(LostSourcePointCount);
 
-  AddDiagnosticEvent(Format('CreateSessionSummary: TotalDeviceChannelCount=%d; EnabledDeviceChannelCount=%d; DisabledDeviceChannelCount=%d; ResolvedUniqueDeviceCount=%d; DistinctDeviceQmaxCount=%d; ProcessingDeviceCount=%d; ProcessingDevicePointCount=%d; SessionModeCount=%d; ExpectedDevicePointCount=%d; ProcessedDevicePointCount=0; SavedDevicePointCount=0; ParticipantCount=%d; UniqueParticipantCount=%d; DuplicateParticipantCount=%d; LostSourcePointCount=%d',
+  AddDiagnosticEvent(Format('CreateSessionSummary: TotalDeviceChannelCount=%d; EnabledDeviceChannelCount=%d; DisabledDeviceChannelCount=%d; ResolvedUniqueDeviceCount=%d; DistinctDeviceQmaxCount=%d; ProcessingDeviceCount=%d; SourceDevicePointCount=%d; SessionModeCount=%d; AssignedDevicePointCount=%d; ProcessedDevicePointCount=0; SavedDeviceResultCount=0; ParticipantCount=%d; UniqueParticipantCount=%d; DuplicateParticipantCount=%d; LostSourcePointCount=%d',
     [TotalDeviceChannelCount, EnabledDeviceChannelCount, DisabledDeviceChannelCount,
      ResolvedUniqueDeviceCount, DistinctDeviceQmaxCount, ProcessingDeviceCount,
      ProcessingDevicePointCount, FPoints.Count, ProcessingDevicePointCount,
@@ -3260,9 +3364,9 @@ begin
   end;
 
   if (LostSourcePointCount > 0) or (ParticipantCount <> ProcessingDevicePointCount) or
-     (FPoints.Count <> ProcessingDevicePointCount) then
+     (DuplicateParticipantCount > 0) then
   begin
-    PointName := Format('SessionPointLost: ExpectedDevicePointCount=%d; SessionModeCount=%d; ParticipantCount=%d; LostSourcePointCount=%d; DuplicateParticipantCount=%d',
+    PointName := Format('SessionPointLost: SourceDevicePointCount=%d; SessionModeCount=%d; AssignedDevicePointCount=%d; LostSourcePointCount=%d; DuplicateParticipantCount=%d',
       [ProcessingDevicePointCount, FPoints.Count, ParticipantCount,
        LostSourcePointCount, DuplicateParticipantCount]);
     ProtocolManager.AddMessage(pcError, psMeasurement, 'SessionPointLost',

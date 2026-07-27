@@ -15,9 +15,10 @@ stability = meter[meter.index('function TMeterValue.AnalyzePointStabilityForMeas
 checks = {
     'session identity includes device channel and source point': all(x in create for x in ('DeviceUUID', 'DeviceChannelUUID', 'SourcePointUUID')),
     'session rejects missing point identity': 'DevicePointIdentityMissing' in create,
-    'session does not merge by flow': 'MergedByAbsoluteQ' not in create and 'Abs(SessionPoint.Q - TargetQLS)' not in create,
-    'session validates source/session cardinality': 'FPoints.Count <> ProcessingDevicePointCount' in create,
-    'session reports separate mode and device-point counts': all(x in create for x in ('SessionModeCount', 'ExpectedDevicePointCount', 'ProcessedDevicePointCount', 'SavedDevicePointCount')),
+    'session groups only compatible physical modes': 'PointsAreCompatible' in create and 'MergedCompatibleDevicePointIntoPhysicalMode' in create,
+    'compatibility includes flow and operating conditions': all(x in create for x in ('DifferentTargetFlow', 'DifferentTemperature', 'DifferentPressure', 'DifferentStopCriteria', 'DifferentStopLimits', 'DifferentRepeatCount', 'DifferentMeasurementConfiguration', 'DifferentStabilizationOrProtocolRepeats')),
+    'session validates source/assignment cardinality': 'ParticipantCount <> ProcessingDevicePointCount' in create,
+    'session reports separate mode and device-point counts': all(x in create for x in ('SessionModeCount', 'SourceDevicePointCount', 'AssignedDevicePointCount', 'ProcessedDevicePointCount', 'SavedDeviceResultCount')),
     'stability uses monotonic timestamps': 'CurrentMs := GetMonotonicTimeMs' in stability,
     'stability retains inclusive left boundary': 'SourceSamples[I].TimeStampMs >= AMinTimeStampMs' in stability,
     'stability requires full actual duration': 'AInfo.ActualWindowDurationSec + EPS >= AWindowDurationSec' in stability,
@@ -29,14 +30,16 @@ checks = {
     'automatic run finalizes only at end of point list': 'FinalizeMeasurementRun(mrrSuccess, mdrEndOfPointList)' in run,
     'result saving filters by exact participant channel': 'CurrentPointIncludesChannel(DeviceChannel, CurrentSourcePointUUID)' in work,
     'result saving resolves original source point UUID': 'SameText(DevicePoint.UUID, CurrentSourcePointUUID)' in work,
+    'individual source point status is saved': 'SourcePoint.Status := mptsSaved' in run,
 }
 
 # Identity regression: equal flows across devices remain six source identities.
 source_points = [(f'device-{d}', f'channel-{d}', f'point-{p}', q)
-                 for d, p, q in ((1, 1, 1.0), (1, 2, 2.0), (1, 3, 3.0),
-                                 (2, 1, 1.0), (2, 2, 2.0), (2, 3, 3.0))]
+                 for d, p, q in ((1, 1, 1.0), (2, 1, 1.0), (3, 1, 1.0),
+                                 (1, 2, 2.0), (2, 2, 2.0), (3, 2, 2.0))]
 checks['six cross-device points remain six identities'] = len({x[:3] for x in source_points}) == 6
-checks['different target flows remain distinct'] = len({(x[:3], x[3]) for x in source_points}) == 6
+checks['two compatible flows form two physical modes'] = len({x[3] for x in source_points}) == 2
+checks['different target flows remain distinct'] = 1.0 != 2.0
 
 for name, ok in checks.items():
     print(f"{'PASS' if ok else 'FAIL'}: {name}")
