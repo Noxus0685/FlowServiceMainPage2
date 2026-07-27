@@ -2168,9 +2168,6 @@ begin
     FFrameProtocol.Align := TAlignLayout.Client;
   end;
 
-  InitializeAutoMeasurementTestTab;
-  RefreshAutoMeasurementTestContext;
-
   RefreshFlowGraphChannels('UpdateForm');
 
   if FFrameFlowMeterProperties = nil then
