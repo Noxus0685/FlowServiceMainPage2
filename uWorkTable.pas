@@ -204,6 +204,46 @@ type
   TChannel = class;
   TWorkTable = class;
 
+  /// Test-only distortion applied by TWorkTableManager.UpdateSimulation.
+  /// The object contains configuration only; it never advances the measurement FSM.
+  TSimulationScenarioMode = (ssmNormal, ssmFactor, ssmNoPulses,
+    ssmNoise, ssmDelayedFactor);
+
+  TSimulationTestScenario = class
+  private
+    FEnabled: Boolean;
+    FAutomaticTestActive: Boolean;
+    FTargetWorkTable: TWorkTable;
+    FTargetDeviceChannel: TChannel;
+    FMode: TSimulationScenarioMode;
+    FFactor: Double;
+    FOffsetImpSec: Double;
+    FNoisePercent: Double;
+    FStartDelaySec: Double;
+    FDurationSec: Double;
+    FStartedAtMs: Double;
+    FActivatedLogged: Boolean;
+    FLastAdjustmentLogMs: Double;
+    function GetElapsedSec(const ACurrentTimeMs: Double): Double;
+  public
+    constructor Create;
+    procedure BeginTest(const ACurrentTimeMs: Double);
+    procedure Clear;
+    function AppliesTo(const AWorkTable: TWorkTable; const AChannel: TChannel;
+      const ACurrentTimeMs: Double): Boolean;
+    function AdjustImpSec(const ABaseImpSec, ACurrentTimeMs: Double): Double;
+    property Enabled: Boolean read FEnabled write FEnabled;
+    property AutomaticTestActive: Boolean read FAutomaticTestActive write FAutomaticTestActive;
+    property TargetWorkTable: TWorkTable read FTargetWorkTable write FTargetWorkTable;
+    property TargetDeviceChannel: TChannel read FTargetDeviceChannel write FTargetDeviceChannel;
+    property Mode: TSimulationScenarioMode read FMode write FMode;
+    property Factor: Double read FFactor write FFactor;
+    property OffsetImpSec: Double read FOffsetImpSec write FOffsetImpSec;
+    property NoisePercent: Double read FNoisePercent write FNoisePercent;
+    property StartDelaySec: Double read FStartDelaySec write FStartDelaySec;
+    property DurationSec: Double read FDurationSec write FDurationSec;
+  end;
+
   TDeviceCreateMode = (
     dcmUserCreated,
     dcmGridPlaceholder,
@@ -865,6 +905,9 @@ type
     FWorkTables: TObjectList<TWorkTable>;
     FIsSimulationMode :Boolean;
     FActiveWorkTable  :TWorkTable;
+    FSimulationTestScenario: TSimulationTestScenario;
+    FSimulationTestRunning: Boolean;
+    FSimulationModeBeforeTest: Boolean;
 
   public
     constructor Create(const AIniFileName: string);
@@ -888,11 +931,15 @@ type
     function BuildImpSecValuesForChannels(const AWorkTable: TWorkTable; AChannels: TObjectList<TChannel>;
     const AFlowRate, AFallbackImpSec: Double; const ASplitByQmax: Boolean = True;
     const ASplitByEnabledGroup: Boolean = False): TArray<Double>;
+    procedure StartSimulationMeasurementTest;
+    procedure StopSimulationMeasurementTest(const AStopMeasurement: Boolean = True);
 
     property WorkTables: TObjectList<TWorkTable> read FWorkTables;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
     property IniFileName: string read FIniFileName write FIniFileName;
     property IsSimulationMode:Boolean read FIsSimulationMode  write FIsSimulationMode;
+    property SimulationTestScenario: TSimulationTestScenario read FSimulationTestScenario;
+    property SimulationTestRunning: Boolean read FSimulationTestRunning;
     procedure UpdateSimulation;
 
   end;
@@ -910,6 +957,73 @@ uses
 const
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
   DEVICE_FLOW_RATE_DIM_INDEX = 4;
+
+{ TSimulationTestScenario }
+
+constructor TSimulationTestScenario.Create;
+begin
+  inherited Create;
+  Clear;
+end;
+
+procedure TSimulationTestScenario.BeginTest(const ACurrentTimeMs: Double);
+begin
+  FStartedAtMs := ACurrentTimeMs;
+  FAutomaticTestActive := True;
+  FActivatedLogged := False;
+  FLastAdjustmentLogMs := 0;
+end;
+
+procedure TSimulationTestScenario.Clear;
+begin
+  FEnabled := False;
+  FAutomaticTestActive := False;
+  FTargetWorkTable := nil;
+  FTargetDeviceChannel := nil;
+  FMode := ssmNormal;
+  FFactor := 1;
+  FOffsetImpSec := 0;
+  FNoisePercent := 0;
+  FStartDelaySec := 0;
+  FDurationSec := 0;
+  FStartedAtMs := 0;
+  FActivatedLogged := False;
+  FLastAdjustmentLogMs := 0;
+end;
+
+function TSimulationTestScenario.GetElapsedSec(const ACurrentTimeMs: Double): Double;
+begin
+  Result := Max(0.0, (ACurrentTimeMs - FStartedAtMs) / 1000.0);
+end;
+
+function TSimulationTestScenario.AppliesTo(const AWorkTable: TWorkTable;
+  const AChannel: TChannel; const ACurrentTimeMs: Double): Boolean;
+var
+  Elapsed: Double;
+begin
+  Elapsed := GetElapsedSec(ACurrentTimeMs);
+  Result := FEnabled and FAutomaticTestActive and (FStartedAtMs > 0) and
+    (AWorkTable = FTargetWorkTable) and (AChannel = FTargetDeviceChannel) and
+    (Elapsed >= FStartDelaySec) and
+    ((FDurationSec <= 0) or (Elapsed < FStartDelaySec + FDurationSec));
+end;
+
+function TSimulationTestScenario.AdjustImpSec(const ABaseImpSec,
+  ACurrentTimeMs: Double): Double;
+var
+  AppliedFactor, NoiseMultiplier: Double;
+begin
+  AppliedFactor := FFactor;
+  if FMode = ssmNormal then
+    AppliedFactor := 1
+  else if FMode = ssmNoPulses then
+    AppliedFactor := 0;
+
+  NoiseMultiplier := 1;
+  if (FMode = ssmNoise) and (FNoisePercent > 0) then
+    NoiseMultiplier := 1 + ((Random * 2 - 1) * FNoisePercent / 100);
+  Result := Max(0.0, ABaseImpSec * AppliedFactor * NoiseMultiplier + FOffsetImpSec);
+end;
 
   {$REGION 'HELPERS'}
 
@@ -6174,6 +6288,7 @@ begin
   inherited Create;
   FIniFileName := AIniFileName;
   FWorkTables := TObjectList<TWorkTable>.Create(True);
+  FSimulationTestScenario := TSimulationTestScenario.Create;
   TPump.Pumps := TObjectList<TPump>.Create(True);
   TWeight.Weights := TObjectList<TWeight>.Create(True);
 end;
@@ -6181,9 +6296,74 @@ end;
 { Frees managed work table collection and manager resources. }
 destructor TWorkTableManager.Destroy;
 begin
+  FSimulationTestScenario.Free;
   FWorkTables.Free;
   FreeAndNil(TWeight.Weights);
   inherited;
+end;
+
+procedure TWorkTableManager.StartSimulationMeasurementTest;
+begin
+  if FSimulationTestRunning then
+    raise EInvalidOperation.Create('Simulation measurement test is already running');
+  if (FSimulationTestScenario.TargetWorkTable = nil) or
+     (FSimulationTestScenario.TargetDeviceChannel = nil) then
+    raise EArgumentException.Create('Simulation test work table and device channel are required');
+  if FSimulationTestScenario.TargetWorkTable.DeviceChannels.IndexOf(
+       FSimulationTestScenario.TargetDeviceChannel) < 0 then
+    raise EArgumentException.Create('Simulation test target must be a device channel of the selected work table');
+
+  FSimulationModeBeforeTest := FIsSimulationMode;
+  FIsSimulationMode := True;
+  FSimulationTestRunning := True;
+  FSimulationTestScenario.Enabled := True;
+  FSimulationTestScenario.BeginTest(Now * MSecsPerDay);
+  if ProtocolManager <> nil then
+  begin
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'SimulationTestStarted',
+      'Simulation measurement test started', FSimulationTestScenario.TargetWorkTable.Name);
+    ProtocolManager.AddMessage(pcState, psWorkTable, 'SimulationModeEnabled',
+      'Existing work table simulation enabled by test',
+      BoolToStr(FSimulationModeBeforeTest, True));
+  end;
+
+  { Use only the production public entry point. }
+  try
+    FSimulationTestScenario.TargetWorkTable.MeasurementMode := mrmAutomatic;
+    FSimulationTestScenario.TargetWorkTable.StartMeasurementRun;
+  except
+    FSimulationTestScenario.Clear;
+    FIsSimulationMode := FSimulationModeBeforeTest;
+    FSimulationTestRunning := False;
+    raise;
+  end;
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'AutomaticMeasurementRequested',
+      'Automatic measurement requested by simulation test',
+      FSimulationTestScenario.TargetWorkTable.Name);
+end;
+
+procedure TWorkTableManager.StopSimulationMeasurementTest(
+  const AStopMeasurement: Boolean);
+var
+  Target: TWorkTable;
+  Run: TMeasurementRun;
+begin
+  if not FSimulationTestRunning then
+    Exit;
+  Target := FSimulationTestScenario.TargetWorkTable;
+  if AStopMeasurement and (Target <> nil) and (Target.MeasurementRun <> nil) then
+  begin
+    Run := TMeasurementRun(Target.MeasurementRun);
+    if not Run.RunCompleted then
+      Target.StopMeasurementRun;
+  end;
+  FSimulationTestScenario.Clear;
+  FIsSimulationMode := FSimulationModeBeforeTest;
+  FSimulationTestRunning := False;
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'SimulationTestStopped',
+      'Simulation measurement test stopped and scenario cleared', '');
 end;
 
 { Loads managed work tables from configured INI file. }
@@ -7232,6 +7412,8 @@ var
   TargetImpSec: Double;
   TargetDeviceFlow: Double;
   ChannelCoef: Double;
+  BaseImpSec: Double;
+  Scenario: TSimulationTestScenario;
 begin
   EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
   try
@@ -7277,6 +7459,38 @@ begin
           [TargetDeviceFlow, AOldTargetFlow, IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
       ApplySimpleSimulationNoise(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
         ACurrentTimeMs, 1.0, AWorkTable.DeviceReady);
+      { This is the sole scenario injection point: after the normal device signal
+        has been built, and before the normal ImpResult accumulator runs.  Etalon
+        channels never pass through this block. }
+      Scenario := FSimulationTestScenario;
+      if FIsSimulationMode and (Scenario <> nil) and
+         Scenario.AppliesTo(AWorkTable, Channel, ACurrentTimeMs) then
+      begin
+        BaseImpSec := Channel.ImpSec;
+        Channel.ImpSec := Scenario.AdjustImpSec(BaseImpSec, ACurrentTimeMs);
+        if ProtocolManager <> nil then
+        begin
+          if not Scenario.FActivatedLogged then
+          begin
+            Scenario.FActivatedLogged := True;
+            ProtocolManager.AddMessage(pcState, psWorkTable, 'ScenarioActivated',
+              'Simulation test scenario activated', AWorkTable.Name);
+          end;
+          if (Scenario.FLastAdjustmentLogMs = 0) or
+             (ACurrentTimeMs - Scenario.FLastAdjustmentLogMs >= 1000) then
+          begin
+            Scenario.FLastAdjustmentLogMs := ACurrentTimeMs;
+            ProtocolManager.AddMessage(pcState, psWorkTable, 'DeviceImpSecAdjusted',
+              'Simulation test device impulses adjusted',
+              Format('WorkTable=%s Channel=%d BaseImpSec=%.6f Factor=%.6f OffsetImpSec=%.6f ResultImpSec=%.6f ImpResult=%.6f MeasurementStage=%s',
+                [AWorkTable.Name, AWorkTable.DeviceChannels.IndexOf(Channel), BaseImpSec,
+                 Scenario.FFactor, Scenario.FOffsetImpSec, Channel.ImpSec,
+                 Channel.ImpResult,
+                 TMeasurementRun.MeasurementStateToString(
+                   TMeasurementRun(AWorkTable.MeasurementRun).Stage)]));
+          end;
+        end;
+      end;
       UpdateChannelCurSec(Channel, 0.3);
     end;
   finally
