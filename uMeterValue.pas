@@ -1833,7 +1833,7 @@ begin
     AInfo.LastWindowSampleTimeMs := LastMs;
     AInfo.HasLeftBoundaryCoverage := True;
     AInfo.HasRightBoundaryCoverage := True;
-    AInfo.WindowDurationSec := Max(0.0, (LastMs - WindowStartMs) / 1000.0);
+    AInfo.WindowDurationSec := Max(0.0, (CurrentMs - WindowStartMs) / 1000.0);
     AInfo.ActualWindowDurationSec := AInfo.WindowDurationSec;
     AInfo.CurrentValue := Window[Count - 1].Value;
     AInfo.HasCurrentValue := True;
@@ -1867,7 +1867,7 @@ begin
 
   AInfo.HasEnoughSamples := Count >= AMinSampleCount;
   AInfo.HasFullWindow := (Count > 0) and
-    (AInfo.ActualWindowDurationSec + EPS >= AWindowDurationSec);
+    (AInfo.ActualWindowDurationSec > AWindowDurationSec);
   AInfo.HasEnoughWindow := AInfo.HasFullWindow;
   if not AInfo.HasEnoughSamples then Include(AInfo.FailReasons, mvsfrNotEnoughSamples);
   if not AInfo.HasFullWindow then Include(AInfo.FailReasons, mvsfrWindowNotFilled);
