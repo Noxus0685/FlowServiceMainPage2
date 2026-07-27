@@ -4,6 +4,7 @@ interface
 
 uses
   System.Classes,
+  System.Diagnostics,
   System.Generics.Collections,
   System.IniFiles,
   System.Math,
@@ -6986,8 +6987,9 @@ end;
 
 function GetCurrentTimeMs: Double;
 begin
-  // GetTickCount64 is monotonic and is not affected by wall-clock changes.
-  Result := GetTickCount64;
+  // TStopwatch uses the platform's monotonic high-resolution counter and is
+  // available to all FMX targets supported by RAD Studio 12.
+  Result := TStopwatch.GetTimeStamp * 1000.0 / TStopwatch.Frequency;
 end;
 
 function CalculateRampDurationByFlowDelta(const AStartFlowLS, ATargetFlowLS: Double): Double;
@@ -7672,6 +7674,7 @@ begin
     swtFINALREAD:
       WorkTable.State := swtCOMPLETE;
 
+    end;
   end;
   finally
     TInterlocked.Exchange(FSimulationUpdateInProgress, 0);
