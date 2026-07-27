@@ -1202,7 +1202,6 @@ end;
 procedure TFrameMainTable.UpdateFlowMeterPropertiesFrame(ARow: Integer = -1;
   AEtalon: Boolean = False);
 var
-  Channel: TChannel;
 begin
   if FFrameFlowMeterProperties = nil then
     Exit;
@@ -7251,7 +7250,6 @@ var
   StartTick: Cardinal;
   Step, I, RepeatCount: Integer;
   Point: TDevicePoint;
-  Channel: TChannel;
   Samples: TArray<TMeterValueSample>;
   LastSampleTimeMs, InitialSampleTimeMs: Int64;
   LastFlow, LastFrequency, LastImpSec, LastTemp, LastPressure: Double;
@@ -7264,6 +7262,8 @@ var
   LogFile: string;
 
   procedure ReadProductionSnapshot;
+  var
+    Channel: TChannel;
   begin
     LastFlow := 0;
     LastTemp := 0;
@@ -8073,21 +8073,12 @@ begin
     // Если найден дубликат - остаемся в ячейке, не очищая значение
     if DuplicateFound then
     begin
-      TThread.Queue(nil,
-        procedure
-        begin
-          // Остаемся в этой же ячейке для исправления
-          GridDevices.SetFocus;
-          GridDevices.SelectCell(ACol, ARow);
-          TThread.ForceQueue(nil,
-            procedure
-            begin
-              if GridDevices.Model <> nil then
-                GridDevices.Model.ShowEditor;
-            end
-          );
-        end
-      );
+      // Событие редактирования выполняется в UI-потоке; дополнительная очередь
+      // здесь не нужна и не поддерживает вложенные анонимные процедуры в Win32.
+      GridDevices.SetFocus;
+      GridDevices.SelectCell(ACol, ARow);
+      if GridDevices.Model <> nil then
+        GridDevices.Model.ShowEditor;
       Exit; // Выходим, не переходим на следующую строку
     end;
   end;
@@ -8113,20 +8104,10 @@ begin
   if (NextRow < 0) or (NextRow >= GridDevices.RowCount) then
     Exit;
 
-  TThread.Queue(nil,
-    procedure
-    begin
-      GridDevices.SetFocus;
-      GridDevices.SelectCell(StringColumnDeviceSerial1.Index, NextRow);
-      TThread.ForceQueue(nil,
-        procedure
-        begin
-          if GridDevices.Model <> nil then
-            GridDevices.Model.ShowEditor;
-        end
-      );
-    end
-  );
+  GridDevices.SetFocus;
+  GridDevices.SelectCell(StringColumnDeviceSerial1.Index, NextRow);
+  if GridDevices.Model <> nil then
+    GridDevices.Model.ShowEditor;
 end;
 
 function TFrameMainTable.GetDisplayFlowText(AFlowMeter: TFlowMeter;

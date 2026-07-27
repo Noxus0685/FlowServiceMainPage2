@@ -6,6 +6,9 @@ work = (root / 'uWorkTable.pas').read_text(encoding='utf-8-sig')
 start = frm.index('procedure TFrameMainTable.RunAutoMeasurementScenario')
 end = frm.index('procedure TFrameMainTable.MeasurementButtonClickManualMode', start)
 scenario = frm[start:end]
+editing_start = frm.index('procedure TFrameMainTable.GridDevicesEditingDone')
+editing_end = frm.index('function TFrameMainTable.GetDisplayFlowText', editing_start)
+editing_done = frm[editing_start:editing_end]
 
 checks = {
     'scenario uses the production start entry point': 'WT.StartMeasurementRun;' in scenario,
@@ -31,6 +34,10 @@ checks = {
         'ImpSec=', 'FlowValue=', 'Temperature=', 'Pressure=',
         'MeasurementRunStage=', 'WorkTableState=', 'EngineState='
     ]),
+    'for-in channel control belongs to snapshot local scope':
+        'procedure ReadProductionSnapshot;\n  var\n    Channel: TChannel;' in scenario,
+    'grid editor flow avoids unsupported nested thread queues':
+        'TThread.ForceQueue(nil,' not in editing_done and 'TThread.Queue(nil,' not in editing_done,
 }
 
 failed = [name for name, ok in checks.items() if not ok]
