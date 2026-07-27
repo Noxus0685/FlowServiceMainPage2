@@ -1572,6 +1572,8 @@ begin
   UpdateInstrumentNameEdit;
 
   FWorkTableManager.UpdateSimulation;
+  { One non-blocking observer check per normal UI timer tick. }
+  FWorkTableManager.TickSimulationMeasurementTest;
 end;
 
 
