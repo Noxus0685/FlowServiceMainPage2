@@ -1284,10 +1284,12 @@ begin
     if FActiveStabilityStartMs <= 0 then
       FActiveStabilityStartMs := ATimeStampMs;
     FSamples.Add(Sample);
-    CutoffMs := ATimeStampMs - Round(Max(FStabilitySettings.WindowDurationSec * 10.0, 300.0) * 1000.0);
-    MaxHistorySamples := Max(FStabilitySettings.MinSampleCount * 20, ARRAY_SIZE);
+    CutoffMs := ATimeStampMs -
+      Round(Max(FStabilitySettings.WindowDurationSec * 2.0, 1.0) * 1000.0);
+    MaxHistorySamples := Max(
+      Max(FStabilitySettings.MinSampleCount * 2, 2),
+      Ceil(Max(FStabilitySettings.WindowDurationSec, 1.0)) + 1);
     while (FSamples.Count > 0) and
-      (FSamples[0].TimeStampMs < FActiveStabilityStartMs) and
       ((FSamples.Count > MaxHistorySamples) or (FSamples[0].TimeStampMs < CutoffMs)) do
       FSamples.Delete(0);
   finally
@@ -1349,10 +1351,12 @@ begin
       (FSamples[InsertIndex].TimeStampMs < ATimeStampMs) do
       Inc(InsertIndex);
     FSamples.Insert(InsertIndex, Sample);
-    CutoffMs := ATimeStampMs - Round(Max(FStabilitySettings.WindowDurationSec * 10.0, 300.0) * 1000.0);
-    MaxHistorySamples := Max(FStabilitySettings.MinSampleCount * 20, ARRAY_SIZE);
+    CutoffMs := ATimeStampMs -
+      Round(Max(FStabilitySettings.WindowDurationSec * 2.0, 1.0) * 1000.0);
+    MaxHistorySamples := Max(
+      Max(FStabilitySettings.MinSampleCount * 2, 2),
+      Ceil(Max(FStabilitySettings.WindowDurationSec, 1.0)) + 1);
     while (FSamples.Count > 0) and
-      (FSamples[0].TimeStampMs < FActiveStabilityStartMs) and
       ((FSamples.Count > MaxHistorySamples) or (FSamples[0].TimeStampMs < CutoffMs)) do
     begin
       FSamples.Delete(0);

@@ -1,4 +1,4 @@
-unit frmMeterValueEditFrame;
+﻿unit frmMeterValueEditFrame;
 
 interface
 
@@ -1856,7 +1856,6 @@ var
     if FTestSettings.MinSampleCount < 2 then FTestSettings.MinSampleCount := 10;
     if FTestSettings.WindowDurationSec <= 0 then FTestSettings.WindowDurationSec := 10;
     if FTestSettings.MaxSampleAgeSec <= 0 then FTestSettings.MaxSampleAgeSec := 3;
-    if FTestSettings.ConfirmationTimeSec < 0 then FTestSettings.ConfirmationTimeSec := 3;
     if FTestSettings.ExitThresholdFactor < 1 then FTestSettings.ExitThresholdFactor := 1.2;
     if FTestSettings.OutlierFactor <= 0 then FTestSettings.OutlierFactor := 3.5;
     if FTestSettings.ForecastHorizonSec < 0 then FTestSettings.ForecastHorizonSec := 10;
@@ -2014,7 +2013,6 @@ begin
           FTestSettings.MaxStdDeviation := DisplayDeltaToBase('0.01');
           FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.001');
           FTestSettings.MaxSampleAgeSec := 3;
-          FTestSettings.ConfirmationTimeSec := 3;
           for I := 0 to Count - 1 do
             AddSamplePoint(I, BaseValue);
         end;
