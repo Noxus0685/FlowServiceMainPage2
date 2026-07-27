@@ -4985,7 +4985,11 @@ begin
         if Point.Participants[I].RepeatsCompleted >= Point.Participants[I].RepeatsRequired then
           Point.Participants[I].Status := mptsSaved
         else
-          Point.Participants[I].Status := mptsProcessed;
+          { A repeat was persisted, but the participant is not complete yet.
+            mptsSave is the existing persisted status for this state; do not
+            introduce a new enum member because status ordinals are stored in
+            the database. }
+          Point.Participants[I].Status := mptsSave;
       end;
       Point.DateTime := Now;
       FLastSaveMeasurementResultsResult := 'success';
