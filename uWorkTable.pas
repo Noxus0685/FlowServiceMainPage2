@@ -5488,6 +5488,7 @@ var
   BeforePointCount: Integer;
   AfterPointCount: Integer;
   BeforePointUUIDs: string;
+  CurrentSourcePointUUID: string;
 
 
   function BoolText(const AValue: Boolean): string;
@@ -5512,6 +5513,35 @@ var
           Result := Result + ',';
         Result := Result + P.UUID;
       end;
+  end;
+
+  function CurrentPointIncludesChannel(AChannel: TChannel;
+    out ASourcePointUUID: string): Boolean;
+  var
+    Participant: TMeasurementPointParticipant;
+    ChannelDeviceUUID: string;
+  begin
+    ASourcePointUUID := '';
+    if CurrentPoint = nil then
+      Exit(True);
+    if Length(CurrentPoint.Participants) = 0 then
+    begin
+      ASourcePointUUID := CurrentPoint.UUID;
+      Exit(True); // legacy/manual point
+    end;
+
+    ChannelDeviceUUID := '';
+    if (AChannel <> nil) and (AChannel.FlowMeter <> nil) and
+       (AChannel.FlowMeter.Device <> nil) then
+      ChannelDeviceUUID := AChannel.FlowMeter.Device.UUID;
+    for Participant in CurrentPoint.Participants do
+      if SameText(Participant.DeviceChannelUUID, AChannel.UUID) and
+         SameText(Participant.DeviceUUID, ChannelDeviceUUID) then
+      begin
+        ASourcePointUUID := Participant.SourcePointUUID;
+        Exit(True);
+      end;
+    Result := False;
   end;
 
   procedure LogDevicePointsForSave(const ACaption: string; ADevice: TDevice);
@@ -5564,6 +5594,8 @@ begin
   begin
     if (DeviceChannel = nil) or (not DeviceChannel.Enabled) then
       Continue;
+    if not CurrentPointIncludesChannel(DeviceChannel, CurrentSourcePointUUID) then
+      Continue;
 
     SourceDevice := nil;
     if DeviceChannel.FlowMeter <> nil then
@@ -5610,7 +5642,9 @@ begin
       if (CurrentPoint <> nil) and (Device.Points <> nil) then
         for DevicePoint in Device.Points do
           if (DevicePoint <> nil) and
-             (((CurrentPoint.ID <> 0) and (DevicePoint.ID = CurrentPoint.ID)) or
+             (((CurrentSourcePointUUID <> '') and
+               SameText(DevicePoint.UUID, CurrentSourcePointUUID)) or
+              ((CurrentPoint.ID <> 0) and (DevicePoint.ID = CurrentPoint.ID)) or
               ((CurrentPoint.ID = 0) and (Trim(CurrentPoint.Name) <> '') and
                SameText(DevicePoint.Name, CurrentPoint.Name))) then
           begin
