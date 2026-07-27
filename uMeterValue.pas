@@ -1717,8 +1717,9 @@ var
   SourceSamples: TArray<TMeterValueSample>;
   Window: TArray<TMeterValueSample>;
   CurrentMs, RequiredWindowMs, WindowStartMs, FirstMs, LastMs, LastSampleTimeMs: Int64;
-  I, Count, IntervalCount: Integer;
+  I, Count, IntervalCount, FirstUsedIndex: Integer;
   AllowedDeviation, SampleIntervalMs, IntervalSum, RangeEpsilon: Double;
+  Sum, SumSq, SumT, MeanT, Numerator, Denominator, SampleTimeSec: Double;
   Msg: string;
 begin
   AInfo := Default(TMeterValueStabilityInfo);
@@ -1781,6 +1782,24 @@ begin
     end;
   end;
   SetLength(Window, Count);
+
+  // Stability is calculated from the latest AMinSampleCount samples, not from
+  // every sample collected since the stage started. Older samples must stop
+  // affecting the result as soon as enough newer samples have arrived.
+  if Count > AMinSampleCount then
+  begin
+    FirstUsedIndex := Count - AMinSampleCount;
+    for I := 0 to High(AInfo.SampleResults) do
+      if AInfo.SampleResults[I].InWindow and
+         (AInfo.SampleResults[I].TimeStampMs < Window[FirstUsedIndex].TimeStampMs) then
+      begin
+        AInfo.SampleResults[I].InWindow := False;
+        AInfo.SampleResults[I].IsInDisplayAnalysisWindow := False;
+      end;
+    Window := Copy(Window, FirstUsedIndex, AMinSampleCount);
+    Count := Length(Window);
+  end;
+
   AInfo.SampleCount := Length(SourceSamples);
   AInfo.UsedSampleCount := Count;
   if IntervalCount > 0 then
@@ -1836,6 +1855,37 @@ begin
       end;
     end;
     AInfo.Variation := AInfo.MaxValue - AInfo.MinValue;
+    Sum := 0.0;
+    for I := 0 to Count - 1 do
+      Sum := Sum + Window[I].Value;
+    AInfo.MeanValue := Sum / Count;
+
+    SumSq := 0.0;
+    for I := 0 to Count - 1 do
+      SumSq := SumSq + Sqr(Window[I].Value - AInfo.MeanValue);
+    AInfo.StdDeviation := Sqrt(SumSq / Count);
+
+    if Count >= 2 then
+    begin
+      SumT := 0.0;
+      for I := 0 to Count - 1 do
+        SumT := SumT + (Window[I].TimeStampMs - FirstMs) / 1000.0;
+      MeanT := SumT / Count;
+      Numerator := 0.0;
+      Denominator := 0.0;
+      for I := 0 to Count - 1 do
+      begin
+        SampleTimeSec := (Window[I].TimeStampMs - FirstMs) / 1000.0;
+        Numerator := Numerator +
+          (SampleTimeSec - MeanT) * (Window[I].Value - AInfo.MeanValue);
+        Denominator := Denominator + Sqr(SampleTimeSec - MeanT);
+      end;
+      if Denominator > EPS then
+      begin
+        AInfo.TrendRate := Numerator / Denominator;
+        AInfo.HasTrend := True;
+      end;
+    end;
     AInfo.HasStatistics := True;
   end;
 
@@ -1847,16 +1897,30 @@ begin
   if not AInfo.HasFullWindow then Include(AInfo.FailReasons, mvsfrWindowNotFilled);
   if AInfo.HasLastSampleAge and not AInfo.IsDataActual then Include(AInfo.FailReasons, mvsfrStaleData);
 
+  AInfo.IsVariationStable := AInfo.HasStatistics and
+    (AInfo.Variation <= FStabilitySettings.MaxVariation);
+  AInfo.IsDeviationStable := AInfo.HasStatistics and
+    (AInfo.StdDeviation <= FStabilitySettings.MaxStdDeviation);
+  AInfo.IsTrendStable := AInfo.HasTrend and
+    (Abs(AInfo.TrendRate) <= FStabilitySettings.MaxTrendRate);
+  if not AInfo.IsVariationStable then Include(AInfo.FailReasons, mvsfrVariationTooHigh);
+  if not AInfo.IsDeviationStable then Include(AInfo.FailReasons, mvsfrDeviationTooHigh);
+  if not AInfo.IsTrendStable then Include(AInfo.FailReasons, mvsfrTrendTooHigh);
+
   AInfo.IsSignalStable := AInfo.HasFullWindow and AInfo.HasEnoughSamples and
-    AInfo.IsDataActual and AInfo.AllSamplesInRange;
+    AInfo.IsDataActual and AInfo.IsVariationStable and
+    AInfo.IsDeviationStable and AInfo.IsTrendStable;
   AInfo.IsConfirmed := AInfo.IsSignalStable;
   AInfo.IsStabilityConfirmed := AInfo.IsSignalStable;
   RangeEpsilon := Max(1E-9, Abs(ATargetValue) * 1E-9);
   AInfo.IsCurrentValueInRange := AInfo.HasCurrentValue and (AInfo.CurrentValue >= AInfo.StabilityLowerLimit - RangeEpsilon) and
     (AInfo.CurrentValue <= AInfo.StabilityUpperLimit + RangeEpsilon);
-  AInfo.IsMeanValueInRange := True;
+  AInfo.IsMeanValueInRange := AInfo.HasStatistics and
+    (AInfo.MeanValue >= AInfo.StabilityLowerLimit - RangeEpsilon) and
+    (AInfo.MeanValue <= AInfo.StabilityUpperLimit + RangeEpsilon);
   AInfo.IsForecastInRange := True;
-  AInfo.IsSuitableForMeasurement := AInfo.IsSignalStable;
+  AInfo.IsSuitableForMeasurement := AInfo.IsSignalStable and
+    AInfo.IsCurrentValueInRange;
 
   if mvsfrStaleData in AInfo.FailReasons then AInfo.Status := mvssStaleData
   else if (mvsfrNoData in AInfo.FailReasons) or (mvsfrNotEnoughSamples in AInfo.FailReasons) or
@@ -1874,6 +1938,15 @@ begin
      (mvsfrSampleAboveStabilityRange in AInfo.FailReasons) then
     Msg := Msg + Format('Отсчёт вне допуска точки: значение %.6f; диапазон %.6f..%.6f. ',
       [AInfo.FirstOutOfRangeSampleValue, AInfo.StabilityLowerLimit, AInfo.StabilityUpperLimit]);
+  if mvsfrVariationTooHigh in AInfo.FailReasons then
+    Msg := Msg + Format('Размах %.6f превышает допустимый %.6f. ',
+      [AInfo.Variation, FStabilitySettings.MaxVariation]);
+  if mvsfrDeviationTooHigh in AInfo.FailReasons then
+    Msg := Msg + Format('Стандартное отклонение %.6f превышает допустимое %.6f. ',
+      [AInfo.StdDeviation, FStabilitySettings.MaxStdDeviation]);
+  if mvsfrTrendTooHigh in AInfo.FailReasons then
+    Msg := Msg + Format('Тренд %.6f ед./с превышает допустимый %.6f ед./с. ',
+      [AInfo.TrendRate, FStabilitySettings.MaxTrendRate]);
   if mvsfrStaleData in AInfo.FailReasons then
     Msg := Msg + Format('Данные устарели: последнее значение получено %.1f с назад. ', [AInfo.LastSampleAgeSec]);
   if Msg = '' then
