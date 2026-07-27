@@ -3,31 +3,37 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 frm = (root / 'frmMainTable.pas').read_text(encoding='utf-8-sig')
 work = (root / 'uWorkTable.pas').read_text(encoding='utf-8-sig')
-meter = (root / 'uMeterValue.pas').read_text(encoding='utf-8-sig')
-run = (root / 'uMeasurementRun.pas').read_text(encoding='utf-8-sig')
+start = frm.index('procedure TFrameMainTable.RunAutoMeasurementScenario')
+end = frm.index('procedure TFrameMainTable.MeasurementButtonClickManualMode', start)
+scenario = frm[start:end]
 
 checks = {
-    'virtual clock API is available': all(x in meter for x in [
-        'EnableVirtualClock', 'AdvanceVirtualClock', 'DisableVirtualClock',
-        'if FVirtualClockEnabled then', 'Exit(FVirtualClockMs)'
+    'scenario uses the production start entry point': 'WT.StartMeasurementRun;' in scenario,
+    'scenario rejects simulation mode': 'if WT.IsSimulationMode then' in scenario,
+    'scenario does not generate or inject meter data': not any(x in scenario for x in [
+        '.SetValue(', '.Reset(', 'AddStabilitySampleManual', 'ActualQ :=',
+        'EnableVirtualClock', 'AdvanceVirtualClock', 'IsSimulationMode := True'
     ]),
-    'measurement run uses virtual-capable monotonic time': 'TThread.GetTickCount64' not in run and 'TMeterValue.GetMonotonicTimeMs' in run,
-    'scenario writes generated flow to production parameter': 'WT.FlowRate.SetValue(ActualQ)' in frm and 'WT.FlowRate.Value' in frm,
-    'scenario verifies parameter and last sample delivery': all(x in frm for x in [
-        'AppliedQ := WT.FlowRate.Value.Value', 'ReadLastSample(WT.FlowRate.Value',
-        'FAIL — тестовое значение не передано в рабочий параметр'
+    'scenario observes production timestamps': all(x in scenario for x in [
+        'GetStabilitySamples', 'LastSampleTimeMs > InitialSampleTimeMs',
+        'FAIL — новые данные от оборудования не поступили'
     ]),
-    'scenario waits for selected point before injection': 'DeliveryCheck=Skipped; Reason=PointNotSelected' in frm and 'FAIL — штатная FSM не выбрала точку' in frm,
-    'scenario starts virtual time after existing samples': 'MaxExistingSampleTimeMs' in frm and 'VirtualTimeStartMs := Max(TMeterValue.GetMonotonicTimeMs, MaxExistingSampleTimeMs) + 1' in frm,
-    'scenario has early no-progress detection': 'FAIL — отсутствует прогресс FSM' in frm and 'NoProgressSteps >= 20' in frm,
-    'scenario restores simulation mode and virtual clock': 'TMeterValue.DisableVirtualClock' in frm and 'WT.IsSimulationMode := OldSimulation' in frm,
-    'virtual executor blocks real commands with responses': all(x in work for x in [
-        'property IsSimulationMode: Boolean', 'State := swtMONITOR', 'State := swtEXECUTE',
-        'State := swtCOMPLETE', 'рабочее сохранение результатов заблокировано'
+    'scenario observes production FSM without driving transitions':
+        'Run.Execute(' not in scenario and 'Run.Process' not in scenario,
+    'scenario diagnoses real acquisition and stabilization': all(x in scenario for x in [
+        'FAIL — стабилизация по реальным данным не достигнута',
+        'FAIL — оборудование не подтвердило запуск',
+        'FAIL — реальные результаты не получены',
+        'FAIL — результаты не сохранены'
+    ]),
+    'report contains required hardware fields': all(x in scenario for x in [
+        'ModuleAddress=', 'ModuleChannel=', 'ReadTimestamp=', 'Frequency=',
+        'ImpSec=', 'FlowValue=', 'Temperature=', 'Pressure=',
+        'MeasurementRunStage=', 'WorkTableState=', 'EngineState='
     ]),
 }
 
 failed = [name for name, ok in checks.items() if not ok]
 if failed:
     raise SystemExit('FAILED auto scenario static checks: ' + '; '.join(failed))
-print('OK: auto scenario delivery, virtual-time, executor, progress, and restore checks passed.')
+print('OK: auto scenario is a production-only observer with hardware diagnostics.')
