@@ -2056,7 +2056,7 @@ begin
       MatchedDistance := Abs(BestPoint.Q - TargetValue);
     end;
 
-    LogText := Format('DeviceChannelReadiness: ChannelIndex=%d; ChannelUUID=%s; ChannelName=%s; DeviceUUID=%s; DevicePointUUID=%s; DevicePointName=%s; MeasurementMode=%s; MeasurementPointQLS=%.6f; ParticipantFound=%s; ParticipantSourcePointUUID=%s; ParticipantSourceTargetQLS=%.6f; DeviceTargetValue=%.6f; TargetDifferenceToPhysicalPointLS=%.9f; MergeToleranceLS=%.9f; ParticipatesInCurrentPoint=%s; DevicePointErrorPercent=%.6f; StabilityLower=%.6f; StabilityUpper=%.6f; UsedSampleCount=%d; RequiredSampleCount=%d; ActualWindowDurationSec=%.3f; RequiredWindowDurationSec=%.3f; HasEnoughSamples=%s; HasFullWindow=%s; IsDataActual=%s; OutOfRangeSampleCount=%d; FirstOutOfRangeValue=%.6f; FirstOutOfRangeTimeMs=%d; StableReady=%s; Ready=%s; Reason=%s; TargetSource=%s; DevicePointMatchSource=%s; ActualLS=%.6f; ActualM3H=%.6f',
+    LogText := Format('DeviceChannelReadiness: ChannelIndex=%d; ChannelUUID=%s; ChannelName=%s; DeviceUUID=%s; DevicePointUUID=%s; DevicePointName=%s; MeasurementMode=%s; MeasurementPointQLS=%.6f; ParticipantFound=%s; ParticipantSourcePointUUID=%s; ParticipantSourceTargetQLS=%.6f; DeviceTargetValue=%.6f; TargetDifferenceToPhysicalPointLS=%.9f; MergeToleranceLS=%.9f; ParticipatesInCurrentPoint=%s; DevicePointErrorPercent=%.6f; StabilityLower=%.6f; StabilityUpper=%.6f; UsedSampleCount=%d; RequiredSampleCount=%d; ActualWindowDurationSec=%.3f; RequiredWindowDurationSec=%.3f; HasEnoughSamples=%s; HasFullWindow=%s; IsDataActual=%s; OutOfRangeSampleCount=%d; FirstOutOfRangeValue=%.6f; FirstOutOfRangeTimeMs=%d; Variation=%.9f; MaxVariation=%.9f; IsVariationStable=%s; StdDeviation=%.9f; MaxStdDeviation=%.9f; IsDeviationStable=%s; TrendRate=%.9f; MaxTrendRate=%.9f; IsTrendStable=%s; StableReady=%s; Ready=%s; Reason=%s; TargetSource=%s; DevicePointMatchSource=%s; ActualLS=%.6f; ActualM3H=%.6f',
       [I, Channel.UUID, Channel.Name, DeviceUUID, DevicePointUUID, MatchedPointName,
        ModeText, CurrentPointQ, BoolToStr(ParticipantFound, True), Participant.SourcePointUUID,
        Participant.SelectedSourceTargetQLS, TargetValue, TargetDifferenceToPhysicalPoint, MergeToleranceLS,
@@ -2066,8 +2066,12 @@ begin
        Max(0.001, FRequiredDeviceStabilizationSec), BoolToStr(SignalInfo.HasEnoughSamples, True),
        BoolToStr(SignalInfo.HasFullWindow, True), BoolToStr(SignalInfo.IsDataActual, True),
        SignalInfo.OutOfRangeSampleCount, SignalInfo.FirstOutOfRangeSampleValue,
-       SignalInfo.FirstOutOfRangeSampleTimeMs, BoolToStr(StableReady, True),
-       BoolToStr(Ready, True), Reason, TargetSource, PointMatchSource, ActualValue, M3H(ActualValue)]);
+       SignalInfo.FirstOutOfRangeSampleTimeMs,
+       SignalInfo.Variation, Settings.MaxVariation, BoolToStr(SignalInfo.IsVariationStable, True),
+       SignalInfo.StdDeviation, Settings.MaxStdDeviation, BoolToStr(SignalInfo.IsDeviationStable, True),
+       SignalInfo.TrendRate, Settings.MaxTrendRate, BoolToStr(SignalInfo.IsTrendStable, True),
+       BoolToStr(StableReady, True), BoolToStr(Ready, True), Reason, TargetSource,
+       PointMatchSource, ActualValue, M3H(ActualValue)]);
     PublishDeviceLog(LogText);
 
     if Ready then
