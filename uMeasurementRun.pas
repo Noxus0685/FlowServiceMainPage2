@@ -3273,6 +3273,8 @@ end;
 
 procedure TMeasurementRun.Start;
 begin
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'Start.Enter',
+    'Вход в TMeasurementRun.Start', Format('Mode=%d', [Ord(FMode)]));
   FCriticalSection.Acquire;
   try
     if IsThreadRunning then
@@ -3285,7 +3287,11 @@ begin
     FPhysicalMeasureStarted := False;
     FPhysicalStopRequested := False;
     FActualStopEventFired := False;
+    ProtocolManager.AddMessage(pcAction, psMeasurement, 'CreateSession.Enter',
+      'Начало формирования сессии', '');
     CreateSession;
+    ProtocolManager.AddMessage(pcAction, psMeasurement, 'CreateSession.Exit',
+      'Формирование сессии завершено', Format('Points=%d', [FPoints.Count]));
     if FWorkTable = nil then
     begin
       ProtocolManager.AddMessage(pcWarning, psMeasurement, 'Start',
@@ -3387,7 +3393,11 @@ begin
 );
 
   FThread.FreeOnTerminate := False;
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'ThreadStart.Enter',
+    'Запуск рабочего потока TMeasurementRun', '');
   FThread.Start;
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'ThreadStart.Exit',
+    'Рабочий поток TMeasurementRun запущен', '');
 
 
    // if not FStopRequested then

@@ -1446,9 +1446,18 @@ begin
 
   FActiveWorkTable.MeasurementMode := MeasurementRun.Mode;
 
+  ProtocolManager.AddMessage(pcInfo, psMeasurement, 'MeasurementStart',
+    'Параметры штатного запуска измерения',
+    Format('SimulationMode=%s; RunMode=%d; WorkTableState=%s; MeasurementRunStage=%s; EngineState=%s',
+      [BoolToStr((WorkTableManager <> nil) and WorkTableManager.IsSimulationMode, True),
+       Ord(MeasurementRun.Mode), TWorkTable.WorkTableStateToString(FActiveWorkTable.State),
+       TMeasurementRun.MeasurementStateToString(MeasurementRun.Stage),
+       '<TFmxFlowPlantEngine state is not exposed by TWorkTable>']));
   ProtocolManager.AddMessage(pcAction, psForm, 'StartMeasurement', 'Запрос на запуск измерений', FActiveWorkTable.Name);
 
   FActiveWorkTable.StartMeasurementRun;
+  ProtocolManager.AddMessage(pcAction, psForm, 'StartMeasurementCompleted',
+    'Штатный запрос запуска передан TWorkTable', FActiveWorkTable.Name);
   end;
 
 procedure TFrameMainTable.StopMeasurement;
@@ -7336,7 +7345,8 @@ begin
       FinalReason := 'FAIL — MeasurementRun не создан'
     else if Run.IsWorkerThreadRunning then
       FinalReason := 'FAIL — измерение уже выполняется'
-    else if WT.IsSimulationMode then
+    else if ((FWorkTableManager <> nil) and FWorkTableManager.IsSimulationMode) or
+            WT.IsSimulationMode then
       FinalReason := 'FAIL — автоматический тест запрещён в SimulationMode';
 
     if FinalReason = '' then

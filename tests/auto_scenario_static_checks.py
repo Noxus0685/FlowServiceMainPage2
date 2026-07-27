@@ -3,6 +3,8 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 frm = (root / 'frmMainTable.pas').read_text(encoding='utf-8-sig')
 work = (root / 'uWorkTable.pas').read_text(encoding='utf-8-sig')
+table_form = (root / 'fuTable_Main.pas').read_text(encoding='utf-8-sig')
+legacy_form = (root / 'fuMain.pas').read_text(encoding='utf-8-sig')
 start = frm.index('procedure TFrameMainTable.RunAutoMeasurementScenario')
 end = frm.index('procedure TFrameMainTable.MeasurementButtonClickManualMode', start)
 scenario = frm[start:end]
@@ -12,7 +14,9 @@ editing_done = frm[editing_start:editing_end]
 
 checks = {
     'scenario uses the production start entry point': 'WT.StartMeasurementRun;' in scenario,
-    'scenario rejects simulation mode': 'if WT.IsSimulationMode then' in scenario,
+    'scenario rejects simulation mode': all(x in scenario for x in [
+        'FWorkTableManager.IsSimulationMode', 'WT.IsSimulationMode then'
+    ]),
     'scenario does not generate or inject meter data': not any(x in scenario for x in [
         '.SetValue(', '.Reset(', 'AddStabilitySampleManual', 'ActualQ :=',
         'EnableVirtualClock', 'AdvanceVirtualClock', 'IsSimulationMode := True'
@@ -38,6 +42,14 @@ checks = {
         'procedure ReadProductionSnapshot;\n  var\n    Channel: TChannel;' in scenario,
     'grid editor flow avoids unsupported nested thread queues':
         'TThread.ForceQueue(nil,' not in editing_done and 'TThread.Queue(nil,' not in editing_done,
+    'main table timer gates simulation but keeps UI updates': all(x in table_form for x in [
+        'SyncWorkTableObservers;', 'UpdateInstrumentNameEdit;',
+        'if FWorkTableManager.IsSimulationMode then\n    FWorkTableManager.UpdateSimulation;'
+    ]),
+    'UpdateSimulation has an internal no-mutation guard':
+        'if not IsSimulationMode then\n    Exit;\n\n  for WorkTable in FWorkTables do' in work,
+    'legacy simulation timer is disabled in real mode':
+        '(FWorkTableManager = nil) or (not FWorkTableManager.IsSimulationMode)' in legacy_form,
 }
 
 failed = [name for name, ok in checks.items() if not ok]

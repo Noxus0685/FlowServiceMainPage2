@@ -5831,6 +5831,11 @@ end;
 procedure TWorkTable.StartMeasurementRun;
 begin
 
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMeasurementRun.Enter',
+    'Начало штатной подготовки запуска',
+    Format('SimulationMode=%s; State=%s', [BoolToStr(IsSimulationMode, True),
+      WorkTableStateToString(State)]));
+
   ResetMeasurementValues;
 
   RecalculateAllMeterValues;
@@ -5840,6 +5845,10 @@ begin
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMeasurementRun',
     'Запуск измерения', Format('Mode=%d', [Ord(MeasurementMode)]));
   TMeasurementRun(FMeasurementRun).Execute(mcStart);
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMeasurementRun.Exit',
+    'Команда mcStart передана TMeasurementRun',
+    Format('State=%s; Stage=%s', [WorkTableStateToString(State),
+      TMeasurementRun.MeasurementStateToString(TMeasurementRun(FMeasurementRun).Stage)]));
 
 end;
 
@@ -7567,7 +7576,12 @@ end;
 
 begin
 
-     for WorkTable in WorkTableManager.WorkTables do
+  { Second-level safety boundary: callers cannot accidentally mix generated
+    values/state transitions with the physical module polling chain. }
+  if not IsSimulationMode then
+    Exit;
+
+  for WorkTable in FWorkTables do
    begin
 
   // ============================================================
