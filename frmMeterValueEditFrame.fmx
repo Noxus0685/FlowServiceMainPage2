@@ -735,7 +735,7 @@
                 Size.Width = 240.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
-                Text = #1050#1086#1083#1080#1095#1077#1089#1090#1074#1086' '#1086#1090#1086#1073#1088#1072#1078#1072#1077#1084#1099#1093' '#1076#1072#1085#1085#1099#1093', '#1096#1090'.'
+                Text = 'Размер массива, шт.'
               end
               object EditSampleSize: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
@@ -1177,7 +1177,7 @@
                 Size.Width = 250.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
-                Text = #1042#1089#1077#1075#1086' '#1086#1090#1089#1095#1105#1090#1086#1074
+                Text = 'Размер массива'
               end
               object EditResultSampleCount: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
@@ -1297,24 +1297,6 @@
                 Size.Height = 24.000000000000000000
                 Size.PlatformDefault = False
               end
-              object LabelResultIsDataActual: TLabel
-                Position.X = 410.000000000000000000
-                Position.Y = 182.000000000000000000
-                Size.Width = 165.000000000000000000
-                Size.Height = 22.000000000000000000
-                Size.PlatformDefault = False
-                Text = #1040#1082#1090#1091#1072#1083#1100#1085#1086#1089#1090#1100' '#1076#1072#1085#1085#1099#1093
-              end
-              object EditResultIsDataActual: TEdit
-                Touch.InteractiveGestures = [LongTap, DoubleTap]
-                TabOrder = 20
-                ReadOnly = True
-                Position.X = 580.000000000000000000
-                Position.Y = 180.000000000000000000
-                Size.Width = 110.000000000000000000
-                Size.Height = 24.000000000000000000
-                Size.PlatformDefault = False
-              end
               object LabelResultActualSampleSpan: TLabel
                 Position.X = 410.000000000000000000
                 Position.Y = 212.000000000000000000
@@ -1330,24 +1312,6 @@
                 Position.X = 580.000000000000000000
                 Position.Y = 210.000000000000000000
                 Size.Width = 110.000000000000000000
-                Size.Height = 24.000000000000000000
-                Size.PlatformDefault = False
-              end
-              object LabelResultLastSampleAge: TLabel
-                Position.X = 12.000000000000000000
-                Position.Y = 182.000000000000000000
-                Size.Width = 250.000000000000000000
-                Size.Height = 22.000000000000000000
-                Size.PlatformDefault = False
-                Text = #1042#1086#1079#1088#1072#1089#1090' '#1087#1086#1089#1083#1077#1076#1085#1077#1075#1086' '#1079#1085#1072#1095#1077#1085#1080#1103', '#1089
-              end
-              object EditResultLastSampleAge: TEdit
-                Touch.InteractiveGestures = [LongTap, DoubleTap]
-                TabOrder = 5
-                ReadOnly = True
-                Position.X = 280.000000000000000000
-                Position.Y = 180.000000000000000000
-                Size.Width = 120.000000000000000000
                 Size.Height = 24.000000000000000000
                 Size.PlatformDefault = False
               end
@@ -1636,15 +1600,15 @@
             GridColor = xFFCCCCCC
             AxisColor = claBlack
             BackgroundColor = claWhite
-            MarginLeft = 40.000000000000000000
+            MarginLeft = 100.000000000000000000
             MarginRight = 20.000000000000000000
             MarginTop = 40.000000000000000000
-            MarginBottom = 40.000000000000000000
+            MarginBottom = 70.000000000000000000
             Title = #1048#1089#1090#1086#1088#1080#1103' '#1089#1080#1075#1085#1072#1083#1072
             XTitle = #1042#1088#1077#1084#1103', '#1089
             YTitle = #1047#1085#1072#1095#1077#1085#1080#1077
-            XTitleOffset = 5.000000000000000000
-            YTitleOffset = 30.000000000000000000
+            XTitleOffset = 20.000000000000000000
+            YTitleOffset = 65.000000000000000000
           end
         end
       end
