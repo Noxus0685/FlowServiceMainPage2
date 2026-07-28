@@ -310,6 +310,7 @@ type
     procedure UpdateDetailedConclusion(const AInfo: TMeterValueStabilityInfo);
     function ChartColorOptionToAlphaColor(const AOption: TChartColorOption): TAlphaColor;
     procedure ApplyChartSeriesStyle(const ASeries: TChartSeries; const AColor: TChartColorOption; const AThickness: Double; const AShowMarkers: Boolean);
+    function CalculateYAxisStep(const AMinValue, AMaxValue: Double): Double;
     procedure UpdateStabilityChart;
   public
     constructor Create(AOwner: TComponent); override;
@@ -2491,6 +2492,31 @@ begin
   ASeries.ShowMarkers := AShowMarkers;
 end;
 
+function TFrameMeterValueEdit.CalculateYAxisStep(const AMinValue,
+  AMaxValue: Double): Double;
+var
+  RangeValue: Double;
+  StepExponent: Integer;
+  StepMantissa: Double;
+begin
+  RangeValue := AMaxValue - AMinValue;
+  if RangeValue <= 0 then
+    RangeValue := 2;
+
+  Result := RangeValue / 6;
+  StepExponent := Floor(Log10(Result));
+  StepMantissa := Result / Power(10, StepExponent);
+  if StepMantissa < 1.5 then
+    StepMantissa := 1
+  else if StepMantissa < 3.5 then
+    StepMantissa := 2
+  else if StepMantissa < 7.5 then
+    StepMantissa := 5
+  else
+    StepMantissa := 10;
+  Result := StepMantissa * Power(10, StepExponent);
+end;
+
 procedure TFrameMeterValueEdit.UpdateStabilityChart;
 var
   Indexes: TList<Integer>;
@@ -2516,6 +2542,18 @@ var
   UpperLimit: Double;
   MinDisplayValue: Double;
   MaxDisplayValue: Double;
+  DataMinY: Double;
+  DataMaxY: Double;
+  AxisMinY: Double;
+  AxisMaxY: Double;
+  DesiredMinY: Double;
+  DesiredMaxY: Double;
+  YStep: Double;
+  ActualYStep: Double;
+  TrendStartValue: Double;
+  TrendEndValue: Double;
+  ForecastValue: Double;
+  RangeIteration: Integer;
   AnalysisStartSec: Double;
   ToleranceColor: TAlphaColor;
   ChartSettings: TMeterValueStabilitySettings;
@@ -2535,6 +2573,7 @@ begin
     ChartStability.Title := 'История сигнала';
     ChartStability.XTitle := 'Время, с';
     ChartStability.YTitle := AppendUnit('Значение', DisplayUnitName);
+    ChartStability.AutoRangeY := True;
 
     if Length(FDisplayedSamples) = 0 then
       Exit;
@@ -2561,13 +2600,13 @@ begin
         MinDisplayValue := Min(MinDisplayValue, DisplayValue);
         MaxDisplayValue := Max(MaxDisplayValue, DisplayValue);
       end;
+      DataMinY := MinDisplayValue;
+      DataMaxY := MaxDisplayValue;
       HasLimits := (Indexes.Count > 1) and TryGetTestTargetLimits(LowerLimit, UpperLimit);
       if HasLimits then
       begin
         LowerLimit := ValueToCurrentDimension(LowerLimit);
         UpperLimit := ValueToCurrentDimension(UpperLimit);
-        MinDisplayValue := Min(MinDisplayValue, LowerLimit);
-        MaxDisplayValue := Max(MaxDisplayValue, UpperLimit);
         LowerSeries := ChartStability.AddSeries('Нижняя граница');
         UpperSeries := ChartStability.AddSeries('Верхняя граница');
         ToleranceColor := ChartColorOptionToAlphaColor(ChartSettings.ChartToleranceColor);
@@ -2612,11 +2651,16 @@ begin
           TrendSeries.Color := TAlphaColors.Purple;
           TrendSeries.Thickness := 1.5;
           TrendSeries.ShowMarkers := False;
-          TrendSeries.AddPoint(((FTestStabilityInfo.FirstWindowSampleTimeMs - BaseTimeMs) / 1000),
-            ValueToCurrentDimension(FTestStabilityInfo.ForecastValue - FTestStabilityInfo.TrendRate * FTestSettings.ForecastHorizonSec -
-              FTestStabilityInfo.TrendRate * (MaxActualTimeSec - ((FTestStabilityInfo.FirstWindowSampleTimeMs - BaseTimeMs) / 1000))));
-          TrendSeries.AddPoint(MaxActualTimeSec,
-            ValueToCurrentDimension(FTestStabilityInfo.ForecastValue - FTestStabilityInfo.TrendRate * FTestSettings.ForecastHorizonSec));
+          TrendStartValue := ValueToCurrentDimension(FTestStabilityInfo.ForecastValue -
+            FTestStabilityInfo.TrendRate * FTestSettings.ForecastHorizonSec -
+            FTestStabilityInfo.TrendRate * (MaxActualTimeSec -
+              ((FTestStabilityInfo.FirstWindowSampleTimeMs - BaseTimeMs) / 1000)));
+          TrendEndValue := ValueToCurrentDimension(FTestStabilityInfo.ForecastValue -
+            FTestStabilityInfo.TrendRate * FTestSettings.ForecastHorizonSec);
+          TrendSeries.AddPoint(((FTestStabilityInfo.FirstWindowSampleTimeMs - BaseTimeMs) / 1000), TrendStartValue);
+          TrendSeries.AddPoint(MaxActualTimeSec, TrendEndValue);
+          DataMinY := Min(DataMinY, Min(TrendStartValue, TrendEndValue));
+          DataMaxY := Max(DataMaxY, Max(TrendStartValue, TrendEndValue));
         end;
         ForecastSeries := ChartStability.AddSeries('Прогноз');
         ForecastSeries.Thickness := ChartSettings.ChartSignalLineWidth;
@@ -2624,9 +2668,12 @@ begin
         Sample := FDisplayedSamples[Indexes[Indexes.Count - 1]];
         X := (Sample.TimeStampMs - BaseTimeMs) / 1000;
         ForecastEndTimeSec := X + FTestSettings.ForecastHorizonSec;
-        ForecastSeries.AddPoint(X, ValueToCurrentDimension(Sample.Value));
-        ForecastSeries.AddPoint(ForecastEndTimeSec,
-          ValueToCurrentDimension(FTestStabilityInfo.ForecastValue));
+        DisplayValue := ValueToCurrentDimension(Sample.Value);
+        ForecastValue := ValueToCurrentDimension(FTestStabilityInfo.ForecastValue);
+        ForecastSeries.AddPoint(X, DisplayValue);
+        ForecastSeries.AddPoint(ForecastEndTimeSec, ForecastValue);
+        DataMinY := Min(DataMinY, Min(DisplayValue, ForecastValue));
+        DataMaxY := Max(DataMaxY, Max(DisplayValue, ForecastValue));
       end;
 
       if HasLimits then
@@ -2636,6 +2683,39 @@ begin
         UpperSeries.AddPoint(MinActualTimeSec, UpperLimit);
         UpperSeries.AddPoint(MaxActualTimeSec, UpperLimit);
       end;
+
+      AxisMinY := DataMinY;
+      AxisMaxY := DataMaxY;
+      if SameValue(AxisMinY, AxisMaxY) then
+      begin
+        AxisMinY := DataMinY - 1;
+        AxisMaxY := DataMaxY + 1;
+      end;
+      YStep := CalculateYAxisStep(AxisMinY, AxisMaxY);
+      if HasLimits then
+      begin
+        { Recheck the step after padding because it is the final range that
+          determines the actual ticks drawn by TSimpleChart. }
+        for RangeIteration := 0 to 9 do
+        begin
+          DesiredMinY := LowerLimit - YStep;
+          DesiredMaxY := UpperLimit + YStep;
+          AxisMinY := Min(DataMinY, DesiredMinY);
+          AxisMaxY := Max(DataMaxY, DesiredMaxY);
+          ActualYStep := CalculateYAxisStep(AxisMinY, AxisMaxY);
+          if ActualYStep <= YStep then
+            Break;
+          YStep := ActualYStep;
+        end;
+        DesiredMinY := LowerLimit - YStep;
+        DesiredMaxY := UpperLimit + YStep;
+        AxisMinY := Min(DataMinY, DesiredMinY);
+        AxisMaxY := Max(DataMaxY, DesiredMaxY);
+      end;
+      ChartStability.AutoRangeY := False;
+      ChartStability.YMin := AxisMinY;
+      ChartStability.YMax := AxisMaxY;
+
       if (FTestStabilityInfo.WindowStartMs >= 0) and
          (FTestStabilityInfo.WindowStartMs >= BaseTimeMs) then
       begin
@@ -2644,8 +2724,8 @@ begin
         StartSeries.Color := TAlphaColors.Gray;
         StartSeries.Thickness := 1;
         StartSeries.ShowMarkers := False;
-        StartSeries.AddPoint(AnalysisStartSec, MinDisplayValue);
-        StartSeries.AddPoint(AnalysisStartSec, MaxDisplayValue);
+        StartSeries.AddPoint(AnalysisStartSec, AxisMinY);
+        StartSeries.AddPoint(AnalysisStartSec, AxisMaxY);
       end;
     finally
       Indexes.Free;
