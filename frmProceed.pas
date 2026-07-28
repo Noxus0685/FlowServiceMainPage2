@@ -79,6 +79,7 @@ type
     StringColumnSpillageQEtalonStd: TStringColumn;
     StringColumnSpillageQEtalonCV: TStringColumn;
     StringColumnSpillageDeviceFlowRate: TStringColumn;
+    StringColumnSpillageMeanFlow: TStringColumn;
     StringColumnSpillageDeviceVolume: TStringColumn;
     StringColumnSpillageVelocity: TStringColumn;
     StringColumnSpillageError: TStringColumn;
@@ -175,6 +176,8 @@ type
     MenuItemGridDataPointsDelete: TMenuItem;
     MenuItemGridDataPointsClear: TMenuItem;
     MenuItemGridDataPointsClose: TMenuItem;
+    MenuItemGridDataPointsColumns: TMenuItem;
+    MenuItemGridDataPointsMeanFlow: TMenuItem;
     PopupMenuGridResults: TPopupMenu;
     MenuItemGridResultsDelete: TMenuItem;
     MenuItemGridResultsClear: TMenuItem;
@@ -278,6 +281,8 @@ type
     procedure SaveLayoutSettingsToWorkTable;
     procedure GridDataPointsColumnMoved(Column: TColumn; FromIndex,
       ToIndex: Integer);
+    procedure PopupMenuGridDataPointsPopup(Sender: TObject);
+    procedure MenuGridDataPointsColumnClick(Sender: TObject);
     procedure btnOKClick(Sender: TObject);
     procedure btnCancelClick(Sender: TObject);
   private
@@ -393,6 +398,11 @@ begin
     GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
   if GridDataPoints <> nil then
     GridDataPoints.OnDrawColumnCell := GridDataPointsDrawColumnCell;
+  MenuItemGridDataPointsMeanFlow.TagObject := StringColumnSpillageMeanFlow;
+  MenuItemGridDataPointsMeanFlow.AutoCheck := False;
+  MenuItemGridDataPointsMeanFlow.Visible := True;
+  MenuItemGridDataPointsMeanFlow.OnClick := MenuGridDataPointsColumnClick;
+  PopupMenuGridDataPoints.OnPopup := PopupMenuGridDataPointsPopup;
 
   FCurrentSession := nil;
   FreeAndNil(FSessionDevice);
@@ -1015,6 +1025,42 @@ begin
   CaptureGridColumnsLayout(GridResults, ResultsColumns);
   WorkTable.DataPointsGridColumns := DataPointsColumns;
   WorkTable.ResultsGridColumns := ResultsColumns;
+end;
+
+procedure TFrameProceed.PopupMenuGridDataPointsPopup(Sender: TObject);
+var
+  Column: TColumn;
+begin
+  Column := nil;
+  if MenuItemGridDataPointsMeanFlow.TagObject is TColumn then
+    Column := TColumn(MenuItemGridDataPointsMeanFlow.TagObject);
+  MenuItemGridDataPointsMeanFlow.Enabled := Column <> nil;
+  if Column <> nil then
+    MenuItemGridDataPointsMeanFlow.IsChecked := Column.Visible
+  else
+    MenuItemGridDataPointsMeanFlow.IsChecked := False;
+end;
+
+procedure TFrameProceed.MenuGridDataPointsColumnClick(Sender: TObject);
+var
+  MenuItem: TMenuItem;
+  Column: TColumn;
+begin
+  if not (Sender is TMenuItem) then
+    Exit;
+  MenuItem := TMenuItem(Sender);
+  Column := nil;
+  if MenuItem.TagObject is TColumn then
+    Column := TColumn(MenuItem.TagObject);
+  if Column = nil then
+  begin
+    MenuItem.IsChecked := False;
+    MenuItem.Enabled := False;
+    Exit;
+  end;
+  Column.Visible := not Column.Visible;
+  MenuItem.IsChecked := Column.Visible;
+  SaveLayoutSettingsToWorkTable;
 end;
 
 
@@ -3563,6 +3609,21 @@ begin
     else
       Value := FloatToStr(P.DeviceVolumeFlow);
   end
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageMeanFlow then
+  begin
+    if (FSessionEtalon <> nil) and (FActiveWorkTable <> nil) then
+    begin
+      if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
+        Value := FSessionEtalon.ValueVolumeFlow.GetStrNum(P.EtalonVolumeFlow)
+      else
+        Value := FSessionEtalon.ValueMassFlow.GetStrNum(P.EtalonMassFlow);
+    end
+    else if (FActiveWorkTable <> nil) and
+            (FActiveWorkTable.TableFlow <> nil) then
+      Value := FActiveWorkTable.TableFlow.ValueFlow.GetStrNum(P.QavgEtalon)
+    else
+      Value := FloatToStr(P.QavgEtalon);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageError then
   begin
     if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
@@ -3776,6 +3837,7 @@ begin
 
     StringColumnSpillageQavgEtalon.Header:= 'Расход, ' + FlowDimName;
     StringColumnSpillageDeviceFlowRate.Header:= 'Расход прибора, ' + FlowDimName;
+    StringColumnSpillageMeanFlow.Header := 'Ср. расход, ' + FlowDimName;
 
     StringColumnSpillageEtalonVolume.Header := 'Объем эталона, ' + QuantityDimName;
     StringColumnSpillageDeviceVolume.Header := 'Объем прибора, ' + QuantityDimName;
@@ -3788,6 +3850,7 @@ begin
 
     StringColumnSpillageQavgEtalon.Header:= 'Расход, ' + FlowDimName;
     StringColumnSpillageDeviceFlowRate.Header:='Расход прибора, ' + FlowDimName;
+    StringColumnSpillageMeanFlow.Header := 'Ср. расход, ' + FlowDimName;
 
     StringColumnSpillageEtalonVolume.Header := 'Масса эталона, ' + QuantityDimName;
     StringColumnSpillageDeviceVolume.Header := 'Масса прибора, ' + QuantityDimName;

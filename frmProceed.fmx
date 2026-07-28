@@ -99,6 +99,12 @@ object FrameProceed: TFrameProceed
             Header = #1056#1072#1089#1093#1086#1076' '#1087#1088#1080#1073#1086#1088#1072','
             HeaderSettings.TextSettings.WordWrap = False
           end
+          object StringColumnSpillageMeanFlow: TStringColumn
+            Header = #1057#1088'. '#1088#1072#1089#1093#1086#1076', '#1084'3/'#1095
+            HeaderSettings.TextSettings.WordWrap = False
+            HeaderSettings.TextSettings.HorzAlign = Center
+            ReadOnly = True
+          end
           object StringColumnSpillageDeviceVolume: TStringColumn
             Header = #1054#1073#1098#1077#1084' '#1087#1088#1080#1073#1086#1088#1072','
             HeaderSettings.TextSettings.WordWrap = False
@@ -795,6 +801,7 @@ object FrameProceed: TFrameProceed
     end
   end
   object PopupMenuGridDataPoints: TPopupMenu
+    OnPopup = PopupMenuGridDataPointsPopup
     Left = 578
     Top = 200
     object MenuItemGridDataPointsDelete: TMenuItem
@@ -808,6 +815,15 @@ object FrameProceed: TFrameProceed
     object MenuItemGridDataPointsClose: TMenuItem
       Action = ActionSessionClose
       ImageIndex = -1
+    end
+    object MenuItemGridDataPointsColumns: TMenuItem
+      Text = #1050#1086#1083#1086#1085#1082#1080
+      object MenuItemGridDataPointsMeanFlow: TMenuItem
+        AutoCheck = False
+        Visible = True
+        Text = #1057#1088'. '#1088#1072#1089#1093#1086#1076
+        OnClick = MenuGridDataPointsColumnClick
+      end
     end
   end
   object PopupMenuGridResults: TPopupMenu

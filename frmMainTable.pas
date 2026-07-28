@@ -418,6 +418,7 @@ type
     MenuItemDevicesColumn16: TMenuItem;
     MenuItemDevicesColumn17: TMenuItem;
     MenuItemDevicesColumn18: TMenuItem;
+    MenuItemDevicesColumnMeanFlow: TMenuItem;
     MenuItemEtalonsWorkTablesGroup: TMenuItem;
     MenuItemEtalonsWorkTablesAddTable: TMenuItem;
     MenuItemEtalonsWorkTablesAddDeviceChannel: TMenuItem;
@@ -752,6 +753,8 @@ type
   FLastClickCol: TColumn;
   FLastClickTick: Cardinal;
   FLastPopupGrid: TGrid;
+  FMeasurementMeanFlow: Double;
+  FMeasurementMeanFlowValid: Boolean;
 
   FRows: array of TRowData;
   IsUpdating: Boolean;
@@ -802,6 +805,13 @@ type
     function GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
     function GetDeviceGroupColor(const AGroup: Integer): TAlphaColor;
     function GetDisplayFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
+    function TryGetValidMeasurementFlow(AChannel: TChannel; out AFlow: Double): Boolean;
+    function CalculateMeasurementMeanFlow(out AMeanFlow: Double): Boolean;
+    function CalculateDeviationPercent(const AValue, AMeanValue: Double;
+      out ADeviationPercent: Double): Boolean;
+    function FormatMeasurementPercent(AChannel: TChannel;
+      const AValue: Double): string;
+    procedure BindMeasurementColumnMenuItems;
 
     procedure RefreshFlowGraphChannels(const AReason: string = 'Unspecified');
     procedure AddFlowGraphSamples(const ATimeStampMs: Int64);
@@ -2168,6 +2178,7 @@ begin
   PopupColumnEtalonSignal1.Items.Assign(PopupColumnDeviceSignal1.Items);
   GridEtalons.OnDrawColumnCell := GridEtalonsDrawColumnCell;
   GridDevices.OnDrawColumnCell := GridDevicesDrawColumnCell;
+  BindMeasurementColumnMenuItems;
 
   ComboEditUnits.Items.Clear;
   for UnitName in CVolumeFlowUnits do
@@ -2953,7 +2964,7 @@ var
   HasDeviceRow: Boolean;
   HasEtalonRow: Boolean;
 
-  procedure UpdateColumnMenuChecks(const APrefix: string; AGrid: TGrid);
+  procedure UpdateColumnMenuChecks(AGrid: TGrid);
   var
     I: Integer;
     MenuItem: TMenuItem;
@@ -2962,13 +2973,15 @@ var
     if AGrid = nil then
       Exit;
 
-    for I := 0 to AGrid.ColumnCount - 1 do
+    for I := 0 to ComponentCount - 1 do
     begin
-      Component := FindComponent('MenuItem' + APrefix + 'Column' + IntToStr(I));
-      if Component is TMenuItem then
+      Component := Components[I];
+      if (Component is TMenuItem) and
+         (TMenuItem(Component).TagObject is TColumn) and
+         (TColumn(TMenuItem(Component).TagObject).Parent = AGrid) then
       begin
         MenuItem := TMenuItem(Component);
-        MenuItem.IsChecked := AGrid.Columns[I].Visible;
+        MenuItem.IsChecked := TColumn(MenuItem.TagObject).Visible;
         MenuItem.Enabled := CanEdit;
       end;
     end;
@@ -3042,8 +3055,8 @@ begin
   if ActionDeleteEtalons <> nil then
     ActionDeleteEtalons.Enabled := HasEtalonRow;
 
-  UpdateColumnMenuChecks('Devices', GridDevices);
-  UpdateColumnMenuChecks('Etalons', GridEtalons);
+  UpdateColumnMenuChecks(GridDevices);
+  UpdateColumnMenuChecks(GridEtalons);
 end;
 
 procedure TFrameMainTable.PopupMenuDevicesGridPopup(Sender: TObject);
@@ -3072,16 +3085,14 @@ begin
   MenuItem := TMenuItem(Sender);
   Column := nil;
   if MenuItem.TagObject is TColumn then
-    Column := TColumn(MenuItem.TagObject)
-  else if (Copy(MenuItem.Name, 1, Length('MenuItemDevicesColumn')) = 'MenuItemDevicesColumn') and
-    (GridDevices <> nil) and (MenuItem.Tag >= 0) and (MenuItem.Tag < GridDevices.ColumnCount) then
-    Column := GridDevices.Columns[Integer(MenuItem.Tag)]
-  else if (Copy(MenuItem.Name, 1, Length('MenuItemEtalonsColumn')) = 'MenuItemEtalonsColumn') and
-    (GridEtalons <> nil) and (MenuItem.Tag >= 0) and (MenuItem.Tag < GridEtalons.ColumnCount) then
-    Column := GridEtalons.Columns[Integer(MenuItem.Tag)];
+    Column := TColumn(MenuItem.TagObject);
 
   if Column = nil then
+  begin
+    MenuItem.IsChecked := False;
+    MenuItem.Enabled := False;
     Exit;
+  end;
 
   if (FFrameProceed <> nil) and (Column = FFrameProceed.StringColumnSpillageNum) then
   begin
@@ -3090,9 +3101,9 @@ begin
     Exit;
   end;
 
-  NewVisible := not MenuItem.IsChecked;
-  MenuItem.IsChecked := NewVisible;
+  NewVisible := not Column.Visible;
   Column.Visible := NewVisible;
+  MenuItem.IsChecked := Column.Visible;
 
   if (FFrameProceed <> nil) and (Column = FFrameProceed.CheckColumnSpillageEnable) and
      not FFrameProceed.CheckColumnSpillageEnable.Visible then
@@ -8404,6 +8415,117 @@ begin
     Result := AFlowMeter.ValueFlow.GetStrValue;
 end;
 
+function TFrameMainTable.TryGetValidMeasurementFlow(AChannel: TChannel;
+  out AFlow: Double): Boolean;
+var
+  FlowValue: TMeterValue;
+begin
+  AFlow := 0;
+  Result := (AChannel <> nil) and AChannel.Enabled and
+    (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil);
+  if not Result then
+    Exit;
+
+  FlowValue := AChannel.FlowMeter.ValueFlow;
+  Result := (FlowValue <> nil) and
+    (((FlowValue.Values <> nil) and (FlowValue.Values.Count > 0)) or
+     (FlowValue.MeanCnt > 0));
+  if not Result then
+    Exit;
+
+  AFlow := FlowValue.GetDoubleValue;
+  Result := not IsNan(AFlow) and not IsInfinite(AFlow);
+end;
+
+function TFrameMainTable.CalculateMeasurementMeanFlow(
+  out AMeanFlow: Double): Boolean;
+var
+  I, ValidCount: Integer;
+  Flow, Sum: Double;
+begin
+  AMeanFlow := 0;
+  Sum := 0;
+  ValidCount := 0;
+  if FActiveWorkTable <> nil then
+    for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+      if TryGetValidMeasurementFlow(FActiveWorkTable.DeviceChannels[I], Flow) then
+      begin
+        Sum := Sum + Flow;
+        Inc(ValidCount);
+      end;
+  Result := ValidCount > 0;
+  if Result then
+    AMeanFlow := Sum / ValidCount;
+end;
+
+function TFrameMainTable.CalculateDeviationPercent(const AValue,
+  AMeanValue: Double; out ADeviationPercent: Double): Boolean;
+begin
+  ADeviationPercent := 0;
+  Result := not IsNan(AValue) and not IsInfinite(AValue) and
+    not IsNan(AMeanValue) and not IsInfinite(AMeanValue) and
+    not SameValue(AMeanValue, 0, 1E-12);
+  if Result then
+    ADeviationPercent := (AValue - AMeanValue) / AMeanValue * 100;
+end;
+
+function TFrameMainTable.FormatMeasurementPercent(AChannel: TChannel;
+  const AValue: Double): string;
+begin
+  { Apply the same Accuracy and trailing-zero rules as the adjacent
+    metrological error value. }
+  if (AChannel <> nil) and (AChannel.FlowMeter <> nil) and
+     (AChannel.FlowMeter.ValueError <> nil) then
+    Result := AChannel.FlowMeter.ValueError.GetStrNum(AValue)
+  else
+    Result := FormatFloat('0.000', AValue);
+end;
+
+procedure TFrameMainTable.BindMeasurementColumnMenuItems;
+begin
+  MenuItemDevicesColumn0.TagObject := CheckColumnDeviceEnable1;
+  MenuItemDevicesColumn1.TagObject := StringColumnDeviceChanel1;
+  MenuItemDevicesColumn2.TagObject := ColumnDeviceType1;
+  MenuItemDevicesColumn3.TagObject := PopupColumnDeviceDN1;
+  MenuItemDevicesColumn4.TagObject := StringColumnDeviceName1;
+  MenuItemDevicesColumn5.TagObject := StringColumnDeviceSerial1;
+  MenuItemDevicesColumn6.TagObject := PopupColumnDeviceSignal1;
+  MenuItemDevicesColumn7.TagObject := StringColumnDeviceRawValue1;
+  MenuItemDevicesColumn8.TagObject := StringColumnDeviceFlowRate1;
+  MenuItemDevicesColumnMeanFlow.TagObject := StringColumnDeviceAvgFlowRate1;
+  MenuItemDevicesColumnMeanFlow.AutoCheck := False;
+  MenuItemDevicesColumnMeanFlow.Visible := True;
+  MenuItemDevicesColumnMeanFlow.OnClick := MenuGridLayOutClick;
+  MenuItemDevicesColumn9.TagObject := StringColumnDeviceQuantity1;
+  MenuItemDevicesColumn10.TagObject := StringColumnDeviceError1;
+  MenuItemDevicesColumn11.TagObject := StringColumnDeviceStd1;
+  MenuItemDevicesColumn12.TagObject := StringColumnDeviceQuantityBefore1;
+  MenuItemDevicesColumn13.TagObject := StringColumnDeviceQuantityAfter1;
+  MenuItemDevicesColumn14.TagObject := StringColumnDevicePressureDelta1;
+  MenuItemDevicesColumn15.TagObject := StringColumnDeviceOptions1;
+  MenuItemDevicesColumn16.TagObject := StringColumnDeviceRawSumValue1;
+  MenuItemDevicesColumn17.TagObject := StringColumnUUID1;
+  MenuItemDevicesColumn18.TagObject := StringColumnDeviceCoef1;
+
+  { Etalon bindings are explicit as well, so changing the device grid does not
+    reintroduce the old ordinal-index dependency in the neighbouring menu. }
+  MenuItemEtalonsColumn0.TagObject := CheckColumnEtalonEnable1;
+  MenuItemEtalonsColumn1.TagObject := StringColumnEtalonChanel1;
+  MenuItemEtalonsColumn2.TagObject := StringColumnEtalonType1;
+  MenuItemEtalonsColumn3.TagObject := PopupColumnEtalonDN1;
+  MenuItemEtalonsColumn4.TagObject := StringColumnEtalonName1;
+  MenuItemEtalonsColumn5.TagObject := PopupColumnEtalonSignal1;
+  MenuItemEtalonsColumn6.TagObject := StringColumnEtalonRawValue1;
+  MenuItemEtalonsColumn7.TagObject := StringColumnEtalonFlowRate1;
+  MenuItemEtalonsColumn8.TagObject := StringColumnEtalonAvgFlowRate1;
+  MenuItemEtalonsColumn9.TagObject := StringColumnEtalonQuantity1;
+  MenuItemEtalonsColumn10.TagObject := StringColumnEtalonSerial1;
+  MenuItemEtalonsColumn11.TagObject := StringColumnEtalonError1;
+  MenuItemEtalonsColumn12.TagObject := StringColumnEtalonStd1;
+  MenuItemEtalonsColumn13.TagObject := StringColumnEtalonPressureDelta1;
+  MenuItemEtalonsColumn14.TagObject := StringColumnEtalonRawSumValue1;
+end;
+
 function TFrameMainTable.GetAverageFlowText(AFlowMeter: TFlowMeter;
   AWorkTable: TWorkTable): string;
 var
@@ -8431,6 +8553,7 @@ procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
   WorkTable: TWorkTable;
+  Flow, Deviation: Double;
 begin
   WorkTable := FActiveWorkTable;
 
@@ -8470,7 +8593,15 @@ begin
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceAvgFlowRate1 then
     begin
-      Value := GetAverageFlowText(WorkTable.DeviceChannels[ARow].FlowMeter, WorkTable);
+      if FMeasurementMeanFlowValid then
+      begin
+        if WorkTable.ValueFlowRate <> nil then
+          Value := WorkTable.ValueFlowRate.GetStrNum(FMeasurementMeanFlow)
+        else
+          Value := FormatFloat('0.###', FMeasurementMeanFlow);
+      end
+      else
+        Value := '—';
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceQuantity1 then
     begin
@@ -8508,11 +8639,12 @@ begin
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceStd1 then
     begin
-      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStrStdDeviationPercent
+      if TryGetValidMeasurementFlow(WorkTable.DeviceChannels[ARow], Flow) and
+         FMeasurementMeanFlowValid and
+         CalculateDeviationPercent(Flow, FMeasurementMeanFlow, Deviation) then
+        Value := FormatMeasurementPercent(WorkTable.DeviceChannels[ARow], Deviation)
       else
-        Value := '-';
+        Value := '—';
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceError1 then
     begin
@@ -9216,6 +9348,7 @@ var
 begin
   NormalizeActiveWorkTable;
   WT := FActiveWorkTable;
+  FMeasurementMeanFlowValid := CalculateMeasurementMeanFlow(FMeasurementMeanFlow);
 
   if WT <> nil then
     SoftReloadGridByGrowingRowCount(
