@@ -802,6 +802,7 @@ var
     AMeterValue.IsToSave := Ini.ReadBool(ASection, 'IsToSave', True);
     AMeterValue.FStabilitySettings.Enabled := Ini.ReadBool(ASection, 'StabilityEnabled', AMeterValue.FStabilitySettings.Enabled);
     AMeterValue.FStabilitySettings.MinSampleCount := Ini.ReadInteger(ASection, 'StabilityMinSampleCount', AMeterValue.FStabilitySettings.MinSampleCount);
+    AMeterValue.FStabilitySettings.WindowDurationSec := Ini.ReadFloat(ASection, 'Window_Duration_Sec', AMeterValue.FStabilitySettings.WindowDurationSec);
     AMeterValue.FStabilitySettings.SampleSize := Ini.ReadInteger(ASection, 'Sample_Size', AMeterValue.FStabilitySettings.SampleSize);
     if AMeterValue.FStabilitySettings.SampleSize < 1 then
       AMeterValue.FStabilitySettings.SampleSize := 20;
@@ -1188,6 +1189,7 @@ begin
   FillChar(FStabilitySettings, SizeOf(FStabilitySettings), 0);
   FStabilitySettings.Enabled := False;
   FStabilitySettings.MinSampleCount := 10;
+  FStabilitySettings.WindowDurationSec := 10.0;
   FStabilitySettings.SampleSize := 20;
   FStabilitySettings.MaxSampleAgeSec := 3.0;
   FStabilitySettings.MaxVariation := 0.0;
@@ -1482,6 +1484,14 @@ begin
     Exit(False);
   end;
 
+  if IsNan(FStabilitySettings.WindowDurationSec) or
+     IsInfinite(FStabilitySettings.WindowDurationSec) or
+     (FStabilitySettings.WindowDurationSec < 0) then
+  begin
+    AErrorText := 'Длительность окна анализа должна быть неотрицательным числом';
+    Exit(False);
+  end;
+
   Result := (FStabilitySettings.MaxVariation >= 0) and
     (FStabilitySettings.MaxStdDeviation >= 0) and
     (FStabilitySettings.MaxTrendRate >= 0) and
@@ -1749,6 +1759,9 @@ begin
   if (ASettings.MinSampleCount < 1) or
      (ASettings.MinSampleCount > ASettings.SampleSize) or
      (ASettings.SampleSize < 1) or
+     IsNan(ASettings.WindowDurationSec) or
+     IsInfinite(ASettings.WindowDurationSec) or
+     (ASettings.WindowDurationSec < 0) or
      (ASettings.MaxVariation < 0) or
      (ASettings.MaxStdDeviation < 0) or (ASettings.MaxTrendRate < 0) or
      (ASettings.ForecastHorizonSec < 0) or
@@ -1782,7 +1795,7 @@ begin
 
   AInfo.CurrentAnalysisTimeMs := ACurrentMs;
   AInfo.RequiredSampleCount := ASettings.MinSampleCount;
-  AInfo.RequiredWindowDurationSec := 0;
+  AInfo.RequiredWindowDurationSec := ASettings.WindowDurationSec;
   SetLength(Window, 0);
   for I := 0 to High(ASamples) do
     if (ASamples[I].TimeStampMs <= ACurrentMs) and
@@ -1795,8 +1808,7 @@ begin
   else
   begin
     FirstUsedIndex := EligibleCount - 1;
-    while (FirstUsedIndex > 0) and
-          (EligibleCount - FirstUsedIndex < ASettings.MinSampleCount) do
+    while FirstUsedIndex > 0 do
     begin
       { A candidate must be both close enough to the newest sample and
         continuous with the next, already accepted, newer sample. }
@@ -1837,9 +1849,16 @@ begin
     AInfo.HasCurrentValue := True;
   end;
 
-  AInfo.HasEnoughSamples := N > 0;
-  AInfo.HasFullWindow := AInfo.HasEnoughSamples;
+  AInfo.HasEnoughSamples := N >= ASettings.MinSampleCount;
+  AInfo.HasEnoughWindowDuration :=
+    (ASettings.WindowDurationSec <= 0) or
+    (AInfo.ActualWindowDurationSec >= ASettings.WindowDurationSec);
+  AInfo.HasFullWindow := AInfo.HasEnoughSamples and AInfo.HasEnoughWindowDuration;
   AInfo.HasEnoughWindow := AInfo.HasFullWindow;
+  if not AInfo.HasEnoughSamples then
+    Include(AInfo.FailReasons, mvsfrNotEnoughSamples);
+  if not AInfo.HasEnoughWindowDuration then
+    Include(AInfo.FailReasons, mvsfrWindowTooShort);
   if AInfo.HasLastSampleAge and not AInfo.IsDataActual then Include(AInfo.FailReasons, mvsfrStaleData);
 
   Used := Window;
@@ -1957,7 +1976,7 @@ begin
   if not AInfo.IsDeviationStable then Include(AInfo.FailReasons, mvsfrDeviationTooHigh);
   if not AInfo.IsTrendStable then Include(AInfo.FailReasons, mvsfrTrendTooHigh);
 
-  MathStable := AInfo.HasEnoughSamples and AInfo.IsDataActual and
+  MathStable := AInfo.HasFullWindow and AInfo.IsDataActual and
     AInfo.HasStatistics and AInfo.HasTrend and
     AInfo.IsVariationStable and AInfo.IsDeviationStable and AInfo.IsTrendStable and
     AInfo.IsOutlierLevelAcceptable and not (mvsfrInvalidSettings in AInfo.FailReasons);
@@ -1984,11 +2003,20 @@ begin
     ((not ASettings.RequireForecastInRange) or AInfo.IsForecastInRange);
 
   if mvsfrStaleData in AInfo.FailReasons then AInfo.Status := mvssStaleData
-  else if (mvsfrWindowNotFilled in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.Status := mvssNotEnoughData
+  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or
+          (mvsfrWindowTooShort in AInfo.FailReasons) or
+          (mvsfrWindowNotFilled in AInfo.FailReasons) or
+          (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.Status := mvssNotEnoughData
   else if AInfo.IsSignalStable then AInfo.Status := mvssStable
   else AInfo.Status := mvssUnstable;
 
   Msg := '';
+  if mvsfrNotEnoughSamples in AInfo.FailReasons then
+    Msg := Msg + Format('Недостаточно отсчётов: получено %d, требуется не менее %d. ',
+      [AInfo.UsedSampleCount, AInfo.RequiredSampleCount]);
+  if mvsfrWindowTooShort in AInfo.FailReasons then
+    Msg := Msg + Format('Недостаточная длительность окна: получено %.3f с, требуется не менее %.3f с. ',
+      [AInfo.ActualWindowDurationSec, AInfo.RequiredWindowDurationSec]);
   if mvsfrInsufficientTimeSpread in AInfo.FailReasons then Msg := Msg + 'Недостаточный временной интервал между точками для расчёта тренда. ';
   if mvsfrStaleData in AInfo.FailReasons then Msg := Msg + Format('Данные устарели: последнее значение получено %.1f с назад. ', [AInfo.LastSampleAgeSec]);
   if mvsfrVariationTooHigh in AInfo.FailReasons then Msg := Msg + Format('В окне %d отсчётов. Размах %.4f превышает допустимые %.4f. ', [AInfo.UsedSampleCount, AInfo.Variation, ASettings.MaxVariation]);
@@ -1999,7 +2027,10 @@ begin
   if AInfo.IsSuitableForMeasurement then AInfo.StatusText := 'Значение пригодно для измерения.'
   else if mvsfrAnalysisDisabled in AInfo.FailReasons then AInfo.StatusText := 'Анализ стабильности отключён.'
   else if mvsfrNoData in AInfo.FailReasons then AInfo.StatusText := 'Нет актуальных данных.'
-  else if (mvsfrWindowNotFilled in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.StatusText := Trim(Msg)
+  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or
+          (mvsfrWindowTooShort in AInfo.FailReasons) or
+          (mvsfrWindowNotFilled in AInfo.FailReasons) or
+          (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.StatusText := Trim(Msg)
   else if AInfo.IsSignalStable then AInfo.StatusText := 'Сигнал стабилен, но значение вне диапазона.'
   else AInfo.StatusText := 'Сигнал нестабилен.';
 
@@ -3700,6 +3731,7 @@ begin
 
       Ini.WriteBool(Section, 'StabilityEnabled', MV.FStabilitySettings.Enabled);
       Ini.WriteInteger(Section, 'StabilityMinSampleCount', MV.FStabilitySettings.MinSampleCount);
+      Ini.WriteFloat(Section, 'Window_Duration_Sec', MV.FStabilitySettings.WindowDurationSec);
       Ini.WriteInteger(Section, 'Sample_Size', MV.FStabilitySettings.SampleSize);
       Ini.WriteFloat(Section, 'StabilityMaxSampleAgeSec', MV.FStabilitySettings.MaxSampleAgeSec);
       Ini.WriteFloat(Section, 'StabilityMaxVariation', MV.FStabilitySettings.MaxVariation);
@@ -3995,6 +4027,7 @@ begin
 
       MV.FStabilitySettings.Enabled := Ini.ReadBool(Section, 'StabilityEnabled', MV.FStabilitySettings.Enabled);
       MV.FStabilitySettings.MinSampleCount := Ini.ReadInteger(Section, 'StabilityMinSampleCount', MV.FStabilitySettings.MinSampleCount);
+      MV.FStabilitySettings.WindowDurationSec := Ini.ReadFloat(Section, 'Window_Duration_Sec', MV.FStabilitySettings.WindowDurationSec);
       MV.FStabilitySettings.SampleSize := Ini.ReadInteger(Section, 'Sample_Size', MV.FStabilitySettings.SampleSize);
       if MV.FStabilitySettings.SampleSize < 1 then
         MV.FStabilitySettings.SampleSize := 20;
