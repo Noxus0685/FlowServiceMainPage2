@@ -2001,7 +2001,6 @@ begin
 
         Settings := ValueFlow.StabilitySettings;
         ValueFlow.AnalyzePointStabilityForMeasurement(FStabilityDataStartMs,
-          Settings.MinSampleCount,
           Settings.MaxSampleAgeSec, TargetValue, ErrorPercent, SignalInfo);
         StableInfo.LowerLimit := SignalInfo.StabilityLowerLimit;
         StableInfo.UpperLimit := SignalInfo.StabilityUpperLimit;
@@ -2062,7 +2061,7 @@ begin
        Participant.SelectedSourceTargetQLS, TargetValue, TargetDifferenceToPhysicalPoint, MergeToleranceLS,
        BoolToStr(ParticipantFound and (Reason <> 'ParticipantTargetDoesNotMatchPhysicalPoint'), True),
        ErrorPercent, SignalInfo.StabilityLowerLimit, SignalInfo.StabilityUpperLimit,
-       SignalInfo.UsedSampleCount, Settings.MinSampleCount, SignalInfo.WindowDurationSec,
+       SignalInfo.UsedSampleCount, SignalInfo.RequiredSampleCount, SignalInfo.WindowDurationSec,
        Max(0.001, FRequiredDeviceStabilizationSec), BoolToStr(SignalInfo.HasEnoughSamples, True),
        BoolToStr(SignalInfo.HasFullWindow, True), BoolToStr(SignalInfo.IsDataActual, True),
        SignalInfo.OutOfRangeSampleCount, SignalInfo.FirstOutOfRangeSampleValue,
@@ -2201,7 +2200,6 @@ begin
         Settings := StableValue.StabilitySettings;
         if Reason = '' then
           StableValue.AnalyzePointStabilityForMeasurement(FStabilityDataStartMs,
-            Settings.MinSampleCount,
             Settings.MaxSampleAgeSec, TargetValue, PointErrorPercent, SignalInfo)
         else
           SignalInfo := Default(TMeterValueStabilityInfo);
@@ -2218,7 +2216,7 @@ begin
           [BoolToStr(ChannelStable, True), Channel.UUID, Channel.Name, TargetValue, PointErrorPercent,
            SignalInfo.StabilityLowerLimit, SignalInfo.StabilityUpperLimit, Point.FlowAccuracy,
            StableInfo.LowerLimit, StableInfo.UpperLimit, SignalInfo.UsedSampleCount,
-           Settings.MinSampleCount, SignalInfo.WindowDurationSec, Max(0.001, FRequiredDeviceStabilizationSec),
+           SignalInfo.RequiredSampleCount, SignalInfo.WindowDurationSec, Max(0.001, FRequiredDeviceStabilizationSec),
            BoolToStr(SignalInfo.HasEnoughSamples, True), BoolToStr(SignalInfo.HasFullWindow, True),
            BoolToStr(SignalInfo.IsDataActual, True), SignalInfo.OutOfRangeSampleCount,
            SignalInfo.MinValue, SignalInfo.MaxValue,
@@ -4227,7 +4225,7 @@ var
     if AMeterValue = nil then
       Exit;
     Settings := AMeterValue.StabilitySettings;
-    MinHistorySec := Max(1, Settings.MinSampleCount);
+    MinHistorySec := Max(1, Settings.MaxSampleAgeSec);
     NeedSec := Ceil(MinHistorySec) + 1 + SETUP_MARGIN_SEC;
     if FRequiredDeviceStabilizationSec > 0 then
       NeedSec := NeedSec + FRequiredDeviceStabilizationSec;
