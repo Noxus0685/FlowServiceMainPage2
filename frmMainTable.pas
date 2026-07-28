@@ -8494,6 +8494,8 @@ begin
   MenuItemDevicesColumn7.TagObject := StringColumnDeviceRawValue1;
   MenuItemDevicesColumn8.TagObject := StringColumnDeviceFlowRate1;
   MenuItemDevicesColumnMeanFlow.TagObject := StringColumnDeviceAvgFlowRate1;
+  MenuItemDevicesColumnMeanFlow.AutoCheck := False;
+  MenuItemDevicesColumnMeanFlow.Visible := True;
   MenuItemDevicesColumnMeanFlow.OnClick := MenuGridLayOutClick;
   MenuItemDevicesColumn9.TagObject := StringColumnDeviceQuantity1;
   MenuItemDevicesColumn10.TagObject := StringColumnDeviceError1;

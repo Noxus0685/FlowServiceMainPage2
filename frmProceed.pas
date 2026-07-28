@@ -399,6 +399,8 @@ begin
   if GridDataPoints <> nil then
     GridDataPoints.OnDrawColumnCell := GridDataPointsDrawColumnCell;
   MenuItemGridDataPointsMeanFlow.TagObject := StringColumnSpillageMeanFlow;
+  MenuItemGridDataPointsMeanFlow.AutoCheck := False;
+  MenuItemGridDataPointsMeanFlow.Visible := True;
   MenuItemGridDataPointsMeanFlow.OnClick := MenuGridDataPointsColumnClick;
   PopupMenuGridDataPoints.OnPopup := PopupMenuGridDataPointsPopup;
 
