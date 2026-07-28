@@ -132,8 +132,6 @@ type
     EditResultRequiredWindowDuration: TEdit;
     EditResultElapsedWindowSec: TEdit;
     EditResultActualSampleSpan: TEdit;
-    EditResultLastSampleAge: TEdit;
-    EditResultIsDataActual: TEdit;
     EditResultCurrentValue: TEdit;
     EditResultMeanValue: TEdit;
     EditResultMinValue: TEdit;
@@ -220,6 +218,7 @@ type
     function CanRunStabilityAutoRefresh: Boolean;
     procedure UpdateStabilityAutoRefreshTimer;
     procedure RefreshStabilityHistoryAndAnalysis;
+    procedure RecalculateAll(const ARefreshSource, AShowValidationError: Boolean);
     procedure TimerStabilityAutoRefreshTimer(Sender: TObject);
     procedure SetSampleSource(const ASource: TMeterValueSampleSource);
     procedure UpdateSampleSourceControls;
@@ -516,8 +515,6 @@ begin
   EditResultRequiredWindowDuration.ReadOnly := True;
   EditResultElapsedWindowSec.ReadOnly := True;
   EditResultActualSampleSpan.ReadOnly := True;
-  EditResultLastSampleAge.ReadOnly := True;
-  EditResultIsDataActual.ReadOnly := True;
   EditResultCurrentValue.ReadOnly := True;
   EditResultMeanValue.ReadOnly := True;
   EditResultMinValue.ReadOnly := True;
@@ -544,7 +541,7 @@ begin
   SetHintFor('LabelStabilityDisplayUnit', 'Единица, выбранная для отображения текущего TMeterValue. Все размерные значения результатов и соответствующие настройки показываются в этой единице. Внутреннее хранение может выполняться в базовой единице.');
   SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения по заданным критериям.');
   SetHintFor('LabelMinSampleCount', 'Количество последних точек в окне и минимальное количество точек для подтверждения стабильности.');
-  SetHintFor('LabelSampleSize', 'Максимальное количество последних точек рабочей истории и строк таблицы истории TMeterValue.');
+  SetHintFor('LabelSampleSize', 'Максимальное количество последних точек, хранящихся в рабочем массиве истории TMeterValue и отображаемых в таблице.');
   SetHintFor('LabelMinWindowDurationSec', 'Минимальное время от первой точки текущего окна до времени анализа, необходимое для подтверждения стабильности.');
   SetHintFor('LabelMaxSampleAgeSec', 'Максимально допустимый возраст самой новой точки относительно времени анализа.');
   SetHintFor('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности, задающий гистерезис выхода.');
@@ -937,15 +934,14 @@ begin
   SetLabelText('LabelGeneratorNoise', 'Шум ±, ' + UnitName);
   SetLabelText('LabelGeneratorOutlierAmplitude', 'Амплитуда выброса, ' + UnitName);
   SetLabelText('LabelMinSampleCount', 'Количество отсчётов в окне, шт.');
-  SetLabelText('LabelSampleSize', 'Количество отображаемых данных, шт.');
+  SetLabelText('LabelSampleSize', 'Размер массива, шт.');
   SetLabelText('LabelMinWindowDurationSec', 'Минимальная длительность окна, с');
-  SetLabelText('LabelResultSampleCount', 'Количество отображаемых данных');
+  SetLabelText('LabelResultSampleCount', 'Размер массива');
   SetLabelText('LabelResultConfiguredWindowSampleCount', 'Количество отсчётов в окне');
   SetLabelText('LabelResultUsedSampleCount', 'Использовано отсчётов');
   SetLabelText('LabelResultRequiredWindowDuration', 'Минимальная длительность окна, с');
   SetLabelText('LabelResultElapsedWindowSec', 'Прошло с начала окна, с');
   SetLabelText('LabelResultActualSampleSpan', 'Интервал первой–последней точки, с');
-  SetLabelText('LabelResultIsDataActual', 'Актуальность данных');
   SetLabelText('LabelMaxSampleAgeSec', 'Максимальный возраст данных, с');
   SetLabelText('LabelMaxVariation', 'Максимальный размах, ' + UnitName);
   SetLabelText('LabelMaxStdDeviation', 'Максимальное стандартное отклонение, ' + UnitName);
@@ -989,7 +985,7 @@ begin
   SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения. При отключении анализ не подтверждает готовность измерения.');
   SetHintFor('ComboBoxSampleSource', 'Выбирает массив для preview-анализа. История TMeterValue использует рабочую историю текущего значения. Тестовый массив не изменяет рабочую историю.');
   SetLabelHint('LabelMinSampleCount', 'Количество последних точек в окне и минимальное количество точек для подтверждения стабильности. Единица: шт.');
-  SetLabelHint('LabelSampleSize', 'Максимальное количество последних точек рабочей истории и строк таблицы истории TMeterValue. Единица: шт.');
+  SetLabelHint('LabelSampleSize', 'Максимальное количество последних точек, хранящихся в рабочем массиве истории TMeterValue и отображаемых в таблице.');
   SetLabelHint('LabelMinWindowDurationSec', 'Минимальное время от первой точки текущего окна до текущего времени анализа. Не влияет на отбор точек, их количество или актуальность.');
   SetLabelHint('LabelMaxSampleAgeSec', 'Максимально допустимый возраст самой новой точки относительно времени анализа. На состав окна и разрывы между точками не влияет. При значении не больше нуля проверка отключена. Единица: с.');
   SetLabelHint('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности. Большее значение создаёт гистерезис и снижает частые переключения, меньшее быстрее снимает подтверждение. Безразмерная величина.');
@@ -1086,49 +1082,34 @@ begin
   end;
 end;
 
-procedure TFrameMeterValueEdit.RefreshStabilityHistoryAndAnalysis;
-var
-  WasLastRow: Boolean;
-  SelectedTimeStampMs: Int64;
-  SelectedRow: Integer;
-  I: Integer;
+procedure TFrameMeterValueEdit.RecalculateAll(const ARefreshSource,
+  AShowValidationError: Boolean);
 begin
-  if (GridSamples <> nil) and GridSamples.IsFocused and (FSampleSource = mssTestSamples) then
+  AnalyzeDisplayedSamples(FSampleSource = mssWorkHistory,
+    AShowValidationError, ARefreshSource);
+  GridSamples.Repaint;
+  UpdateStabilityChart;
+end;
+
+procedure TFrameMeterValueEdit.RefreshStabilityHistoryAndAnalysis;
+begin
+  if (GridSamples <> nil) and GridSamples.IsFocused and
+     (FSampleSource = mssTestSamples) then
     Exit;
   if not CanRunStabilityAutoRefresh then
     Exit;
 
-  SelectedRow := GridSamples.Row;
-  WasLastRow := (SelectedRow >= 0) and (SelectedRow = GridSamples.RowCount - 1);
-  SelectedTimeStampMs := -1;
-  if (SelectedRow >= 0) and (SelectedRow < Length(FDisplayedSamples)) and
-     (GetSampleIndexForGridRow(SelectedRow) >= 0) then
-    SelectedTimeStampMs := FDisplayedSamples[GetSampleIndexForGridRow(SelectedRow)].TimeStampMs;
-
-  RefreshDisplayedSamples;
-  if FSampleSource = mssWorkHistory then
-    FTestCurrentTimeMs := TMeterValue.GetMonotonicTimeMs;
-  RefreshSamplesGrid(False);
-
-  if WasLastRow and (GridSamples.RowCount > 0) then
-    GridSamples.Row := GridSamples.RowCount - 1
-  else if SelectedTimeStampMs >= 0 then
-    for I := 0 to High(FDisplayedSamples) do
-      if FDisplayedSamples[I].TimeStampMs = SelectedTimeStampMs then
-      begin
-        GridSamples.Row := GetGridRowForSampleIndex(I);
-        Break;
-      end;
-  GridSamples.Selected := GridSamples.Row;
-
-  AnalyzeDisplayedSamples(FSampleSource = mssWorkHistory, False, False);
-  UpdateStabilityChart;
+  RecalculateAll(FSampleSource = mssWorkHistory, False);
 end;
 
 procedure TFrameMeterValueEdit.SetAnalysisTimeByLastDisplayedSample;
 begin
   if Length(FDisplayedSamples) = 0 then
+  begin
+    FTestCurrentTimeMs := 0;
+    EditAnalysisTime.Text := '0';
     Exit;
+  end;
   FTestCurrentTimeMs := FDisplayedSamples[High(FDisplayedSamples)].TimeStampMs;
   EditAnalysisTime.Text := FloatToStr(FTestCurrentTimeMs / 1000.0);
 end;
@@ -1139,11 +1120,23 @@ begin
   if ComboBoxSampleSource <> nil then
     ComboBoxSampleSource.ItemIndex := Ord(FSampleSource);
   UpdateSampleSourceControls;
-  RefreshSamplesGrid;
-  if FSampleSource = mssWorkHistory then
-    Analyze
+  RefreshDisplayedSamples;
+  if FSampleSource = mssTestSamples then
+  begin
+    FTestCurrentTimeMs := 0;
+    EditAnalysisTime.Text := '0';
+  end
   else
-    AnalyzeIfNeeded;
+    SetAnalysisTimeByLastDisplayedSample;
+
+  RefreshSamplesGrid(False);
+  if CheckBoxAutoAnalyze.IsChecked then
+    RecalculateAll(False, False)
+  else
+  begin
+    ClearTestAnalysis;
+    UpdateStabilityChart;
+  end;
   UpdateStabilityAutoRefreshTimer;
 end;
 
@@ -1274,10 +1267,10 @@ end;
 
 procedure TFrameMeterValueEdit.ButtonUseLastSampleTimeClick(Sender: TObject);
 begin
-  if Length(FDisplayedSamples) = 0 then
-    Exit;
+  if FSampleSource = mssWorkHistory then
+    RefreshDisplayedSamples;
   SetAnalysisTimeByLastDisplayedSample;
-  AnalyzeDisplayedSamples(FSampleSource = mssWorkHistory, True, False);
+  RecalculateAll(False, True);
 end;
 
 function TFrameMeterValueEdit.SampleSecondsToMs(const ASeconds: Double): Int64;
@@ -1577,8 +1570,6 @@ begin
   EditResultRequiredWindowDuration.Text := EmptyText;
   EditResultElapsedWindowSec.Text := EmptyText;
   EditResultActualSampleSpan.Text := EmptyText;
-  EditResultLastSampleAge.Text := EmptyText;
-  EditResultIsDataActual.Text := EmptyText;
   EditResultCurrentValue.Text := EmptyText;
   EditResultMeanValue.Text := EmptyText;
   EditResultMinValue.Text := EmptyText;
@@ -2039,7 +2030,7 @@ end;
 
 procedure TFrameMeterValueEdit.ButtonAnalyzeClick(Sender: TObject);
 begin
-  AnalyzeDisplayedSamples(False, True, False);
+  RecalculateAll(FSampleSource = mssWorkHistory, True);
 end;
 
 procedure TFrameMeterValueEdit.ButtonGenerateNewClick(Sender: TObject);
@@ -2311,8 +2302,6 @@ var
   LowerLimit: Double;
   UpperLimit: Double;
   I: Integer;
-  OldSampleCount: Integer;
-  OldRowCount: Integer;
   SelectedRow: Integer;
   SelectedTimeStampMs: Int64;
   SelectedSampleValue: Double;
@@ -2321,8 +2310,6 @@ begin
   if FMeterValue = nil then
     Exit;
 
-  OldSampleCount := Length(FDisplayedSamples);
-  OldRowCount := GridSamples.RowCount;
   SelectedRow := GridSamples.Row;
   SelectedTimeStampMs := 0;
   SelectedSampleValue := 0;
@@ -2336,8 +2323,6 @@ begin
   if ARefreshSource then
   begin
     RefreshDisplayedSamples;
-    OldSampleCount := Length(FDisplayedSamples);
-    OldRowCount := Length(FDisplayedSamples);
   end;
 
   if Length(FDisplayedSamples) = 0 then
@@ -2381,18 +2366,24 @@ begin
   DisplayAnalysis(FTestStabilityInfo);
   RefreshSamplesGrid(False);
 
-  if (SelectedRow >= 0) and (SelectedRow < GridSamples.RowCount) then
+  if SelectedRow >= 0 then
   begin
-    GridSamples.Row := SelectedRow;
-    GridSamples.Selected := SelectedRow;
-    if (GetSampleIndexForGridRow(SelectedRow) >= 0) and
-       (FDisplayedSamples[GetSampleIndexForGridRow(SelectedRow)].TimeStampMs = SelectedTimeStampMs) and
-       SameValue(FDisplayedSamples[GetSampleIndexForGridRow(SelectedRow)].Value, SelectedSampleValue) then
-      LoadSampleToEditor(SelectedRow);
+    GridSamples.Row := Min(SelectedRow, GridSamples.RowCount - 1);
+    for I := 0 to High(FDisplayedSamples) do
+      if (FDisplayedSamples[I].TimeStampMs = SelectedTimeStampMs) and
+         SameValue(FDisplayedSamples[I].Value, SelectedSampleValue) then
+      begin
+        GridSamples.Row := GetGridRowForSampleIndex(I);
+        Break;
+      end;
+    if GridSamples.Row >= 0 then
+    begin
+      GridSamples.Selected := GridSamples.Row;
+      LoadSampleToEditor(GridSamples.Row);
+    end;
   end;
 
-  Assert(Length(FDisplayedSamples) = OldSampleCount);
-  Assert(GridSamples.RowCount = OldRowCount);
+  GridSamples.Repaint;
   UpdateStabilityChart;
 end;
 
@@ -2441,8 +2432,6 @@ begin
     AInfo.UsedSampleCount > 0, 3);
   EditResultActualSampleSpan.Text := FormatInfoFloat(AInfo.ActualSampleSpanSec,
     AInfo.UsedSampleCount > 0, 3);
-  EditResultLastSampleAge.Text := FormatInfoFloat(AInfo.LastSampleAgeSec, AInfo.HasLastSampleAge, 2);
-  EditResultIsDataActual.Text := BoolText(AInfo.IsDataActual);
   EditResultCurrentValue.Text := FormatBaseInfo(AInfo.CurrentValue, AInfo.HasCurrentValue);
   EditResultMeanValue.Text := FormatBaseInfo(AInfo.MeanValue, AInfo.HasStatistics);
   EditResultMinValue.Text := FormatBaseInfo(AInfo.MinValue, AInfo.HasStatistics);
@@ -2987,11 +2976,11 @@ begin
   else if IntValue < 1 then
     AErrorText := 'Количество отсчётов в окне должно быть не меньше 1.'
   else if not TryReadInteger(EditSampleSize.Text, IntValue) then
-    AErrorText := 'Некорректное количество отображаемых данных.'
+    AErrorText := 'Некорректный размер массива.'
   else if IntValue < 1 then
-    AErrorText := 'Количество отображаемых данных должно быть не меньше 1.'
+    AErrorText := 'Размер массива должен быть не меньше 1.'
   else if StrToInt(Trim(EditMinSampleCount.Text)) > IntValue then
-    AErrorText := 'Количество отсчётов в окне не может превышать количество отображаемых данных'
+    AErrorText := 'Количество отсчётов в окне не может превышать размер массива'
   else if (not TryReadFloat(EditMinWindowDurationSec.Text, DoubleValue)) or (DoubleValue < 0) then
     AErrorText := 'Минимальная длительность окна должна быть неотрицательным числом'
   else if not TryReadFloat(EditMaxSampleAgeSec.Text, DoubleValue) then
