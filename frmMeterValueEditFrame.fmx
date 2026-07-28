@@ -729,6 +729,23 @@
                 Size.Height = 24.000000000000000000
                 Size.PlatformDefault = False
               end
+              object LabelSampleSize: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 92.000000000000000000
+                Size.Width = 240.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = #1050#1086#1083#1080#1095#1077#1089#1090#1074#1086' '#1086#1090#1086#1073#1088#1072#1078#1072#1077#1084#1099#1093' '#1076#1072#1085#1085#1099#1093', '#1096#1090'.'
+              end
+              object EditSampleSize: TEdit
+                Touch.InteractiveGestures = [LongTap, DoubleTap]
+                TabOrder = 2
+                Position.X = 280.000000000000000000
+                Position.Y = 90.000000000000000000
+                Size.Width = 120.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+              end
               object LabelMaxSampleAgeSec: TLabel
                 Position.X = 12.000000000000000000
                 Position.Y = 122.000000000000000000
