@@ -391,10 +391,11 @@ var
   T: TDeviceType;
 
   AllNode, ManNode, CatNode, ModNode: TTreeViewItem;
-  PrevSelectedNode, RestoredNode: TTreeViewItem;
+  SelectedNode, RestoredNode: TTreeViewItem;
   PrevNodeText, PrevNodeTagString, PrevNodePath: string;
   PrevNodeTag: NativeInt;
   PrevExpandedPaths: TStringList;
+  HasPreviousSelection: Boolean;
   ManText, ManKey: string;
   CatText, CatKey: string;
   ModText, ModKey: string;
@@ -491,6 +492,7 @@ begin
   end;
 
 
+  PrevExpandedPaths := nil;
   TreeViewTypes.BeginUpdate;
   try
     PrevExpandedPaths := TStringList.Create;
@@ -500,18 +502,25 @@ begin
     for I := 0 to TreeViewTypes.Count - 1 do
       CollectExpandedNodes(TreeViewTypes.ItemByIndex(I));
 
-    PrevSelectedNode := GetActiveTreeNode;
     PrevNodeText := '';
     PrevNodeTagString := '';
     PrevNodeTag := -1;
     PrevNodePath := '';
-    if PrevSelectedNode <> nil then
+    SelectedNode := GetActiveTreeNode;
+    HasPreviousSelection := SelectedNode <> nil;
+    if HasPreviousSelection then
     begin
-      PrevNodeText := PrevSelectedNode.Text;
-      PrevNodeTagString := NormalizeTreeKey(PrevSelectedNode.TagString);
-      PrevNodeTag := PrevSelectedNode.Tag;
-      PrevNodePath := BuildNodePath(PrevSelectedNode);
+      PrevNodeText := SelectedNode.Text;
+      PrevNodeTagString := NormalizeTreeKey(SelectedNode.TagString);
+      PrevNodeTag := SelectedNode.Tag;
+      PrevNodePath := BuildNodePath(SelectedNode);
     end;
+
+    // После очистки дерева допустимо использовать только сохраненные значения:
+    // все ссылки на прежние TTreeViewItem становятся недействительными.
+    SelectedNode := nil;
+    TreeViewTypes.Selected := nil;
+    TreeViewTypes.Clear;
 
     {----------------------------------}
     { Корневой узел }
@@ -687,7 +696,7 @@ begin
     end;
 
     RestoredNode := nil;
-    if PrevSelectedNode <> nil then
+    if HasPreviousSelection then
     begin
       for I := 0 to TreeViewTypes.Count - 1 do
       begin
@@ -2136,13 +2145,8 @@ end;
 
 procedure TFormTypeSelect.RebuildTreeFull;
 begin
-  TreeViewTypes.BeginUpdate;
-  try
-    TreeViewTypes.Clear;
-  finally
-    TreeViewTypes.EndUpdate;
-  end;
-
+  // BuildTree самостоятельно сохраняет состояние значениями и лишь затем
+  // очищает дерево; предварительная очистка уничтожила бы это состояние.
   BuildTree;
 end;
 
@@ -2827,4 +2831,3 @@ end;
 
 
 end.
-
