@@ -1,11 +1,11 @@
 object FrameProtocol: TFrameProtocol
-  Size.Width = 600.000000000000000000
+  Size.Width = 814.000000000000000000
   Size.Height = 400.000000000000000000
   Size.PlatformDefault = False
   object ListBoxProtocol: TListBox
     Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
     Align = Client
-    Size.Width = 600.000000000000000000
+    Size.Width = 814.000000000000000000
     Size.Height = 344.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
@@ -13,13 +13,13 @@ object FrameProtocol: TFrameProtocol
     DefaultItemStyles.ItemStyle = ''
     DefaultItemStyles.GroupHeaderStyle = ''
     DefaultItemStyles.GroupFooterStyle = ''
-    Viewport.Width = 596.000000000000000000
+    Viewport.Width = 810.000000000000000000
     Viewport.Height = 340.000000000000000000
   end
   object LayoutFilters: TLayout
     Align = Top
     Position.Y = 32.000000000000000000
-    Size.Width = 600.000000000000000000
+    Size.Width = 814.000000000000000000
     Size.Height = 24.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 1
@@ -48,7 +48,7 @@ object FrameProtocol: TFrameProtocol
       Size.Width = 71.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 3
+      TabOrder = 5
       Text = 'ACTION'
       OnChange = FilterChanged
     end
@@ -58,7 +58,7 @@ object FrameProtocol: TFrameProtocol
       Size.Width = 56.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 4
+      TabOrder = 6
       Text = 'FRM'
       OnChange = FilterChanged
     end
@@ -68,7 +68,7 @@ object FrameProtocol: TFrameProtocol
       Size.Width = 48.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 5
+      TabOrder = 7
       Text = 'PAR'
       OnChange = FilterChanged
     end
@@ -78,7 +78,7 @@ object FrameProtocol: TFrameProtocol
       Size.Width = 48.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 6
+      TabOrder = 8
       Text = 'WT'
       OnChange = FilterChanged
     end
@@ -88,7 +88,7 @@ object FrameProtocol: TFrameProtocol
       Size.Width = 48.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 7
+      TabOrder = 9
       Text = 'MR'
       OnChange = FilterChanged
     end
@@ -98,23 +98,43 @@ object FrameProtocol: TFrameProtocol
       Size.Width = 55.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 8
+      TabOrder = 10
       Text = 'MKS'
       OnChange = FilterChanged
     end
     object CheckBoxWorkLog: TCheckBox
       Align = Left
       Position.X = 464.000000000000000000
-      Size.Width = 71.000000000000000000
+      Size.Width = 89.000000000000000000
+      Size.Height = 24.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 4
+      Text = 'WORKLOG'
+      OnChange = FilterChanged
+    end
+    object CheckBoxProc: TCheckBox
+      Align = Left
+      Position.X = 553.000000000000000000
+      Size.Width = 89.000000000000000000
+      Size.Height = 24.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 3
+      Text = 'PROC'
+      OnChange = FilterChanged
+    end
+    object CheckBoxHandler: TCheckBox
+      Align = Left
+      Position.X = 642.000000000000000000
+      Size.Width = 89.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 2
-      Text = 'WORKLOG'
+      Text = 'HANDLER'
       OnChange = FilterChanged
     end
   end
   object ToolBarProtocol: TToolBar
-    Size.Width = 600.000000000000000000
+    Size.Width = 814.000000000000000000
     Size.Height = 32.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 2

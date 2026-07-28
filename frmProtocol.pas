@@ -39,6 +39,8 @@ type
     CheckBoxMKS: TCheckBox;
     ListBoxProtocol: TListBox;
     CheckBoxWorkLog: TCheckBox;
+    CheckBoxProc: TCheckBox;
+    CheckBoxHandler: TCheckBox;
     procedure SpeedButtonResumeClick(Sender: TObject);
     procedure SpeedButtonPauseClick(Sender: TObject);
     procedure SpeedButtonClearClick(Sender: TObject);
@@ -196,6 +198,8 @@ begin
     LoadCheckBoxSetting(Ini, CheckBoxMeasurement);
     LoadCheckBoxSetting(Ini, CheckBoxMKS);
     LoadCheckBoxSetting(Ini, CheckBoxWorkLog);
+    LoadCheckBoxSetting(Ini, CheckBoxProc);
+    LoadCheckBoxSetting(Ini, CheckBoxHandler);
     for I := 0 to ComponentCount - 1 do
       if Components[I] is TComboBox then
       begin
@@ -230,7 +234,8 @@ begin
     SaveCheckBoxSetting(Ini, CheckBoxMeasurement);
     SaveCheckBoxSetting(Ini, CheckBoxMKS);
     SaveCheckBoxSetting(Ini, CheckBoxWorkLog);
-
+        SaveCheckBoxSetting(Ini, CheckBoxProc);
+        SaveCheckBoxSetting(Ini, CheckBoxHandler);
     for I := 0 to ComponentCount - 1 do
       if Components[I] is TComboBox then
         SaveComboBoxSetting(Ini, TComboBox(Components[I]));
@@ -359,6 +364,9 @@ begin
     pcAction: Result := CheckBoxAction.IsChecked;
     pcMKS: Result := CheckBoxMKS.IsChecked;
     pcWorkLog: Result := CheckBoxWorkLog.IsChecked;
+    pcProc: Result := CheckBoxProc.IsChecked;
+    pcHandler: Result := CheckBoxHandler.IsChecked;
+
   end;
 
   if (not Result) or (Msg.Category = pcMKS) then

@@ -864,8 +864,6 @@ type
     function IsMeasurementActive(AWorkTable: TWorkTable): Boolean;
     function NeedSaveMeasurementResults(AWorkTable: TWorkTable): Boolean;
     procedure AcceptMeasurementResults;
-    procedure RequestStartTest;
-    procedure RequestStopTest;
 
     procedure InitializeAutoMeasurementTestTab;
     procedure RefreshAutoMeasurementTestContext;
@@ -1419,18 +1417,6 @@ begin
     FActiveWorkTable.StopMonitor;
     ProtocolManager.AddMessage(pcAction, psForm, 'StopMonitor', 'Пользователь запросил остановку мониторинга', FActiveWorkTable.Name);
   end;
-end;
-
-procedure TFrameMainTable.RequestStartTest;
-begin
-  if Assigned(FOnWorkTableCommand) and (FActiveWorkTable <> nil) then
-    FOnWorkTableCommand(FActiveWorkTable, awtStartTest);
-end;
-
-procedure TFrameMainTable.RequestStopTest;
-begin
-  if Assigned(FOnWorkTableCommand) and (FActiveWorkTable <> nil) then
-    FOnWorkTableCommand(FActiveWorkTable, awtStopTest);
 end;
 
 procedure TFrameMainTable.StartMeasurement;
@@ -5548,7 +5534,7 @@ procedure TFrameMainTable.AddFlowGraphSamples(const ATimeStampMs: Int64);
   procedure LogSample(const AKind, AKey: string; const ARawValue: Double; const AAccepted: Boolean; const AReason: string; const ASamplesBefore, ASamplesAfter: Integer);
   begin
     if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(pcAction, psForm, 'FlowGraphAddSample',
+      ProtocolManager.AddMessage(pcMKS, psForm, 'FlowGraphAddSample',
         Format('PointIndex=%d; PointKey=%s; SeriesKind=%s; SeriesKey=%s; RawValueLS=%g; Accepted=%s; RejectReason=%s; TimeStampMs=%d; SegmentStartMs=%d; SamplesBefore=%d; SamplesAfter=%d',
           [FCurrentGraphPointIndex, FCurrentGraphPointKey, AKind, AKey, ARawValue, BoolToStr(AAccepted, True), AReason,
            ATimeStampMs, FCurrentGraphPointStartMs, ASamplesBefore, ASamplesAfter]), '');
@@ -5772,7 +5758,7 @@ begin
       AxisMaxDisplay := FlowToCurrentDimension(YDataMax + PaddingLS);
       SetFlowChartYAxis(AChart, AxisMinDisplay, AxisMaxDisplay);
       if Assigned(ProtocolManager) then
-        ProtocolManager.AddMessage(pcAction, psForm, 'FlowChartLimits',
+        ProtocolManager.AddMessage(pcMKS, psForm, 'FlowChartLimits',
           Format('PointName=%s; PointQ_LS=%.12g; PointQ_Display=%.12g; FlowAccuracy=%s; LowerLS=%.12g; UpperLS=%.12g; LowerDisplay=%.12g; UpperDisplay=%.12g; ActualMinLS=%.12g; ActualMaxLS=%.12g; ActualMinDisplay=%.12g; ActualMaxDisplay=%.12g; YAxisMin=%.12g; YAxisMax=%.12g; DisplayUnit=%s',
             [FCurrentGraphPointKey, Limits.TargetLS, FlowToCurrentDimension(Limits.TargetLS), TMeasurementRun(FActiveWorkTable.MeasurementRun).CurrentPoint.FlowAccuracy, Limits.LowerLS, Limits.UpperLS, FlowToCurrentDimension(Limits.LowerLS), FlowToCurrentDimension(Limits.UpperLS), DataMinLS, DataMaxLS, FlowToCurrentDimension(DataMinLS), FlowToCurrentDimension(DataMaxLS), AxisMinDisplay, AxisMaxDisplay, UnitName]), '');
     end;
@@ -5900,7 +5886,7 @@ begin
   end;
 
   if Assigned(ProtocolManager) then
-    ProtocolManager.AddMessage(pcAction, psForm, 'FlowGraphTick',
+    ProtocolManager.AddMessage(pcMKS, psForm, 'FlowGraphTick',
       Format('TimeMs=%d; RunActive=%s; LastRunActive=%s; NewRunStarted=%s; Stage=%d; WorkTableState=%d; CurrentPointAssigned=%s; CurrentPointIndex=%d; CurrentPointKey=%s; StoredPointKey=%s; SegmentStartMs=%d; ChannelsReady=%s; SamplingActive=%s',
         [CurrentTimeMs, BoolToStr(RunActive, True), BoolToStr(FLastGraphRunActive, True), BoolToStr(NewRunStarted, True),
          StageOrdinal, WorkTableStateOrdinal, BoolToStr(Point <> nil, True), PointIndex, PointKey, FCurrentGraphPointKey, FCurrentGraphPointStartMs,

@@ -24,14 +24,19 @@ type
   private
     FAction: Integer;
   public
+    SourceName: string;
+    Description: string;
     constructor Create(AAction: Integer);
     property Action: Integer read FAction;
+
   end;
 
   TEventNotification = class
   private
     FEvent: Integer;
   public
+    SourceName: string;
+    Description: string;
     constructor Create(AEvent: Integer);
     property Event: Integer read FEvent;
   end;
@@ -41,6 +46,8 @@ type
     FOldState: Integer;
     FNewState: Integer;
   public
+    SourceName: string;
+    Description: string;
     constructor Create(AOldState: Integer; ANewState: Integer);
     property OldState: Integer read FOldState;
     property NewState: Integer read FNewState;
@@ -86,12 +93,16 @@ constructor TActionNotification.Create(AAction: Integer);
 begin
   inherited Create;
   FAction := AAction;
+      SourceName:= '-';
+    Description:= '-';
 end;
 
 constructor TEventNotification.Create(AEvent: Integer);
 begin
   inherited Create;
   FEvent := AEvent;
+        SourceName:= '-';
+    Description:= '-';
 end;
 
 constructor TStateNotification.Create(AOldState: Integer; ANewState: Integer);
@@ -99,6 +110,8 @@ begin
   inherited Create;
   FOldState := AOldState;
   FNewState := ANewState;
+  SourceName:= '-';
+  Description:= '-';
 end;
 
 constructor TObservableObject.Create;
@@ -214,13 +227,20 @@ end;
 procedure TObservableObject.NotifyOwned(Event: Integer; Data: TObject);
 var
   LocalObservers: TArray<IEventObserver>;
+  LocalData: TObject;
+  LocalEvent: Integer;
 begin
   if Data = nil then
     Exit;
 
-  if FIsDestroying or (FObserversLock = nil) or (FObservers = nil) then
+  LocalData := Data;
+  LocalEvent := Event;
+
+  if FIsDestroying or
+     (FObserversLock = nil) or
+     (FObservers = nil) then
   begin
-    Data.Free;
+    LocalData.Free;
     Exit;
   end;
 
@@ -241,13 +261,19 @@ begin
         for I := 0 to Length(LocalObservers) - 1 do
         begin
           Observer := LocalObservers[I];
+
           if Observer <> nil then
-            Observer.OnNotify(Self, Event, Data);
+            Observer.OnNotify(
+              Self,
+              LocalEvent,
+              LocalData
+            );
         end;
       finally
-        Data.Free;
+        LocalData.Free;
       end;
-    end);
+    end
+  );
 end;
 
 procedure TObservableObject.NotifyOwned(AEvent: ENotifyEvent; Data: TObject);

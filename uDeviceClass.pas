@@ -212,7 +212,9 @@ type
     DateTime: TDateTime;         // Дата/время окончания измерения
     ArchivedData: string;        // Архив сырых данных (по секундам и т.п.)
 
-    constructor Create(ADeviceID : Integer);
+    constructor Create(ADeviceID : Integer);  overload;
+    constructor Create; overload;
+
     destructor Destroy; override;
 
     procedure Assign(ASource: TDevicePoint; FullAssign: Boolean);
@@ -1165,6 +1167,70 @@ begin
     end;
 end;
 
+
+
+constructor TDevicePoint.Create;
+begin
+  inherited Create;
+
+  DataPoints := TObjectList<TPointSpillage>.Create(False);
+  ProtocolDataPoints := TObjectList<TPointSpillage>.Create(False);
+
+  FID := 0;
+  FState := osClean;
+  FEnabled := True;
+
+  { Идентификация }
+  DeviceID := -1;
+  DeviceTypeUUID := '';
+
+  { Общая информация }
+  Name := 'Точка вспомогательная';
+  Description := 'Точка измерения не принадлежащая устройству';
+  Num := 0;
+  DateTime := 0;
+
+  { Параметры расхода }
+  FlowRate := 0.0;
+  Q := 0.0;
+  FlowAccuracy := '';
+
+  { Условия измерения }
+  Pressure := 0.0;
+  Temp := 0.0;
+  TempAccuracy := '';
+
+  { Ограничения }
+  LimitImp := 0;
+  LimitVolume := 0.0;
+  LimitTime := 0.0;
+  SpillageStop := STOP_BY_TIME;
+  SpillageType := Integer(stWithoutStop);
+  EtalonType := Integer(etAuto);
+  FlowSorceType := Integer(fstNone );
+
+  { Метрология }
+  Error := 0.0;
+
+  { Дополнительно }
+  Pause := 0;
+  RequireAutoStabilization := False;
+  RequiredStabilizationSec := 0.0;
+
+  { Повторы }
+  RepeatsProtocol := 0;
+  Repeats := 0;
+  RepeatsCompleted := 0;
+
+  Status := mptsNone;
+  StatusStr := '-';
+  ResultError := 0.0;
+  AverageError := 0.0;
+  StdDev := 0.0;
+end;
+
+
+
 constructor TDevicePoint.Create(ADeviceID : Integer);
 begin
   inherited Create;
@@ -1224,8 +1290,6 @@ begin
   AverageError := 0.0;
   StdDev := 0.0;
 end;
-
-
 
 destructor TDevicePoint.Destroy;
 begin

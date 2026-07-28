@@ -19,6 +19,7 @@ type
 
   EProtocolCategory = (
     pcNone,
+    pcProc,
     pcEvent,
     pcState,
     pcAction,
@@ -26,7 +27,9 @@ type
     pcInfo,
     pcWarning,
     pcError,
-    pcWorkLog
+    pcWorkLog,
+    pcHandler
+
   );
 
   TProtocolSource = (
@@ -316,6 +319,9 @@ begin
     pcAction: Result := 'ACTION';
     pcMKS: Result := 'MKS';
     pcInfo: Result := 'INFO';
+    pcProc: Result := 'PROC';
+    pcHandler: Result := 'HANDLER';
+
     pcWarning: Result := 'Warning!';
     pcError: Result := 'Error!';
   else

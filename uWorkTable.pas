@@ -2903,6 +2903,8 @@ type
   // Список каналов, составляющих один вариант выбора.
   TChannelList = TList<TChannel>;
 
+
+
 var
   I: Integer;
   Channel: TChannel;
@@ -2931,6 +2933,31 @@ var
   BestGroupCount: Integer;
 
   SelectionDescription: string;
+
+  procedure ProtocolSelection(
+    const AStage: string;
+    const AResult: string;
+    const ADetails: string
+  );
+  begin
+    if ProtocolManager = nil then
+      Exit;
+
+    ProtocolManager.AddMessage(
+      pcInfo,
+      psWorkTable,
+      'SelectEtalons.' + AStage,
+      AResult,
+      Format(
+        'WorkTable="%s"; Target=%.6f; %s',
+        [
+          Name,
+          AFlowRate,
+          ADetails
+        ]
+      )
+    );
+  end;
 
   procedure SetSelectionError(ACode: Integer; const AMsg: string);
   begin
@@ -2969,7 +2996,7 @@ var
 
     // Канал без назначенного расходомера не может участвовать
     // в выборе эталонного набора.
-    if (AChannel = nil) or (not AChannel.Enabled) or (AChannel.State = osDeleted) or
+    if (AChannel = nil) or {(not AChannel.Enabled) or} (AChannel.State = osDeleted) or
        (AChannel.FlowMeter = nil) then
       Exit;
 
@@ -3162,6 +3189,22 @@ begin
   // освобождает их благодаря doOwnsValues.
   Groups := TObjectDictionary<Integer, TChannelList>.Create([doOwnsValues]);
   try
+
+  if FEtalonChannels <> nil then
+    ProtocolSelection(
+      'Begin',
+      'Начат предварительный выбор эталонов',
+      Format('EtalonChannelCount=%d', [FEtalonChannels.Count])
+    )
+  else
+    ProtocolSelection(
+      'Begin',
+      'Начат предварительный выбор эталонов',
+      'EtalonChannelCount=0; Collection=nil'
+    );
+
+
+
     // Проверяем наличие коллекции эталонных каналов.
     //
     // При ошибке существующие значения Channel.Enabled не изменяются.
@@ -3198,10 +3241,54 @@ begin
       Channel := FEtalonChannels[I];
 
       if not IsChannelValidForSelection(Channel) then
+      begin
+
+              ProtocolSelection(
+          'Candidate',
+          'Канал отклонён до проверки диапазона',
+          Format(
+            'Index=%d; Enabled=%s; State=%d; Group=%d; ' +
+            'FlowMeterAssigned=%s; QMinWork=%.6f; QMaxWork=%.6f',
+            [
+              I,
+              BoolToStr(Channel.Enabled,'True','False'),
+              Ord(Channel.State),
+              Channel.Group,
+              BoolToStr(Channel.FlowMeter <> nil,'True','False'),
+              Channel.QMinWork,
+              Channel.QMaxWork
+            ]
+          )
+        );
+
         Continue;
+        end;
 
       FlowMin := GetChannelFlowMin(Channel);
       FlowMax := GetChannelFlowMax(Channel);
+
+       ProtocolSelection(
+        'Candidate',
+        'Канал допущен к проверке диапазона',
+        Format(
+          'Index=%d; Name="%s"; Enabled=%s; Group=%d; ' +
+          'QMinWork=%.6f; QMaxWork=%.6f; ' +
+          'TargetInsideRange=%s',
+          [
+            I,
+            Channel.FlowMeter.Name,
+            BoolToStr(Channel.Enabled,'True','False'),
+            Channel.Group,
+            FlowMin,
+            FlowMax,
+            BoolToStr(
+              (AFlowRate >= FlowMin) and
+              (AFlowRate <= FlowMax),
+              'True','False'
+            )
+          ]
+        )
+      );
 
       // Каждый канал рассматривается как одиночный эталон
       // независимо от значения Channel.Group.
@@ -3215,9 +3302,43 @@ begin
         //
         // В будущем это сравнение необходимо заменить вызовом отдельной
         // функции оценки метрологической пригодности эталона.
-        if (BestSingle = nil) or
+            if (BestSingle = nil) or
            (FlowMax < GetChannelFlowMax(BestSingle)) then
+        begin
           BestSingle := Channel;
+
+          ProtocolSelection(
+            'BestSingle',
+            'Выбран новый лучший одиночный кандидат',
+            Format(
+              'Index=%d; Name="%s"; Group=%d; ' +
+              'QMinWork=%.6f; QMaxWork=%.6f; Policy=MinimumQMax',
+              [
+                I,
+                Channel.FlowMeter.Name,
+                Channel.Group,
+                FlowMin,
+                FlowMax
+              ]
+            )
+          );
+        end
+        else
+          ProtocolSelection(
+            'BestSingle',
+            'Одиночный кандидат не заменил текущий лучший',
+            Format(
+              'Index=%d; Name="%s"; CandidateQMax=%.6f; ' +
+              'BestName="%s"; BestQMax=%.6f; Reason=CandidateQMaxNotLess',
+              [
+                I,
+                Channel.FlowMeter.Name,
+                FlowMax,
+                BestSingle.FlowMeter.Name,
+                GetChannelFlowMax(BestSingle)
+              ]
+            )
+          );
       end;
 
       // Одновременно собираем корректные каналы групп.
@@ -3286,6 +3407,19 @@ begin
       Exit;
     end;
 
+
+    ProtocolSelection(
+      'Success',
+      'Предварительный выбор эталонов успешно завершён',
+      Format(
+        'Selection="%s"; SelectedCount=%d; ',
+        [
+          SelectionDescription,
+          SelectedChannels.Count
+        ]
+      )
+    );
+
     // ------------------------------------------------------------
     // ЭТАП 3. АТОМАРНОЕ ПРИМЕНЕНИЕ НАЙДЕННОГО РЕЗУЛЬТАТА
     // ------------------------------------------------------------
@@ -3308,6 +3442,7 @@ begin
     // Отдельный FireEvent здесь не вызывается. Предполагается, что
     // FireAction для awtSelectEtalons после обработки формирует
     // ewtEtalonsChanged.
+
     FireAction(
       awtSelectEtalons,
       'SelectEtalons',
@@ -3574,7 +3709,7 @@ begin
     for I := 0 to FEtalonChannels.Count - 1 do
     begin
       Channel := FEtalonChannels[I];
-      if (Channel = nil) or (not Channel.Enabled) or (Channel.State = osDeleted) or
+      if (Channel = nil) {or (not Channel.Enabled)} or (Channel.State = osDeleted) or
          (Channel.FlowMeter = nil) or (Channel.FlowMeter.Device = nil) then
         Continue;
 
@@ -3613,7 +3748,7 @@ begin
   for I := 0 to FEtalonChannels.Count - 1 do
   begin
     Channel := FEtalonChannels[I];
-    if (Channel = nil) or (not Channel.Enabled) or
+    if (Channel = nil) {or (not Channel.Enabled)} or
        (Channel.FlowMeter = nil) or (Channel.FlowMeter.Device = nil) then
       Continue;
 
@@ -5133,30 +5268,30 @@ end;
 
 procedure TWorkTable.DoProcStart(AProcName: string);
 begin
-  NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
+ // NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 
 end;
 
 procedure TWorkTable.DoProcStop(AProcName: string);
 begin
-  NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
+ // NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 
 end;
 
 procedure TWorkTable.DoProcPause(AProcName: string);
 begin
-  NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
+ // NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 
 end;
 
 procedure TWorkTable.DoProcNextStep(AProcName: string);
 begin
-  NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
+ // NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 end;
 
 procedure TWorkTable.DoProcRepeat(AProcName: string);
 begin
-  NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
+ // NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 
 end;
 
@@ -5176,6 +5311,7 @@ end;
 procedure TWorkTable.SetState(const ANewState: EStateWorkTable);
 var
   OldState: EStateWorkTable;
+  Notification:TStateNotification;
 begin
   if FState = ANewState then
     Exit;
@@ -5192,7 +5328,12 @@ begin
     'Изменено состояние рабочего стола',
     Format('%s: %s -> %s', [Text, WorkTableStateToString(OldState),
       WorkTableStateToString(ANewState)]));
-  NotifyOwned(notifyStateChanged, TStateNotification.Create(Ord(OldState), Ord(ANewState)));
+
+  Notification:= TStateNotification.Create(Ord(OldState),Ord(ANewState));
+  Notification.SourceName:='WorkTable SetState';
+  Notification.Description:='';
+
+  NotifyOwned(notifyStateChanged,Notification);
 end;
 
 function TWorkTable.CreateActionNotification(AAction: EActionWorkTable; const ASourceName: string;
@@ -5201,6 +5342,8 @@ begin
   FAction := AAction;
   ProtocolManager.AddMessage(pcAction, psWorkTable, ASourceName, ADescription, Name);
   Result := TActionNotification.Create(Ord(AAction));
+  Result.SourceName:= ASourceName;
+  Result.Description:= ADescription;
 end;
 
 procedure TWorkTable.FireAction(AAction: EActionWorkTable; const ASourceName: string;
@@ -5264,14 +5407,10 @@ end;
 procedure TWorkTable.DoStartMonitor;
 begin
   CaptureEnvironmentSimulationBase;
-
- // SetState(swtSTARTMONITOR);
-
 end;
 
 procedure TWorkTable.DoStopMonitor;
 begin
- // SetState(swtSTOPMONITOR);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStopMonitor',
     'Подготовка к остановке монитора. Ничего тут нет.', Name);
 end;
@@ -5320,19 +5459,23 @@ end;
 procedure TWorkTable.MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint;
   APointIndex: Integer);
 begin
-  FInstalledMeasurementPointIndex := APointIndex;
-  if APoint <> nil then
-  begin
-    FInstalledMeasurementPointUUID := APoint.UUID;
-    FInstalledMeasurementTargetFlowLS := APoint.Q;
-  end
-  else
+
+  if APoint=nil then
   begin
     FInstalledMeasurementPointUUID := '';
     FInstalledMeasurementTargetFlowLS := 0;
+    Exit;
   end;
 
-  if (FCurrentPoint <> nil) and (APoint <> nil) then
+
+  FInstalledMeasurementPointIndex := APointIndex;
+  FInstalledMeasurementPointUUID := APoint.UUID;
+  FInstalledMeasurementTargetFlowLS := APoint.Q;
+
+if FCurrentPoint = nil then
+  FCurrentPoint := TDevicePoint.Create;
+
+
     FCurrentPoint.Assign(APoint, True);
 
  // Notify(notifyStateChanged, APoint);
@@ -5703,20 +5846,20 @@ begin
     ResetMeasurementValues;
     CaptureEnvironmentSimulationBase;
     State := swtEXECUTE;
-    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartTest',
+    ProtocolManager.AddMessage(pcProc, psWorkTable, 'StartTest',
       'Сценарный тест: реальный запуск измерения заблокирован, состояние swtEXECUTE установлено имитатором', Name);
     Exit;
   end;
 
   if State in [swtSTARTMONITOR, swtSTARTMONITORWAIT, swtMONITOR] then
-    ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
+    ProtocolManager.AddMessage(pcProc, psWorkTable, 'DoStartTest',
       'Переход из режима монитора к измерению без промежуточной остановки', Name);
 
   ResetMeasurementValues;
   CaptureEnvironmentSimulationBase;
   State := swtSTARTTEST;
 
-  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
+  ProtocolManager.AddMessage(pcProc, psWorkTable, 'StartTest',
     'Подготовка к запуску измерения. Данные очищены', Name);
 
   FireAction(awtStartTest, 'StartTest', 'Запрошен запуск измерения');
@@ -5728,7 +5871,7 @@ begin
   begin
     ResetSpillageRuntimeValues;
     State := swtEXECUTE;
-    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartTestRepeat',
+    ProtocolManager.AddMessage(pcProc, psWorkTable, 'StartTestRepeat',
       'Сценарный тест: реальный повторный запуск измерения заблокирован, состояние swtEXECUTE установлено имитатором', Name);
     Exit;
   end;
@@ -5736,7 +5879,7 @@ begin
   ResetSpillageRuntimeValues;
   State := swtSTARTTEST;
 
-  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTestRepeat',
+  ProtocolManager.AddMessage(pcProc, psWorkTable, 'DoStartTestRepeat',
     'Подготовка к запуску повторного измерения. Сброшены только накопители проливки', Name);
 
   FireAction(awtStartTest, 'StartTestRepeat', 'Запрошен запуск повторного измерения');
@@ -5749,15 +5892,16 @@ begin
     ResetMeasurementValues;
     CaptureEnvironmentSimulationBase;
     State := swtMONITOR;
-    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMonitor',
+    ProtocolManager.AddMessage(pcProc, psWorkTable, 'StartMonitor',
       'Сценарный тест: реальный запуск мониторинга заблокирован, состояние swtMONITOR установлено имитатором', Name);
     Exit;
   end;
 
   ResetMeasurementValues;
   CaptureEnvironmentSimulationBase;
-  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartMonitor',
+  ProtocolManager.AddMessage(pcProc, psWorkTable, 'StartMonitor',
     'Подготовка к запуску монитра. Очищены данные', Name);
+
   FireAction(awtStartMonitor, 'StartMonitor', 'Действие: запуск монитора');
 end;
 
@@ -5766,7 +5910,7 @@ begin
   if IsSimulationMode then
   begin
     State := swtCOMPLETE;
-    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopTest',
+    ProtocolManager.AddMessage(pcProc, psWorkTable, 'StopTest',
       'Сценарный тест: реальная остановка измерения заблокирована, состояние swtCOMPLETE установлено имитатором', Name);
     Exit;
   end;
@@ -5779,7 +5923,7 @@ begin
   if IsSimulationMode then
   begin
     State := swtCONNECTED;
-    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopMonitor',
+    ProtocolManager.AddMessage(pcProc, psWorkTable, 'StopMonitor',
       'Сценарный тест: реальная остановка мониторинга заблокирована, состояние swtCONNECTED установлено имитатором', Name);
     Exit;
   end;
@@ -5797,7 +5941,7 @@ begin
 
   FMode := MeasurementMode;
   TMeasurementRun(FMeasurementRun).Mode := MeasurementMode;
-  ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMeasurementRun',
+  ProtocolManager.AddMessage(pcProc, psWorkTable, 'StartMeasurementRun',
     'Запуск измерения', Format('Mode=%d', [Ord(MeasurementMode)]));
   TMeasurementRun(FMeasurementRun).Execute(mcStart);
 
@@ -5819,7 +5963,7 @@ begin
 
   FMode := RunMode;
   TMeasurementRun(FMeasurementRun).Mode := RunMode;
-  ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMeasurementRun',
+  ProtocolManager.AddMessage(pcProc, psWorkTable, 'StartMeasurementRun',
     'Запуск измерения', Format('Mode=%d', [Ord(RunMode)]));
   TMeasurementRun(FMeasurementRun).Execute(mcStart);
 end;

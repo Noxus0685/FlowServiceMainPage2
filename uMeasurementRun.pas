@@ -1331,7 +1331,7 @@ begin
   end
   else
   begin
-    ProtocolManager.AddMessage(pcAction, psMeasurement, 'StartTest',
+    ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitMeasureStart',
       'Отдана команда запуска измерения', MeasurementStateToString(FCurrentStage));
     AddDiagnosticEvent('StartTest called');
     FWorkTable.StartTest;
