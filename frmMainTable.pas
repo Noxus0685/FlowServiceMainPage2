@@ -899,13 +899,13 @@ type
   private
     FInitialized: Boolean;
     FStabilitySampleTimer: TTimer;
-    procedure StabilitySampleTimerTimer(Sender: TObject);
     FChange: string ;
     FInstrumentalVisibleOrder: TList<TLayout>;
     FFrameProceed: TFrameProceed;
     FFrameMainTable: TFrameMainTable;
     FOnWorkTableCommand: TWorkTableCommandEvent;
     function GetLayoutByMenuItem(AMenuItem: TMenuItem): TLayout;
+    procedure StabilitySampleTimerTimer(Sender: TObject);
     procedure RebuildInstrumentalVisibleOrder;
     procedure ApplyInstrumentalVisibleOrder;
     procedure SetInstrumentalLayoutVisible(ALayout: TLayout; AVisible: Boolean);
