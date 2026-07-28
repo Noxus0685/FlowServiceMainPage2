@@ -194,9 +194,9 @@ begin
   FFrameMeterValueEdit.SetIntegratedMode(TabItem1, LayoutStabilityForecast);
 {$IFDEF DEBUG}
   if MeterValue <> nil then
-    DebugLog(Format('Stability before LoadFromMeterValue: Ptr=%p Hash=%s Name=%s SampleSize=%d',
+    DebugLog(Format('Stability before LoadFromMeterValue: Ptr=%p Hash=%s Name=%s MinSampleCount=%d',
       [Pointer(MeterValue), MeterValue.Hash, MeterValue.Name,
-       MeterValue.StabilitySettings.SampleSize]));
+       MeterValue.StabilitySettings.MinSampleCount]));
 {$ENDIF}
   FFrameMeterValueEdit.LoadFromMeterValue(MeterValue);
 end;

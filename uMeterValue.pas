@@ -75,6 +75,10 @@ type
     /// <summary>Chronological history of physical-value samples used only by stability analysis.</summary>
     FSamples: TList<TMeterValueSample>;
     FActiveStabilityStartMs: Int64;
+    /// <summary>Second bucket of the latest automatic stability sample.</summary>
+    FAutomaticSampleBucket: Int64;
+    /// <summary>Index of the latest automatic stability sample; always validated before reuse.</summary>
+    FAutomaticSampleIndex: Integer;
     /// <summary>Last calculated stability-analysis snapshot for consumers that should not recalculate immediately.</summary>
     FLastStabilityInfo: TMeterValueStabilityInfo;
     /// <summary>Compatibility timestamp for old confirmation consumers.</summary>
@@ -91,6 +95,8 @@ type
     procedure ResetStabilityInfo;
     /// <summary>Adds a physical-value sample with an externally provided monotonic timestamp.</summary>
     procedure AddSample(const AValue: Double; const ATimeStampMs: Int64); overload;
+    /// <summary>Captures automatic SetValue history by merging updates inside one monotonic second bucket.</summary>
+    procedure CaptureAutomaticStabilitySample(const AValue: Double; const ATimeStampMs: Int64);
     function FindDimIndex(const AName: string): Integer;
     function FormatDisplayValue(const AValue: Double): string;
     class constructor CreateClass;
@@ -218,7 +224,6 @@ type
     class procedure DisableVirtualClock; static;
     /// <summary>Clears stability samples and runtime confirmation state while preserving all settings.</summary>
     procedure ClearSamplesHistory;
-    procedure AddCurrentStabilitySample;
     /// <summary>Returns a thread-safe immutable copy of chronological stability samples.</summary>
     function GetSamples: TArray<TMeterValueSample>;
     /// <summary>Returns a thread-safe immutable copy of chronological stability samples for editor preview.</summary>
@@ -242,6 +247,7 @@ type
     function AnalyzeStabilityForMeasurement(const AMinTimeStampMs: Int64;
       const ASettings: TMeterValueStabilitySettings; out AInfo: TMeterValueStabilityInfo): Boolean; overload;
     function AnalyzePointStabilityForMeasurement(const AMinTimeStampMs: Int64;
+      const AMinSampleCount: Integer;
       const AMaxSampleAgeSec: Double; const ATargetValue: Double;
       const AErrorPercent: Double; out AInfo: TMeterValueStabilityInfo): Boolean;
     /// <summary>Clears runtime confirmation state without touching settings or sample history.</summary>
@@ -495,6 +501,8 @@ begin
   FAggregateMeterValues := TObjectList<TMeterValue>.Create(False);
   FSamples := TList<TMeterValueSample>.Create;
   FActiveStabilityStartMs := 0;
+  FAutomaticSampleBucket := -1;
+  FAutomaticSampleIndex := -1;
   FSampleLock := TCriticalSection.Create;
   InitStabilitySettings;
   ResetStabilityInfo;
@@ -801,7 +809,8 @@ var
   begin
     AMeterValue.IsToSave := Ini.ReadBool(ASection, 'IsToSave', True);
     AMeterValue.FStabilitySettings.Enabled := Ini.ReadBool(ASection, 'StabilityEnabled', AMeterValue.FStabilitySettings.Enabled);
-    AMeterValue.FStabilitySettings.SampleSize := Ini.ReadInteger(ASection, 'Sample Size', AMeterValue.FStabilitySettings.SampleSize);
+    AMeterValue.FStabilitySettings.MinSampleCount := Ini.ReadInteger(ASection, 'StabilityMinSampleCount', AMeterValue.FStabilitySettings.MinSampleCount);
+    AMeterValue.FStabilitySettings.SampleSize := Ini.ReadInteger(ASection, 'Sample_Size', AMeterValue.FStabilitySettings.SampleSize);
     if AMeterValue.FStabilitySettings.SampleSize < 1 then
       AMeterValue.FStabilitySettings.SampleSize := 20;
     AMeterValue.FStabilitySettings.MaxSampleAgeSec := S2F(Ini.ReadString(ASection, 'StabilityMaxSampleAgeSec', F2S(AMeterValue.FStabilitySettings.MaxSampleAgeSec)));
@@ -1186,6 +1195,7 @@ procedure TMeterValue.InitStabilitySettings;
 begin
   FillChar(FStabilitySettings, SizeOf(FStabilitySettings), 0);
   FStabilitySettings.Enabled := False;
+  FStabilitySettings.MinSampleCount := 10;
   FStabilitySettings.SampleSize := 20;
   FStabilitySettings.MaxSampleAgeSec := 3.0;
   FStabilitySettings.MaxVariation := 0.0;
@@ -1212,11 +1222,22 @@ end;
 procedure TMeterValue.TrimStabilityHistory;
 var
   HistoryLimit: Integer;
+  I: Integer;
 begin
   HistoryLimit := Max(1, FStabilitySettings.SampleSize);
-
   while FSamples.Count > HistoryLimit do
     FSamples.Delete(0);
+
+  FAutomaticSampleIndex := -1;
+  if FAutomaticSampleBucket >= 0 then
+    for I := FSamples.Count - 1 downto 0 do
+      if FSamples[I].TimeStampMs div 1000 = FAutomaticSampleBucket then
+      begin
+        FAutomaticSampleIndex := I;
+        Break;
+      end;
+  if FAutomaticSampleIndex < 0 then
+    FAutomaticSampleBucket := -1;
 end;
 
 procedure TMeterValue.SetStabilitySettings(
@@ -1270,23 +1291,34 @@ end;
 procedure TMeterValue.AddSample(const AValue: Double; const ATimeStampMs: Int64);
 var
   Sample: TMeterValueSample;
-  LastTimeStampMs: Int64;
+  LastSample: TMeterValueSample;
+  LastIndex: Integer;
 begin
-  Sample.Value := AValue;
   Sample.TimeStampMs := ATimeStampMs;
-
+  Sample.Value := AValue;
   FSampleLock.Enter;
   try
     if FSamples.Count > 0 then
     begin
-      LastTimeStampMs := FSamples[FSamples.Count - 1].TimeStampMs;
-      if Sample.TimeStampMs < LastTimeStampMs then
+      LastIndex := FSamples.Count - 1;
+      LastSample := FSamples[LastIndex];
+
+      if ATimeStampMs < LastSample.TimeStampMs then
         Exit;
-      if Sample.TimeStampMs = LastTimeStampMs then
-        Sample.TimeStampMs := LastTimeStampMs + 1;
+
+      if LastSample.TimeStampMs = ATimeStampMs then
+      begin
+        if not SameValue(LastSample.Value, AValue, EPS) then
+        begin
+          LastSample.Value := AValue;
+          FSamples[LastIndex] := LastSample;
+        end;
+        Exit;
+      end;
     end;
+
     if FActiveStabilityStartMs <= 0 then
-      FActiveStabilityStartMs := Sample.TimeStampMs;
+      FActiveStabilityStartMs := ATimeStampMs;
     FSamples.Add(Sample);
     TrimStabilityHistory;
   finally
@@ -1294,9 +1326,63 @@ begin
   end;
 end;
 
-procedure TMeterValue.AddCurrentStabilitySample;
+procedure TMeterValue.CaptureAutomaticStabilitySample(const AValue: Double;
+  const ATimeStampMs: Int64);
+var
+  CurrentBucket: Int64;
+  Sample: TMeterValueSample;
+  LastIndex: Integer;
+  InsertIndex: Integer;
 begin
-  AddSample(Value, GetMonotonicTimeMs);
+  CurrentBucket := ATimeStampMs div 1000;
+  FSampleLock.Enter;
+  try
+    if (FAutomaticSampleBucket >= 0) and
+       (CurrentBucket < FAutomaticSampleBucket) then
+    begin
+      FAutomaticSampleBucket := -1;
+      FAutomaticSampleIndex := -1;
+    end;
+
+    if (FAutomaticSampleBucket = CurrentBucket) and
+       (FAutomaticSampleIndex >= 0) and
+       (FAutomaticSampleIndex < FSamples.Count) and
+       (FSamples[FAutomaticSampleIndex].TimeStampMs div 1000 = CurrentBucket) then
+    begin
+      Sample := FSamples[FAutomaticSampleIndex];
+      Sample.TimeStampMs := ATimeStampMs;
+      Sample.Value := AValue;
+      FSamples[FAutomaticSampleIndex] := Sample;
+      Exit;
+    end;
+
+    LastIndex := FSamples.Count - 1;
+    if (FAutomaticSampleBucket = CurrentBucket) and
+       (LastIndex >= 0) and
+       (FSamples[LastIndex].TimeStampMs div 1000 = CurrentBucket) then
+    begin
+      Sample := FSamples[LastIndex];
+      Sample.TimeStampMs := ATimeStampMs;
+      Sample.Value := AValue;
+      FSamples[LastIndex] := Sample;
+      FAutomaticSampleIndex := LastIndex;
+      Exit;
+    end;
+
+    Sample.TimeStampMs := ATimeStampMs;
+    Sample.Value := AValue;
+    if FActiveStabilityStartMs <= 0 then
+      FActiveStabilityStartMs := ATimeStampMs;
+    InsertIndex := 0;
+    while (InsertIndex < FSamples.Count) and
+      (FSamples[InsertIndex].TimeStampMs < ATimeStampMs) do
+      Inc(InsertIndex);
+    FSamples.Insert(InsertIndex, Sample);
+    FAutomaticSampleBucket := CurrentBucket;
+    TrimStabilityHistory;
+  finally
+    FSampleLock.Leave;
+  end;
 end;
 
 procedure TMeterValue.ClearSamplesHistory;
@@ -1305,6 +1391,8 @@ begin
   try
     FSamples.Clear;
     FActiveStabilityStartMs := 0;
+    FAutomaticSampleBucket := -1;
+    FAutomaticSampleIndex := -1;
     ResetStabilityInfo;
   finally
     FSampleLock.Leave;
@@ -1343,7 +1431,9 @@ begin
       if FSamples[I].TimeStampMs = ATimeStampMs then
       begin
         FSamples[I] := Sample;
-                ResetStabilityInfo;
+        FAutomaticSampleBucket := -1;
+        FAutomaticSampleIndex := -1;
+        ResetStabilityInfo;
         Exit(True);
       end;
 
@@ -1351,6 +1441,8 @@ begin
     while (I < FSamples.Count) and (FSamples[I].TimeStampMs < ATimeStampMs) do
       Inc(I);
     FSamples.Insert(I, Sample);
+    FAutomaticSampleBucket := -1;
+    FAutomaticSampleIndex := -1;
     ResetStabilityInfo;
     Result := True;
   finally
@@ -1371,6 +1463,8 @@ begin
     Sample := FSamples[AIndex];
     Sample.Value := AValue;
     FSamples[AIndex] := Sample;
+    FAutomaticSampleBucket := -1;
+    FAutomaticSampleIndex := -1;
     ResetStabilityInfo;
     Result := True;
   finally
@@ -1386,6 +1480,8 @@ begin
     if (AIndex < 0) or (AIndex >= FSamples.Count) then
       Exit;
     FSamples.Delete(AIndex);
+    FAutomaticSampleBucket := -1;
+    FAutomaticSampleIndex := -1;
     ResetStabilityInfo;
     Result := True;
   finally
@@ -1399,6 +1495,8 @@ begin
   try
     FSamples.Clear;
     FActiveStabilityStartMs := 0;
+    FAutomaticSampleBucket := -1;
+    FAutomaticSampleIndex := -1;
     ResetStabilityInfo;
   finally
     FSampleLock.Leave;
@@ -1464,7 +1562,8 @@ end;
 
 function TMeterValue.ValidateStabilitySettings(out AErrorText: string): Boolean;
 begin
-  Result := (FStabilitySettings.SampleSize >= 1) and
+  Result := (FStabilitySettings.MinSampleCount >= 1) and
+    (FStabilitySettings.SampleSize >= 1) and
     (FStabilitySettings.MaxVariation >= 0) and
     (FStabilitySettings.MaxStdDeviation >= 0) and
     (FStabilitySettings.MaxTrendRate >= 0) and
@@ -1611,7 +1710,7 @@ end;
 
 
 function TMeterValue.AnalyzePointStabilityForMeasurement(const AMinTimeStampMs: Int64;
-  const AMaxSampleAgeSec: Double;
+  const AMinSampleCount: Integer; const AMaxSampleAgeSec: Double;
   const ATargetValue: Double; const AErrorPercent: Double;
   out AInfo: TMeterValueStabilityInfo): Boolean;
 var
@@ -1620,7 +1719,7 @@ var
   CurrentMs: Int64;
   AllowedDeviation, LowerLimit, UpperLimit: Double;
 begin
-  if IsNan(AErrorPercent) or
+  if (AMinSampleCount < 1) or IsNan(AErrorPercent) or
      IsInfinite(AErrorPercent) or (AErrorPercent < 0) then
   begin
     AInfo := Default(TMeterValueStabilityInfo);
@@ -1634,6 +1733,7 @@ begin
   CurrentMs := GetMonotonicTimeMs;
   Settings := FStabilitySettings;
   Settings.Enabled := True;
+  Settings.MinSampleCount := AMinSampleCount;
   Settings.MaxSampleAgeSec := AMaxSampleAgeSec;
   Settings.TargetValue := ATargetValue;
   AllowedDeviation := Abs(ATargetValue) * Abs(AErrorPercent) / 100.0;
@@ -1674,7 +1774,7 @@ var
   Window: TArray<TIndexedSample>;
   Used: TArray<TIndexedSample>;
   FirstMs, LastMs, LastSampleTimeMs: Int64;
-  I, N: Integer;
+  I, N, EligibleCount, FirstUsedIndex: Integer;
   Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept, RangeEpsilon: Double;
   Msg: string;
   OutlierValues: TArray<Double>;
@@ -1729,7 +1829,7 @@ begin
     Exit(False);
   end;
 
-  if (ASettings.SampleSize < 1) or
+  if (ASettings.MinSampleCount < 1) or (ASettings.SampleSize < 1) or
      (ASettings.MaxVariation < 0) or
      (ASettings.MaxStdDeviation < 0) or (ASettings.MaxTrendRate < 0) or
      (ASettings.ForecastHorizonSec < 0) or
@@ -1762,15 +1862,32 @@ begin
      (AInfo.LastSampleAgeSec <= ASettings.MaxSampleAgeSec));
 
   AInfo.CurrentAnalysisTimeMs := ACurrentMs;
-  AInfo.RequiredSampleCount := 0;
+  AInfo.RequiredSampleCount := ASettings.MinSampleCount;
   AInfo.RequiredWindowDurationSec := 0;
   SetLength(Window, 0);
-  for I := 0 to High(ASamples) do
-    if (ASamples[I].TimeStampMs <= ACurrentMs) and
-       ((AAnalysisStartMs <= 0) or (ASamples[I].TimeStampMs >= AAnalysisStartMs)) and
-       ((ASettings.MaxSampleAgeSec <= 0) or
-        (ASamples[I].TimeStampMs >= ACurrentMs - Round(ASettings.MaxSampleAgeSec * 1000.0))) then
-      AddWindowSample(I, ASamples[I]);
+  if AInfo.IsDataActual then
+  begin
+    for I := 0 to High(ASamples) do
+      if ASamples[I].TimeStampMs <= ACurrentMs then
+        AddWindowSample(I, ASamples[I]);
+
+    EligibleCount := Length(Window);
+    if EligibleCount > 0 then
+    begin
+      FirstUsedIndex := EligibleCount - 1;
+      for I := FirstUsedIndex - 1 downto 0 do
+        if ((Window[I + 1].Sample.TimeStampMs - Window[I].Sample.TimeStampMs) <=
+            Round(ASettings.MaxSampleAgeSec * 1000.0)) or (ASettings.MaxSampleAgeSec <= 0) then
+          FirstUsedIndex := I
+        else
+          Break;
+      if EligibleCount - FirstUsedIndex > ASettings.MinSampleCount then
+        FirstUsedIndex := EligibleCount - ASettings.MinSampleCount;
+      for I := 0 to EligibleCount - FirstUsedIndex - 1 do
+        Window[I] := Window[FirstUsedIndex + I];
+      SetLength(Window, EligibleCount - FirstUsedIndex);
+    end;
+  end;
 
   for I := 0 to High(Window) do
     AInfo.SampleResults[Window[I].SourceIndex].InWindow := True;
@@ -1791,9 +1908,10 @@ begin
     AInfo.HasCurrentValue := True;
   end;
 
-  AInfo.HasEnoughSamples := N > 0;
+  AInfo.HasEnoughSamples := N >= ASettings.MinSampleCount;
   AInfo.HasFullWindow := AInfo.HasEnoughSamples;
   AInfo.HasEnoughWindow := AInfo.HasFullWindow;
+  if not AInfo.HasEnoughSamples then Include(AInfo.FailReasons, mvsfrNotEnoughSamples);
   if AInfo.HasLastSampleAge and not AInfo.IsDataActual then Include(AInfo.FailReasons, mvsfrStaleData);
 
   Used := Window;
@@ -1911,7 +2029,7 @@ begin
   if not AInfo.IsDeviationStable then Include(AInfo.FailReasons, mvsfrDeviationTooHigh);
   if not AInfo.IsTrendStable then Include(AInfo.FailReasons, mvsfrTrendTooHigh);
 
-  MathStable := AInfo.HasEnoughSamples and AInfo.IsDataActual and
+  MathStable := AInfo.HasEnoughSamples and AInfo.HasFullWindow and AInfo.IsDataActual and
     AInfo.HasStatistics and AInfo.HasTrend and
     AInfo.IsVariationStable and AInfo.IsDeviationStable and AInfo.IsTrendStable and
     AInfo.IsOutlierLevelAcceptable and not (mvsfrInvalidSettings in AInfo.FailReasons);
@@ -1938,11 +2056,12 @@ begin
     ((not ASettings.RequireForecastInRange) or AInfo.IsForecastInRange);
 
   if mvsfrStaleData in AInfo.FailReasons then AInfo.Status := mvssStaleData
-  else if (mvsfrWindowNotFilled in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.Status := mvssNotEnoughData
+  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrWindowNotFilled in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.Status := mvssNotEnoughData
   else if AInfo.IsSignalStable then AInfo.Status := mvssStable
   else AInfo.Status := mvssUnstable;
 
   Msg := '';
+  if mvsfrNotEnoughSamples in AInfo.FailReasons then Msg := Msg + Format('Недостаточно отсчётов: %d из %d. ', [AInfo.UsedSampleCount, ASettings.MinSampleCount]);
   if mvsfrInsufficientTimeSpread in AInfo.FailReasons then Msg := Msg + 'Недостаточный временной интервал между точками для расчёта тренда. ';
   if mvsfrStaleData in AInfo.FailReasons then Msg := Msg + Format('Данные устарели: последнее значение получено %.1f с назад. ', [AInfo.LastSampleAgeSec]);
   if mvsfrVariationTooHigh in AInfo.FailReasons then Msg := Msg + Format('В окне %d отсчётов. Размах %.4f превышает допустимые %.4f. ', [AInfo.UsedSampleCount, AInfo.Variation, ASettings.MaxVariation]);
@@ -1953,7 +2072,7 @@ begin
   if AInfo.IsSuitableForMeasurement then AInfo.StatusText := 'Значение пригодно для измерения.'
   else if mvsfrAnalysisDisabled in AInfo.FailReasons then AInfo.StatusText := 'Анализ стабильности отключён.'
   else if mvsfrNoData in AInfo.FailReasons then AInfo.StatusText := 'Нет данных.'
-  else if (mvsfrWindowNotFilled in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.StatusText := Trim(Msg)
+  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrWindowNotFilled in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.StatusText := Trim(Msg)
   else if AInfo.IsSignalStable then AInfo.StatusText := 'Сигнал стабилен, но значение вне диапазона.'
   else AInfo.StatusText := 'Сигнал нестабилен.';
 
@@ -2661,6 +2780,7 @@ begin
   else
     Value := InputValue;
 
+  CaptureAutomaticStabilitySample(Value, GetMonotonicTimeMs);
 end;
 
 { Assigns value, applies range limits, and updates history/mean buffers. }
@@ -3653,7 +3773,8 @@ begin
       Ini.WriteInteger(Section, 'UpdateType', Ord(MV.UpdateType));
 
       Ini.WriteBool(Section, 'StabilityEnabled', MV.FStabilitySettings.Enabled);
-      Ini.WriteInteger(Section, 'Sample Size', MV.FStabilitySettings.SampleSize);
+      Ini.WriteInteger(Section, 'StabilityMinSampleCount', MV.FStabilitySettings.MinSampleCount);
+      Ini.WriteInteger(Section, 'Sample_Size', MV.FStabilitySettings.SampleSize);
       Ini.WriteFloat(Section, 'StabilityMaxSampleAgeSec', MV.FStabilitySettings.MaxSampleAgeSec);
       Ini.WriteFloat(Section, 'StabilityMaxVariation', MV.FStabilitySettings.MaxVariation);
       Ini.WriteFloat(Section, 'StabilityMaxStdDeviation', MV.FStabilitySettings.MaxStdDeviation);
@@ -3947,7 +4068,8 @@ begin
       MV.UpdateType := EUpdateType(Ini.ReadInteger(Section, 'UpdateType', Ord(MV.UpdateType)));
 
       MV.FStabilitySettings.Enabled := Ini.ReadBool(Section, 'StabilityEnabled', MV.FStabilitySettings.Enabled);
-      MV.FStabilitySettings.SampleSize := Ini.ReadInteger(Section, 'Sample Size', MV.FStabilitySettings.SampleSize);
+      MV.FStabilitySettings.MinSampleCount := Ini.ReadInteger(Section, 'StabilityMinSampleCount', MV.FStabilitySettings.MinSampleCount);
+      MV.FStabilitySettings.SampleSize := Ini.ReadInteger(Section, 'Sample_Size', MV.FStabilitySettings.SampleSize);
       if MV.FStabilitySettings.SampleSize < 1 then
         MV.FStabilitySettings.SampleSize := 20;
       MV.FStabilitySettings.MaxSampleAgeSec := S2F(Ini.ReadString(Section, 'StabilityMaxSampleAgeSec', F2S(MV.FStabilitySettings.MaxSampleAgeSec)));
@@ -3971,6 +4093,9 @@ begin
       MV.FStabilitySettings.ChartSignalLineWidth := ReadChartLineWidth(Section, 'ChartSignalLineWidth', MV.FStabilitySettings.ChartSignalLineWidth);
       MV.FStabilitySettings.ChartToleranceLineWidth := ReadChartLineWidth(Section, 'ChartToleranceLineWidth', MV.FStabilitySettings.ChartToleranceLineWidth);
 {$IFDEF DEBUG}
+      DebugLog(Format('Stability LoadFromFile: Section=%s Hash=%s Name=%s MinSampleCount=%d TargetValue=%.12g',
+        [Section, MV.Hash, MV.Name, MV.FStabilitySettings.MinSampleCount,
+         MV.FStabilitySettings.TargetValue]));
 {$ENDIF}
 
       MV.Dimensions.Clear;
