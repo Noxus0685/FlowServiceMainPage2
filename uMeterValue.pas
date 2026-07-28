@@ -810,6 +810,9 @@ var
     AMeterValue.IsToSave := Ini.ReadBool(ASection, 'IsToSave', True);
     AMeterValue.FStabilitySettings.Enabled := Ini.ReadBool(ASection, 'StabilityEnabled', AMeterValue.FStabilitySettings.Enabled);
     AMeterValue.FStabilitySettings.MinSampleCount := Ini.ReadInteger(ASection, 'StabilityMinSampleCount', AMeterValue.FStabilitySettings.MinSampleCount);
+    AMeterValue.FStabilitySettings.SampleSize := Ini.ReadInteger(ASection, 'Sample_Size', AMeterValue.FStabilitySettings.SampleSize);
+    if AMeterValue.FStabilitySettings.SampleSize < 1 then
+      AMeterValue.FStabilitySettings.SampleSize := 20;
     AMeterValue.FStabilitySettings.MaxSampleAgeSec := S2F(Ini.ReadString(ASection, 'StabilityMaxSampleAgeSec', F2S(AMeterValue.FStabilitySettings.MaxSampleAgeSec)));
     AMeterValue.FStabilitySettings.MaxVariation := S2F(Ini.ReadString(ASection, 'StabilityMaxVariation', F2S(AMeterValue.FStabilitySettings.MaxVariation)));
     AMeterValue.FStabilitySettings.MaxStdDeviation := S2F(Ini.ReadString(ASection, 'StabilityMaxStdDeviation', F2S(AMeterValue.FStabilitySettings.MaxStdDeviation)));
@@ -1193,6 +1196,7 @@ begin
   FillChar(FStabilitySettings, SizeOf(FStabilitySettings), 0);
   FStabilitySettings.Enabled := False;
   FStabilitySettings.MinSampleCount := 10;
+  FStabilitySettings.SampleSize := 20;
   FStabilitySettings.MaxSampleAgeSec := 3.0;
   FStabilitySettings.MaxVariation := 0.0;
   FStabilitySettings.MaxStdDeviation := 0.0;
@@ -1220,7 +1224,7 @@ var
   HistoryLimit: Integer;
   I: Integer;
 begin
-  HistoryLimit := Max(1, FStabilitySettings.MinSampleCount);
+  HistoryLimit := Max(1, FStabilitySettings.SampleSize);
   while FSamples.Count > HistoryLimit do
     FSamples.Delete(0);
 
@@ -1559,6 +1563,7 @@ end;
 function TMeterValue.ValidateStabilitySettings(out AErrorText: string): Boolean;
 begin
   Result := (FStabilitySettings.MinSampleCount >= 1) and
+    (FStabilitySettings.SampleSize >= 1) and
     (FStabilitySettings.MaxVariation >= 0) and
     (FStabilitySettings.MaxStdDeviation >= 0) and
     (FStabilitySettings.MaxTrendRate >= 0) and
@@ -1824,7 +1829,7 @@ begin
     Exit(False);
   end;
 
-  if (ASettings.MinSampleCount < 1) or
+  if (ASettings.MinSampleCount < 1) or (ASettings.SampleSize < 1) or
      (ASettings.MaxVariation < 0) or
      (ASettings.MaxStdDeviation < 0) or (ASettings.MaxTrendRate < 0) or
      (ASettings.ForecastHorizonSec < 0) or
@@ -1861,17 +1866,27 @@ begin
   AInfo.RequiredWindowDurationSec := 0;
   SetLength(Window, 0);
   if AInfo.IsDataActual then
+  begin
     for I := 0 to High(ASamples) do
       if ASamples[I].TimeStampMs <= ACurrentMs then
         AddWindowSample(I, ASamples[I]);
 
-  EligibleCount := Length(Window);
-  if EligibleCount > ASettings.MinSampleCount then
-  begin
-    FirstUsedIndex := EligibleCount - ASettings.MinSampleCount;
-    for I := 0 to ASettings.MinSampleCount - 1 do
-      Window[I] := Window[FirstUsedIndex + I];
-    SetLength(Window, ASettings.MinSampleCount);
+    EligibleCount := Length(Window);
+    if EligibleCount > 0 then
+    begin
+      FirstUsedIndex := EligibleCount - 1;
+      for I := FirstUsedIndex - 1 downto 0 do
+        if ((Window[I + 1].Sample.TimeStampMs - Window[I].Sample.TimeStampMs) <=
+            Round(ASettings.MaxSampleAgeSec * 1000.0)) or (ASettings.MaxSampleAgeSec <= 0) then
+          FirstUsedIndex := I
+        else
+          Break;
+      if EligibleCount - FirstUsedIndex > ASettings.MinSampleCount then
+        FirstUsedIndex := EligibleCount - ASettings.MinSampleCount;
+      for I := 0 to EligibleCount - FirstUsedIndex - 1 do
+        Window[I] := Window[FirstUsedIndex + I];
+      SetLength(Window, EligibleCount - FirstUsedIndex);
+    end;
   end;
 
   for I := 0 to High(Window) do
@@ -3759,6 +3774,7 @@ begin
 
       Ini.WriteBool(Section, 'StabilityEnabled', MV.FStabilitySettings.Enabled);
       Ini.WriteInteger(Section, 'StabilityMinSampleCount', MV.FStabilitySettings.MinSampleCount);
+      Ini.WriteInteger(Section, 'Sample_Size', MV.FStabilitySettings.SampleSize);
       Ini.WriteFloat(Section, 'StabilityMaxSampleAgeSec', MV.FStabilitySettings.MaxSampleAgeSec);
       Ini.WriteFloat(Section, 'StabilityMaxVariation', MV.FStabilitySettings.MaxVariation);
       Ini.WriteFloat(Section, 'StabilityMaxStdDeviation', MV.FStabilitySettings.MaxStdDeviation);
@@ -4053,6 +4069,9 @@ begin
 
       MV.FStabilitySettings.Enabled := Ini.ReadBool(Section, 'StabilityEnabled', MV.FStabilitySettings.Enabled);
       MV.FStabilitySettings.MinSampleCount := Ini.ReadInteger(Section, 'StabilityMinSampleCount', MV.FStabilitySettings.MinSampleCount);
+      MV.FStabilitySettings.SampleSize := Ini.ReadInteger(Section, 'Sample_Size', MV.FStabilitySettings.SampleSize);
+      if MV.FStabilitySettings.SampleSize < 1 then
+        MV.FStabilitySettings.SampleSize := 20;
       MV.FStabilitySettings.MaxSampleAgeSec := S2F(Ini.ReadString(Section, 'StabilityMaxSampleAgeSec', F2S(MV.FStabilitySettings.MaxSampleAgeSec)));
       MV.FStabilitySettings.MaxVariation := S2F(Ini.ReadString(Section, 'StabilityMaxVariation', F2S(MV.FStabilitySettings.MaxVariation)));
       MV.FStabilitySettings.MaxStdDeviation := S2F(Ini.ReadString(Section, 'StabilityMaxStdDeviation', F2S(MV.FStabilitySettings.MaxStdDeviation)));

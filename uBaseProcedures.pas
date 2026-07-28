@@ -214,6 +214,8 @@ type
     Enabled: Boolean;
     /// <summary>Exact number of the latest eligible samples in the analysis window.</summary>
     MinSampleCount: Integer;
+    /// <summary>Maximum number of latest samples kept in working history and shown from TMeterValue history.</summary>
+    SampleSize: Integer;
     /// <summary>Maximum allowed age in seconds for the latest sample.</summary>
     MaxSampleAgeSec: Double;
     /// <summary>Maximum allowed max-min spread in physical units.</summary>

@@ -105,6 +105,7 @@ type
     ButtonGenerateAppend: TButton;
     CheckBoxStabilityEnabled: TCheckBox;
     EditMinSampleCount: TEdit;
+    EditSampleSize: TEdit;
     EditMaxSampleAgeSec: TEdit;
     EditExitThresholdFactor: TEdit;
     EditMaxVariation: TEdit;
@@ -483,6 +484,7 @@ begin
   EditAnalysisTime.OnExit := EditAnalysisTimeExit;
   CheckBoxStabilityEnabled.OnChange := HandleSettingsChange;
   EditMinSampleCount.OnExit := HandleSettingsChange;
+  EditSampleSize.OnExit := HandleSettingsChange;
   EditMaxSampleAgeSec.OnExit := HandleSettingsChange;
   EditExitThresholdFactor.OnExit := HandleSettingsChange;
   EditMaxVariation.OnExit := HandleSettingsChange;
@@ -532,7 +534,8 @@ begin
   SetHintFor('LabelStabilityDisplayUnit', 'Единица, выбранная для отображения текущего TMeterValue. Все размерные значения результатов и соответствующие настройки показываются в этой единице. Внутреннее хранение может выполняться в базовой единице.');
   SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения по заданным критериям.');
   SetHintFor('LabelMinSampleCount', 'Точный размер окна анализа: используются последние подходящие отсчёты.');
-  SetHintFor('LabelMaxSampleAgeSec', 'Максимально допустимый возраст последнего отсчёта относительно текущего времени анализа.');
+  SetHintFor('LabelSampleSize', 'Максимальное количество последних точек рабочей истории и строк таблицы истории TMeterValue.');
+  SetHintFor('LabelMaxSampleAgeSec', 'Максимально допустимый разрыв между соседними точками непрерывного окна.');
   SetHintFor('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности, задающий гистерезис выхода.');
   SetHintFor('LabelMaxVariation', 'Максимально допустимый размах значений в окне анализа.');
   SetHintFor('LabelMaxStdDeviation', 'Максимально допустимое стандартное отклонение значений в окне анализа.');
@@ -923,6 +926,8 @@ begin
   SetLabelText('LabelGeneratorNoise', 'Шум ±, ' + UnitName);
   SetLabelText('LabelGeneratorOutlierAmplitude', 'Амплитуда выброса, ' + UnitName);
   SetLabelText('LabelMinSampleCount', 'Количество отсчётов в окне, шт.');
+  SetLabelText('LabelSampleSize', 'Количество отображаемых данных, шт.');
+  SetLabelText('LabelResultSampleCount', 'Количество отображаемых данных');
   SetLabelText('LabelResultWindowDuration', 'Количество отсчётов в окне');
   SetLabelText('LabelMaxSampleAgeSec', 'Максимальный возраст данных, с');
   SetLabelText('LabelMaxVariation', 'Максимальный размах, ' + UnitName);
@@ -967,7 +972,8 @@ begin
   SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения. При отключении анализ не подтверждает готовность измерения.');
   SetHintFor('ComboBoxSampleSource', 'Выбирает массив для preview-анализа. История TMeterValue использует рабочую историю текущего значения. Тестовый массив не изменяет рабочую историю.');
   SetLabelHint('LabelMinSampleCount', 'Точный размер окна анализа: используются последние подходящие отсчёты. Единица: шт.');
-  SetLabelHint('LabelMaxSampleAgeSec', 'Максимально допустимый возраст последней доступной точки относительно текущего времени анализа. Если последняя точка актуальна, возраст остальных точек окна не проверяется. При значении не больше нуля проверка отключена. Единица: с.');
+  SetLabelHint('LabelSampleSize', 'Максимальное количество последних точек рабочей истории и строк таблицы истории TMeterValue. Единица: шт.');
+  SetLabelHint('LabelMaxSampleAgeSec', 'Максимально допустимый разрыв между соседними точками непрерывного окна; также проверяется актуальность последней точки относительно времени анализа. При значении не больше нуля проверка отключена. Единица: с.');
   SetLabelHint('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности. Большее значение создаёт гистерезис и снижает частые переключения, меньшее быстрее снимает подтверждение. Безразмерная величина.');
   SetLabelHint('LabelMaxVariation', 'Максимально допустимый размах между минимумом и максимумом в использованных точках. Единица: ' + UnitName + '. Чем меньше порог, тем строже проверка стабильности.');
   SetLabelHint('LabelMaxStdDeviation', 'Стандартное отклонение характеризует абсолютный разброс значений и имеет ту же физическую единицу, что и измеряемая величина. Это не процент, если отдельно не указано относительное стандартное отклонение. Единица: ' + UnitName + '.');
@@ -1844,6 +1850,7 @@ var
     FTestTargetValue := EntryTargetValue;
     if not FTestSettings.Enabled then FTestSettings.Enabled := True;
     if FTestSettings.MinSampleCount < 1 then FTestSettings.MinSampleCount := 10;
+    if FTestSettings.SampleSize < 1 then FTestSettings.SampleSize := 20;
     if FTestSettings.MaxSampleAgeSec <= 0 then FTestSettings.MaxSampleAgeSec := 3;
     if FTestSettings.ExitThresholdFactor < 1 then FTestSettings.ExitThresholdFactor := 1.2;
     if FTestSettings.OutlierFactor <= 0 then FTestSettings.OutlierFactor := 3.5;
@@ -2436,7 +2443,7 @@ begin
   EditResultUsedSampleCount.Text := IntToStr(AInfo.UsedSampleCount);
   EditResultOutlierCount.Text := IntToStr(AInfo.OutlierCount);
   EditResultOutlierFraction.Text := FormatInfoFloat(AInfo.OutlierFraction * 100, AInfo.UsedSampleCount > 0, 2);
-  EditResultWindowDuration.Text := IntToStr(AInfo.UsedSampleCount);
+  EditResultWindowDuration.Text := IntToStr(FTestSettings.MinSampleCount);
   EditResultLastSampleAge.Text := FormatInfoFloat(AInfo.LastSampleAgeSec, AInfo.HasLastSampleAge, 2);
   EditResultCurrentValue.Text := FormatBaseInfo(AInfo.CurrentValue, AInfo.HasCurrentValue);
   EditResultMeanValue.Text := FormatBaseInfo(AInfo.MeanValue, AInfo.HasStatistics);
@@ -2766,6 +2773,7 @@ begin
     CheckBoxStabilityEnabled.IsChecked := FTestSettings.Enabled;
     CheckBoxAutoAnalyze.IsChecked := FTestSettings.AutoAnalyze;
     EditMinSampleCount.Text := IntToStr(FTestSettings.MinSampleCount);
+    EditSampleSize.Text := IntToStr(FTestSettings.SampleSize);
     EditMaxSampleAgeSec.Text := FormatFloat('0.########', FTestSettings.MaxSampleAgeSec);
     EditExitThresholdFactor.Text := FormatFloat('0.########', FTestSettings.ExitThresholdFactor);
     EditMaxVariation.Text := BaseDeltaToDisplayText(FTestSettings.MaxVariation);
@@ -2814,6 +2822,7 @@ begin
   ASettings.Enabled := CheckBoxStabilityEnabled.IsChecked;
   ASettings.AutoAnalyze := CheckBoxAutoAnalyze.IsChecked;
   TryReadInteger(EditMinSampleCount.Text, ASettings.MinSampleCount);
+  TryReadInteger(EditSampleSize.Text, ASettings.SampleSize);
   TryReadFloat(EditMaxSampleAgeSec.Text, ASettings.MaxSampleAgeSec);
   TryReadFloat(EditExitThresholdFactor.Text, ASettings.ExitThresholdFactor);
   ASettings.MaxVariation := DisplayDeltaToBase(EditMaxVariation.Text);
@@ -2843,6 +2852,7 @@ function TFrameMeterValueEdit.StabilitySettingsEqual(const ALeft,
 begin
   Result := (ALeft.Enabled = ARight.Enabled) and
     (ALeft.MinSampleCount = ARight.MinSampleCount) and
+    (ALeft.SampleSize = ARight.SampleSize) and
     SameValue(ALeft.MaxSampleAgeSec, ARight.MaxSampleAgeSec, 1E-9) and
     SameValue(ALeft.MaxVariation, ARight.MaxVariation, 1E-9) and
     SameValue(ALeft.MaxStdDeviation, ARight.MaxStdDeviation, 1E-9) and
@@ -2948,7 +2958,7 @@ begin
   Result := False;
   AErrorText := '';
 
-  if (EditMinSampleCount = nil) or (EditMaxSampleAgeSec = nil) or
+  if (EditMinSampleCount = nil) or (EditSampleSize = nil) or (EditMaxSampleAgeSec = nil) or
      (EditExitThresholdFactor = nil) or (EditMaxVariation = nil) or
      (EditMaxStdDeviation = nil) or (EditMaxTrendRate = nil) or
      (EditMaxOutlierFractionPercent = nil) or (EditOutlierFactor = nil) or
@@ -2964,6 +2974,10 @@ begin
     AErrorText := 'Некорректное количество отсчётов в окне.'
   else if IntValue < 1 then
     AErrorText := 'Количество отсчётов в окне должно быть не меньше 1.'
+  else if not TryReadInteger(EditSampleSize.Text, IntValue) then
+    AErrorText := 'Некорректное количество отображаемых данных.'
+  else if IntValue < 1 then
+    AErrorText := 'Количество отображаемых данных должно быть не меньше 1.'
   else if not TryReadFloat(EditMaxSampleAgeSec.Text, DoubleValue) then
     AErrorText := 'Максимальный возраст данных должен быть корректным числом.'
   else if (not TryReadFloat(EditExitThresholdFactor.Text, DoubleValue)) or (DoubleValue < 1) then
