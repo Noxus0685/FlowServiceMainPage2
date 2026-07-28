@@ -812,9 +812,6 @@ type
     function FormatMeasurementPercent(AChannel: TChannel;
       const AValue: Double): string;
     procedure BindMeasurementColumnMenuItems;
-    procedure SyncMeasurementColumnMenuItem(AMenuItem: TMenuItem;
-      AColumn: TColumn);
-    procedure SyncMeasurementColumnsMenu;
 
     procedure RefreshFlowGraphChannels(const AReason: string = 'Unspecified');
     procedure AddFlowGraphSamples(const ATimeStampMs: Int64);
@@ -2182,7 +2179,6 @@ begin
   GridEtalons.OnDrawColumnCell := GridEtalonsDrawColumnCell;
   GridDevices.OnDrawColumnCell := GridDevicesDrawColumnCell;
   BindMeasurementColumnMenuItems;
-  SyncMeasurementColumnsMenu;
 
   ComboEditUnits.Items.Clear;
   for UnitName in CVolumeFlowUnits do
@@ -8500,6 +8496,7 @@ begin
   MenuItemDevicesColumn7.TagObject := StringColumnDeviceRawValue1;
   MenuItemDevicesColumn8.TagObject := StringColumnDeviceFlowRate1;
   MenuItemDevicesColumnMeanFlow.TagObject := StringColumnDeviceAvgFlowRate1;
+  MenuItemDevicesColumnMeanFlow.OnClick := MenuGridLayOutClick;
   MenuItemDevicesColumn9.TagObject := StringColumnDeviceQuantity1;
   MenuItemDevicesColumn10.TagObject := StringColumnDeviceError1;
   MenuItemDevicesColumn11.TagObject := StringColumnDeviceStd1;
@@ -8528,50 +8525,6 @@ begin
   MenuItemEtalonsColumn12.TagObject := StringColumnEtalonStd1;
   MenuItemEtalonsColumn13.TagObject := StringColumnEtalonPressureDelta1;
   MenuItemEtalonsColumn14.TagObject := StringColumnEtalonRawSumValue1;
-end;
-
-procedure TFrameMainTable.SyncMeasurementColumnMenuItem(AMenuItem: TMenuItem;
-  AColumn: TColumn);
-begin
-  if AMenuItem = nil then
-    Exit;
-  if AColumn = nil then
-  begin
-    AMenuItem.IsChecked := False;
-    AMenuItem.Enabled := False;
-    Exit;
-  end;
-  AMenuItem.Enabled := True;
-  AMenuItem.IsChecked := AColumn.Visible;
-end;
-
-procedure TFrameMainTable.SyncMeasurementColumnsMenu;
-begin
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn0, CheckColumnDeviceEnable1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn1, StringColumnDeviceChanel1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn2, ColumnDeviceType1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn3, PopupColumnDeviceDN1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn4, StringColumnDeviceName1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn5, StringColumnDeviceSerial1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn6, PopupColumnDeviceSignal1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn7, StringColumnDeviceRawValue1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn8, StringColumnDeviceFlowRate1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumnMeanFlow,
-    StringColumnDeviceAvgFlowRate1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn9, StringColumnDeviceQuantity1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn10, StringColumnDeviceError1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn11, StringColumnDeviceStd1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn12,
-    StringColumnDeviceQuantityBefore1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn13,
-    StringColumnDeviceQuantityAfter1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn14,
-    StringColumnDevicePressureDelta1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn15, StringColumnDeviceOptions1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn16,
-    StringColumnDeviceRawSumValue1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn17, StringColumnUUID1);
-  SyncMeasurementColumnMenuItem(MenuItemDevicesColumn18, StringColumnDeviceCoef1);
 end;
 
 function TFrameMainTable.GetAverageFlowText(AFlowMeter: TFlowMeter;
