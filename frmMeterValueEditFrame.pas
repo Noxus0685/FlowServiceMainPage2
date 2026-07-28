@@ -124,6 +124,7 @@ type
     EditTargetLowerLimit: TEdit;
     EditTargetUpperLimit: TEdit;
     EditResultSampleCount: TEdit;
+    EditResultConfiguredWindowSampleCount: TEdit;
     EditResultUsedSampleCount: TEdit;
     EditResultOutlierCount: TEdit;
     EditResultOutlierFraction: TEdit;
@@ -503,6 +504,7 @@ begin
   EditTargetLowerLimit.ReadOnly := True;
   EditTargetUpperLimit.ReadOnly := True;
   EditResultSampleCount.ReadOnly := True;
+  EditResultConfiguredWindowSampleCount.ReadOnly := True;
   EditResultUsedSampleCount.ReadOnly := True;
   EditResultOutlierCount.ReadOnly := True;
   EditResultOutlierFraction.ReadOnly := True;
@@ -533,7 +535,7 @@ begin
   InitializeScenarioList;
   SetHintFor('LabelStabilityDisplayUnit', 'Единица, выбранная для отображения текущего TMeterValue. Все размерные значения результатов и соответствующие настройки показываются в этой единице. Внутреннее хранение может выполняться в базовой единице.');
   SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения по заданным критериям.');
-  SetHintFor('LabelMinSampleCount', 'Точный размер окна анализа: используются последние подходящие отсчёты.');
+  SetHintFor('LabelMinSampleCount', 'Максимальное количество последних последовательных точек аналитического окна.');
   SetHintFor('LabelSampleSize', 'Максимальное количество последних точек рабочей истории и строк таблицы истории TMeterValue.');
   SetHintFor('LabelMaxSampleAgeSec', 'Максимально допустимый разрыв между соседними точками непрерывного окна.');
   SetHintFor('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности, задающий гистерезис выхода.');
@@ -928,7 +930,8 @@ begin
   SetLabelText('LabelMinSampleCount', 'Количество отсчётов в окне, шт.');
   SetLabelText('LabelSampleSize', 'Количество отображаемых данных, шт.');
   SetLabelText('LabelResultSampleCount', 'Количество отображаемых данных');
-  SetLabelText('LabelResultWindowDuration', 'Количество отсчётов в окне');
+  SetLabelText('LabelResultConfiguredWindowSampleCount', 'Количество отсчётов в окне');
+  SetLabelText('LabelResultUsedSampleCount', 'Использовано отсчётов');
   SetLabelText('LabelMaxSampleAgeSec', 'Максимальный возраст данных, с');
   SetLabelText('LabelMaxVariation', 'Максимальный размах, ' + UnitName);
   SetLabelText('LabelMaxStdDeviation', 'Максимальное стандартное отклонение, ' + UnitName);
@@ -971,7 +974,7 @@ begin
   SetHintFor('LabelStabilityDisplayUnit', 'Единица, выбранная для отображения текущего TMeterValue. Все размерные значения результатов и соответствующие настройки показываются в этой единице. Внутреннее хранение может выполняться в базовой единице.');
   SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения. При отключении анализ не подтверждает готовность измерения.');
   SetHintFor('ComboBoxSampleSource', 'Выбирает массив для preview-анализа. История TMeterValue использует рабочую историю текущего значения. Тестовый массив не изменяет рабочую историю.');
-  SetLabelHint('LabelMinSampleCount', 'Точный размер окна анализа: используются последние подходящие отсчёты. Единица: шт.');
+  SetLabelHint('LabelMinSampleCount', 'Максимальное количество последних последовательных точек аналитического окна. Единица: шт.');
   SetLabelHint('LabelSampleSize', 'Максимальное количество последних точек рабочей истории и строк таблицы истории TMeterValue. Единица: шт.');
   SetLabelHint('LabelMaxSampleAgeSec', 'Максимально допустимый разрыв между соседними точками непрерывного окна; также проверяется актуальность последней точки относительно времени анализа. При значении не больше нуля проверка отключена. Единица: с.');
   SetLabelHint('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности. Большее значение создаёт гистерезис и снижает частые переключения, меньшее быстрее снимает подтверждение. Безразмерная величина.');
@@ -1139,12 +1142,12 @@ begin
   EditSampleTime.Enabled := True;
   EditSampleTime.ReadOnly := (FSampleSource = mssWorkHistory) and (GridSamples.Row >= 0);
   EditSampleValue.Enabled := True;
-  EditSampleValue.ReadOnly := False;
+  EditSampleValue.ReadOnly := not IsTestMode;
   EditSampleTimeStep.Enabled := True;
   EditSampleTimeStep.ReadOnly := False;
-  ButtonSampleAdd.Enabled := True;
-  ButtonSampleEdit.Enabled := GridSamples.Row >= 0;
-  ButtonSampleDelete.Enabled := GridSamples.Row >= 0;
+  ButtonSampleAdd.Enabled := IsTestMode;
+  ButtonSampleEdit.Enabled := IsTestMode and (GridSamples.Row >= 0);
+  ButtonSampleDelete.Enabled := IsTestMode and (GridSamples.Row >= 0);
   ButtonSamplesClear.Enabled := Length(FDisplayedSamples) > 0;
   ComboBoxStabilityScenario.Enabled := IsTestMode;
   ButtonApplyScenario.Enabled := IsTestMode;
@@ -1296,8 +1299,8 @@ begin
   if SampleIndex < 0 then
     Exit;
 
-  EditSampleTime.Text := FloatToStr((FDisplayedSamples[SampleIndex].TimeStampMs -
-    FDisplayedSamples[0].TimeStampMs) / 1000);
+  EditSampleTime.Text := FloatToStr((FDisplayedSamples[High(FDisplayedSamples)].TimeStampMs -
+    FDisplayedSamples[SampleIndex].TimeStampMs) / 1000.0);
   EditSampleValue.Text := BaseToDisplayText(FDisplayedSamples[SampleIndex].Value);
 end;
 
@@ -1356,21 +1359,7 @@ begin
   end;
 
   if FSampleSource = mssWorkHistory then
-  begin
-    if Length(FDisplayedSamples) > 0 then
-      Sample.TimeStampMs := FDisplayedSamples[0].TimeStampMs + SampleSecondsToMs(SafeFloat(EditSampleTime.Text))
-    else
-      Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(EditSampleTime.Text));
-    if (FMeterValue <> nil) and FMeterValue.AddStabilitySampleManual(Sample.TimeStampMs, Sample.Value) then
-    begin
-      RefreshSamplesGrid(True);
-      GridSamples.Row := 0;
-      GridSamples.Selected := GridSamples.Row;
-      LoadSampleToEditor(GridSamples.Row);
-      AnalyzeIfNeeded;
-    end;
     Exit;
-  end;
 
   if FTestSamples.Count = 0 then
     Sample.TimeStampMs := 0
@@ -1409,20 +1398,10 @@ begin
   Sample.Value := DisplayToBase(EditSampleValue.Text);
 
   if FSampleSource = mssWorkHistory then
-  begin
-    if (FMeterValue <> nil) and FMeterValue.UpdateStabilitySampleValue(Index, Sample.Value) then
-    begin
-      RefreshSamplesGrid(True);
-      GridSamples.Row := GetGridRowForSampleIndex(Index);
-      GridSamples.Selected := GridSamples.Row;
-      LoadSampleToEditor(GridSamples.Row);
-      AnalyzeIfNeeded;
-    end;
     Exit;
-  end;
 
   if Length(FDisplayedSamples) > 0 then
-    Sample.TimeStampMs := FDisplayedSamples[0].TimeStampMs + SampleSecondsToMs(SafeFloat(EditSampleTime.Text))
+    Sample.TimeStampMs := FDisplayedSamples[High(FDisplayedSamples)].TimeStampMs - SampleSecondsToMs(SafeFloat(EditSampleTime.Text))
   else
     Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(EditSampleTime.Text));
   FTestSamples[Index] := Sample;
@@ -1452,14 +1431,7 @@ begin
     Exit;
 
   if FSampleSource = mssWorkHistory then
-  begin
-    if (FMeterValue <> nil) and FMeterValue.DeleteStabilitySample(Index) then
-    begin
-      RefreshSamplesGrid(True);
-      AnalyzeIfNeeded;
-    end;
     Exit;
-  end;
 
   FTestSamples.Delete(Index);
   RefreshSamplesGrid;
@@ -1515,8 +1487,6 @@ begin
 
   if AInfo.IsSignalStable then
     SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, 'ДА', COLOR_COMPLETED)
-  else if mvsfrNotEnoughSamples in AInfo.FailReasons then
-    SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, 'НЕТ', COLOR_WARNING)
   else
     SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, 'НЕТ', COLOR_WARNING);
 
@@ -1554,8 +1524,7 @@ begin
     SuitableColor := COLOR_COMPLETED
   else if mvsfrInvalidSettings in AInfo.FailReasons then
     SuitableColor := COLOR_INVALID
-  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or
-          (mvsfrWindowNotFilled in AInfo.FailReasons) then
+  else if       (mvsfrWindowNotFilled in AInfo.FailReasons) then
     SuitableColor := COLOR_WARNING
   else if mvsfrStaleData in AInfo.FailReasons then
     SuitableColor := COLOR_INVALID
@@ -1584,6 +1553,7 @@ begin
     Exit;
 
   EditResultSampleCount.Text := EmptyText;
+  EditResultConfiguredWindowSampleCount.Text := EmptyText;
   EditResultUsedSampleCount.Text := EmptyText;
   EditResultOutlierCount.Text := EmptyText;
   EditResultOutlierFraction.Text := EmptyText;
@@ -1959,7 +1929,7 @@ begin
         end;
       mtsNotEnoughData:
         begin
-          FTestSettings.MinSampleCount := ScenarioPointCount + 1;
+          FTestSettings.MinSampleCount := Min(FTestSettings.SampleSize, ScenarioPointCount + 1);
           for I := 0 to Count - 1 do
             AddSamplePoint(I, BaseValue);
         end;
@@ -2088,7 +2058,8 @@ begin
 
   case ACol of
     0: Value := IntToStr(ARow + 1);
-    1: Value := FloatToStr((FDisplayedSamples[GetSampleIndexForGridRow(ARow)].TimeStampMs - FDisplayedSamples[0].TimeStampMs) / 1000);
+    1: Value := FloatToStr((FDisplayedSamples[High(FDisplayedSamples)].TimeStampMs -
+      FDisplayedSamples[GetSampleIndexForGridRow(ARow)].TimeStampMs) / 1000.0);
     2: Value := IntToStr(FDisplayedSamples[GetSampleIndexForGridRow(ARow)].TimeStampMs);
     3: Value := BaseToDisplayText(FDisplayedSamples[GetSampleIndexForGridRow(ARow)].Value);
     4: if FindSampleAnalysis(ARow, AResult) then Value := InWindowText(AResult) else Value := '';
@@ -2115,7 +2086,7 @@ begin
   Sample := FTestSamples[GetSampleIndexForGridRow(ARow)];
   case ACol of
     1: if Length(FDisplayedSamples) > 0 then
-         Sample.TimeStampMs := FDisplayedSamples[0].TimeStampMs + SampleSecondsToMs(SafeFloat(Value.ToString))
+         Sample.TimeStampMs := FDisplayedSamples[High(FDisplayedSamples)].TimeStampMs - SampleSecondsToMs(SafeFloat(Value.ToString))
        else
          Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(Value.ToString));
     3: Sample.Value := DisplayToBase(Value.ToString);
@@ -2440,10 +2411,12 @@ begin
   end;
 
   EditResultSampleCount.Text := IntToStr(AInfo.SampleCount);
+  EditResultConfiguredWindowSampleCount.Text := IntToStr(FTestSettings.MinSampleCount);
   EditResultUsedSampleCount.Text := IntToStr(AInfo.UsedSampleCount);
   EditResultOutlierCount.Text := IntToStr(AInfo.OutlierCount);
   EditResultOutlierFraction.Text := FormatInfoFloat(AInfo.OutlierFraction * 100, AInfo.UsedSampleCount > 0, 2);
-  EditResultWindowDuration.Text := IntToStr(FTestSettings.MinSampleCount);
+  EditResultWindowDuration.Text := FormatInfoFloat(AInfo.WindowDurationSec,
+    AInfo.UsedSampleCount > 0, 3);
   EditResultLastSampleAge.Text := FormatInfoFloat(AInfo.LastSampleAgeSec, AInfo.HasLastSampleAge, 2);
   EditResultCurrentValue.Text := FormatBaseInfo(AInfo.CurrentValue, AInfo.HasCurrentValue);
   EditResultMeanValue.Text := FormatBaseInfo(AInfo.MeanValue, AInfo.HasStatistics);
@@ -2978,6 +2951,8 @@ begin
     AErrorText := 'Некорректное количество отображаемых данных.'
   else if IntValue < 1 then
     AErrorText := 'Количество отображаемых данных должно быть не меньше 1.'
+  else if StrToInt(Trim(EditMinSampleCount.Text)) > IntValue then
+    AErrorText := 'Количество отсчётов в окне не может превышать количество отображаемых данных'
   else if not TryReadFloat(EditMaxSampleAgeSec.Text, DoubleValue) then
     AErrorText := 'Максимальный возраст данных должен быть корректным числом.'
   else if (not TryReadFloat(EditExitThresholdFactor.Text, DoubleValue)) or (DoubleValue < 1) then
