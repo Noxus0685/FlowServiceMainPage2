@@ -1704,8 +1704,9 @@ var
   Window: TArray<TIndexedSample>;
   Used: TArray<TIndexedSample>;
   FirstMs, LastMs, LastSampleTimeMs: Int64;
-  I, N, EligibleCount, FirstUsedIndex, WindowCount: Integer;
-  Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept, RangeEpsilon: Double;
+  I, N, EligibleCount, NewestIndex, OldestIndex, WindowCount: Integer;
+  Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept, RangeEpsilon,
+    WindowDurationSec: Double;
   Msg: string;
   OutlierValues: TArray<Double>;
   Outliers: TArray<Boolean>;
@@ -1811,10 +1812,29 @@ begin
     SetLength(Window, 0)
   else
   begin
-    WindowCount := Min(ASettings.MinSampleCount, EligibleCount);
-    FirstUsedIndex := EligibleCount - WindowCount;
+    NewestIndex := High(Window);
+    OldestIndex := NewestIndex;
+    while OldestIndex >= 0 do
+    begin
+      WindowCount := NewestIndex - OldestIndex + 1;
+      if WindowCount > 1 then
+        WindowDurationSec := (Window[NewestIndex].Sample.TimeStampMs -
+          Window[OldestIndex].Sample.TimeStampMs) / 1000.0
+      else
+        WindowDurationSec := 0.0;
+
+      if (WindowCount >= ASettings.MinSampleCount) and
+         ((ASettings.MinWindowDurationSec <= 0) or
+          (WindowDurationSec >= ASettings.MinWindowDurationSec)) then
+        Break;
+      Dec(OldestIndex);
+    end;
+    if OldestIndex < 0 then
+      OldestIndex := 0;
+
+    WindowCount := NewestIndex - OldestIndex + 1;
     for I := 0 to WindowCount - 1 do
-      Window[I] := Window[FirstUsedIndex + I];
+      Window[I] := Window[OldestIndex + I];
     SetLength(Window, WindowCount);
   end;
 
@@ -1836,14 +1856,20 @@ begin
     AInfo.ElapsedWindowSec := Max(0.0, (ACurrentMs - FirstMs) / 1000.0);
     { Compatibility fields retained for existing diagnostic consumers. }
     AInfo.WindowDurationSec := AInfo.ElapsedWindowSec;
-    AInfo.ActualWindowDurationSec := AInfo.ActualSampleSpanSec;
     AInfo.HasCurrentValue := True;
   end;
+
+  if N < 2 then
+    AInfo.ActualWindowDurationSec := 0.0
+  else
+    AInfo.ActualWindowDurationSec := Max(0.0,
+      (Window[N - 1].Sample.TimeStampMs -
+       Window[0].Sample.TimeStampMs) / 1000.0);
 
   AInfo.HasEnoughSamples := N >= ASettings.MinSampleCount;
   AInfo.HasEnoughWindowDuration :=
     (ASettings.MinWindowDurationSec <= 0) or
-    (AInfo.ElapsedWindowSec >= ASettings.MinWindowDurationSec);
+    (AInfo.ActualWindowDurationSec >= ASettings.MinWindowDurationSec);
   AInfo.HasFullWindow := AInfo.HasEnoughSamples and AInfo.HasEnoughWindowDuration;
   AInfo.HasEnoughWindow := AInfo.HasFullWindow;
   if not AInfo.HasEnoughSamples then
