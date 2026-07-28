@@ -226,6 +226,12 @@ type
   TMeasurementRun = class(TObservableObject)
 
   private
+    const
+      STABILITY_VARIATION_ERROR_FACTOR = 0.50;
+      STABILITY_STDDEV_ERROR_FACTOR = 0.15;
+      STABILITY_TREND_ERROR_FACTOR = 0.25;
+      STABILITY_FORECAST_HORIZON_SEC = 5.0;
+
     FWorkTable: TWorkTable;
     FPoints: TObjectList<TDevicePoint>;
 
@@ -379,6 +385,9 @@ type
     function CalcStableTimeoutSec: Integer;
     procedure ResetPointSetupState;
     procedure StartNewStabilityAttempt;
+    procedure ConfigureStabilityByPoint(AValue: TMeterValue; APoint: TDevicePoint);
+    procedure ConfigureTargetRangeByPoint(AValue: TMeterValue; APoint: TDevicePoint;
+      const ARequireRange: Boolean);
 
     procedure RunThreadProc;
     function IsThreadRunning: Boolean;
@@ -487,6 +496,56 @@ begin
   end;
 
   Result := True;
+end;
+
+procedure TMeasurementRun.ConfigureStabilityByPoint(AValue: TMeterValue;
+  APoint: TDevicePoint);
+var
+  Settings: TMeterValueStabilitySettings;
+  ErrorAbsolute: Double;
+begin
+  if (AValue = nil) or (APoint = nil) then
+    Exit;
+
+  Settings := AValue.StabilitySettings;
+  ErrorAbsolute := Abs(APoint.Q) * Abs(APoint.Error) / 100.0;
+  if ErrorAbsolute > 0 then
+  begin
+    Settings.MaxVariation := ErrorAbsolute * STABILITY_VARIATION_ERROR_FACTOR;
+    Settings.MaxStdDeviation := ErrorAbsolute * STABILITY_STDDEV_ERROR_FACTOR;
+    Settings.MaxTrendRate := ErrorAbsolute * STABILITY_TREND_ERROR_FACTOR /
+      STABILITY_FORECAST_HORIZON_SEC;
+  end;
+  Settings.ForecastHorizonSec := STABILITY_FORECAST_HORIZON_SEC;
+  AValue.StabilitySettings := Settings;
+end;
+
+procedure TMeasurementRun.ConfigureTargetRangeByPoint(AValue: TMeterValue;
+  APoint: TDevicePoint; const ARequireRange: Boolean);
+var
+  Settings: TMeterValueStabilitySettings;
+  MinPercent, MaxPercent: Double;
+begin
+  if (AValue = nil) or (APoint = nil) then
+    Exit;
+
+  Settings := AValue.StabilitySettings;
+  Settings.TargetValue := APoint.Q;
+  if AccuracyToRange(APoint.FlowAccuracy, MinPercent, MaxPercent) then
+  begin
+    Settings.TargetAccuracyMinusPercent := Abs(MinPercent);
+    Settings.TargetAccuracyPlusPercent := Abs(MaxPercent);
+  end
+  else
+  begin
+    Settings.TargetAccuracyMinusPercent := 0.0;
+    Settings.TargetAccuracyPlusPercent := 0.0;
+  end;
+  Settings.TargetToleranceAbsolute := 0.0;
+  Settings.RequireCurrentValueInRange := ARequireRange;
+  Settings.RequireMeanValueInRange := ARequireRange;
+  Settings.RequireForecastInRange := False;
+  AValue.StabilitySettings := Settings;
 end;
 
 function GetAccuracyWidth(const AAccuracy: string): Double;
@@ -1210,10 +1269,32 @@ begin
 end;
 
 procedure TMeasurementRun.EnterWaitPointSetup;
+var
+  I: Integer;
+  Channel: TChannel;
+  Point: TDevicePoint;
 begin
   SetCurrentPointStatus(mptsSetupPoint);
   if FWorkTable = nil then
     Exit;
+
+  Point := GetCurrentPoint;
+  if (FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.Value <> nil) then
+  begin
+    ConfigureStabilityByPoint(FWorkTable.FlowRate.Value, Point);
+    ConfigureTargetRangeByPoint(FWorkTable.FlowRate.Value, Point, True);
+  end;
+  if FWorkTable.EtalonChannels <> nil then
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.EtalonChannels[I];
+      if (Channel <> nil) and (Channel.FlowMeter <> nil) and
+         (Channel.FlowMeter.ValueFlow <> nil) then
+      begin
+        ConfigureStabilityByPoint(Channel.FlowMeter.ValueFlow, Point);
+        ConfigureTargetRangeByPoint(Channel.FlowMeter.ValueFlow, Point, True);
+      end;
+    end;
   AddDiagnosticEvent(Format(
     'PointSetupWaitStarted: PointIndex=%d; PointUUID=%s; TargetFlowLS=%.6f; SelectedEtalonUUID=%s; WorkTableState=%s; Attempt=%d; CommandSent=%s',
     [FSetupPointIndex, FSetupPointUUID, FSetupTargetFlowLS, GetSelectedEtalonUUID,
@@ -1999,9 +2080,11 @@ begin
         StableInfo.LowerLimit := TargetValue - AllowedDeviation;
         StableInfo.UpperLimit := TargetValue + AllowedDeviation;
 
+        ConfigureStabilityByPoint(ValueFlow, BestPoint);
+        ConfigureTargetRangeByPoint(ValueFlow, BestPoint, False);
         Settings := ValueFlow.StabilitySettings;
-        ValueFlow.AnalyzePointStabilityForMeasurement(FStabilityDataStartMs,
-          Settings.MaxSampleAgeSec, TargetValue, ErrorPercent, SignalInfo);
+        ValueFlow.AnalyzeStabilityForMeasurement(FStabilityDataStartMs,
+          Settings, SignalInfo);
         StableInfo.LowerLimit := SignalInfo.StabilityLowerLimit;
         StableInfo.UpperLimit := SignalInfo.StabilityUpperLimit;
         CurrentInRange := SignalInfo.IsCurrentValueInRange;
@@ -2197,13 +2280,15 @@ begin
         else
           GroupFlows.Add(GroupKey, ActualValue);
 
+        ConfigureStabilityByPoint(StableValue, Point);
+        ConfigureTargetRangeByPoint(StableValue, Point, True);
         Settings := StableValue.StabilitySettings;
         if Reason = '' then
-          StableValue.AnalyzePointStabilityForMeasurement(FStabilityDataStartMs,
-            Settings.MaxSampleAgeSec, TargetValue, PointErrorPercent, SignalInfo)
+          StableValue.AnalyzeStabilityForMeasurement(FStabilityDataStartMs,
+            Settings, SignalInfo)
         else
           SignalInfo := Default(TMeterValueStabilityInfo);
-        ChannelStable := (Reason = '') and SignalInfo.IsSignalStable;
+        ChannelStable := (Reason = '') and SignalInfo.IsSuitableForMeasurement;
 
         AllChannelsStable := AllChannelsStable and ChannelStable;
         if Reason <> '' then
@@ -2245,7 +2330,17 @@ begin
       if StableValue = nil then
         Exit;
       ActualValue := StableValue.GetDoubleValue;
+      ConfigureStabilityByPoint(StableValue, Point);
+      ConfigureTargetRangeByPoint(StableValue, Point, True);
       Settings := StableValue.StabilitySettings;
+      if Reason = '' then
+        StableValue.AnalyzeStabilityForMeasurement(FStabilityDataStartMs,
+          Settings, SignalInfo)
+      else
+        SignalInfo := Default(TMeterValueStabilityInfo);
+      AllChannelsStable := (Reason = '') and SignalInfo.IsSuitableForMeasurement;
+      if not AllChannelsStable then
+        FirstChannelFailureReason := SignalInfo.StatusText;
       AddDiagnosticEvent(Format('EtalonFlowFallback=True; Source=FWorkTable.FlowRate.Value; Actual=%.6f', [ActualValue]));
     end;
   finally
