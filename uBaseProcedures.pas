@@ -213,13 +213,13 @@ type
   TMeterValueStabilitySettings = record
     /// <summary>Enables mathematical stability analysis; disabled values never auto-confirm readiness.</summary>
     Enabled: Boolean;
-    /// <summary>Minimum number of continuous samples required to confirm stability.</summary>
+    /// <summary>Exact maximum window size and minimum sample count required to confirm stability.</summary>
     MinSampleCount: Integer;
     /// <summary>Minimum continuous-window duration required to confirm stability; zero disables this check.</summary>
     WindowDurationSec: Double;
     /// <summary>Maximum number of latest samples kept in working history and shown from TMeterValue history.</summary>
     SampleSize: Integer;
-    /// <summary>Maximum allowed age in seconds for the latest sample.</summary>
+    /// <summary>Maximum allowed age in seconds for the latest eligible sample.</summary>
     MaxSampleAgeSec: Double;
     /// <summary>Maximum allowed max-min spread in physical units.</summary>
     MaxVariation: Double;
