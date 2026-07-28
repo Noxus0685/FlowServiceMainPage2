@@ -754,6 +754,8 @@ type
   FLastClickCol: TColumn;
   FLastClickTick: Cardinal;
   FLastPopupGrid: TGrid;
+  FMeasurementMeanFlow: Double;
+  FMeasurementMeanFlowValid: Boolean;
 
   FRows: array of TRowData;
   IsUpdating: Boolean;
@@ -3232,6 +3234,7 @@ begin
 
   ApplyGridColumnsLayout(GridEtalons, WorkTable.EtalonsGridColumns);
   ApplyGridColumnsLayout(GridDevices, WorkTable.DevicesGridColumns);
+  GridDevices.Repaint;
   if FFrameProceed <> nil then
     ApplyGridColumnsLayout(FFrameProceed.GridDataPoints, WorkTable.DataPointsGridColumns);
   if FFrameProceed <> nil then
@@ -9333,6 +9336,7 @@ var
 begin
   NormalizeActiveWorkTable;
   WT := FActiveWorkTable;
+  FMeasurementMeanFlowValid := CalculateMeasurementMeanFlow(FMeasurementMeanFlow);
 
   if WT <> nil then
     SoftReloadGridByGrowingRowCount(
