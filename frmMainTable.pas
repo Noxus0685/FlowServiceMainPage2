@@ -3232,6 +3232,7 @@ begin
 
   ApplyGridColumnsLayout(GridEtalons, WorkTable.EtalonsGridColumns);
   ApplyGridColumnsLayout(GridDevices, WorkTable.DevicesGridColumns);
+  GridDevices.Repaint;
   if FFrameProceed <> nil then
     ApplyGridColumnsLayout(FFrameProceed.GridDataPoints, WorkTable.DataPointsGridColumns);
   if FFrameProceed <> nil then
