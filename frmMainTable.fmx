@@ -5048,7 +5048,6 @@ object FrameMainTable: TFrameMainTable
           end
           object MenuItemDevicesColumnMeanFlow: TMenuItem
             Locked = True
-            IsChecked = True
             Text = #1057#1088'. '#1088#1072#1089#1093#1086#1076
             OnClick = MenuGridLayOutClick
           end
