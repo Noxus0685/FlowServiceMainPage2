@@ -176,7 +176,6 @@ type
   TMeterValueStabilityFailReason = (
     mvsfrAnalysisDisabled,
     mvsfrNoData,
-    mvsfrNotEnoughSamples,  // Fewer samples than MinSampleCount are available in the active window.
     mvsfrWindowNotFilled,    // Kept for binary/source compatibility; no longer emitted.
     mvsfrInsufficientTimeSpread, // Timestamps are too close or identical to calculate a trend.
     mvsfrStaleData,         // Last sample age exceeds MaxSampleAgeSec.
@@ -190,7 +189,9 @@ type
     mvsfrSampleBelowStabilityRange,
     mvsfrSampleAboveStabilityRange,
     mvsfrInvalidPointError,
-    mvsfrInvalidSettings    // Settings failed validation and analysis result is not reliable.
+    mvsfrInvalidSettings,   // Settings failed validation and analysis result is not reliable.
+    mvsfrNotEnoughSamples,  // Active window contains fewer than MinSampleCount samples.
+    mvsfrWindowTooShort     // Active window duration is shorter than WindowDurationSec.
   );
 
   /// <summary>Set of failure reasons; multiple simultaneous problems can be reported.</summary>
@@ -212,8 +213,10 @@ type
   TMeterValueStabilitySettings = record
     /// <summary>Enables mathematical stability analysis; disabled values never auto-confirm readiness.</summary>
     Enabled: Boolean;
-    /// <summary>Exact number of the latest eligible samples in the analysis window.</summary>
+    /// <summary>Minimum number of continuous samples required to confirm stability.</summary>
     MinSampleCount: Integer;
+    /// <summary>Minimum continuous-window duration required to confirm stability; zero disables this check.</summary>
+    WindowDurationSec: Double;
     /// <summary>Maximum number of latest samples kept in working history and shown from TMeterValue history.</summary>
     SampleSize: Integer;
     /// <summary>Maximum allowed age in seconds for the latest sample.</summary>
@@ -335,8 +338,10 @@ type
     StableCandidateDurationSec: Double;
     /// <summary>Compatibility alias: true when IsSignalStable is true.</summary>
     IsConfirmed: Boolean;
-    /// <summary>True when active-window sample count meets MinSampleCount.</summary>
+    /// <summary>True when the active time window contains data.</summary>
     HasEnoughSamples: Boolean;
+    /// <summary>True when the actual continuous-window duration meets WindowDurationSec.</summary>
+    HasEnoughWindowDuration: Boolean;
     /// <summary>Compatibility alias for HasEnoughSamples.</summary>
     HasFullWindow: Boolean;
     /// <summary>Compatibility alias for HasFullWindow.</summary>
@@ -1286,10 +1291,9 @@ begin
   case AReason of
     mvsfrAnalysisDisabled: Result := 'анализ стабильности отключён';
     mvsfrNoData: Result := 'нет доступных данных';
-    mvsfrNotEnoughSamples: Result := 'недостаточно отсчётов';
     mvsfrWindowNotFilled: Result := 'Набор окна стабилизации';
     mvsfrInsufficientTimeSpread: Result := 'недостаточный временной интервал между точками для расчёта тренда';
-    mvsfrStaleData: Result := 'последнее значение устарело';
+    mvsfrStaleData: Result := 'нет актуальных данных';
     mvsfrVariationTooHigh: Result := 'размах превышает допустимое значение';
     mvsfrDeviationTooHigh: Result := 'стандартное отклонение превышает допустимое значение';
     mvsfrTrendTooHigh: Result := 'скорость тренда превышает допустимое значение';
@@ -1301,6 +1305,8 @@ begin
     mvsfrSampleAboveStabilityRange: Result := 'отсчёт выше допуска точки';
     mvsfrInvalidPointError: Result := 'некорректный допуск точки';
     mvsfrInvalidSettings: Result := 'некорректные настройки';
+    mvsfrNotEnoughSamples: Result := 'недостаточно отсчётов в окне';
+    mvsfrWindowTooShort: Result := 'недостаточная длительность окна анализа';
   else
     Result := 'неизвестная причина';
   end;
