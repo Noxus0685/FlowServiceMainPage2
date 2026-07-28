@@ -313,7 +313,6 @@ object FormTypeSelect: TFormTypeSelect
           Size.Height = 22.000000000000000000
           Size.PlatformDefault = False
           KillFocusByReturn = True
-          OnExit = EditFindTypeExit
         end
         object SpeedButtonFindInternet: TSpeedButton
           Action = actTypeFindInternet
