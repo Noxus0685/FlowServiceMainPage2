@@ -191,7 +191,7 @@ type
     mvsfrInvalidPointError,
     mvsfrInvalidSettings,   // Settings failed validation and analysis result is not reliable.
     mvsfrNotEnoughSamples,  // Active window contains fewer than MinSampleCount samples.
-    mvsfrWindowTooShort     // Active window duration is shorter than WindowDurationSec.
+    mvsfrWindowTooShort     // Window lifetime is shorter than MinWindowDurationSec.
   );
 
   /// <summary>Set of failure reasons; multiple simultaneous problems can be reported.</summary>
@@ -216,7 +216,7 @@ type
     /// <summary>Exact maximum window size and minimum sample count required to confirm stability.</summary>
     MinSampleCount: Integer;
     /// <summary>Minimum continuous-window duration required to confirm stability; zero disables this check.</summary>
-    WindowDurationSec: Double;
+    MinWindowDurationSec: Double;
     /// <summary>Maximum number of latest samples kept in working history and shown from TMeterValue history.</summary>
     SampleSize: Integer;
     /// <summary>Maximum allowed age in seconds for the latest eligible sample.</summary>
@@ -325,6 +325,10 @@ type
     LastWindowSampleTimeMs: Int64;
     RequiredSampleCount: Integer;
     ActualWindowDurationSec: Double;
+    /// <summary>Elapsed time from the first selected sample to the current analysis time.</summary>
+    ElapsedWindowSec: Double;
+    /// <summary>Time span between the first and last selected samples.</summary>
+    ActualSampleSpanSec: Double;
     RequiredWindowDurationSec: Double;
     SampleIntervalMs: Double;
     BoundaryToleranceMs: Integer;
@@ -340,7 +344,7 @@ type
     IsConfirmed: Boolean;
     /// <summary>True when the active time window contains data.</summary>
     HasEnoughSamples: Boolean;
-    /// <summary>True when the actual continuous-window duration meets WindowDurationSec.</summary>
+    /// <summary>True when elapsed window lifetime meets MinWindowDurationSec.</summary>
     HasEnoughWindowDuration: Boolean;
     /// <summary>Compatibility alias for HasEnoughSamples.</summary>
     HasFullWindow: Boolean;
