@@ -712,23 +712,6 @@
                 TabOrder = 0
                 Text = #1040#1085#1072#1083#1080#1079' '#1089#1090#1072#1073#1080#1083#1100#1085#1086#1089#1090#1080' '#1074#1082#1083#1102#1095#1105#1085
               end
-              object LabelMinSampleCount: TLabel
-                Position.X = 12.000000000000000000
-                Position.Y = 62.000000000000000000
-                Size.Width = 240.000000000000000000
-                Size.Height = 22.000000000000000000
-                Size.PlatformDefault = False
-                Text = #1052#1080#1085#1080#1084#1072#1083#1100#1085#1086#1077' '#1082#1086#1083#1080#1095#1077#1089#1090#1074#1086' '#1086#1090#1089#1095#1105#1090#1086#1074
-              end
-              object EditMinSampleCount: TEdit
-                Touch.InteractiveGestures = [LongTap, DoubleTap]
-                TabOrder = 1
-                Position.X = 280.000000000000000000
-                Position.Y = 60.000000000000000000
-                Size.Width = 120.000000000000000000
-                Size.Height = 24.000000000000000000
-                Size.PlatformDefault = False
-              end
               object LabelSampleSize: TLabel
                 Position.X = 12.000000000000000000
                 Position.Y = 92.000000000000000000

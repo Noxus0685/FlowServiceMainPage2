@@ -104,7 +104,6 @@ type
     ButtonGenerateNew: TButton;
     ButtonGenerateAppend: TButton;
     CheckBoxStabilityEnabled: TCheckBox;
-    EditMinSampleCount: TEdit;
     EditSampleSize: TEdit;
     EditMaxSampleAgeSec: TEdit;
     EditExitThresholdFactor: TEdit;
@@ -483,7 +482,6 @@ begin
   GridSamples.OnSelectCell := GridSamplesSelectCell;
   EditAnalysisTime.OnExit := EditAnalysisTimeExit;
   CheckBoxStabilityEnabled.OnChange := HandleSettingsChange;
-  EditMinSampleCount.OnExit := HandleSettingsChange;
   EditSampleSize.OnExit := HandleSettingsChange;
   EditMaxSampleAgeSec.OnExit := HandleSettingsChange;
   EditExitThresholdFactor.OnExit := HandleSettingsChange;
@@ -533,7 +531,6 @@ begin
   InitializeScenarioList;
   SetHintFor('LabelStabilityDisplayUnit', 'Единица, выбранная для отображения текущего TMeterValue. Все размерные значения результатов и соответствующие настройки показываются в этой единице. Внутреннее хранение может выполняться в базовой единице.');
   SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения по заданным критериям.');
-  SetHintFor('LabelMinSampleCount', 'Точный размер окна анализа: используются последние подходящие отсчёты.');
   SetHintFor('LabelSampleSize', 'Максимальное количество последних точек рабочей истории и строк таблицы истории TMeterValue.');
   SetHintFor('LabelMaxSampleAgeSec', 'Максимально допустимый разрыв между соседними точками непрерывного окна.');
   SetHintFor('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности, задающий гистерезис выхода.');
@@ -925,10 +922,9 @@ begin
   SetLabelText('LabelGeneratorTrend', 'Тренд, ' + UnitName + '/с');
   SetLabelText('LabelGeneratorNoise', 'Шум ±, ' + UnitName);
   SetLabelText('LabelGeneratorOutlierAmplitude', 'Амплитуда выброса, ' + UnitName);
-  SetLabelText('LabelMinSampleCount', 'Количество отсчётов в окне, шт.');
-  SetLabelText('LabelSampleSize', 'Количество отображаемых данных, шт.');
-  SetLabelText('LabelResultSampleCount', 'Количество отображаемых данных');
-  SetLabelText('LabelResultWindowDuration', 'Количество отсчётов в окне');
+  SetLabelText('LabelSampleSize', 'Размер истории, отсчётов');
+  SetLabelText('LabelResultSampleCount', 'Количество точек истории');
+  SetLabelText('LabelResultUsedSampleCount', 'Количество отсчётов в окне');
   SetLabelText('LabelMaxSampleAgeSec', 'Максимальный возраст данных, с');
   SetLabelText('LabelMaxVariation', 'Максимальный размах, ' + UnitName);
   SetLabelText('LabelMaxStdDeviation', 'Максимальное стандартное отклонение, ' + UnitName);
@@ -971,7 +967,6 @@ begin
   SetHintFor('LabelStabilityDisplayUnit', 'Единица, выбранная для отображения текущего TMeterValue. Все размерные значения результатов и соответствующие настройки показываются в этой единице. Внутреннее хранение может выполняться в базовой единице.');
   SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения. При отключении анализ не подтверждает готовность измерения.');
   SetHintFor('ComboBoxSampleSource', 'Выбирает массив для preview-анализа. История TMeterValue использует рабочую историю текущего значения. Тестовый массив не изменяет рабочую историю.');
-  SetLabelHint('LabelMinSampleCount', 'Точный размер окна анализа: используются последние подходящие отсчёты. Единица: шт.');
   SetLabelHint('LabelSampleSize', 'Максимальное количество последних точек рабочей истории и строк таблицы истории TMeterValue. Единица: шт.');
   SetLabelHint('LabelMaxSampleAgeSec', 'Максимально допустимый разрыв между соседними точками непрерывного окна; также проверяется актуальность последней точки относительно времени анализа. При значении не больше нуля проверка отключена. Единица: с.');
   SetLabelHint('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности. Большее значение создаёт гистерезис и снижает частые переключения, меньшее быстрее снимает подтверждение. Безразмерная величина.');
@@ -1296,8 +1291,8 @@ begin
   if SampleIndex < 0 then
     Exit;
 
-  EditSampleTime.Text := FloatToStr((FDisplayedSamples[SampleIndex].TimeStampMs -
-    FDisplayedSamples[0].TimeStampMs) / 1000);
+  EditSampleTime.Text := FloatToStr((FDisplayedSamples[High(FDisplayedSamples)].TimeStampMs -
+    FDisplayedSamples[SampleIndex].TimeStampMs) / 1000.0);
   EditSampleValue.Text := BaseToDisplayText(FDisplayedSamples[SampleIndex].Value);
 end;
 
@@ -1358,7 +1353,7 @@ begin
   if FSampleSource = mssWorkHistory then
   begin
     if Length(FDisplayedSamples) > 0 then
-      Sample.TimeStampMs := FDisplayedSamples[0].TimeStampMs + SampleSecondsToMs(SafeFloat(EditSampleTime.Text))
+      Sample.TimeStampMs := FDisplayedSamples[High(FDisplayedSamples)].TimeStampMs - SampleSecondsToMs(SafeFloat(EditSampleTime.Text))
     else
       Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(EditSampleTime.Text));
     if (FMeterValue <> nil) and FMeterValue.AddStabilitySampleManual(Sample.TimeStampMs, Sample.Value) then
@@ -1422,7 +1417,7 @@ begin
   end;
 
   if Length(FDisplayedSamples) > 0 then
-    Sample.TimeStampMs := FDisplayedSamples[0].TimeStampMs + SampleSecondsToMs(SafeFloat(EditSampleTime.Text))
+    Sample.TimeStampMs := FDisplayedSamples[High(FDisplayedSamples)].TimeStampMs - SampleSecondsToMs(SafeFloat(EditSampleTime.Text))
   else
     Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(EditSampleTime.Text));
   FTestSamples[Index] := Sample;
@@ -1515,8 +1510,6 @@ begin
 
   if AInfo.IsSignalStable then
     SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, 'ДА', COLOR_COMPLETED)
-  else if mvsfrNotEnoughSamples in AInfo.FailReasons then
-    SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, 'НЕТ', COLOR_WARNING)
   else
     SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, 'НЕТ', COLOR_WARNING);
 
@@ -1554,8 +1547,7 @@ begin
     SuitableColor := COLOR_COMPLETED
   else if mvsfrInvalidSettings in AInfo.FailReasons then
     SuitableColor := COLOR_INVALID
-  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or
-          (mvsfrWindowNotFilled in AInfo.FailReasons) then
+  else if       (mvsfrWindowNotFilled in AInfo.FailReasons) then
     SuitableColor := COLOR_WARNING
   else if mvsfrStaleData in AInfo.FailReasons then
     SuitableColor := COLOR_INVALID
@@ -1849,7 +1841,6 @@ var
     FTestSettings := EntrySettings;
     FTestTargetValue := EntryTargetValue;
     if not FTestSettings.Enabled then FTestSettings.Enabled := True;
-    if FTestSettings.MinSampleCount < 1 then FTestSettings.MinSampleCount := 10;
     if FTestSettings.SampleSize < 1 then FTestSettings.SampleSize := 20;
     if FTestSettings.MaxSampleAgeSec <= 0 then FTestSettings.MaxSampleAgeSec := 3;
     if FTestSettings.ExitThresholdFactor < 1 then FTestSettings.ExitThresholdFactor := 1.2;
@@ -1943,7 +1934,7 @@ begin
       mtsManyOutliers:
         begin
           FTestSettings.MaxOutlierFraction := 0.10;
-          WindowPointCount := EnsureRange(FTestSettings.MinSampleCount, 1, Count);
+          WindowPointCount := EnsureRange(FTestSettings.SampleSize, 1, Count);
           RequiredOutlierCount := Floor(WindowPointCount *
             FTestSettings.MaxOutlierFraction) + 1;
           RequiredOutlierCount := EnsureRange(RequiredOutlierCount, 2,
@@ -1959,7 +1950,7 @@ begin
         end;
       mtsNotEnoughData:
         begin
-          FTestSettings.MinSampleCount := ScenarioPointCount + 1;
+          FTestSettings.SampleSize := ScenarioPointCount + 1;
           for I := 0 to Count - 1 do
             AddSamplePoint(I, BaseValue);
         end;
@@ -2088,7 +2079,8 @@ begin
 
   case ACol of
     0: Value := IntToStr(ARow + 1);
-    1: Value := FloatToStr((FDisplayedSamples[GetSampleIndexForGridRow(ARow)].TimeStampMs - FDisplayedSamples[0].TimeStampMs) / 1000);
+    1: Value := FloatToStr((FDisplayedSamples[High(FDisplayedSamples)].TimeStampMs -
+      FDisplayedSamples[GetSampleIndexForGridRow(ARow)].TimeStampMs) / 1000.0);
     2: Value := IntToStr(FDisplayedSamples[GetSampleIndexForGridRow(ARow)].TimeStampMs);
     3: Value := BaseToDisplayText(FDisplayedSamples[GetSampleIndexForGridRow(ARow)].Value);
     4: if FindSampleAnalysis(ARow, AResult) then Value := InWindowText(AResult) else Value := '';
@@ -2115,7 +2107,7 @@ begin
   Sample := FTestSamples[GetSampleIndexForGridRow(ARow)];
   case ACol of
     1: if Length(FDisplayedSamples) > 0 then
-         Sample.TimeStampMs := FDisplayedSamples[0].TimeStampMs + SampleSecondsToMs(SafeFloat(Value.ToString))
+         Sample.TimeStampMs := FDisplayedSamples[High(FDisplayedSamples)].TimeStampMs - SampleSecondsToMs(SafeFloat(Value.ToString))
        else
          Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(Value.ToString));
     3: Sample.Value := DisplayToBase(Value.ToString);
@@ -2443,7 +2435,8 @@ begin
   EditResultUsedSampleCount.Text := IntToStr(AInfo.UsedSampleCount);
   EditResultOutlierCount.Text := IntToStr(AInfo.OutlierCount);
   EditResultOutlierFraction.Text := FormatInfoFloat(AInfo.OutlierFraction * 100, AInfo.UsedSampleCount > 0, 2);
-  EditResultWindowDuration.Text := IntToStr(FTestSettings.MinSampleCount);
+  EditResultWindowDuration.Text := FormatInfoFloat(AInfo.WindowDurationSec,
+    AInfo.UsedSampleCount > 0, 3);
   EditResultLastSampleAge.Text := FormatInfoFloat(AInfo.LastSampleAgeSec, AInfo.HasLastSampleAge, 2);
   EditResultCurrentValue.Text := FormatBaseInfo(AInfo.CurrentValue, AInfo.HasCurrentValue);
   EditResultMeanValue.Text := FormatBaseInfo(AInfo.MeanValue, AInfo.HasStatistics);
@@ -2772,7 +2765,6 @@ begin
   try
     CheckBoxStabilityEnabled.IsChecked := FTestSettings.Enabled;
     CheckBoxAutoAnalyze.IsChecked := FTestSettings.AutoAnalyze;
-    EditMinSampleCount.Text := IntToStr(FTestSettings.MinSampleCount);
     EditSampleSize.Text := IntToStr(FTestSettings.SampleSize);
     EditMaxSampleAgeSec.Text := FormatFloat('0.########', FTestSettings.MaxSampleAgeSec);
     EditExitThresholdFactor.Text := FormatFloat('0.########', FTestSettings.ExitThresholdFactor);
@@ -2821,7 +2813,6 @@ begin
   ASettings := FTestSettings;
   ASettings.Enabled := CheckBoxStabilityEnabled.IsChecked;
   ASettings.AutoAnalyze := CheckBoxAutoAnalyze.IsChecked;
-  TryReadInteger(EditMinSampleCount.Text, ASettings.MinSampleCount);
   TryReadInteger(EditSampleSize.Text, ASettings.SampleSize);
   TryReadFloat(EditMaxSampleAgeSec.Text, ASettings.MaxSampleAgeSec);
   TryReadFloat(EditExitThresholdFactor.Text, ASettings.ExitThresholdFactor);
@@ -2851,7 +2842,6 @@ function TFrameMeterValueEdit.StabilitySettingsEqual(const ALeft,
   ARight: TMeterValueStabilitySettings): Boolean;
 begin
   Result := (ALeft.Enabled = ARight.Enabled) and
-    (ALeft.MinSampleCount = ARight.MinSampleCount) and
     (ALeft.SampleSize = ARight.SampleSize) and
     SameValue(ALeft.MaxSampleAgeSec, ARight.MaxSampleAgeSec, 1E-9) and
     SameValue(ALeft.MaxVariation, ARight.MaxVariation, 1E-9) and
@@ -2958,7 +2948,7 @@ begin
   Result := False;
   AErrorText := '';
 
-  if (EditMinSampleCount = nil) or (EditSampleSize = nil) or (EditMaxSampleAgeSec = nil) or
+  if (EditSampleSize = nil) or (EditMaxSampleAgeSec = nil) or
      (EditExitThresholdFactor = nil) or (EditMaxVariation = nil) or
      (EditMaxStdDeviation = nil) or (EditMaxTrendRate = nil) or
      (EditMaxOutlierFractionPercent = nil) or (EditOutlierFactor = nil) or
@@ -2970,14 +2960,10 @@ begin
     Exit;
   end;
 
-  if not TryReadInteger(EditMinSampleCount.Text, IntValue) then
-    AErrorText := 'Некорректное количество отсчётов в окне.'
+  if not TryReadInteger(EditSampleSize.Text, IntValue) then
+    AErrorText := 'Некорректный размер истории.'
   else if IntValue < 1 then
-    AErrorText := 'Количество отсчётов в окне должно быть не меньше 1.'
-  else if not TryReadInteger(EditSampleSize.Text, IntValue) then
-    AErrorText := 'Некорректное количество отображаемых данных.'
-  else if IntValue < 1 then
-    AErrorText := 'Количество отображаемых данных должно быть не меньше 1.'
+    AErrorText := 'Размер истории должен быть больше нуля.'
   else if not TryReadFloat(EditMaxSampleAgeSec.Text, DoubleValue) then
     AErrorText := 'Максимальный возраст данных должен быть корректным числом.'
   else if (not TryReadFloat(EditExitThresholdFactor.Text, DoubleValue)) or (DoubleValue < 1) then

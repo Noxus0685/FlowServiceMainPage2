@@ -898,6 +898,8 @@ type
 
   private
     FInitialized: Boolean;
+    FStabilitySampleTimer: TTimer;
+    procedure StabilitySampleTimerTimer(Sender: TObject);
     FChange: string ;
     FInstrumentalVisibleOrder: TList<TLayout>;
     FFrameProceed: TFrameProceed;
@@ -1173,6 +1175,9 @@ end;
 
 destructor TFrameMainTable.Destroy;
 begin
+  if FStabilitySampleTimer <> nil then
+    FStabilitySampleTimer.Enabled := False;
+  FreeAndNil(FStabilitySampleTimer);
   FreeAndNil(FFlowGraphHistory);
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
@@ -2138,6 +2143,10 @@ begin
 
 
   FInitialized := True;
+  FStabilitySampleTimer := TTimer.Create(Self);
+  FStabilitySampleTimer.Interval := 1000;
+  FStabilitySampleTimer.OnTimer := StabilitySampleTimerTimer;
+  FStabilitySampleTimer.Enabled := True;
   SwitchAuto.IsChecked := False;
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
@@ -5161,6 +5170,17 @@ begin
   else
     LabelFlowRate.Text := '-'; }
 
+end;
+
+procedure TFrameMainTable.StabilitySampleTimerTimer(Sender: TObject);
+var
+  MV: TMeterValue;
+begin
+  { The registry owns only live objects: TMeterValue.Destroy removes an item before
+    releasing its state. The timer never retains a meter value or its sample lock. }
+  for MV in TMeterValue.GetMeterValues do
+    if (MV <> nil) and MV.StabilitySettings.Enabled then
+      MV.AddCurrentStabilitySample;
 end;
 
 procedure TFrameMainTable.TimerMainTimer(Sender: TObject);
