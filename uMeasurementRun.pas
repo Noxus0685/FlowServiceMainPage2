@@ -1753,6 +1753,7 @@ var
   StableReady, RangeReady, Ready, RequireRange: Boolean;
   CurrentInRange, MeanInRange, ForecastInRange: Boolean;
   Reason, LogText, CurrentPointName, DeviceUUID, DevicePointUUID, MatchedPointName, ModeText: string;
+  FirstNotReadyStatusText: string;
   CurrentPointQ, CurrentPointFlowRate, MatchedPointQ, MatchedDistance: Double;
   FlowRateDistance, BestFlowRateDistance: Double;
   CurrentTick: UInt64;
@@ -1842,6 +1843,7 @@ begin
   TotalSecCount := 0;
   ReadyAutoCount := 0;
   TotalAutoCount := 0;
+  FirstNotReadyStatusText := '';
   for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
   begin
     Channel := FWorkTable.DeviceChannels[I];
@@ -1999,7 +2001,6 @@ begin
 
         Settings := ValueFlow.StabilitySettings;
         ValueFlow.AnalyzePointStabilityForMeasurement(FStabilityDataStartMs,
-          Max(0.001, FRequiredDeviceStabilizationSec), Settings.MinSampleCount,
           Settings.MaxSampleAgeSec, TargetValue, ErrorPercent, SignalInfo);
         StableInfo.LowerLimit := SignalInfo.StabilityLowerLimit;
         StableInfo.UpperLimit := SignalInfo.StabilityUpperLimit;
@@ -2054,18 +2055,22 @@ begin
       MatchedDistance := Abs(BestPoint.Q - TargetValue);
     end;
 
-    LogText := Format('DeviceChannelReadiness: ChannelIndex=%d; ChannelUUID=%s; ChannelName=%s; DeviceUUID=%s; DevicePointUUID=%s; DevicePointName=%s; MeasurementMode=%s; MeasurementPointQLS=%.6f; ParticipantFound=%s; ParticipantSourcePointUUID=%s; ParticipantSourceTargetQLS=%.6f; DeviceTargetValue=%.6f; TargetDifferenceToPhysicalPointLS=%.9f; MergeToleranceLS=%.9f; ParticipatesInCurrentPoint=%s; DevicePointErrorPercent=%.6f; StabilityLower=%.6f; StabilityUpper=%.6f; UsedSampleCount=%d; RequiredSampleCount=%d; ActualWindowDurationSec=%.3f; RequiredWindowDurationSec=%.3f; HasEnoughSamples=%s; HasFullWindow=%s; IsDataActual=%s; OutOfRangeSampleCount=%d; FirstOutOfRangeValue=%.6f; FirstOutOfRangeTimeMs=%d; StableReady=%s; Ready=%s; Reason=%s; TargetSource=%s; DevicePointMatchSource=%s; ActualLS=%.6f; ActualM3H=%.6f',
+    LogText := Format('DeviceChannelReadiness: ChannelIndex=%d; ChannelUUID=%s; ChannelName=%s; DeviceUUID=%s; DevicePointUUID=%s; DevicePointName=%s; MeasurementMode=%s; MeasurementPointQLS=%.6f; ParticipantFound=%s; ParticipantSourcePointUUID=%s; ParticipantSourceTargetQLS=%.6f; DeviceTargetValue=%.6f; TargetDifferenceToPhysicalPointLS=%.9f; MergeToleranceLS=%.9f; ParticipatesInCurrentPoint=%s; DevicePointErrorPercent=%.6f; StabilityLower=%.6f; StabilityUpper=%.6f; UsedSampleCount=%d; RequiredSampleCount=%d; ElapsedWindowSec=%.3f; RequiredWindowDurationSec=%.3f; HasEnoughSamples=%s; HasFullWindow=%s; IsDataActual=%s; OutOfRangeSampleCount=%d; FirstOutOfRangeValue=%.6f; FirstOutOfRangeTimeMs=%d; Variation=%.9f; MaxVariation=%.9f; IsVariationStable=%s; StdDeviation=%.9f; MaxStdDeviation=%.9f; IsDeviationStable=%s; TrendRate=%.9f; MaxTrendRate=%.9f; IsTrendStable=%s; StableReady=%s; Ready=%s; Reason=%s; TargetSource=%s; DevicePointMatchSource=%s; ActualLS=%.6f; ActualM3H=%.6f',
       [I, Channel.UUID, Channel.Name, DeviceUUID, DevicePointUUID, MatchedPointName,
        ModeText, CurrentPointQ, BoolToStr(ParticipantFound, True), Participant.SourcePointUUID,
        Participant.SelectedSourceTargetQLS, TargetValue, TargetDifferenceToPhysicalPoint, MergeToleranceLS,
        BoolToStr(ParticipantFound and (Reason <> 'ParticipantTargetDoesNotMatchPhysicalPoint'), True),
        ErrorPercent, SignalInfo.StabilityLowerLimit, SignalInfo.StabilityUpperLimit,
-       SignalInfo.UsedSampleCount, Settings.MinSampleCount, SignalInfo.WindowDurationSec,
-       Max(0.001, FRequiredDeviceStabilizationSec), BoolToStr(SignalInfo.HasEnoughSamples, True),
+       SignalInfo.UsedSampleCount, SignalInfo.RequiredSampleCount, SignalInfo.ElapsedWindowSec,
+       SignalInfo.RequiredWindowDurationSec, BoolToStr(SignalInfo.HasEnoughSamples, True),
        BoolToStr(SignalInfo.HasFullWindow, True), BoolToStr(SignalInfo.IsDataActual, True),
        SignalInfo.OutOfRangeSampleCount, SignalInfo.FirstOutOfRangeSampleValue,
-       SignalInfo.FirstOutOfRangeSampleTimeMs, BoolToStr(StableReady, True),
-       BoolToStr(Ready, True), Reason, TargetSource, PointMatchSource, ActualValue, M3H(ActualValue)]);
+       SignalInfo.FirstOutOfRangeSampleTimeMs,
+       SignalInfo.Variation, Settings.MaxVariation, BoolToStr(SignalInfo.IsVariationStable, True),
+       SignalInfo.StdDeviation, Settings.MaxStdDeviation, BoolToStr(SignalInfo.IsDeviationStable, True),
+       SignalInfo.TrendRate, Settings.MaxTrendRate, BoolToStr(SignalInfo.IsTrendStable, True),
+       BoolToStr(StableReady, True), BoolToStr(Ready, True), Reason, TargetSource,
+       PointMatchSource, ActualValue, M3H(ActualValue)]);
     PublishDeviceLog(LogText);
 
     if Ready then
@@ -2077,13 +2082,25 @@ begin
     end
     else
     begin
+      // Do not stop or overwrite the aggregate result here. Every enabled
+      // participant is analyzed during the same IsDevicesStable call, so all
+      // channel windows advance simultaneously. Preserve only the first
+      // failure for the user-facing status.
       Result := False;
-      StableInfo.Status := sRun_NN;
-      StableInfo.StatusText := Format('Device channel is not ready: UUID=%s; Name=%s; Mode=%s; Reason=%s', [Channel.UUID, Channel.Name, ModeText, Reason]);
+      if FirstNotReadyStatusText = '' then
+        FirstNotReadyStatusText := Format(
+          'Device channel is not ready: UUID=%s; Name=%s; Mode=%s; Reason=%s',
+          [Channel.UUID, Channel.Name, ModeText, Reason]);
     end;
   end;
 
-  AddDiagnosticEvent(Format('DeviceReadinessSummary: SecondsDevicesReadyCount=%d; AutomaticDevicesReadyCount=%d; TotalRequiredDevices=%d',
+  if not Result then
+  begin
+    StableInfo.Status := sRun_NN;
+    StableInfo.StatusText := FirstNotReadyStatusText;
+  end;
+
+  AddDiagnosticEvent(Format('DeviceReadinessSummary: SecondsDevicesReadyCount=%d; AutomaticDevicesReadyCount=%d; TotalRequiredDevices=%d; AllChannelsCheckedSimultaneously=True',
     [ReadySecCount, ReadyAutoCount, TotalSecCount + TotalAutoCount]));
 
   if CheckedCount = 0 then
@@ -2112,7 +2129,7 @@ var
   ActualValue: Double;
   MinPercent, MaxPercent, AllowedMinus, AllowedPlus: Double;
   PointErrorPercent: Double;
-  ToleranceSource, Reason, ChannelReason: string;
+  ToleranceSource, Reason, ChannelReason, FirstChannelFailureReason: string;
   GroupFlows: TDictionary<Integer, Double>;
   Pair: TPair<Integer, Double>;
   GroupKey: Integer;
@@ -2133,6 +2150,7 @@ begin
   HasEtalonValue := False;
   AllChannelsStable := True;
   Reason := '';
+  FirstChannelFailureReason := '';
   PointErrorPercent := 0;
   Settings := Default(TMeterValueStabilitySettings);
   ToleranceSource := 'Point.FlowAccuracy';
@@ -2182,7 +2200,6 @@ begin
         Settings := StableValue.StabilitySettings;
         if Reason = '' then
           StableValue.AnalyzePointStabilityForMeasurement(FStabilityDataStartMs,
-            Max(0.001, FRequiredDeviceStabilizationSec), Settings.MinSampleCount,
             Settings.MaxSampleAgeSec, TargetValue, PointErrorPercent, SignalInfo)
         else
           SignalInfo := Default(TMeterValueStabilityInfo);
@@ -2193,14 +2210,20 @@ begin
           ChannelReason := Reason
         else
           ChannelReason := SignalInfo.StatusText;
-        AddDiagnosticEvent(Format('EtalonChannelReady=%s; ChannelUUID=%s; ChannelName=%s; TargetValue=%.6f; PointErrorPercent=%.6f; StabilityLower=%.6f; StabilityUpper=%.6f; FlowAccuracy=%s; FlowReachedLower=%.6f; FlowReachedUpper=%.6f; UsedSampleCount=%d; RequiredSampleCount=%d; ActualWindowDurationSec=%.3f; RequiredWindowDurationSec=%.3f; HasEnoughSamples=%s; HasFullWindow=%s; IsDataActual=%s; OutOfRangeSampleCount=%d; MinSampleValue=%.6f; MaxSampleValue=%.6f; StableReady=%s; FlowReached=%s; Ready=%s; Reason=%s',
+        if (not ChannelStable) and (FirstChannelFailureReason = '') then
+          FirstChannelFailureReason := ChannelReason;
+        AddDiagnosticEvent(Format('EtalonChannelReady=%s; ChannelUUID=%s; ChannelName=%s; TargetValue=%.6f; PointErrorPercent=%.6f; StabilityLower=%.6f; StabilityUpper=%.6f; FlowAccuracy=%s; FlowReachedLower=%.6f; FlowReachedUpper=%.6f; UsedSampleCount=%d; RequiredSampleCount=%d; ElapsedWindowSec=%.3f; RequiredWindowDurationSec=%.3f; HasEnoughSamples=%s; HasFullWindow=%s; IsDataActual=%s; OutOfRangeSampleCount=%d; MinSampleValue=%.6f; MaxSampleValue=%.6f; Variation=%.9f; MaxVariation=%.9f; IsVariationStable=%s; StdDeviation=%.9f; MaxStdDeviation=%.9f; IsDeviationStable=%s; TrendRate=%.9f; MaxTrendRate=%.9f; IsTrendStable=%s; StableReady=%s; FlowReached=%s; Ready=%s; Reason=%s',
           [BoolToStr(ChannelStable, True), Channel.UUID, Channel.Name, TargetValue, PointErrorPercent,
            SignalInfo.StabilityLowerLimit, SignalInfo.StabilityUpperLimit, Point.FlowAccuracy,
            StableInfo.LowerLimit, StableInfo.UpperLimit, SignalInfo.UsedSampleCount,
-           Settings.MinSampleCount, SignalInfo.WindowDurationSec, Max(0.001, FRequiredDeviceStabilizationSec),
+           SignalInfo.RequiredSampleCount, SignalInfo.ElapsedWindowSec, SignalInfo.RequiredWindowDurationSec,
            BoolToStr(SignalInfo.HasEnoughSamples, True), BoolToStr(SignalInfo.HasFullWindow, True),
            BoolToStr(SignalInfo.IsDataActual, True), SignalInfo.OutOfRangeSampleCount,
-           SignalInfo.MinValue, SignalInfo.MaxValue, BoolToStr(ChannelStable, True),
+           SignalInfo.MinValue, SignalInfo.MaxValue,
+           SignalInfo.Variation, Settings.MaxVariation, BoolToStr(SignalInfo.IsVariationStable, True),
+           SignalInfo.StdDeviation, Settings.MaxStdDeviation, BoolToStr(SignalInfo.IsDeviationStable, True),
+           SignalInfo.TrendRate, Settings.MaxTrendRate, BoolToStr(SignalInfo.IsTrendStable, True),
+           BoolToStr(ChannelStable, True),
            BoolToStr((ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit), True),
            BoolToStr(ChannelStable and ((ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit)), True),
            ChannelReason]));
@@ -2240,9 +2263,10 @@ begin
   StableInfo.IsReadyForMeasurement := GroupFlowReached and AllChannelsStable;
   Result := StableInfo.IsReadyForMeasurement;
   if Result then StableInfo.Status := sOk else StableInfo.Status := sRun_NN;
-  StableInfo.StatusText := Format('EtalonFlowStable=%s; GroupFlowReached=%s; AllSelectedEtalonChannelsStable=%s; ToleranceSource=%s; Target=%.6f; Actual=%.6f; Lower=%.6f; Upper=%.6f',
+  StableInfo.StatusText := Format('EtalonFlowStable=%s; GroupFlowReached=%s; AllSelectedEtalonChannelsStable=%s; ToleranceSource=%s; Target=%.6f; Actual=%.6f; Lower=%.6f; Upper=%.6f; FailureReason=%s',
     [BoolToStr(Result, True), BoolToStr(GroupFlowReached, True), BoolToStr(AllChannelsStable, True),
-     ToleranceSource, TargetValue, ActualValue, StableInfo.LowerLimit, StableInfo.UpperLimit]);
+     ToleranceSource, TargetValue, ActualValue, StableInfo.LowerLimit, StableInfo.UpperLimit,
+     FirstChannelFailureReason]);
 end;
 
 procedure TMeasurementRun.ContinueAfterPointError(const AStatus: EMeasurementPointStatus;
@@ -4201,7 +4225,7 @@ var
     if AMeterValue = nil then
       Exit;
     Settings := AMeterValue.StabilitySettings;
-    MinHistorySec := Max(0.001, Settings.WindowDurationSec);
+    MinHistorySec := Max(1, Settings.MaxSampleAgeSec);
     NeedSec := Ceil(MinHistorySec) + 1 + SETUP_MARGIN_SEC;
     if FRequiredDeviceStabilizationSec > 0 then
       NeedSec := NeedSec + FRequiredDeviceStabilizationSec;
