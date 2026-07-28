@@ -225,12 +225,13 @@ type
 
   TMeasurementRun = class(TObservableObject)
 
-  private
-    const
+  const
       STABILITY_VARIATION_ERROR_FACTOR = 0.50;
       STABILITY_STDDEV_ERROR_FACTOR = 0.15;
       STABILITY_TREND_ERROR_FACTOR = 0.25;
       STABILITY_FORECAST_HORIZON_SEC = 5.0;
+
+  private
 
     FWorkTable: TWorkTable;
     FPoints: TObjectList<TDevicePoint>;
