@@ -1798,6 +1798,14 @@ begin
     while (FirstUsedIndex > 0) and
           (EligibleCount - FirstUsedIndex < ASettings.MinSampleCount) do
     begin
+      { A candidate must be both close enough to the newest sample and
+        continuous with the next, already accepted, newer sample. }
+      if (ASettings.MaxSampleAgeSec > 0) and
+         (Window[EligibleCount - 1].Sample.TimeStampMs -
+          Window[FirstUsedIndex - 1].Sample.TimeStampMs >
+          Round(ASettings.MaxSampleAgeSec * 1000.0)) then
+        Break;
+
       if (ASettings.MaxSampleAgeSec > 0) and
          (Window[FirstUsedIndex].Sample.TimeStampMs -
           Window[FirstUsedIndex - 1].Sample.TimeStampMs >
