@@ -256,6 +256,8 @@ type
     procedure TreeViewDevicesChange(Sender: TObject);
     procedure TreeViewDevicesMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Single);
     function GetSelectedResultDevice: TDevice;
+    function CanDeleteSelectedDataPoint(const AOwner: TObject): Boolean;
+    function GetDeleteButtonHint: string;
     function DeleteSelectedDataPointWithRules(const AOwner: TObject): Boolean;
     procedure ButtonSessionClearPointsClick(Sender: TObject);
     procedure ButtonSessionCancelClick(Sender: TObject);
@@ -441,7 +443,6 @@ var
   Device: TDevice;
   Session, ActiveSession: TSessionSpillage;
   WorkTable: TWorkTable;
-  HasSelectedPoint: Boolean;
   PointDeleteHint, PointsClearHint, NewSessionHint, CloseSessionHint,
     SynchTableHint, DeviceRemoveHint, SessionDeleteHint: string;
 begin
@@ -469,40 +470,40 @@ begin
       WorkTable := TWorkTable(Item.TagObject);
   end;
 
-  HasSelectedPoint := (GridDataPoints <> nil) and GridDataPoints.Visible and
-    (GridDataPoints.Row >= 0) and
-    (GridDataPoints.Row < Length(FCurrentSpillages));
-  if HasSelectedPoint then
-    PointDeleteHint := 'Удалить выбранное измерение из таблицы для выбранного в дереве прибора или сессии'
-  else
-    PointDeleteHint := 'Выберите измерение в таблице для удаления';
+  PointDeleteHint := GetDeleteButtonHint;
 
-  if Session <> nil then
+  if (GridDataPoints = nil) or not GridDataPoints.Visible then
+    PointsClearHint := 'Откройте таблицу измерений прибора или сессии для удаления всех измерений'
+  else if Session <> nil then
     PointsClearHint := 'Удалить все измерения выбранной в дереве сессии'
   else if Device <> nil then
     PointsClearHint := 'Удалить все отображаемые измерения выбранного в дереве прибора'
   else
     PointsClearHint := 'Выберите в дереве прибор или сессию для удаления измерений';
 
-  if Device <> nil then
+  if (Item <> nil) and (Item.TagObject is TDevice) then
     NewSessionHint := 'Создать новую сессию для выбранного в дереве прибора'
+  else if (Item <> nil) and (Item.TagObject is TSessionSpillage) and
+          (Device <> nil) then
+    NewSessionHint := 'Создать новую сессию для прибора выбранной сессии'
   else
-    NewSessionHint := 'Выберите в дереве прибор для создания новой сессии';
+    NewSessionHint := 'Выберите в дереве прибор или его сессию для создания новой сессии';
 
   if Session <> nil then
     CloseSessionHint := 'Закрыть выбранную в дереве сессию'
   else if ActiveSession <> nil then
     CloseSessionHint := 'Закрыть активную сессию выбранного в дереве прибора'
   else
-    CloseSessionHint := 'Выберите в дереве открытую сессию или прибор с активной сессией';
+    CloseSessionHint := 'Выберите сессию или прибор с активной сессией';
 
   if WorkTable <> nil then
-    SynchTableHint := 'Синхронизировать список обработки с выбранным в дереве рабочим столом'
-  else if (FWorkTableManager <> nil) and
-          (FWorkTableManager.ActiveWorkTable <> nil) then
-    SynchTableHint := 'Синхронизировать список обработки с активным рабочим столом'
+    SynchTableHint := 'Синхронизировать список обработки с выбранным рабочим столом'
+  else if (Item <> nil) and SameText(Item.Text, '...') then
+    SynchTableHint := 'Синхронизировать список обработки со всеми рабочими столами с предварительной очисткой'
+  else if (Item <> nil) and SameText(Item.Text, 'прочее') then
+    SynchTableHint := 'Добавить в список обработки приборы из всех рабочих столов'
   else
-    SynchTableHint := 'Нет рабочего стола для синхронизации';
+    SynchTableHint := 'Выберите в дереве рабочий стол, узел «...» или «прочее» для синхронизации';
 
   if Device <> nil then
     DeviceRemoveHint := 'Удалить выбранный в дереве прибор из списка обработки'
@@ -3180,6 +3181,86 @@ begin
 
   Result := FCurrentResultRows[GridResults.Row].Device;
 end;
+
+function TFrameProceed.CanDeleteSelectedDataPoint(
+  const AOwner: TObject): Boolean;
+var
+  Item: TTreeViewItem;
+  Device: TDevice;
+begin
+  // AOwner controls confirmation reuse during deletion, but does not affect
+  // whether the selected point is a valid deletion target.
+  Result := False;
+  if (GridDataPoints = nil) or not GridDataPoints.Visible or
+     (GridDataPoints.Row < 0) or
+     (GridDataPoints.Row >= Length(FCurrentSpillages)) or
+     (FCurrentSpillages[GridDataPoints.Row] = nil) then
+    Exit;
+
+  if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+    Exit;
+
+  Item := TreeViewDevices.Selected;
+  Device := nil;
+  if Item.TagObject is TSessionSpillage then
+    Device := ResolveSelectedDevice
+  else if Item.TagObject is TDevice then
+    Device := TDevice(Item.TagObject)
+  else
+    Exit;
+
+  Result := Device <> nil;
+end;
+
+function TFrameProceed.GetDeleteButtonHint: string;
+var
+  Item: TTreeViewItem;
+  HasSelectedDataPoint: Boolean;
+  ResultDevice: TDevice;
+begin
+  Result := 'Выберите объект в дереве';
+  if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+    Exit;
+
+  Item := TreeViewDevices.Selected;
+  HasSelectedDataPoint :=
+    (GridDataPoints <> nil) and GridDataPoints.Visible and
+    (GridDataPoints.Row >= 0) and
+    (GridDataPoints.Row < Length(FCurrentSpillages)) and
+    (FCurrentSpillages[GridDataPoints.Row] <> nil);
+
+  if SameText(Item.Text, '...') or SameText(Item.Text, 'прочее') or
+     (Item.TagObject is TWorkTable) then
+  begin
+    ResultDevice := GetSelectedResultDevice;
+    if ResultDevice <> nil then
+      Result := 'Удалить выбранный в таблице результатов прибор из списка обработки'
+    else
+      Result := 'Выберите прибор в таблице результатов для удаления из списка обработки';
+    Exit;
+  end;
+
+  if Item.TagObject is TDevice then
+  begin
+    if HasSelectedDataPoint and CanDeleteSelectedDataPoint(Item.TagObject) then
+      Result := 'Удалить выбранное измерение из таблицы выбранного прибора'
+    else
+      Result := 'Удалить выбранный в дереве прибор из списка обработки';
+    Exit;
+  end;
+
+  if Item.TagObject is TSessionSpillage then
+  begin
+    if HasSelectedDataPoint and CanDeleteSelectedDataPoint(Item.TagObject) then
+      Result := 'Удалить выбранное измерение из таблицы выбранной сессии'
+    else
+      Result := 'Удалить выбранную в дереве сессию и связанные с ней измерения';
+    Exit;
+  end;
+
+  Result := 'Для выбранного объекта действие удаления недоступно';
+end;
+
 function TFrameProceed.DeleteSelectedDataPointWithRules(const AOwner: TObject): Boolean;
 var
   Item: TTreeViewItem;

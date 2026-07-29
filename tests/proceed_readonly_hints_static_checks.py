@@ -13,6 +13,15 @@ def procedure_body(source: str, name: str) -> str:
     return source[start:] if next_proc < 0 else source[start:next_proc]
 
 
+def function_body(source: str, name: str) -> str:
+    start = source.index(f"function {name}")
+    next_function = source.find("\nfunction ", start + 1)
+    next_procedure = source.find("\nprocedure ", start + 1)
+    ends = [position for position in (next_function, next_procedure) if position >= 0]
+    end = min(ends) if ends else len(source)
+    return source[start:end]
+
+
 def test_proceed_grids_are_configured_read_only():
     initialize = procedure_body(PAS, "TFrameProceed.Initialize")
     for grid in ("GridDataPoints", "GridResults", "GridCoefs"):
@@ -41,13 +50,14 @@ def test_nested_coefficients_grid_is_read_only_in_proceed():
 def test_dynamic_hints_name_actual_selection_sources_and_are_synchronized():
     hints = procedure_body(PAS, "TFrameProceed.UpdateActionHints")
     required = (
-        "Удалить выбранное измерение из таблицы для выбранного в дереве прибора или сессии",
-        "Выберите измерение в таблице для удаления",
+        "PointDeleteHint := GetDeleteButtonHint",
         "Удалить все измерения выбранной в дереве сессии",
         "Удалить все отображаемые измерения выбранного в дереве прибора",
+        "Откройте таблицу измерений прибора или сессии для удаления всех измерений",
         "Создать новую сессию для выбранного в дереве прибора",
+        "Создать новую сессию для прибора выбранной сессии",
         "Закрыть активную сессию выбранного в дереве прибора",
-        "Синхронизировать список обработки с выбранным в дереве рабочим столом",
+        "Синхронизировать список обработки с выбранным рабочим столом",
         "Удалить все рабочие столы и связанные с ними данные",
     )
     for text in required:
@@ -62,6 +72,28 @@ def test_dynamic_hints_name_actual_selection_sources_and_are_synchronized():
         assert f"{action}.Hint :=" in hints
         for button in buttons:
             assert f"{button}.Hint :=" in hints
+
+
+def test_delete_button_hint_follows_click_handler_without_side_effects():
+    hint = function_body(PAS, "TFrameProceed.GetDeleteButtonHint")
+    predicate = function_body(PAS, "TFrameProceed.CanDeleteSelectedDataPoint")
+
+    for text in (
+        "Выберите объект в дереве",
+        "Удалить выбранное измерение из таблицы выбранного прибора",
+        "Удалить выбранный в дереве прибор из списка обработки",
+        "Удалить выбранное измерение из таблицы выбранной сессии",
+        "Удалить выбранную в дереве сессию и связанные с ней измерения",
+        "Удалить выбранный в таблице результатов прибор из списка обработки",
+        "Выберите прибор в таблице результатов для удаления из списка обработки",
+        "Для выбранного объекта действие удаления недоступно",
+    ):
+        assert text in hint
+
+    assert "CanDeleteSelectedDataPoint(Item.TagObject)" in hint
+    assert "DeleteSelectedDataPointWithRules" not in hint
+    for side_effect in ("MessageDlg", ".State :=", "RefreshMeasurements", "osDeleted"):
+        assert side_effect not in predicate
 
 
 def test_toolbar_buttons_show_hints():
