@@ -16,7 +16,6 @@ uses
   FMX.Types,
   System.Classes,
   System.Generics.Collections,
-  System.Threading,
   System.Math,
   System.Rtti,
   System.SysUtils,
@@ -28,7 +27,6 @@ uses
   uDeviceClass,
   uDataManager,
   uMeasurementRun,
-  uAutoMeasurementTestRunner,
   uObservable,
   uRepositories,
   uWorkTable;
@@ -52,19 +50,6 @@ type
     StringColumnLimitTime: TStringColumn;
     StringColumnLimitImp: TStringColumn;
     StringColumnLimitVolume: TStringColumn;
-    LayoutAutoTests: TLayout;
-    ComboBoxAutoTestScenario: TComboBox;
-    ButtonRunAutoTestScenario: TButton;
-    ButtonRunAllAutoTestScenarios: TButton;
-    LabelAutoTestResult: TLabel;
-    GridAutoTestResults: TGrid;
-    StringColumnAutoTestNo: TStringColumn;
-    StringColumnAutoTestScenario: TStringColumn;
-    StringColumnAutoTestResult: TStringColumn;
-    StringColumnAutoTestTime: TStringColumn;
-    StringColumnAutoTestStage: TStringColumn;
-    StringColumnAutoTestWorkTableState: TStringColumn;
-    StringColumnAutoTestReason: TStringColumn;
     procedure GridMeasurmentRunGetValue(Sender: TObject; const ACol,
       ARow: Integer; var Value: TValue);
     procedure GridMeasurmentRunDrawColumnCell(Sender: TObject;
@@ -79,18 +64,10 @@ type
     procedure SpeedButtonPointDeleteClick(Sender: TObject);
     procedure SpeedButtonPointNextClick(Sender: TObject);
     procedure SpeedButtonPointPrevClick(Sender: TObject);
-    procedure ButtonRunAutoTestScenarioClick(Sender: TObject);
-    procedure ButtonRunAllAutoTestScenariosClick(Sender: TObject);
-    procedure GridAutoTestResultsGetValue(Sender: TObject; const ACol,
-      ARow: Integer; var Value: TValue);
-    procedure GridAutoTestResultsDrawColumnCell(Sender: TObject;
-      const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
-      const Row: Integer; const Value: TValue; const State: TGridDrawStates);
   private
     FActiveWorkTable: TWorkTable;
     FInvalidPointIndexes: TList<Integer>;
-    FAutoTestResults: TList<TAutoMeasurementTestResult>;
-    FAutoTestRunning: Boolean;
+    FPointFlowSortDirection: Integer;
     function GetMeasurementRun: TMeasurementRun;
     function GetStopCriteriaText(APoint: TDevicePoint): string;
 
@@ -104,11 +81,9 @@ type
     procedure SetPointEnabledFromGrid(APoint: TDevicePoint; const AEnabled: Boolean);
     procedure UpdateGridMRHeaders;
     procedure UpdateStopCriteriaColumns;
+    procedure UpdatePointOrderControls;
     function IsPointInvalid(APoint: TDevicePoint): Boolean;
     function GetRowColor(const ARow: Integer): TAlphaColor;
-    procedure SetAutoTestControlsEnabled(const AEnabled: Boolean);
-    procedure AddAutoTestResult(const AResult: TAutoMeasurementTestResult);
-    procedure RunAutoTests(const ARunAll: Boolean);
      procedure UpdateGridMesurmentRun;
 
   public
@@ -116,6 +91,7 @@ type
     destructor Destroy; override;
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
     procedure UpdateUI;
+    procedure RefreshFromMeasurementRun;
     property MeasurementRun: TMeasurementRun read GetMeasurementRun;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
 
@@ -129,25 +105,18 @@ constructor TFrameMeasurementRun.Create(AOwner: TComponent);
 begin
   inherited;
   FInvalidPointIndexes := TList<Integer>.Create;
-  FAutoTestResults := TList<TAutoMeasurementTestResult>.Create;
   SpeedButtonPointPrev.OnClick := SpeedButtonPointPrevClick;
   SpeedButtonPointNext.OnClick := SpeedButtonPointNextClick;
   SpeedButtonPause.OnClick := SpeedButtonPauseClick;
   SpeedButtonPointDelete.OnClick := SpeedButtonPointDeleteClick;
   SpeedButtonCreatePoints.OnClick := SpeedButtonCreatePointsClick;
-  ButtonRunAutoTestScenario.OnClick := ButtonRunAutoTestScenarioClick;
-  ButtonRunAllAutoTestScenarios.OnClick := ButtonRunAllAutoTestScenariosClick;
-  GridAutoTestResults.OnGetValue := GridAutoTestResultsGetValue;
-  GridAutoTestResults.OnDrawColumnCell := GridAutoTestResultsDrawColumnCell;
-  TAutoMeasurementTestRunner.FillScenarioNames(ComboBoxAutoTestScenario.Items);
-  ComboBoxAutoTestScenario.ItemIndex := 0;
   GridMeasurmentRun.ShowHint := True;
   GridMeasurmentRun.OnCellClick := GridMeasurmentRunCellClick;
+  FPointFlowSortDirection := 0;
 end;
 
 destructor TFrameMeasurementRun.Destroy;
 begin
-    FreeAndNil(FAutoTestResults);
     FreeAndNil(FInvalidPointIndexes);
     inherited;
 end;
@@ -359,12 +328,7 @@ begin
   end;
 
   if GridMeasurmentRun.Columns[ACol] = StringColumnPointer then
-  begin
-    if MeasurementRun.CurrentPointIndex = ARow then
-      Value := '▶'
-    else
-      Value := '';
-  end
+    Value := ARow + 1
   else if GridMeasurmentRun.Columns[ACol] = StringColumnMRPointName then
     Value := Point.Name
   else if GridMeasurmentRun.Columns[ACol] = StringColumnMRFlowRate then
@@ -429,6 +393,7 @@ procedure TFrameMeasurementRun.GridMeasurmentRunCellClick(const Column: TColumn;
 var
   Point: TDevicePoint;
 begin
+  UpdatePointOrderControls;
   if Column <> CheckColumnMREnable then
     Exit;
 
@@ -451,9 +416,37 @@ var
   HasEnabled: Boolean;
   NewEnabled: Boolean;
   Point: TDevicePoint;
+  SelectedPoint: TDevicePoint;
 begin
-  if (Column <> CheckColumnMREnable) or (MeasurementRun = nil) or
+  if (MeasurementRun = nil) or
      (MeasurementRun.Points = nil) or (MeasurementRun.Points.Count = 0) then
+    Exit;
+
+  if Column = StringColumnMRFlowRate then
+  begin
+    if not (MeasurementRun.Stage in [msNone, msDone]) then
+      Exit;
+    SelectedPoint := nil;
+    if (GridMeasurmentRun.Selected >= 0) and
+       (GridMeasurmentRun.Selected < MeasurementRun.Points.Count) then
+      SelectedPoint := MeasurementRun.Points[GridMeasurmentRun.Selected];
+    if FPointFlowSortDirection <> 1 then
+    begin
+      MeasurementRun.SortPointsByFlow(False);
+      FPointFlowSortDirection := 1;
+    end
+    else
+    begin
+      MeasurementRun.SortPointsByFlow(True);
+      FPointFlowSortDirection := -1;
+    end;
+    if SelectedPoint <> nil then
+      GridMeasurmentRun.Selected := MeasurementRun.Points.IndexOf(SelectedPoint);
+    UpdateGridMesurmentRun;
+    Exit;
+  end;
+
+  if Column <> CheckColumnMREnable then
     Exit;
 
   HasEnabled := False;
@@ -507,6 +500,12 @@ begin
      UpdateGridMesurmentRun;
 end;
 
+procedure TFrameMeasurementRun.RefreshFromMeasurementRun;
+begin
+  FPointFlowSortDirection := 0;
+  UpdateUI;
+end;
+
 
 procedure TFrameMeasurementRun.UpdateGridMRHeaders;
 begin
@@ -545,12 +544,14 @@ end;
 procedure TFrameMeasurementRun.UpdateGridMesurmentRun;
 var
   Rows: Integer;
+  SelectedRow: Integer;
 begin
   if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) then
     Rows := MeasurementRun.Points.Count
   else
     Rows := 0;
 
+  SelectedRow := GridMeasurmentRun.Selected;
   UpdateStopCriteriaColumns;
 
   GridMeasurmentRun.BeginUpdate;
@@ -561,138 +562,62 @@ begin
     GridMeasurmentRun.EndUpdate;
   end;
 
+  if Rows = 0 then
+    GridMeasurmentRun.Selected := -1
+  else if SelectedRow >= Rows then
+    GridMeasurmentRun.Selected := Rows - 1;
+
   GridMeasurmentRun.Repaint;
+  UpdatePointOrderControls;
 end;
 
-
-
-
-procedure TFrameMeasurementRun.SetAutoTestControlsEnabled(const AEnabled: Boolean);
-begin
-  FAutoTestRunning := not AEnabled;
-  ComboBoxAutoTestScenario.Enabled := AEnabled;
-  ButtonRunAutoTestScenario.Enabled := AEnabled;
-  ButtonRunAllAutoTestScenarios.Enabled := AEnabled;
-end;
-
-procedure TFrameMeasurementRun.AddAutoTestResult(const AResult: TAutoMeasurementTestResult);
-begin
-  FAutoTestResults.Add(AResult);
-  GridAutoTestResults.RowCount := FAutoTestResults.Count;
-  GridAutoTestResults.Repaint;
-  LabelAutoTestResult.Text := TAutoMeasurementTestRunner.StatusToString(AResult.Status) + ': ' + AResult.ScenarioName;
-end;
-
-procedure TFrameMeasurementRun.RunAutoTests(const ARunAll: Boolean);
+procedure TFrameMeasurementRun.UpdatePointOrderControls;
 var
-  ScenarioIndex: Integer;
+  Row, Count: Integer;
+  CanEditOrder: Boolean;
 begin
-  if FAutoTestRunning then
-    Exit;
-  ScenarioIndex := ComboBoxAutoTestScenario.ItemIndex + 1;
-  if ScenarioIndex < 1 then
-    ScenarioIndex := 1;
-  FAutoTestResults.Clear;
-  GridAutoTestResults.RowCount := 0;
-  LabelAutoTestResult.Text := 'RUNNING';
-  SetAutoTestControlsEnabled(False);
-  TTask.Run(
-    procedure
-    var
-      Log: TStringList;
-      LogFileName: string;
-      R: TAutoMeasurementTestResult;
-    begin
-      Log := TStringList.Create;
-      try
-        LogFileName := TAutoMeasurementTestRunner.CreateLogFileName;
-        if ARunAll then
-          TAutoMeasurementTestRunner.RunAll(Log,
-            procedure(const AResult: TAutoMeasurementTestResult)
-            begin
-              TThread.Queue(nil,
-                procedure
-                begin
-                  AddAutoTestResult(AResult);
-                end);
-            end)
-        else
-        begin
-          R := TAutoMeasurementTestRunner.RunScenario(ScenarioIndex, Log);
-          TThread.Queue(nil,
-            procedure
-            begin
-              AddAutoTestResult(R);
-            end);
-        end;
-        Log.SaveToFile(LogFileName, TEncoding.UTF8);
-      finally
-        Log.Free;
-        TThread.Queue(nil,
-          procedure
-          begin
-            SetAutoTestControlsEnabled(True);
-          end);
-      end;
-    end);
+  Row := GridMeasurmentRun.Selected;
+  if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) then
+    Count := MeasurementRun.Points.Count
+  else
+    Count := 0;
+  CanEditOrder := (MeasurementRun <> nil) and
+    (MeasurementRun.Stage in [msNone, msDone]);
+  SpeedButtonPointPrev.Enabled := CanEditOrder and (Row > 0) and (Row < Count);
+  SpeedButtonPointNext.Enabled := CanEditOrder and (Row >= 0) and (Row < Count - 1);
 end;
 
-procedure TFrameMeasurementRun.ButtonRunAutoTestScenarioClick(Sender: TObject);
-begin
-  RunAutoTests(False);
-end;
 
-procedure TFrameMeasurementRun.ButtonRunAllAutoTestScenariosClick(Sender: TObject);
-begin
-  RunAutoTests(True);
-end;
 
-procedure TFrameMeasurementRun.GridAutoTestResultsGetValue(Sender: TObject; const ACol,
-  ARow: Integer; var Value: TValue);
+
+procedure TFrameMeasurementRun.SpeedButtonPointPrevClick(Sender: TObject);
 var
-  R: TAutoMeasurementTestResult;
+  Row: Integer;
 begin
-  if (ARow < 0) or (ARow >= FAutoTestResults.Count) then
+  if (MeasurementRun = nil) or not (MeasurementRun.Stage in [msNone, msDone]) then
     Exit;
-  R := FAutoTestResults[ARow];
-  case ACol of
-    0: Value := R.Index;
-    1: Value := R.ScenarioName;
-    2: Value := TAutoMeasurementTestRunner.StatusToString(R.Status);
-    3: Value := IntToStr(R.DurationMs) + ' ms';
-    4: Value := R.StageText;
-    5: Value := R.WorkTableStateText;
-    6: Value := R.Reason;
+  Row := GridMeasurmentRun.Selected;
+  if MeasurementRun.MovePointUp(Row) then
+  begin
+    GridMeasurmentRun.Selected := Row - 1;
+    FPointFlowSortDirection := 0;
+    UpdateGridMesurmentRun;
   end;
 end;
 
-procedure TFrameMeasurementRun.GridAutoTestResultsDrawColumnCell(Sender: TObject;
-  const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
-  const Row: Integer; const Value: TValue; const State: TGridDrawStates);
-var
-  C: TAlphaColor;
-begin
-  C := COLOR_NONE;
-  if (Row >= 0) and (Row < FAutoTestResults.Count) then
-    case FAutoTestResults[Row].Status of
-      amtsPass: C := COLOR_COMPLETED;
-      amtsFail, amtsStopped: C := COLOR_WARNING;
-      amtsError: C := COLOR_INVALID;
-    end;
-  Canvas.Fill.Color := C;
-  Canvas.FillRect(Bounds, 0, 0, [], 1);
-end;
-
-procedure TFrameMeasurementRun.SpeedButtonPointPrevClick(Sender: TObject);
-begin
-  if MeasurementRun <> nil then
-    MeasurementRun.Execute(mcPreviousPoint, Unassigned);
-end;
-
 procedure TFrameMeasurementRun.SpeedButtonPointNextClick(Sender: TObject);
+var
+  Row: Integer;
 begin
-  if MeasurementRun <> nil then
-    MeasurementRun.Execute(mcNextPoint, Null);
+  if (MeasurementRun = nil) or not (MeasurementRun.Stage in [msNone, msDone]) then
+    Exit;
+  Row := GridMeasurmentRun.Selected;
+  if MeasurementRun.MovePointDown(Row) then
+  begin
+    GridMeasurmentRun.Selected := Row + 1;
+    FPointFlowSortDirection := 0;
+    UpdateGridMesurmentRun;
+  end;
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPauseClick(Sender: TObject);
@@ -725,7 +650,11 @@ begin
   if MeasurementRun = nil then
     Exit;
 
-  MeasurementRun.CreateSession;
+  if not (MeasurementRun.Stage in [msNone, msDone]) then
+    Exit;
+  MeasurementRun.InvalidatePreparedPoints;
+  MeasurementRun.RebuildMeasurementPoints;
+  FPointFlowSortDirection := 0;
   FInvalidPointIndexes.Clear;
   UpdateGridMesurmentRun;
 end;

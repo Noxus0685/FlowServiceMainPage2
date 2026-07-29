@@ -764,6 +764,7 @@ type
   FRows: array of TRowData;
   IsUpdating: Boolean;
   FUpdatingChannelEnabled: Boolean;
+  FUpdatingAutoSwitch: Boolean;
   FLastAutoStatusText: string;
   FAutoTestTab: TTabItem;
   FAutoTestInfoLabel: TLabel;
@@ -876,6 +877,9 @@ type
     procedure StopMonitor;
     procedure StartMeasurement;
     procedure StopMeasurement;
+    procedure ApplyMeasurementModeFromSwitch;
+    procedure BuildManualMeasurementPoint;
+    procedure RefreshMeasurementRunFrame;
     procedure UpdateTestButton;
     procedure UpdateTestButtonByWorkTableState;
     procedure UpdateTestButtonByMeasurementRun;
@@ -1488,26 +1492,80 @@ begin
 
  procedure TFrameMainTable.SwitchAutoSwitch(Sender: TObject);
 begin
-        if MeasurementRun=nil then
-        begin
-            SwitchAuto.IsChecked:=False;
-            Exit;
-        end;
+  ApplyMeasurementModeFromSwitch;
+end;
 
-           if SwitchAuto.IsChecked then
-           begin
-             MeasurementRun.Mode:= EMeasurementRunMode.mrmAutomatic;
-             if FActiveWorkTable <> nil then
-               FActiveWorkTable.MeasurementMode := EMeasurementRunMode.mrmAutomatic;
-           end
-           else
-           begin
-             MeasurementRun.Mode:= EMeasurementRunMode.mrmManual;
-             if FActiveWorkTable <> nil then
-               FActiveWorkTable.MeasurementMode := EMeasurementRunMode.mrmManual;
-           end;
+procedure TFrameMainTable.RefreshMeasurementRunFrame;
+begin
+  if FFrameMeasurementRun <> nil then
+    FFrameMeasurementRun.RefreshFromMeasurementRun;
+end;
 
+procedure TFrameMainTable.BuildManualMeasurementPoint;
+begin
+  if (FActiveWorkTable = nil) or (MeasurementRun = nil) or
+     (FActiveWorkTable.CurrentPoint = nil) then
+    Exit;
+
+  { Q is stored in base units.  Use the user's setpoint, never ValueFlow. }
+  if (FActiveWorkTable.FlowRate <> nil) and
+     (FActiveWorkTable.FlowRate.ValueSet <> nil) then
+    FActiveWorkTable.CurrentPoint.Q := FActiveWorkTable.FlowRate.ValueSet.Value;
+  if (FActiveWorkTable.FluidTemp <> nil) and
+     (FActiveWorkTable.FluidTemp.ValueSet <> nil) then
+    FActiveWorkTable.CurrentPoint.Temp := FActiveWorkTable.FluidTemp.ValueSet.Value;
+  if (FActiveWorkTable.FluidPress <> nil) and
+     (FActiveWorkTable.FluidPress.ValueSet <> nil) then
+    FActiveWorkTable.CurrentPoint.Pressure := FActiveWorkTable.FluidPress.ValueSet.Value;
+
+  MeasurementRun.RebuildMeasurementPoints;
+end;
+
+procedure TFrameMainTable.ApplyMeasurementModeFromSwitch;
+var
+  Run: TMeasurementRun;
+  NewMode, PreviousMode: EMeasurementRunMode;
+begin
+  if FUpdatingAutoSwitch or (FActiveWorkTable = nil) then
+    Exit;
+  Run := MeasurementRun;
+  if Run = nil then
+    Exit;
+
+  PreviousMode := Run.Mode;
+  if not (Run.Stage in [msNone, msDone]) then
+  begin
+    FUpdatingAutoSwitch := True;
+    try
+      SwitchAuto.IsChecked := PreviousMode = mrmAutomatic;
+    finally
+      FUpdatingAutoSwitch := False;
+    end;
+    Exit;
+  end;
+
+  if SwitchAuto.IsChecked then
+    NewMode := mrmAutomatic
+  else
+    NewMode := mrmManual;
+  if NewMode = PreviousMode then
+    Exit;
+
+  Run.Mode := NewMode;
+  FActiveWorkTable.MeasurementMode := NewMode;
+  if NewMode = mrmManual then
+    BuildManualMeasurementPoint
+  else
+    Run.RebuildMeasurementPoints;
+
+  RefreshMeasurementRunFrame;
   UpdateTestButton;
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'MeasurementModeChanged',
+    'Изменён режим измерения',
+    Format('Mode=%s; PointsCount=%d; ManualPointAssigned=%s',
+      [TMeasurementRun.MeasurementRunModeToString(Run.Mode), Run.Points.Count,
+       BoolToStr((Run.Mode = mrmManual) and
+         (FActiveWorkTable.CurrentPoint <> nil), True)]));
 end;
 
 procedure TFrameMainTable.UpdateForm;
@@ -4362,7 +4420,9 @@ begin
   if (MeasurementRun = nil) then
     Exit;
 
-   MeasurementRun.CreateSession;
+   MeasurementRun.InvalidatePreparedPoints;
+   MeasurementRun.RebuildMeasurementPoints;
+   RefreshMeasurementRunFrame;
 
 end;
 
@@ -7581,9 +7641,10 @@ begin
           [TMeasurementRun.MeasurementStateToString(Run.Stage), TWorkTable.WorkTableStateToString(WT.State),
            VirtualTimeStartMs - 1, MaxExistingSampleTimeMs, VirtualTimeStartMs]));
         Run.Mode := mrmAutomatic;
-        Run.CreateSession;
+        Run.InvalidatePreparedPoints;
+        Run.RebuildMeasurementPoints;
         if (Run.Points = nil) or (Run.Points.Count = 0) then
-          FinalReason := 'FAIL — штатный CreateSession не сформировал точки'
+          FinalReason := 'FAIL — штатный RebuildMeasurementPoints не сформировал точки'
         else
         begin
           Run.Start;
