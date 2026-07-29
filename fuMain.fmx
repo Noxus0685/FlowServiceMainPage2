@@ -17,11 +17,13 @@
     Size.Height = 778.000000000000000000
     Size.PlatformDefault = False
     StyleLookup = 'tabcontrolstyle'
-    TabIndex = 2
+    TabIndex = 3
     TabOrder = 0
     TabPosition = PlatformDefault
     OnChange = TabControlMainChange
     Sizes = (
+      1780s
+      752s
       1780s
       752s
       1780s
@@ -43,6 +45,21 @@
       TabOrder = 0
       Text = #1043#1083#1072#1074#1085#1072#1103
       ExplicitSize.cx = 64.000000000000000000
+      ExplicitSize.cy = 26.000000000000000000
+    end
+    object TabItemGraphs: TTabItem
+      CustomIcon = <
+        item
+        end>
+      TextSettings.Trimming = None
+      IsSelected = False
+      Size.Width = 72.000000000000000000
+      Size.Height = 26.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = ''
+      TabOrder = 1
+      Text = #1043#1088#1072#1092#1080#1082#1080
+      ExplicitSize.cx = 72.000000000000000000
       ExplicitSize.cy = 26.000000000000000000
     end
     object TabItemMnemo: TTabItem
