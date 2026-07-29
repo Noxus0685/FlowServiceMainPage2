@@ -831,7 +831,9 @@ type
     procedure UpdateGridPopupActions;
     procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
     procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
-    procedure InitializeColumnMenuTags;
+    function NormalizeColumnCaption(const ACaption: string): string;
+    function FindGridColumnByMenuText(AGrid: TGrid;
+      const AMenuText: string): TColumn;
     procedure SyncDevicesColumnsMenu;
     procedure SyncEtalonsColumnsMenu;
     procedure EnforceDataPointsColumnsLayout;
@@ -2151,7 +2153,6 @@ begin
   GridEtalons.OnDrawColumnCell := GridEtalonsDrawColumnCell;
   GridDevices.OnDrawColumnCell := GridDevicesDrawColumnCell;
 
-  InitializeColumnMenuTags;
   SyncDevicesColumnsMenu;
   SyncEtalonsColumnsMenu;
 
@@ -3035,9 +3036,12 @@ begin
     Exit;
 
   MenuItem := TMenuItem(Sender);
-  Index := MenuItem.Tag;
-  if (Index < 0) or (Index >= GridDevices.ColumnCount) then
+  Column := FindGridColumnByMenuText(GridDevices, MenuItem.Text);
+  if Column = nil then
+  begin
+    MenuItem.IsChecked := False;
     Exit;
+  end;
 
   GridDevices.Columns[Index].Visible := not GridDevices.Columns[Index].Visible;
   MenuItem.IsChecked := GridDevices.Columns[Index].Visible;
@@ -3048,61 +3052,57 @@ end;
 procedure TFrameMainTable.EtalonsColumnMenuItemClick(Sender: TObject);
 var
   MenuItem: TMenuItem;
-  Index: Integer;
+  Column: TColumn;
 begin
   if not (Sender is TMenuItem) then
     Exit;
 
   MenuItem := TMenuItem(Sender);
-  Index := MenuItem.Tag;
-  if (Index < 0) or (Index >= GridEtalons.ColumnCount) then
+  Column := FindGridColumnByMenuText(GridEtalons, MenuItem.Text);
+  if Column = nil then
+  begin
+    MenuItem.IsChecked := False;
     Exit;
 
-  GridEtalons.Columns[Index].Visible := not GridEtalons.Columns[Index].Visible;
-  MenuItem.IsChecked := GridEtalons.Columns[Index].Visible;
+  Column.Visible := not Column.Visible;
+  MenuItem.IsChecked := Column.Visible;
   SaveLayoutSettingsToWorkTable;
   GridEtalons.Repaint;
 end;
 
-procedure TFrameMainTable.InitializeColumnMenuTags;
+function TFrameMainTable.NormalizeColumnCaption(
+  const ACaption: string): string;
+var
+  P: Integer;
 begin
-  MenuItemDevicesColumn0.Tag := CheckColumnDeviceEnable1.Index;
-  MenuItemDevicesColumn1.Tag := StringColumnDeviceChanel1.Index;
-  MenuItemDevicesColumn2.Tag := ColumnDeviceType1.Index;
-  MenuItemDevicesColumn3.Tag := PopupColumnDeviceDN1.Index;
-  MenuItemDevicesColumn4.Tag := StringColumnDeviceName1.Index;
-  MenuItemDevicesColumn5.Tag := StringColumnDeviceSerial1.Index;
-  MenuItemDevicesColumn6.Tag := PopupColumnDeviceSignal1.Index;
-  MenuItemDevicesColumn7.Tag := StringColumnDeviceRawValue1.Index;
-  MenuItemDevicesColumn8.Tag := StringColumnDeviceFlowRate1.Index;
-  MenuItemDevicesColumnMeanFlow.Tag := StringColumnDeviceAvgFlowRate1.Index;
-  MenuItemDevicesColumn9.Tag := StringColumnDeviceQuantity1.Index;
-  MenuItemDevicesColumn10.Tag := StringColumnDeviceError1.Index;
-  MenuItemDevicesColumn11.Tag := StringColumnDeviceStd1.Index;
-  MenuItemDevicesColumn12.Tag := StringColumnDeviceQuantityBefore1.Index;
-  MenuItemDevicesColumn13.Tag := StringColumnDeviceQuantityAfter1.Index;
-  MenuItemDevicesColumn14.Tag := StringColumnDevicePressureDelta1.Index;
-  MenuItemDevicesColumn15.Tag := StringColumnDeviceOptions1.Index;
-  MenuItemDevicesColumn16.Tag := StringColumnDeviceRawSumValue1.Index;
-  MenuItemDevicesColumn17.Tag := StringColumnUUID1.Index;
-  MenuItemDevicesColumn18.Tag := StringColumnDeviceCoef1.Index;
+  Result := Trim(ACaption);
+  P := Pos(',', Result);
+  if P > 0 then
+    Result := Trim(Copy(Result, 1, P - 1));
+  Result := LowerCase(Result);
+end;
 
-  MenuItemEtalonsColumn0.Tag := CheckColumnEtalonEnable1.Index;
-  MenuItemEtalonsColumn1.Tag := StringColumnEtalonChanel1.Index;
-  MenuItemEtalonsColumn2.Tag := StringColumnEtalonType1.Index;
-  MenuItemEtalonsColumn3.Tag := PopupColumnEtalonDN1.Index;
-  MenuItemEtalonsColumn4.Tag := StringColumnEtalonName1.Index;
-  MenuItemEtalonsColumn5.Tag := PopupColumnEtalonSignal1.Index;
-  MenuItemEtalonsColumn6.Tag := StringColumnEtalonRawValue1.Index;
-  MenuItemEtalonsColumn7.Tag := StringColumnEtalonFlowRate1.Index;
-  MenuItemEtalonsColumnMeanFlow.Tag := StringColumnEtalonAvgFlowRate1.Index;
-  MenuItemEtalonsColumn8.Tag := StringColumnEtalonQuantity1.Index;
-  MenuItemEtalonsColumn9.Tag := StringColumnEtalonSerial1.Index;
-  MenuItemEtalonsColumn10.Tag := StringColumnEtalonError1.Index;
-  MenuItemEtalonsColumn11.Tag := StringColumnEtalonStd1.Index;
-  MenuItemEtalonsColumn12.Tag := StringColumnEtalonPressureDelta1.Index;
-  MenuItemEtalonsColumn13.Tag := StringColumnEtalonOptions1.Index;
-  MenuItemEtalonsColumn14.Tag := StringColumnEtalonRawSumValue1.Index;
+function TFrameMainTable.FindGridColumnByMenuText(AGrid: TGrid;
+  const AMenuText: string): TColumn;
+var
+  I: Integer;
+  MenuCaption: string;
+  ColumnCaption: string;
+begin
+  Result := nil;
+  if AGrid = nil then
+    Exit;
+
+  MenuCaption := NormalizeColumnCaption(AMenuText);
+  if MenuCaption = '' then
+    Exit;
+
+  for I := 0 to AGrid.ColumnCount - 1 do
+  begin
+    ColumnCaption := NormalizeColumnCaption(AGrid.Columns[I].Header);
+    if SameText(MenuCaption, ColumnCaption) then
+      Exit(AGrid.Columns[I]);
+  end;
 end;
 
 procedure TFrameMainTable.SyncDevicesColumnsMenu;
@@ -3111,7 +3111,7 @@ var
   MenuItem: TMenuItem;
   ColIndex: Integer;
 begin
-  if (GridDevices = nil) or (MenuItemDevicesColumnsGroup = nil) then
+  if MenuItemDevicesColumnsGroup = nil then
     Exit;
 
   for I := 0 to MenuItemDevicesColumnsGroup.ItemsCount - 1 do
@@ -3119,9 +3119,9 @@ begin
     if not (MenuItemDevicesColumnsGroup.Items[I] is TMenuItem) then
       Continue;
     MenuItem := TMenuItem(MenuItemDevicesColumnsGroup.Items[I]);
-    ColIndex := MenuItem.Tag;
-    if (ColIndex >= 0) and (ColIndex < GridDevices.ColumnCount) then
-      MenuItem.IsChecked := GridDevices.Columns[ColIndex].Visible
+    Column := FindGridColumnByMenuText(GridDevices, MenuItem.Text);
+    if Column <> nil then
+      MenuItem.IsChecked := Column.Visible
     else
       MenuItem.IsChecked := False;
   end;
@@ -3131,9 +3131,9 @@ procedure TFrameMainTable.SyncEtalonsColumnsMenu;
 var
   I: Integer;
   MenuItem: TMenuItem;
-  ColIndex: Integer;
+  Column: TColumn;
 begin
-  if (GridEtalons = nil) or (MenuItemEtalonsColumnsGroup = nil) then
+  if MenuItemEtalonsColumnsGroup = nil then
     Exit;
 
   for I := 0 to MenuItemEtalonsColumnsGroup.ItemsCount - 1 do
@@ -3141,9 +3141,9 @@ begin
     if not (MenuItemEtalonsColumnsGroup.Items[I] is TMenuItem) then
       Continue;
     MenuItem := TMenuItem(MenuItemEtalonsColumnsGroup.Items[I]);
-    ColIndex := MenuItem.Tag;
-    if (ColIndex >= 0) and (ColIndex < GridEtalons.ColumnCount) then
-      MenuItem.IsChecked := GridEtalons.Columns[ColIndex].Visible
+    Column := FindGridColumnByMenuText(GridEtalons, MenuItem.Text);
+    if Column <> nil then
+      MenuItem.IsChecked := Column.Visible
     else
       MenuItem.IsChecked := False;
   end;

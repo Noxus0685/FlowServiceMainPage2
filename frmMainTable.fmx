@@ -5741,7 +5741,7 @@ object FrameMainTable: TFrameMainTable
             end
             object StringColumnDeviceQuantity1: TStringColumn
               Tag = 3
-              Header = #1054#1073#1098#1077#1084', '#1084'3'
+              Header = #1054#1073#1098#1105#1084', '#1084'3'
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
               ReadOnly = True
@@ -5761,17 +5761,17 @@ object FrameMainTable: TFrameMainTable
             end
             object StringColumnDeviceQuantityBefore1: TStringColumn
               Tag = 3
-              Header = #1054#1073#1098#1077#1084' '#1076#1086
+              Header = #1054#1073#1098#1105#1084' '#1076#1086
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnDeviceQuantityAfter1: TStringColumn
               Tag = 3
-              Header = #1054#1073#1098#1077#1084' '#1087#1086#1089#1083#1077
+              Header = #1054#1073#1098#1105#1084' '#1087#1086#1089#1083#1077
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnDevicePressureDelta1: TStringColumn
               Tag = 5
-              Header = #1055#1088#1077#1087#1072#1076
+              Header = #1055#1077#1088#1077#1087#1072#1076
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
             end
@@ -5976,7 +5976,7 @@ object FrameMainTable: TFrameMainTable
               end
               object StringColumnEtalonQuantity1: TStringColumn
                 Tag = 3
-                Header = #1054#1073#1098#1077#1084', '#1084'3'
+                Header = #1054#1073#1098#1105#1084', '#1084'3'
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
               end
