@@ -49,8 +49,8 @@ def test_click_handlers_resolve_column_from_current_menu_text():
                           ("EtalonsColumnMenuItemClick", "GridEtalons")):
         body = procedure_body(handler)
         assert f"FindGridColumnByMenuText({grid}, MenuItem.Text)" in body
-        assert "Column.Visible := not Column.Visible;" in body
-        assert "MenuItem.IsChecked := Column.Visible;" in body
+        assert "GridColumn.Visible := not GridColumn.Visible;" in body
+        assert "MenuItem.IsChecked := GridColumn.Visible;" in body
         assert "MenuItem.Tag" not in body
         assert "Columns[Index]" not in body
         assert ".Realign" not in body  # protected in the supported dcc32 version
@@ -65,7 +65,7 @@ def test_sync_resolves_each_item_by_text_and_only_updates_checked_state():
         body = procedure_body(sync)
         assert f"for I := 0 to {group}.ItemsCount - 1 do" in body
         assert f"FindGridColumnByMenuText({grid}, MenuItem.Text)" in body
-        assert "MenuItem.IsChecked := Column.Visible" in body
+        assert "MenuItem.IsChecked := GridColumn.Visible" in body
         assert "MenuItem.Tag" not in body
         assert ".Enabled" not in body
 

@@ -3030,21 +3030,21 @@ end;
 procedure TFrameMainTable.DevicesColumnMenuItemClick(Sender: TObject);
 var
   MenuItem: TMenuItem;
-  Index: Integer;
+  GridColumn: TColumn;
 begin
   if not (Sender is TMenuItem) then
     Exit;
 
   MenuItem := TMenuItem(Sender);
-  Column := FindGridColumnByMenuText(GridDevices, MenuItem.Text);
-  if Column = nil then
+  GridColumn := FindGridColumnByMenuText(GridDevices, MenuItem.Text);
+  if GridColumn = nil then
   begin
     MenuItem.IsChecked := False;
     Exit;
   end;
 
-  GridDevices.Columns[Index].Visible := not GridDevices.Columns[Index].Visible;
-  MenuItem.IsChecked := GridDevices.Columns[Index].Visible;
+  GridColumn.Visible := not GridColumn.Visible;
+  MenuItem.IsChecked := GridColumn.Visible;
   SaveLayoutSettingsToWorkTable;
   GridDevices.Repaint;
 end;
@@ -3052,20 +3052,21 @@ end;
 procedure TFrameMainTable.EtalonsColumnMenuItemClick(Sender: TObject);
 var
   MenuItem: TMenuItem;
-  Column: TColumn;
+  GridColumn: TColumn;
 begin
   if not (Sender is TMenuItem) then
     Exit;
 
   MenuItem := TMenuItem(Sender);
-  Column := FindGridColumnByMenuText(GridEtalons, MenuItem.Text);
-  if Column = nil then
+  GridColumn := FindGridColumnByMenuText(GridEtalons, MenuItem.Text);
+  if GridColumn = nil then
   begin
     MenuItem.IsChecked := False;
     Exit;
+  end;
 
-  Column.Visible := not Column.Visible;
-  MenuItem.IsChecked := Column.Visible;
+  GridColumn.Visible := not GridColumn.Visible;
+  MenuItem.IsChecked := GridColumn.Visible;
   SaveLayoutSettingsToWorkTable;
   GridEtalons.Repaint;
 end;
@@ -3109,7 +3110,7 @@ procedure TFrameMainTable.SyncDevicesColumnsMenu;
 var
   I: Integer;
   MenuItem: TMenuItem;
-  ColIndex: Integer;
+  GridColumn: TColumn;
 begin
   if MenuItemDevicesColumnsGroup = nil then
     Exit;
@@ -3119,9 +3120,9 @@ begin
     if not (MenuItemDevicesColumnsGroup.Items[I] is TMenuItem) then
       Continue;
     MenuItem := TMenuItem(MenuItemDevicesColumnsGroup.Items[I]);
-    Column := FindGridColumnByMenuText(GridDevices, MenuItem.Text);
-    if Column <> nil then
-      MenuItem.IsChecked := Column.Visible
+    GridColumn := FindGridColumnByMenuText(GridDevices, MenuItem.Text);
+    if GridColumn <> nil then
+      MenuItem.IsChecked := GridColumn.Visible
     else
       MenuItem.IsChecked := False;
   end;
@@ -3131,7 +3132,7 @@ procedure TFrameMainTable.SyncEtalonsColumnsMenu;
 var
   I: Integer;
   MenuItem: TMenuItem;
-  Column: TColumn;
+  GridColumn: TColumn;
 begin
   if MenuItemEtalonsColumnsGroup = nil then
     Exit;
@@ -3141,9 +3142,9 @@ begin
     if not (MenuItemEtalonsColumnsGroup.Items[I] is TMenuItem) then
       Continue;
     MenuItem := TMenuItem(MenuItemEtalonsColumnsGroup.Items[I]);
-    Column := FindGridColumnByMenuText(GridEtalons, MenuItem.Text);
-    if Column <> nil then
-      MenuItem.IsChecked := Column.Visible
+    GridColumn := FindGridColumnByMenuText(GridEtalons, MenuItem.Text);
+    if GridColumn <> nil then
+      MenuItem.IsChecked := GridColumn.Visible
     else
       MenuItem.IsChecked := False;
   end;
