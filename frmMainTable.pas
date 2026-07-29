@@ -396,28 +396,31 @@ type
     MenuItemDevicesColumnsGroup: TMenuItem;
     MenuItemDevicesColumnsChannelGroup: TMenuItem;
     MenuItemDevicesColumnsDeviceGroup: TMenuItem;
-    MenuItemDevicesColumnsMeasureGroup: TMenuItem;
-    MenuItemDevicesColumnsStatGroup: TMenuItem;
+    MenuItemDevicesColumnsMeasurementGroup: TMenuItem;
+    MenuItemDevicesColumnsStatisticsGroup: TMenuItem;
     MenuItemDevicesColumnsOtherGroup: TMenuItem;
-    MenuItemDevicesColumn0: TMenuItem;
-    MenuItemDevicesColumn1: TMenuItem;
-    MenuItemDevicesColumn2: TMenuItem;
-    MenuItemDevicesColumn3: TMenuItem;
-    MenuItemDevicesColumn4: TMenuItem;
-    MenuItemDevicesColumn5: TMenuItem;
-    MenuItemDevicesColumn6: TMenuItem;
-    MenuItemDevicesColumn7: TMenuItem;
-    MenuItemDevicesColumn8: TMenuItem;
-    MenuItemDevicesColumn9: TMenuItem;
-    MenuItemDevicesColumn10: TMenuItem;
-    MenuItemDevicesColumn11: TMenuItem;
-    MenuItemDevicesColumn12: TMenuItem;
-    MenuItemDevicesColumn13: TMenuItem;
-    MenuItemDevicesColumn14: TMenuItem;
-    MenuItemDevicesColumn15: TMenuItem;
-    MenuItemDevicesColumn16: TMenuItem;
-    MenuItemDevicesColumn17: TMenuItem;
-    MenuItemDevicesColumn18: TMenuItem;
+    MenuItemDevicesColumnEnable: TMenuItem;
+    MenuItemDevicesColumnChannel: TMenuItem;
+    MenuItemDevicesColumnSignalType: TMenuItem;
+    MenuItemDevicesColumnSignal: TMenuItem;
+    MenuItemDevicesColumnDeviceType: TMenuItem;
+    MenuItemDevicesColumnSize: TMenuItem;
+    MenuItemDevicesColumnDevice: TMenuItem;
+    MenuItemDevicesColumnSerial: TMenuItem;
+    MenuItemDevicesColumnFrequency: TMenuItem;
+    MenuItemDevicesColumnImpulses: TMenuItem;
+    MenuItemDevicesColumnFlow: TMenuItem;
+    MenuItemDevicesColumnMeanFlow: TMenuItem;
+    MenuItemDevicesColumnVolume: TMenuItem;
+    MenuItemDevicesColumnValue: TMenuItem;
+    MenuItemDevicesColumnError: TMenuItem;
+    MenuItemDevicesColumnDeviation: TMenuItem;
+    MenuItemDevicesColumnVolumeBefore: TMenuItem;
+    MenuItemDevicesColumnVolumeAfter: TMenuItem;
+    MenuItemDevicesColumnPressureDelta: TMenuItem;
+    MenuItemDevicesColumnStatus: TMenuItem;
+    MenuItemDevicesColumnUUID: TMenuItem;
+    MenuItemDevicesColumnCoefficient: TMenuItem;
     MenuItemEtalonsWorkTablesGroup: TMenuItem;
     MenuItemEtalonsWorkTablesAddTable: TMenuItem;
     MenuItemEtalonsWorkTablesAddDeviceChannel: TMenuItem;
@@ -434,24 +437,27 @@ type
     MenuItemEtalonsColumnsGroup: TMenuItem;
     MenuItemEtalonsColumnsChannelGroup: TMenuItem;
     MenuItemEtalonsColumnsDeviceGroup: TMenuItem;
-    MenuItemEtalonsColumnsMeasureGroup: TMenuItem;
-    MenuItemEtalonsColumnsStatGroup: TMenuItem;
+    MenuItemEtalonsColumnsMeasurementGroup: TMenuItem;
+    MenuItemEtalonsColumnsStatisticsGroup: TMenuItem;
     MenuItemEtalonsColumnsOtherGroup: TMenuItem;
-    MenuItemEtalonsColumn0: TMenuItem;
-    MenuItemEtalonsColumn1: TMenuItem;
-    MenuItemEtalonsColumn2: TMenuItem;
-    MenuItemEtalonsColumn3: TMenuItem;
-    MenuItemEtalonsColumn4: TMenuItem;
-    MenuItemEtalonsColumn5: TMenuItem;
-    MenuItemEtalonsColumn6: TMenuItem;
-    MenuItemEtalonsColumn7: TMenuItem;
-    MenuItemEtalonsColumn8: TMenuItem;
-    MenuItemEtalonsColumn9: TMenuItem;
-    MenuItemEtalonsColumn10: TMenuItem;
-    MenuItemEtalonsColumn11: TMenuItem;
-    MenuItemEtalonsColumn12: TMenuItem;
-    MenuItemEtalonsColumn13: TMenuItem;
-    MenuItemEtalonsColumn14: TMenuItem;
+    MenuItemEtalonsColumnEnable: TMenuItem;
+    MenuItemEtalonsColumnChannel: TMenuItem;
+    MenuItemEtalonsColumnSignalType: TMenuItem;
+    MenuItemEtalonsColumnSignal: TMenuItem;
+    MenuItemEtalonsColumnDeviceType: TMenuItem;
+    MenuItemEtalonsColumnSize: TMenuItem;
+    MenuItemEtalonsColumnDevice: TMenuItem;
+    MenuItemEtalonsColumnSerial: TMenuItem;
+    MenuItemEtalonsColumnFrequency: TMenuItem;
+    MenuItemEtalonsColumnImpulses: TMenuItem;
+    MenuItemEtalonsColumnFlow: TMenuItem;
+    MenuItemEtalonsColumnMeanFlow: TMenuItem;
+    MenuItemEtalonsColumnVolume: TMenuItem;
+    MenuItemEtalonsColumnValue: TMenuItem;
+    MenuItemEtalonsColumnError: TMenuItem;
+    MenuItemEtalonsColumnDeviation: TMenuItem;
+    MenuItemEtalonsColumnPressureDelta: TMenuItem;
+    MenuItemEtalonsColumnStatus: TMenuItem;
     MenuItemDevicesClearRow: TMenuItem;
     MenuItemDevicesCopy: TMenuItem;
     MenuItemDevicesPaste: TMenuItem;
@@ -629,7 +635,8 @@ type
     procedure MenuInstrumentalLayOutClick(Sender: TObject);
     procedure PopupMenuDevicesGridPopup(Sender: TObject);
     procedure PopupMenuEtalonsGridPopup(Sender: TObject);
-    procedure MenuGridLayOutClick(Sender: TObject);
+    procedure DevicesColumnMenuItemClick(Sender: TObject);
+    procedure EtalonsColumnMenuItemClick(Sender: TObject);
     procedure PopupMenuGridDataPointsPopup(Sender: TObject);
     procedure PopupMenuGridResultsPopup(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
@@ -752,6 +759,7 @@ type
   FLastClickCol: TColumn;
   FLastClickTick: Cardinal;
   FLastPopupGrid: TGrid;
+  FRefreshingGridColumns: Boolean;
 
   FRows: array of TRowData;
   IsUpdating: Boolean;
@@ -838,6 +846,15 @@ type
     procedure UpdateGridPopupActions;
     procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
     procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
+    procedure RefreshGridColumns(AGrid: TGrid);
+    function NormalizeColumnCaption(const ACaption: string): string;
+    function FindGridColumnByName(AGrid: TGrid;
+      const AColumnName: string): TColumn;
+    function FindGridColumnForMenuItem(AGrid: TGrid;
+      AMenuItem: TMenuItem): TColumn;
+    procedure SyncColumnMenuBranch(AParentItem: TMenuItem; AGrid: TGrid);
+    procedure SyncDevicesColumnsMenu;
+    procedure SyncEtalonsColumnsMenu;
     procedure EnforceDataPointsColumnsLayout;
     procedure MarkChannelDeviceModified(AChannel: TChannel);
     procedure PersistChannelEnabled(AWorkTable: TWorkTable; AChannel: TChannel; const AKind: string; const AOldEnabled, ANewEnabled: Boolean);
@@ -2155,6 +2172,9 @@ begin
   GridEtalons.OnDrawColumnCell := GridEtalonsDrawColumnCell;
   GridDevices.OnDrawColumnCell := GridDevicesDrawColumnCell;
 
+  SyncDevicesColumnsMenu;
+  SyncEtalonsColumnsMenu;
+
   ComboEditUnits.Items.Clear;
   for UnitName in CVolumeFlowUnits do
     ComboEditUnits.Items.Add(UnitName);
@@ -2939,26 +2959,6 @@ var
   HasDeviceRow: Boolean;
   HasEtalonRow: Boolean;
 
-  procedure UpdateColumnMenuChecks(const APrefix: string; AGrid: TGrid);
-  var
-    I: Integer;
-    MenuItem: TMenuItem;
-    Component: TComponent;
-  begin
-    if AGrid = nil then
-      Exit;
-
-    for I := 0 to AGrid.ColumnCount - 1 do
-    begin
-      Component := FindComponent('MenuItem' + APrefix + 'Column' + IntToStr(I));
-      if Component is TMenuItem then
-      begin
-        MenuItem := TMenuItem(Component);
-        MenuItem.IsChecked := AGrid.Columns[I].Visible;
-        MenuItem.Enabled := CanEdit;
-      end;
-    end;
-  end;
 begin
   CanEdit := CanEditActiveWorkTable;
   HasDeviceRow := CanEdit and (FActiveWorkTable <> nil) and (GridDevices <> nil) and
@@ -3028,8 +3028,6 @@ begin
   if ActionDeleteEtalons <> nil then
     ActionDeleteEtalons.Enabled := HasEtalonRow;
 
-  UpdateColumnMenuChecks('Devices', GridDevices);
-  UpdateColumnMenuChecks('Etalons', GridEtalons);
 end;
 
 procedure TFrameMainTable.PopupMenuDevicesGridPopup(Sender: TObject);
@@ -3037,6 +3035,7 @@ begin
   FLastPopupGrid := GridDevices;
   PopupMenuWorkTablesPopup(Sender);
   UpdateGridPopupActions;
+  SyncDevicesColumnsMenu;
 end;
 
 procedure TFrameMainTable.PopupMenuEtalonsGridPopup(Sender: TObject);
@@ -3044,48 +3043,152 @@ begin
   FLastPopupGrid := GridEtalons;
   PopupMenuWorkTablesPopup(Sender);
   UpdateGridPopupActions;
+  SyncEtalonsColumnsMenu;
 end;
 
-procedure TFrameMainTable.MenuGridLayOutClick(Sender: TObject);
+procedure TFrameMainTable.DevicesColumnMenuItemClick(Sender: TObject);
 var
   MenuItem: TMenuItem;
-  Column: TColumn;
-  NewVisible: Boolean;
+  GridColumn: TColumn;
 begin
   if not (Sender is TMenuItem) then
     Exit;
 
   MenuItem := TMenuItem(Sender);
-  Column := nil;
-  if MenuItem.TagObject is TColumn then
-    Column := TColumn(MenuItem.TagObject)
-  else if (Copy(MenuItem.Name, 1, Length('MenuItemDevicesColumn')) = 'MenuItemDevicesColumn') and
-    (GridDevices <> nil) and (MenuItem.Tag >= 0) and (MenuItem.Tag < GridDevices.ColumnCount) then
-    Column := GridDevices.Columns[Integer(MenuItem.Tag)]
-  else if (Copy(MenuItem.Name, 1, Length('MenuItemEtalonsColumn')) = 'MenuItemEtalonsColumn') and
-    (GridEtalons <> nil) and (MenuItem.Tag >= 0) and (MenuItem.Tag < GridEtalons.ColumnCount) then
-    Column := GridEtalons.Columns[Integer(MenuItem.Tag)];
-
-  if Column = nil then
+  if MenuItem.ItemsCount > 0 then
     Exit;
 
-  if (FFrameProceed <> nil) and (Column = FFrameProceed.StringColumnSpillageNum) then
+  GridColumn := FindGridColumnForMenuItem(GridDevices, MenuItem);
+  if GridColumn = nil then
   begin
     MenuItem.IsChecked := False;
-    FFrameProceed.StringColumnSpillageNum.Visible := False;
     Exit;
   end;
 
-  NewVisible := not MenuItem.IsChecked;
-  MenuItem.IsChecked := NewVisible;
-  Column.Visible := NewVisible;
-
-  if (FFrameProceed <> nil) and (Column = FFrameProceed.CheckColumnSpillageEnable) and
-     not FFrameProceed.CheckColumnSpillageEnable.Visible then
-    FFrameProceed.CheckColumnSpillageEnable.Visible := True;
-
-  EnforceDataPointsColumnsLayout;
+  GridColumn.Visible := not GridColumn.Visible;
+  MenuItem.IsChecked := GridColumn.Visible;
+  RefreshGridColumns(GridDevices);
   SaveLayoutSettingsToWorkTable;
+end;
+
+procedure TFrameMainTable.EtalonsColumnMenuItemClick(Sender: TObject);
+var
+  MenuItem: TMenuItem;
+  GridColumn: TColumn;
+begin
+  if not (Sender is TMenuItem) then
+    Exit;
+
+  MenuItem := TMenuItem(Sender);
+  if MenuItem.ItemsCount > 0 then
+    Exit;
+
+  GridColumn := FindGridColumnForMenuItem(GridEtalons, MenuItem);
+  if GridColumn = nil then
+  begin
+    MenuItem.IsChecked := False;
+    Exit;
+  end;
+
+  GridColumn.Visible := not GridColumn.Visible;
+  MenuItem.IsChecked := GridColumn.Visible;
+  RefreshGridColumns(GridEtalons);
+  SaveLayoutSettingsToWorkTable;
+end;
+
+function TFrameMainTable.NormalizeColumnCaption(
+  const ACaption: string): string;
+var
+  P: Integer;
+begin
+  Result := StringReplace(ACaption, #$00A0, ' ', [rfReplaceAll]);
+  Result := StringReplace(Result, #13, ' ', [rfReplaceAll]);
+  Result := StringReplace(Result, #10, ' ', [rfReplaceAll]);
+  Result := Trim(Result);
+  while Pos('  ', Result) > 0 do
+    Result := StringReplace(Result, '  ', ' ', [rfReplaceAll]);
+  P := Pos(',', Result);
+  if P > 0 then
+    Result := Trim(Copy(Result, 1, P - 1));
+  while (Result <> '') and (Result[Length(Result)] = ':') do
+    Delete(Result, Length(Result), 1);
+  Result := LowerCase(Trim(Result));
+  Result := StringReplace(Result, 'ё', 'е', [rfReplaceAll]);
+end;
+
+function TFrameMainTable.FindGridColumnByName(AGrid: TGrid;
+  const AColumnName: string): TColumn;
+var
+  I: Integer;
+begin
+  Result := nil;
+  if (AGrid = nil) or (Trim(AColumnName) = '') then
+    Exit;
+
+  for I := 0 to AGrid.ColumnCount - 1 do
+    if SameText(AGrid.Columns[I].Name, AColumnName) then
+      Exit(AGrid.Columns[I]);
+end;
+
+function TFrameMainTable.FindGridColumnForMenuItem(AGrid: TGrid;
+  AMenuItem: TMenuItem): TColumn;
+var
+  I: Integer;
+begin
+  Result := nil;
+  if (AGrid = nil) or (AMenuItem = nil) then
+    Exit;
+
+  if Trim(AMenuItem.TagString) <> '' then
+  begin
+    Result := FindGridColumnByName(AGrid, AMenuItem.TagString);
+    if Result <> nil then
+      Exit;
+  end;
+
+  for I := 0 to AGrid.ColumnCount - 1 do
+    if SameText(NormalizeColumnCaption(AGrid.Columns[I].Header),
+      NormalizeColumnCaption(AMenuItem.Text)) then
+      Exit(AGrid.Columns[I]);
+end;
+
+procedure TFrameMainTable.SyncColumnMenuBranch(AParentItem: TMenuItem;
+  AGrid: TGrid);
+var
+  I: Integer;
+  MenuItem: TMenuItem;
+  GridColumn: TColumn;
+begin
+  if (AParentItem = nil) or (AGrid = nil) then
+    Exit;
+
+  for I := 0 to AParentItem.ItemsCount - 1 do
+  begin
+    if not (AParentItem.Items[I] is TMenuItem) then
+      Continue;
+    MenuItem := TMenuItem(AParentItem.Items[I]);
+    if MenuItem.ItemsCount > 0 then
+    begin
+      SyncColumnMenuBranch(MenuItem, AGrid);
+      Continue;
+    end;
+
+    GridColumn := FindGridColumnForMenuItem(AGrid, MenuItem);
+    if GridColumn <> nil then
+      MenuItem.IsChecked := GridColumn.Visible
+    else
+      MenuItem.IsChecked := False;
+  end;
+end;
+
+procedure TFrameMainTable.SyncDevicesColumnsMenu;
+begin
+  SyncColumnMenuBranch(MenuItemDevicesColumnsGroup, GridDevices);
+end;
+
+procedure TFrameMainTable.SyncEtalonsColumnsMenu;
+begin
+  SyncColumnMenuBranch(MenuItemEtalonsColumnsGroup, GridEtalons);
 end;
 
 procedure TFrameMainTable.CaptureGridColumnsLayout(AGrid: TGrid;
@@ -3144,6 +3247,32 @@ begin
     end;
   finally
     AGrid.EndUpdate;
+  end;
+end;
+
+procedure TFrameMainTable.RefreshGridColumns(AGrid: TGrid);
+var
+  ViewportY: Single;
+begin
+  if FRefreshingGridColumns or (AGrid = nil) then
+    Exit;
+
+  FRefreshingGridColumns := True;
+  try
+    ViewportY := AGrid.ViewportPosition.Y;
+
+    AGrid.Model.BeginUpdate;
+    try
+      AGrid.Model.InvalidateContentSize;
+      AGrid.Model.ContentChanged;
+    finally
+      AGrid.Model.EndUpdate;
+    end;
+
+    AGrid.ViewportPosition := PointF(0, ViewportY);
+    AGrid.Repaint;
+  finally
+    FRefreshingGridColumns := False;
   end;
 end;
 
@@ -3206,11 +3335,21 @@ begin
   );
 
   ApplyGridColumnsLayout(GridEtalons, WorkTable.EtalonsGridColumns);
+  RefreshGridColumns(GridEtalons);
+  SyncEtalonsColumnsMenu;
   ApplyGridColumnsLayout(GridDevices, WorkTable.DevicesGridColumns);
+  RefreshGridColumns(GridDevices);
+  SyncDevicesColumnsMenu;
   if FFrameProceed <> nil then
+  begin
     ApplyGridColumnsLayout(FFrameProceed.GridDataPoints, WorkTable.DataPointsGridColumns);
+    RefreshGridColumns(FFrameProceed.GridDataPoints);
+  end;
   if FFrameProceed <> nil then
+  begin
     ApplyGridColumnsLayout(FFrameProceed.GridResults, WorkTable.ResultsGridColumns);
+    RefreshGridColumns(FFrameProceed.GridResults);
+  end;
 
   EnforceDataPointsColumnsLayout;
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
@@ -6352,6 +6491,9 @@ begin
       StringColumnEtalonQuantity1.TagString := '0';
 
 
+
+  SyncDevicesColumnsMenu;
+  SyncEtalonsColumnsMenu;
 
   if WorkTable.State in [swtSTARTMONITORWAIT, swtMONITOR, swtSTOPMONITOR] then
     RefreshMonitorIndicator;
