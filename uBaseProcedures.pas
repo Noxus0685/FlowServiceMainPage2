@@ -215,10 +215,16 @@ type
     Enabled: Boolean;
     /// <summary>Exact maximum window size and minimum sample count required to confirm stability.</summary>
     MinSampleCount: Integer;
-    /// <summary>Minimum continuous-window duration required to confirm stability; zero disables this check.</summary>
-    MinWindowDurationSec: Double;
     /// <summary>Maximum number of latest samples kept in working history and shown from TMeterValue history.</summary>
     SampleSize: Integer;
+    /// <summary>
+    /// Minimum interval in seconds between automatically captured stability samples.
+    /// More frequent value updates do not create new FSamples entries.
+    /// Zero disables interval filtering.
+    /// </summary>
+    MinimumSampleIntervalSec: Double;
+    /// <summary>Minimum continuous-window duration required to confirm stability; zero disables this check.</summary>
+    MinWindowDurationSec: Double;
     /// <summary>Maximum allowed age in seconds for the latest eligible sample.</summary>
     MaxSampleAgeSec: Double;
     /// <summary>Maximum allowed max-min spread in physical units.</summary>
