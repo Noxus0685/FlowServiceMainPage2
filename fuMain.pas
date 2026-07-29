@@ -20,6 +20,7 @@ type
   TFormMain = class(TForm)
     TabControlMain: TTabControl;
     TabItemTable: TTabItem;
+    TabItemGraphs: TTabItem;
     TabItemResults: TTabItem;
     TimerSetValues: TTimer;
     TabItemTest: TTabItem;
@@ -305,6 +306,7 @@ begin
   FFrameMainTable.Align := TAlignLayout.Client;
   FFrameMainTable.WorkTableManager := FWorkTableManager ;
   FFrameMainTable.Initialize;
+  FFrameMainTable.AttachGraphsTo(TabItemGraphs);
 
 
 
