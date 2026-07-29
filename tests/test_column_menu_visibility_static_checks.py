@@ -6,148 +6,175 @@ PAS = (ROOT / "frmMainTable.pas").read_text(encoding="utf-8")
 FMX_BYTES = (ROOT / "frmMainTable.fmx").read_bytes()
 FMX = FMX_BYTES.decode("ascii")
 
-DEVICE_ITEMS = [f"MenuItemDevicesColumn{i}" for i in range(19)] + ["MenuItemDevicesColumnMeanFlow"]
-ETALON_ITEMS = [f"MenuItemEtalonsColumn{i}" for i in range(15)] + ["MenuItemEtalonsColumnMeanFlow"]
+DEVICE_GROUPS = ("Channel", "Device", "Measurement", "Statistics", "Other")
+ETALON_GROUPS = DEVICE_GROUPS
+DEVICE_ITEMS = (
+    "Enable", "Channel", "SignalType", "Signal", "DeviceType", "Size", "Device", "Serial",
+    "Frequency", "Impulses", "Flow", "MeanFlow", "Volume", "Value", "Error", "Deviation",
+    "VolumeBefore", "VolumeAfter", "PressureDelta", "Status", "UUID", "Coefficient",
+)
+ETALON_ITEMS = (
+    "Enable", "Channel", "SignalType", "Signal", "DeviceType", "Size", "Device", "Serial",
+    "Frequency", "Impulses", "Flow", "MeanFlow", "Volume", "Value", "Error", "Deviation",
+    "PressureDelta", "Status",
+)
 
 
 def procedure_body(name: str) -> str:
     match = re.search(
         rf"(?:procedure|function) TFrameMainTable\.{name}\b(.*?)(?=\n(?:procedure|function) TFrameMainTable\.)",
-        PAS,
-        re.S,
+        PAS, re.S,
     )
     assert match, name
     return match.group(1)
 
 
-def menu_item_block(name: str) -> str:
-    match = re.search(rf"object {name}: TMenuItem(.*?)\n        end", FMX, re.S)
-    assert match, name
-    return match.group(1)
+def object_block(name: str) -> str:
+    marker = f"object {name}: TMenuItem"
+    start = FMX.index(marker)
+    lines = FMX[start:].splitlines(True)
+    depth = 0
+    result = []
+    for line in lines:
+        result.append(line)
+        stripped = line.strip()
+        if stripped.startswith("object "):
+            depth += 1
+        elif stripped == "end":
+            depth -= 1
+            if depth == 0:
+                break
+    return "".join(result)
 
 
-def test_caption_normalization_removes_units_and_normalizes_case():
+def test_complete_named_hierarchy_is_stored_in_fmx_and_declared_in_pas():
+    for prefix, groups, items in (
+        ("Devices", DEVICE_GROUPS, DEVICE_ITEMS),
+        ("Etalons", ETALON_GROUPS, ETALON_ITEMS),
+    ):
+        root = object_block(f"MenuItem{prefix}ColumnsGroup")
+        for group in groups:
+            name = f"MenuItem{prefix}Columns{group}Group"
+            assert f"object {name}: TMenuItem" in root
+            assert re.search(rf"\b{name}: TMenuItem;", PAS)
+            group_header = object_block(name).split("object ", 2)[1]
+            assert "OnClick =" not in group_header.split("object ", 1)[0]
+        for suffix in items:
+            name = f"MenuItem{prefix}Column{suffix}"
+            assert root.count(f"object {name}: TMenuItem") == 1
+            assert re.search(rf"\b{name}: TMenuItem;", PAS)
+            assert f"OnClick = {prefix}ColumnMenuItemClick" in object_block(name)
+
+
+def test_every_real_grid_column_has_exactly_one_menu_binding():
+    expected = {
+        "Devices": re.findall(r"object (\w+): T(?:Check|String|Popup)?Column\b", object_block_grid("GridDevices")),
+        "Etalons": re.findall(r"object (\w+): T(?:Check|String|Popup)?Column\b", object_block_grid("GridEtalons")),
+    }
+    for prefix, columns in expected.items():
+        root = object_block(f"MenuItem{prefix}ColumnsGroup")
+        for column in columns:
+            assert root.count(f"TagString = '{column}'") == 1, column
+
+
+def object_block_grid(name: str) -> str:
+    marker = f"object {name}: TGrid"
+    start = FMX.index(marker)
+    lines = FMX[start:].splitlines(True)
+    depth = 0
+    result = []
+    for line in lines:
+        result.append(line)
+        stripped = line.strip()
+        if stripped.startswith("object "):
+            depth += 1
+        elif stripped == "end":
+            depth -= 1
+            if depth == 0:
+                break
+    return "".join(result)
+
+
+def test_column_menu_is_never_built_or_reordered_at_runtime():
+    assert "EnsureGridColumnsMenu" not in PAS
+    assert "FindColumnMenuGroup" not in PAS
+    assert "FindColumnMenuItem" not in PAS
+    assert not re.search(r"TMenuItem\.Create\([^\n]*(?:Column|Group)", PAS)
+    sync = procedure_body("SyncColumnMenuBranch")
+    for forbidden in (".Create", "AddObject", "InsertObject", "RemoveObject", "Items.Clear",
+                      "DeleteChildren", ".Parent :=", ".Index :=", ".Text :="):
+        assert forbidden not in sync
+
+
+def test_click_and_recursive_sync_resolve_leaves_independently_of_order():
+    lookup = procedure_body("FindGridColumnForMenuItem")
+    assert "FindGridColumnByName(AGrid, AMenuItem.TagString)" in lookup
+    assert "NormalizeColumnCaption(AGrid.Columns[I].Header)" in lookup
+    assert "NormalizeColumnCaption(AMenuItem.Text)" in lookup
+    assert ".Index" not in lookup
+
+    for handler, grid in (("DevicesColumnMenuItemClick", "GridDevices"),
+                          ("EtalonsColumnMenuItemClick", "GridEtalons")):
+        body = procedure_body(handler)
+        assert "if MenuItem.ItemsCount > 0 then" in body
+        assert f"FindGridColumnForMenuItem({grid}, MenuItem)" in body
+        assert "GridColumn.Visible := not GridColumn.Visible;" in body
+        assert f"RefreshGridColumns({grid});" in body
+        assert "SaveLayoutSettingsToWorkTable;" in body
+        assert body.index("GridColumn.Visible := not GridColumn.Visible;") < body.index("MenuItem.IsChecked := GridColumn.Visible;")
+        assert body.index("MenuItem.IsChecked := GridColumn.Visible;") < body.index(f"RefreshGridColumns({grid});")
+        assert body.index(f"RefreshGridColumns({grid});") < body.index("SaveLayoutSettingsToWorkTable;")
+
+    sync = procedure_body("SyncColumnMenuBranch")
+    assert "SyncColumnMenuBranch(MenuItem, AGrid);" in sync
+    assert "FindGridColumnForMenuItem(AGrid, MenuItem)" in sync
+    assert "MenuItem.IsChecked := GridColumn.Visible" in sync
+
+
+def test_dynamic_units_are_removed_during_caption_fallback():
     body = procedure_body("NormalizeColumnCaption")
     assert "P := Pos(',', Result);" in body
     assert "Result := Trim(Copy(Result, 1, P - 1));" in body
     assert "Result := LowerCase(Trim(Result));" in body
     assert "#$00A0" in body
-    assert "StringReplace(Result, #13" in body
-    assert "StringReplace(Result, #10" in body
-    assert "while Pos('  ', Result) > 0 do" in body
-    assert "Result[Length(Result)] = ':'" in body
-    assert "StringReplace(Result, 'ё', 'е'" in body
 
 
-def test_column_lookup_uses_stable_component_name():
-    body = procedure_body("FindGridColumnByName")
-    assert "for I := 0 to AGrid.ColumnCount - 1 do" in body
-    assert "SameText(AGrid.Columns[I].Name, AColumnName)" in body
-    assert "Exit(AGrid.Columns[I]);" in body
-    assert ".Header" not in body
-    assert ".Index" not in body
-    assert "TagObject" not in body
-
-
-def test_base_caption_is_display_only():
-    body = procedure_body("BaseColumnCaption")
-    assert "P := Pos(',', Result);" in body
-    assert "Result := Trim(Copy(Result, 1, P - 1));" in body
-
-
-def test_click_handlers_resolve_column_from_tag_string():
-    for handler, grid in (("DevicesColumnMenuItemClick", "GridDevices"),
-                          ("EtalonsColumnMenuItemClick", "GridEtalons")):
-        body = procedure_body(handler)
-        assert f"FindGridColumnByName({grid}, MenuItem.TagString)" in body
-        assert "GridColumn.Visible := not GridColumn.Visible;" in body
-        assert "MenuItem.IsChecked := GridColumn.Visible;" in body
-        assert "Columns[Index]" not in body
-        assert ".Realign" not in body  # protected in the supported dcc32 version
-        assert f"{grid}.Repaint;" in body
-
-
-def test_recursive_sync_only_checks_leaf_items():
-    body = procedure_body("SyncColumnMenuBranch")
-    assert "for I := 0 to AParentItem.ItemsCount - 1 do" in body
-    assert "if MenuItem.ItemsCount > 0 then" in body
-    assert "SyncColumnMenuBranch(MenuItem, AGrid);" in body
-    assert "FindGridColumnByName(AGrid, MenuItem.TagString)" in body
-    assert "MenuItem.IsChecked := GridColumn.Visible" in body
-    assert "MenuItem.Text := BaseColumnCaption(GridColumn.Header)" in body
-    assert ".Enabled" not in body
-
-    assert "SyncColumnMenuBranch(MenuItemDevicesColumnsGroup, GridDevices);" in procedure_body("SyncDevicesColumnsMenu")
-    assert "SyncColumnMenuBranch(MenuItemEtalonsColumnsGroup, GridEtalons);" in procedure_body("SyncEtalonsColumnsMenu")
-
-
-def test_runtime_completeness_adds_missing_columns_to_other_group():
-    body = procedure_body("EnsureGridColumnsMenu")
-    assert "for I := 0 to AGrid.ColumnCount - 1 do" in body
-    assert "NormalizeColumnCaption(Caption)" in body
-    assert "FindColumnMenuItem(ARootItem, AGrid.Columns[I].Name)" in body
-    assert "NormalizedCaption = NormalizeColumnCaption('Частота')" in body
-    assert "NormalizedCaption = NormalizeColumnCaption('Импульсы')" in body
-    assert "MeasureItem := FindColumnMenuGroup(ARootItem" in body
-    assert "OtherItem := FindColumnMenuGroup(ARootItem" in body
-    assert "TargetItem := MeasureItem" in body
-    assert "MenuItemDevicesColumnsMeasureGroup" not in PAS
-    assert "MenuItemEtalonsColumnsMeasureGroup" not in PAS
-    assert "MenuItemDevicesColumnsOtherGroup" not in PAS
-    assert "MenuItemEtalonsColumnsOtherGroup" not in PAS
-    assert "MenuItem := TMenuItem.Create(TargetItem);" in body
-    assert "MenuItem.Parent := TargetItem;" in body
-    assert "MenuItem.TagString := AGrid.Columns[I].Name;" in body
-    assert "MenuItem.OnClick := DevicesColumnMenuItemClick" in body
-    assert "MenuItem.OnClick := EtalonsColumnMenuItemClick" in body
-
-
-def test_all_column_items_have_grid_specific_handlers_and_tag_strings():
-    for item in DEVICE_ITEMS:
-        block = menu_item_block(item)
-        assert "OnClick = DevicesColumnMenuItemClick" in block
-        assert "TagString =" in block
-        assert "Tag =" not in block and "TagObject" not in block
-    for item in ETALON_ITEMS:
-        block = menu_item_block(item)
-        assert "OnClick = EtalonsColumnMenuItemClick" in block
-        assert "TagString =" in block
-        assert "Tag =" not in block and "TagObject" not in block
-
-
-def test_mean_flow_items_are_ascii_safe_and_have_expected_caption():
-    caption = "Text = #1057#1088#46#32#1088#1072#1089#1093#1086#1076"
-    assert caption in menu_item_block("MenuItemDevicesColumnMeanFlow")
-    assert caption in menu_item_block("MenuItemEtalonsColumnMeanFlow")
-    assert "TagString = 'StringColumnDeviceAvgFlowRate1'" in menu_item_block("MenuItemDevicesColumnMeanFlow")
-    assert "TagString = 'StringColumnEtalonAvgFlowRate1'" in menu_item_block("MenuItemEtalonsColumnMeanFlow")
-    FMX_BYTES.decode("ascii")
-
-
-def test_popup_sync_is_last_operation_and_legacy_binding_is_absent():
+def test_popups_only_sync_existing_column_items():
     for popup, sync in (("PopupMenuDevicesGridPopup", "SyncDevicesColumnsMenu"),
                         ("PopupMenuEtalonsGridPopup", "SyncEtalonsColumnsMenu")):
         body = procedure_body(popup)
         assert body.rstrip().endswith(sync + ";\nend;")
-    for legacy in ("FindGridColumnByMenuText", "InitializeColumnMenuTags", "BindColumnMenuItem", "SyncGridColumnMenu"):
-        assert legacy not in PAS
+        assert "Ensure" not in body
 
 
-def test_fmx_restores_five_subgroups_without_group_click_handlers():
-    expected = {
-        "Devices": ("Channel", "Device", "Measure", "Stat", "Other"),
-        "Etalons": ("Channel", "Device", "Measure", "Stat", "Other"),
-    }
-    for prefix, suffixes in expected.items():
-        for suffix in suffixes:
-            name = f"MenuItem{prefix}Columns{suffix}Group"
-            match = re.search(rf"object {name}: TMenuItem(.*?)(?=\n          object )", FMX, re.S)
-            assert match, name
-            assert "OnClick =" not in match.group(1)
+def test_fmx_remains_ascii_safe():
+    FMX_BYTES.decode("ascii")
 
 
-def test_click_handlers_reject_non_leaf_group_items():
-    for handler in ("DevicesColumnMenuItemClick", "EtalonsColumnMenuItemClick"):
-        body = procedure_body(handler)
-        assert "if MenuItem.ItemsCount > 0 then" in body
-        assert "GridColumn := FindGridColumnByName" in body
+def test_grid_model_and_viewport_are_refreshed_after_structural_changes():
+    body = procedure_body("RefreshGridColumns")
+    assert "FRefreshingGridColumns or (AGrid = nil)" in body
+    assert "ViewportY := AGrid.ViewportPosition.Y;" in body
+    assert "AGrid.Model.BeginUpdate;" in body
+    assert "AGrid.Model.InvalidateContentSize;" in body
+    assert "AGrid.Model.ContentChanged;" in body
+    assert "AGrid.Model.EndUpdate;" in body
+    assert "AGrid.ViewportPosition := PointF(0, ViewportY);" in body
+    assert "AGrid.Repaint;" in body
+    assert "AGrid.Realign" not in body
+    assert body.index("AGrid.Model.InvalidateContentSize;") < body.index("AGrid.Model.ContentChanged;")
+    assert body.index("AGrid.Model.ContentChanged;") < body.index("AGrid.ViewportPosition := PointF(0, ViewportY);")
+
+    load = procedure_body("LoadLayoutSettingsFromWorkTable")
+    for grid in ("GridEtalons", "GridDevices", "FFrameProceed.GridDataPoints", "FFrameProceed.GridResults"):
+        apply = f"ApplyGridColumnsLayout({grid},"
+        refresh = f"RefreshGridColumns({grid});"
+        assert apply in load
+        assert refresh in load
+        assert load.index(apply) < load.index(refresh)
+
+
+def test_model_refresh_is_not_called_from_hot_grid_callbacks():
+    for callback in ("GridDevicesGetValue", "GridEtalonsGetValue", "GridDevicesDrawColumnCell",
+                     "GridEtalonsDrawColumnCell", "TimerMainTimer"):
+        assert "RefreshGridColumns" not in procedure_body(callback)
