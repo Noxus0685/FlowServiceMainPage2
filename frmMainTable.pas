@@ -394,11 +394,6 @@ type
     MenuItemDevicesWorkTablesAddScale: TMenuItem;
     MenuItemDevicesWorkTablesDeleteScale: TMenuItem;
     MenuItemDevicesColumnsGroup: TMenuItem;
-    MenuItemDevicesColumnsChannelGroup: TMenuItem;
-    MenuItemDevicesColumnsDeviceGroup: TMenuItem;
-    MenuItemDevicesColumnsMeasureGroup: TMenuItem;
-    MenuItemDevicesColumnsStatGroup: TMenuItem;
-    MenuItemDevicesColumnsOtherGroup: TMenuItem;
     MenuItemDevicesColumn0: TMenuItem;
     MenuItemDevicesColumn1: TMenuItem;
     MenuItemDevicesColumn2: TMenuItem;
@@ -433,11 +428,6 @@ type
     MenuItemEtalonsWorkTablesAddScale: TMenuItem;
     MenuItemEtalonsWorkTablesDeleteScale: TMenuItem;
     MenuItemEtalonsColumnsGroup: TMenuItem;
-    MenuItemEtalonsColumnsChannelGroup: TMenuItem;
-    MenuItemEtalonsColumnsDeviceGroup: TMenuItem;
-    MenuItemEtalonsColumnsMeasureGroup: TMenuItem;
-    MenuItemEtalonsColumnsStatGroup: TMenuItem;
-    MenuItemEtalonsColumnsOtherGroup: TMenuItem;
     MenuItemEtalonsColumn0: TMenuItem;
     MenuItemEtalonsColumn1: TMenuItem;
     MenuItemEtalonsColumn2: TMenuItem;
@@ -631,7 +621,8 @@ type
     procedure MenuInstrumentalLayOutClick(Sender: TObject);
     procedure PopupMenuDevicesGridPopup(Sender: TObject);
     procedure PopupMenuEtalonsGridPopup(Sender: TObject);
-    procedure MenuGridLayOutClick(Sender: TObject);
+    procedure DevicesColumnMenuItemClick(Sender: TObject);
+    procedure EtalonsColumnMenuItemClick(Sender: TObject);
     procedure PopupMenuGridDataPointsPopup(Sender: TObject);
     procedure PopupMenuGridResultsPopup(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
@@ -840,11 +831,17 @@ type
     procedure UpdateGridPopupActions;
     procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
     procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
-    procedure BindColumnMenuItem(AMenuItem: TMenuItem; AColumn: TColumn;
-      AGrid: TGrid; const AText: string);
-    procedure BindDevicesColumnMenu;
-    procedure BindEtalonsColumnMenu;
-    procedure SyncGridColumnMenu(AGrid: TGrid);
+    function NormalizeColumnCaption(const ACaption: string): string;
+    function FindGridColumnByMenuText(AGrid: TGrid;
+      const AMenuText: string): TColumn;
+    function FindColumnMenuItem(AParentItem: TMenuItem;
+      const ACaption: string): TMenuItem;
+    function FindColumnMenuGroup(AParentItem: TMenuItem;
+      const ACaption: string): TMenuItem;
+    procedure EnsureGridColumnsMenu(AGrid: TGrid; ARootItem: TMenuItem);
+    procedure SyncColumnMenuBranch(AParentItem: TMenuItem; AGrid: TGrid);
+    procedure SyncDevicesColumnsMenu;
+    procedure SyncEtalonsColumnsMenu;
     procedure EnforceDataPointsColumnsLayout;
     procedure MarkChannelDeviceModified(AChannel: TChannel);
     procedure PersistChannelEnabled(AWorkTable: TWorkTable; AChannel: TChannel; const AKind: string; const AOldEnabled, ANewEnabled: Boolean);
@@ -2162,8 +2159,10 @@ begin
   GridEtalons.OnDrawColumnCell := GridEtalonsDrawColumnCell;
   GridDevices.OnDrawColumnCell := GridDevicesDrawColumnCell;
 
-  BindDevicesColumnMenu;
-  BindEtalonsColumnMenu;
+  EnsureGridColumnsMenu(GridDevices, MenuItemDevicesColumnsGroup);
+  EnsureGridColumnsMenu(GridEtalons, MenuItemEtalonsColumnsGroup);
+  SyncDevicesColumnsMenu;
+  SyncEtalonsColumnsMenu;
 
   ComboEditUnits.Items.Clear;
   for UnitName in CVolumeFlowUnits do
@@ -3025,9 +3024,8 @@ begin
   FLastPopupGrid := GridDevices;
   PopupMenuWorkTablesPopup(Sender);
   UpdateGridPopupActions;
-  BindColumnMenuItem(MenuItemDevicesColumnMeanFlow,
-    StringColumnDeviceAvgFlowRate1, GridDevices, 'Ср. расход');
-  SyncGridColumnMenu(GridDevices);
+  EnsureGridColumnsMenu(GridDevices, MenuItemDevicesColumnsGroup);
+  SyncDevicesColumnsMenu;
 end;
 
 procedure TFrameMainTable.PopupMenuEtalonsGridPopup(Sender: TObject);
@@ -3035,121 +3033,245 @@ begin
   FLastPopupGrid := GridEtalons;
   PopupMenuWorkTablesPopup(Sender);
   UpdateGridPopupActions;
-  BindColumnMenuItem(MenuItemEtalonsColumnMeanFlow,
-    StringColumnEtalonAvgFlowRate1, GridEtalons, 'Ср. расход');
-  SyncGridColumnMenu(GridEtalons);
+  EnsureGridColumnsMenu(GridEtalons, MenuItemEtalonsColumnsGroup);
+  SyncEtalonsColumnsMenu;
 end;
 
-procedure TFrameMainTable.MenuGridLayOutClick(Sender: TObject);
+procedure TFrameMainTable.DevicesColumnMenuItemClick(Sender: TObject);
 var
   MenuItem: TMenuItem;
-  Column: TColumn;
+  GridColumn: TColumn;
 begin
   if not (Sender is TMenuItem) then
     Exit;
 
   MenuItem := TMenuItem(Sender);
-  if not (MenuItem.TagObject is TColumn) then
+  if MenuItem.ItemsCount > 0 then
     Exit;
 
-  Column := TColumn(MenuItem.TagObject);
-  if (FLastPopupGrid = nil) or (Column.Parent <> FLastPopupGrid) then
-    Exit;
-
-  Column.Visible := not Column.Visible;
-  MenuItem.IsChecked := Column.Visible;
-  SaveLayoutSettingsToWorkTable;
-  FLastPopupGrid.Realign;
-  FLastPopupGrid.Repaint;
-end;
-
-procedure TFrameMainTable.BindColumnMenuItem(AMenuItem: TMenuItem;
-  AColumn: TColumn; AGrid: TGrid; const AText: string);
-begin
-  if AMenuItem = nil then
-    Exit;
-
-  AMenuItem.Text := AText;
-  AMenuItem.AutoCheck := False;
-  AMenuItem.OnClick := MenuGridLayOutClick;
-
-  if (AColumn = nil) or (AGrid = nil) or (AColumn.Parent <> AGrid) then
+  GridColumn := FindGridColumnByMenuText(GridDevices, MenuItem.Text);
+  if GridColumn = nil then
   begin
-    AMenuItem.TagObject := nil;
-    AMenuItem.Enabled := False;
+    MenuItem.IsChecked := False;
     Exit;
   end;
 
-  AMenuItem.TagObject := AColumn;
-  AMenuItem.Enabled := True;
-  AMenuItem.IsChecked := AColumn.Visible;
+  GridColumn.Visible := not GridColumn.Visible;
+  MenuItem.IsChecked := GridColumn.Visible;
+  SaveLayoutSettingsToWorkTable;
+  GridDevices.Repaint;
 end;
 
-procedure TFrameMainTable.BindDevicesColumnMenu;
+procedure TFrameMainTable.EtalonsColumnMenuItemClick(Sender: TObject);
+var
+  MenuItem: TMenuItem;
+  GridColumn: TColumn;
 begin
-  BindColumnMenuItem(MenuItemDevicesColumn0, CheckColumnDeviceEnable1, GridDevices, 'Вкл');
-  BindColumnMenuItem(MenuItemDevicesColumn1, StringColumnDeviceChanel1, GridDevices, 'Канал');
-  BindColumnMenuItem(MenuItemDevicesColumn2, ColumnDeviceType1, GridDevices, 'Тип прибора');
-  BindColumnMenuItem(MenuItemDevicesColumn3, PopupColumnDeviceDN1, GridDevices, 'Типоразмер');
-  BindColumnMenuItem(MenuItemDevicesColumn4, StringColumnDeviceName1, GridDevices, 'Прибор');
-  BindColumnMenuItem(MenuItemDevicesColumn5, StringColumnDeviceSerial1, GridDevices, 'Серийный');
-  BindColumnMenuItem(MenuItemDevicesColumn6, PopupColumnDeviceSignal1, GridDevices, 'Тип сигнала');
-  BindColumnMenuItem(MenuItemDevicesColumn7, StringColumnDeviceRawValue1, GridDevices, 'Сигнал');
-  BindColumnMenuItem(MenuItemDevicesColumn8, StringColumnDeviceFlowRate1, GridDevices, 'Расход');
-  BindColumnMenuItem(MenuItemDevicesColumnMeanFlow, StringColumnDeviceAvgFlowRate1, GridDevices, 'Ср. расход');
-  BindColumnMenuItem(MenuItemDevicesColumn9, StringColumnDeviceQuantity1, GridDevices, 'Объём');
-  BindColumnMenuItem(MenuItemDevicesColumn10, StringColumnDeviceError1, GridDevices, 'Погрешность');
-  BindColumnMenuItem(MenuItemDevicesColumn11, StringColumnDeviceStd1, GridDevices, 'Отклонение');
-  BindColumnMenuItem(MenuItemDevicesColumn12, StringColumnDeviceQuantityBefore1, GridDevices, 'Объём до');
-  BindColumnMenuItem(MenuItemDevicesColumn13, StringColumnDeviceQuantityAfter1, GridDevices, 'Объём после');
-  BindColumnMenuItem(MenuItemDevicesColumn14, StringColumnDevicePressureDelta1, GridDevices, 'Перепад');
-  BindColumnMenuItem(MenuItemDevicesColumn15, StringColumnDeviceOptions1, GridDevices, 'Статус');
-  BindColumnMenuItem(MenuItemDevicesColumn16, StringColumnDeviceRawSumValue1, GridDevices, 'Значение');
-  BindColumnMenuItem(MenuItemDevicesColumn17, StringColumnUUID1, GridDevices, 'UUID');
-  BindColumnMenuItem(MenuItemDevicesColumn18, StringColumnDeviceCoef1, GridDevices, 'Коэф-нт');
+  if not (Sender is TMenuItem) then
+    Exit;
+
+  MenuItem := TMenuItem(Sender);
+  if MenuItem.ItemsCount > 0 then
+    Exit;
+
+  GridColumn := FindGridColumnByMenuText(GridEtalons, MenuItem.Text);
+  if GridColumn = nil then
+  begin
+    MenuItem.IsChecked := False;
+    Exit;
+  end;
+
+  GridColumn.Visible := not GridColumn.Visible;
+  MenuItem.IsChecked := GridColumn.Visible;
+  SaveLayoutSettingsToWorkTable;
+  GridEtalons.Repaint;
 end;
 
-procedure TFrameMainTable.BindEtalonsColumnMenu;
+function TFrameMainTable.NormalizeColumnCaption(
+  const ACaption: string): string;
+var
+  P: Integer;
 begin
-  BindColumnMenuItem(MenuItemEtalonsColumn0, CheckColumnEtalonEnable1, GridEtalons, 'Вкл');
-  BindColumnMenuItem(MenuItemEtalonsColumn1, StringColumnEtalonChanel1, GridEtalons, 'Канал');
-  BindColumnMenuItem(MenuItemEtalonsColumn2, StringColumnEtalonType1, GridEtalons, 'Тип прибора');
-  BindColumnMenuItem(MenuItemEtalonsColumn3, PopupColumnEtalonDN1, GridEtalons, 'Типоразмер');
-  BindColumnMenuItem(MenuItemEtalonsColumn4, StringColumnEtalonName1, GridEtalons, 'Прибор');
-  BindColumnMenuItem(MenuItemEtalonsColumn5, PopupColumnEtalonSignal1, GridEtalons, 'Тип сигнала');
-  BindColumnMenuItem(MenuItemEtalonsColumn6, StringColumnEtalonRawValue1, GridEtalons, 'Сигнал');
-  BindColumnMenuItem(MenuItemEtalonsColumn7, StringColumnEtalonFlowRate1, GridEtalons, 'Расход');
-  BindColumnMenuItem(MenuItemEtalonsColumnMeanFlow, StringColumnEtalonAvgFlowRate1, GridEtalons, 'Ср. расход');
-  BindColumnMenuItem(MenuItemEtalonsColumn8, StringColumnEtalonQuantity1, GridEtalons, 'Объём');
-  BindColumnMenuItem(MenuItemEtalonsColumn9, StringColumnEtalonSerial1, GridEtalons, 'Серийный');
-  BindColumnMenuItem(MenuItemEtalonsColumn10, StringColumnEtalonError1, GridEtalons, 'Погрешность');
-  BindColumnMenuItem(MenuItemEtalonsColumn11, StringColumnEtalonStd1, GridEtalons, 'Отклонение');
-  BindColumnMenuItem(MenuItemEtalonsColumn12, StringColumnEtalonPressureDelta1, GridEtalons, 'Перепад');
-  BindColumnMenuItem(MenuItemEtalonsColumn13, StringColumnEtalonOptions1, GridEtalons, 'Статус');
-  BindColumnMenuItem(MenuItemEtalonsColumn14, StringColumnEtalonRawSumValue1, GridEtalons, 'Значение');
+  Result := StringReplace(ACaption, #$00A0, ' ', [rfReplaceAll]);
+  Result := StringReplace(Result, #13, ' ', [rfReplaceAll]);
+  Result := StringReplace(Result, #10, ' ', [rfReplaceAll]);
+  Result := Trim(Result);
+  while Pos('  ', Result) > 0 do
+    Result := StringReplace(Result, '  ', ' ', [rfReplaceAll]);
+  P := Pos(',', Result);
+  if P > 0 then
+    Result := Trim(Copy(Result, 1, P - 1));
+  while (Result <> '') and (Result[Length(Result)] = ':') do
+    Delete(Result, Length(Result), 1);
+  Result := LowerCase(Trim(Result));
+  Result := StringReplace(Result, 'ё', 'е', [rfReplaceAll]);
 end;
 
-procedure TFrameMainTable.SyncGridColumnMenu(AGrid: TGrid);
+function TFrameMainTable.FindGridColumnByMenuText(AGrid: TGrid;
+  const AMenuText: string): TColumn;
 var
   I: Integer;
-  MenuItem: TMenuItem;
-  Column: TColumn;
+  MenuCaption: string;
+  ColumnCaption: string;
 begin
+  Result := nil;
   if AGrid = nil then
     Exit;
 
-  for I := 0 to ComponentCount - 1 do
+  MenuCaption := NormalizeColumnCaption(AMenuText);
+  if MenuCaption = '' then
+    Exit;
+
+  for I := 0 to AGrid.ColumnCount - 1 do
   begin
-    if not (Components[I] is TMenuItem) then
-      Continue;
-    MenuItem := TMenuItem(Components[I]);
-    if not (MenuItem.TagObject is TColumn) then
-      Continue;
-    Column := TColumn(MenuItem.TagObject);
-    if Column.Parent <> AGrid then
-      Continue;
-    MenuItem.IsChecked := Column.Visible;
+    ColumnCaption := NormalizeColumnCaption(AGrid.Columns[I].Header);
+    if SameText(MenuCaption, ColumnCaption) then
+      Exit(AGrid.Columns[I]);
   end;
+end;
+
+function TFrameMainTable.FindColumnMenuItem(AParentItem: TMenuItem;
+  const ACaption: string): TMenuItem;
+var
+  I: Integer;
+  MenuItem: TMenuItem;
+begin
+  Result := nil;
+  if AParentItem = nil then
+    Exit;
+
+  for I := 0 to AParentItem.ItemsCount - 1 do
+  begin
+    if not (AParentItem.Items[I] is TMenuItem) then
+      Continue;
+    MenuItem := TMenuItem(AParentItem.Items[I]);
+    if MenuItem.ItemsCount > 0 then
+    begin
+      Result := FindColumnMenuItem(MenuItem, ACaption);
+      if Result <> nil then
+        Exit;
+    end
+    else if SameText(NormalizeColumnCaption(MenuItem.Text), ACaption) then
+      Exit(MenuItem);
+  end;
+end;
+
+function TFrameMainTable.FindColumnMenuGroup(AParentItem: TMenuItem;
+  const ACaption: string): TMenuItem;
+var
+  I: Integer;
+  MenuItem: TMenuItem;
+begin
+  Result := nil;
+  if AParentItem = nil then
+    Exit;
+
+  for I := 0 to AParentItem.ItemsCount - 1 do
+  begin
+    if not (AParentItem.Items[I] is TMenuItem) then
+      Continue;
+    MenuItem := TMenuItem(AParentItem.Items[I]);
+    if (MenuItem.ItemsCount > 0) and
+       SameText(NormalizeColumnCaption(MenuItem.Text), ACaption) then
+      Exit(MenuItem);
+  end;
+end;
+
+procedure TFrameMainTable.EnsureGridColumnsMenu(AGrid: TGrid;
+  ARootItem: TMenuItem);
+var
+  I: Integer;
+  P: Integer;
+  Caption: string;
+  NormalizedCaption: string;
+  MenuItem: TMenuItem;
+  MeasureItem: TMenuItem;
+  OtherItem: TMenuItem;
+  TargetItem: TMenuItem;
+begin
+  if (AGrid = nil) or (ARootItem = nil) then
+    Exit;
+
+  MeasureItem := FindColumnMenuGroup(ARootItem,
+    NormalizeColumnCaption('Измерение'));
+  OtherItem := FindColumnMenuGroup(ARootItem,
+    NormalizeColumnCaption('Прочее'));
+  if OtherItem = nil then
+    Exit;
+
+  for I := 0 to AGrid.ColumnCount - 1 do
+  begin
+    Caption := Trim(AGrid.Columns[I].Header);
+    NormalizedCaption := NormalizeColumnCaption(Caption);
+    if NormalizedCaption = '' then
+      Continue;
+    if FindColumnMenuItem(ARootItem, NormalizedCaption) <> nil then
+      Continue;
+
+    TargetItem := OtherItem;
+    if (NormalizedCaption = NormalizeColumnCaption('Частота')) or
+       (NormalizedCaption = NormalizeColumnCaption('Импульсы')) or
+       (NormalizedCaption = NormalizeColumnCaption('Расход')) or
+       (NormalizedCaption = NormalizeColumnCaption('Ср. расход')) or
+       (NormalizedCaption = NormalizeColumnCaption('Объём')) or
+       (NormalizedCaption = NormalizeColumnCaption('Значение')) then
+    begin
+      if MeasureItem <> nil then
+        TargetItem := MeasureItem;
+    end;
+
+    P := Pos(',', Caption);
+    if P > 0 then
+      Caption := Trim(Copy(Caption, 1, P - 1));
+    MenuItem := TMenuItem.Create(TargetItem);
+    MenuItem.Stored := False;
+    MenuItem.Text := Caption;
+    MenuItem.AutoCheck := False;
+    if AGrid = GridDevices then
+      MenuItem.OnClick := DevicesColumnMenuItemClick
+    else if AGrid = GridEtalons then
+      MenuItem.OnClick := EtalonsColumnMenuItemClick;
+    MenuItem.Parent := TargetItem;
+  end;
+end;
+
+procedure TFrameMainTable.SyncColumnMenuBranch(AParentItem: TMenuItem;
+  AGrid: TGrid);
+var
+  I: Integer;
+  MenuItem: TMenuItem;
+  GridColumn: TColumn;
+begin
+  if (AParentItem = nil) or (AGrid = nil) then
+    Exit;
+
+  for I := 0 to AParentItem.ItemsCount - 1 do
+  begin
+    if not (AParentItem.Items[I] is TMenuItem) then
+      Continue;
+    MenuItem := TMenuItem(AParentItem.Items[I]);
+    if MenuItem.ItemsCount > 0 then
+    begin
+      SyncColumnMenuBranch(MenuItem, AGrid);
+      Continue;
+    end;
+
+    GridColumn := FindGridColumnByMenuText(AGrid, MenuItem.Text);
+    if GridColumn <> nil then
+      MenuItem.IsChecked := GridColumn.Visible
+    else
+      MenuItem.IsChecked := False;
+  end;
+end;
+
+procedure TFrameMainTable.SyncDevicesColumnsMenu;
+begin
+  SyncColumnMenuBranch(MenuItemDevicesColumnsGroup, GridDevices);
+end;
+
+procedure TFrameMainTable.SyncEtalonsColumnsMenu;
+begin
+  SyncColumnMenuBranch(MenuItemEtalonsColumnsGroup, GridEtalons);
 end;
 
 procedure TFrameMainTable.CaptureGridColumnsLayout(AGrid: TGrid;
@@ -3270,9 +3392,9 @@ begin
   );
 
   ApplyGridColumnsLayout(GridEtalons, WorkTable.EtalonsGridColumns);
+  SyncEtalonsColumnsMenu;
   ApplyGridColumnsLayout(GridDevices, WorkTable.DevicesGridColumns);
-  SyncGridColumnMenu(GridEtalons);
-  SyncGridColumnMenu(GridDevices);
+  SyncDevicesColumnsMenu;
   if FFrameProceed <> nil then
     ApplyGridColumnsLayout(FFrameProceed.GridDataPoints, WorkTable.DataPointsGridColumns);
   if FFrameProceed <> nil then
