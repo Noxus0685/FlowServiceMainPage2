@@ -5377,7 +5377,7 @@ object FrameMainTable: TFrameMainTable
           ExplicitSize.cx = 50.000000000000000000
           ExplicitSize.cy = 50.000000000000000000
         end
-        object TabItemGraphs: TTabItem
+        object TabItemWorkTableGraphs: TTabItem
           CustomIcon = <
             item
             end>

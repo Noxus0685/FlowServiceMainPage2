@@ -23,6 +23,7 @@ uses
   uDeviceClass in 'uDeviceClass.pas',
   uMKSDebug in 'uMKSDebug.pas',
   uFlowMeter in 'uFlowMeter.pas',
+  uGraphsViewConfig in 'uGraphsViewConfig.pas',
   uMeasurementRun in 'uMeasurementRun.pas',
   uAutoMeasurementTestRunner in 'uAutoMeasurementTestRunner.pas',
   uMeterValue in 'uMeterValue.pas',
