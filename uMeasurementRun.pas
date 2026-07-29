@@ -471,6 +471,7 @@ type
 
 
     procedure Start;
+    procedure StartPreparedMeasurementRun;
     procedure Stop;
     procedure Pause;
     procedure Resume;
@@ -3217,7 +3218,8 @@ begin
     DirectionText := 'Ascending';
   ProtocolManager.AddMessage(pcAction, psMeasurement, 'MeasurementPointsSorted',
     'Отсортированы поверочные точки',
-    Format('Direction=%s; PointsCount=%d', [DirectionText, FPoints.Count]));
+    Format('Column=Flow; Direction=%s; PointsCount=%d',
+      [DirectionText, FPoints.Count]));
 end;
 
 function TMeasurementRun.ShouldUseAllPoints: Boolean;
@@ -3816,6 +3818,11 @@ begin
 end;
 
 procedure TMeasurementRun.Start;
+begin
+  StartPreparedMeasurementRun;
+end;
+
+procedure TMeasurementRun.StartPreparedMeasurementRun;
 begin
   FCriticalSection.Acquire;
   try
