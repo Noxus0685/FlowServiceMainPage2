@@ -43,7 +43,7 @@ def test_current_main_form_is_built_and_old_graph_tab_is_detached():
 
 def test_graph_configuration_is_control_independent_and_rejects_duplicates():
     for declaration in (
-        "TGraphLayoutKind = (glSingle, glTwoRows, glTwoColumns, glGrid2x2)",
+        "TGraphLayoutKind = (glSingle, glTwoRows, glTwoColumns, glThreePanels,",
         "TGraphSourceKind = (gskFlow, gskTemperature, gskPressure, gskMass,",
         "TGraphSeriesOwnerKind = (gsokEtalon, gsokDevice, gsokWorkTable, gsokSystem)",
         "Panels: TObjectList<TGraphPanelConfig>",
@@ -62,10 +62,31 @@ def test_graph_workspace_has_collapsible_settings_and_runtime_layouts():
         "LayoutGraphsSettings",
         "GraphSettingsToggleClick",
         "glTwoColumns:",
-        "LayoutEtalonGraphSection.Align := TAlignLayout.Top",
-        "LayoutEtalonGraphSection.Align := TAlignLayout.Left",
+        "procedure TFrameMainTable.EnsureGraphViewCount",
+        "procedure TFrameMainTable.ClearGraphsLayout",
+        "glThreePanels:",
+        "glGrid2x2:",
         "ShowLegend",
         "ResolveGraphSeriesMeterValue",
         "ButtonClearFlowGraphsClick",
+    ):
+        assert feature in FRAME
+
+
+def test_disabled_channels_and_dynamic_graph_views_are_runtime_safe():
+    for feature in (
+        "TGraphPanelView = class",
+        "FGraphViews: TObjectList<TGraphPanelView>",
+        "if not C.Enabled then",
+        "'ChannelDisabled'",
+        "S.ChannelAvailable := C.Enabled",
+        "not Pair.Value.EffectiveVisible",
+        "MinimumRange := Max(Abs(CenterValue) * 0.01, 0.000001)",
+        "GraphsLayoutApplied",
+        "GraphScale",
+        "procedure TFrameMainTable.RebuildGraphPopupMenu",
+        "procedure TFrameMainTable.GraphMenuClick",
+        "'Добавить серию'",
+        "'Настроить цвета'",
     ):
         assert feature in FRAME
