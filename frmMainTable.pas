@@ -574,7 +574,7 @@ type
     StyleBook1: TStyleBook;
     PanelControlWorkTables: TPanel;
     TabItemWorkTable1: TTabItem;
-    TabItemGraphs: TTabItem;
+    TabItemWorkTableGraphs: TTabItem;
     LayoutGraphsClient: TLayout;
     LayoutEtalonGraphSection: TLayout;
     LayoutEtalonChart: TLayout;
@@ -6264,8 +6264,19 @@ begin
   end;
   FGraphsRoot.Parent := AParent;
   FGraphsRoot.Align := TAlignLayout.Client;
-  if TabItemGraphs <> nil then
-    TabItemGraphs.Visible := False;
+  if TabItemWorkTableGraphs <> nil then
+  begin
+    TabItemWorkTableGraphs.Visible := False;
+    TabItemWorkTableGraphs.Parent := nil;
+  end;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(
+      pcInfo,
+      psForm,
+      'AttachGraphsTo',
+      'Рабочая область графиков перенесена',
+      Format('TargetParent=%s; ActualParent=%s; Align=%d',
+        [AParent.Name, FGraphsRoot.Parent.Name, Ord(FGraphsRoot.Align)]));
   ApplyGraphsLayout;
 end;
 
