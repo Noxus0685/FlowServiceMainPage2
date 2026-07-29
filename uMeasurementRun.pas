@@ -1987,23 +1987,23 @@ begin
     FLastPointDecisionText := DecisionKey;
   end;
 
-  if Result then
-  begin
-    AInfo.Status := sOk;
-    AInfo.StatusText := 'Испытательная установка готова';
-  end
-  else if not TableFlowAvailable then
-  begin
-    AInfo.Status := sError;
-    AInfo.StatusText := 'Значение расхода стола не назначено';
-  end
-  else if not TableFlowReady then
-  begin
-    AInfo.Status := sWait;
-    AInfo.StatusText := 'Расход стола не готов: ' + SignalInfo.StatusText;
-  end
-  else
-    AInfo := ConditionsInfo;
+if Result then
+begin
+  AInfo.Status := sOk;
+  AInfo.StatusText := 'Испытательная установка готова';
+end
+else if not TableFlowAvailable then
+begin
+  AInfo.Status := sFail_NN;
+  AInfo.StatusText := 'Значение расхода стола не назначено';
+end
+else if not TableFlowReady then
+begin
+  AInfo.Status := sRun_NN;
+  AInfo.StatusText := 'Расход стола не готов: ' + SignalInfo.StatusText;
+end
+else
+  AInfo := ConditionsInfo;
 end;
 
 

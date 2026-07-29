@@ -180,8 +180,8 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 273.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
-            TextSettings.HorzAlign = Center
-            Text = #1059#1089#1083#1086#1074#1080#1103
+              TextSettings.HorzAlign = Center
+              Text = #1059#1089#1083#1086#1074#1080#1103
               TabOrder = 3
               object SpeedButtonMinimizeConditions: TSpeedButton
                 Align = Left
@@ -358,8 +358,8 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 271.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
-            TextSettings.HorzAlign = Center
-            Text = #1056#1072#1089#1093#1086#1076
+              TextSettings.HorzAlign = Center
+              Text = #1056#1072#1089#1093#1086#1076
               TabOrder = 1
               object SpeedButtonMinimzeLayoutFlowRate: TSpeedButton
                 Align = Left
@@ -428,8 +428,8 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 305.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
-            TextSettings.HorzAlign = Center
-            Text = #1043#1083#1072#1074#1085#1072#1103
+              TextSettings.HorzAlign = Center
+              Text = #1043#1083#1072#1074#1085#1072#1103
               TabOrder = 1
               object SpeedButtonMinimizeLayoutMain: TSpeedButton
                 Align = Left
@@ -504,7 +504,7 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 160.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
-            Text = #1058#1080#1087' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
+              Text = #1058#1080#1087' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
               TabOrder = 0
             end
             object LayoutRepeats: TLayout
@@ -733,8 +733,8 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 245.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
-            TextSettings.HorzAlign = Center
-            Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
+              TextSettings.HorzAlign = Center
+              Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
               TabOrder = 3
               object SpeedButtonMinimizeMesure: TSpeedButton
                 Align = Left
@@ -928,8 +928,8 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 305.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
-            TextSettings.HorzAlign = Center
-            Text = #1055#1088#1086#1094#1077#1076#1091#1088#1099
+              TextSettings.HorzAlign = Center
+              Text = #1055#1088#1086#1094#1077#1076#1091#1088#1099
               TabOrder = 1
               object SpeedButtonMinimizeProcedures: TSpeedButton
                 Align = Left
@@ -1003,7 +1003,7 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 160.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
-            Text = #1047#1072#1076#1072#1085#1080#1077' '
+              Text = #1047#1072#1076#1072#1085#1080#1077' '
               TabOrder = 0
             end
           end
@@ -1157,8 +1157,8 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 242.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
-            TextSettings.HorzAlign = Center
-            Text = #1053#1072#1089#1086#1089
+              TextSettings.HorzAlign = Center
+              Text = #1053#1072#1089#1086#1089
               TabOrder = 1
               object SpeedButtonMinimizePumpLayout: TSpeedButton
                 Align = Left
@@ -1327,8 +1327,8 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 242.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
-            TextSettings.HorzAlign = Center
-            Text = #1042#1077#1089#1099
+              TextSettings.HorzAlign = Center
+              Text = #1042#1077#1089#1099
               TabOrder = 1
               object SpeedButton7: TSpeedButton
                 Align = Left
@@ -4973,125 +4973,132 @@ object FrameMainTable: TFrameMainTable
       object MenuItemDevicesColumnsGroup: TMenuItem
         Text = #1050#1086#1083#1086#1085#1082#1080
         object MenuItemDevicesColumnsChannelGroup: TMenuItem
+          Locked = True
           Text = #1050#1072#1085#1072#1083
           object MenuItemDevicesColumnEnable: TMenuItem
-            TagString = 'CheckColumnDeviceEnable1'
+            Locked = True
             Text = #1042#1082#1083
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnChannel: TMenuItem
-            TagString = 'StringColumnDeviceChanel1'
+            Locked = True
             Text = #1050#1072#1085#1072#1083
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnSignalType: TMenuItem
-            TagString = 'PopupColumnDeviceSignal1'
-            Text = #1058#1080#1087#32#1089#1080#1075#1085#1072#1083#1072
+            Locked = True
+            Text = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnSignal: TMenuItem
-            TagString = 'StringColumnDeviceRawValue1'
+            Locked = True
             Text = #1057#1080#1075#1085#1072#1083
             OnClick = DevicesColumnMenuItemClick
           end
         end
         object MenuItemDevicesColumnsDeviceGroup: TMenuItem
+          Locked = True
           Text = #1055#1088#1080#1073#1086#1088
           object MenuItemDevicesColumnDeviceType: TMenuItem
-            TagString = 'ColumnDeviceType1'
-            Text = #1058#1080#1087#32#1087#1088#1080#1073#1086#1088#1072
+            Locked = True
+            Text = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnSize: TMenuItem
-            TagString = 'PopupColumnDeviceDN1'
+            Locked = True
             Text = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnDevice: TMenuItem
-            TagString = 'StringColumnDeviceName1'
+            Locked = True
             Text = #1055#1088#1080#1073#1086#1088
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnSerial: TMenuItem
-            TagString = 'StringColumnDeviceSerial1'
+            Locked = True
             Text = #1057#1077#1088#1080#1081#1085#1099#1081
             OnClick = DevicesColumnMenuItemClick
           end
         end
         object MenuItemDevicesColumnsMeasurementGroup: TMenuItem
+          Locked = True
           Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
           object MenuItemDevicesColumnFrequency: TMenuItem
+            Locked = True
             Text = #1063#1072#1089#1090#1086#1090#1072
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnImpulses: TMenuItem
+            Locked = True
             Text = #1048#1084#1087#1091#1083#1100#1089#1099
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnFlow: TMenuItem
-            TagString = 'StringColumnDeviceFlowRate1'
+            Locked = True
             Text = #1056#1072#1089#1093#1086#1076
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnMeanFlow: TMenuItem
-            TagString = 'StringColumnDeviceAvgFlowRate1'
-            Text = #1057#1088#46#32#1088#1072#1089#1093#1086#1076
+            Locked = True
+            Text = #1057#1088'. '#1088#1072#1089#1093#1086#1076
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnVolume: TMenuItem
-            TagString = 'StringColumnDeviceQuantity1'
+            Locked = True
             Text = #1054#1073#1098#1105#1084
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnValue: TMenuItem
-            TagString = 'StringColumnDeviceRawSumValue1'
+            Locked = True
             Text = #1047#1085#1072#1095#1077#1085#1080#1077
             OnClick = DevicesColumnMenuItemClick
           end
         end
         object MenuItemDevicesColumnsStatisticsGroup: TMenuItem
+          Locked = True
           Text = #1057#1090#1072#1090#1080#1089#1090#1080#1082#1072
           object MenuItemDevicesColumnError: TMenuItem
-            TagString = 'StringColumnDeviceError1'
+            Locked = True
             Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnDeviation: TMenuItem
-            TagString = 'StringColumnDeviceStd1'
+            Locked = True
             Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnVolumeBefore: TMenuItem
-            TagString = 'StringColumnDeviceQuantityBefore1'
-            Text = #1054#1073#1098#1105#1084#32#1076#1086
+            Locked = True
+            Text = #1054#1073#1098#1105#1084' '#1076#1086
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnVolumeAfter: TMenuItem
-            TagString = 'StringColumnDeviceQuantityAfter1'
-            Text = #1054#1073#1098#1105#1084#32#1087#1086#1089#1083#1077
+            Locked = True
+            Text = #1054#1073#1098#1105#1084' '#1087#1086#1089#1083#1077
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnPressureDelta: TMenuItem
-            TagString = 'StringColumnDevicePressureDelta1'
+            Locked = True
             Text = #1055#1077#1088#1077#1087#1072#1076
             OnClick = DevicesColumnMenuItemClick
           end
         end
         object MenuItemDevicesColumnsOtherGroup: TMenuItem
+          Locked = True
           Text = #1055#1088#1086#1095#1077#1077
           object MenuItemDevicesColumnStatus: TMenuItem
-            TagString = 'StringColumnDeviceOptions1'
+            Locked = True
             Text = #1057#1090#1072#1090#1091#1089
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnUUID: TMenuItem
-            TagString = 'StringColumnUUID1'
-            Text = #85#85#73#68
+            Locked = True
+            Text = 'UUID'
             OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnCoefficient: TMenuItem
-            TagString = 'StringColumnDeviceCoef1'
-            Text = #1050#1086#1101#1092#45#1085#1090
+            Locked = True
+            Text = #1050#1086#1101#1092'-'#1085#1090
             OnClick = DevicesColumnMenuItemClick
           end
         end
@@ -5210,104 +5217,111 @@ object FrameMainTable: TFrameMainTable
       object MenuItemEtalonsColumnsGroup: TMenuItem
         Text = #1050#1086#1083#1086#1085#1082#1080
         object MenuItemEtalonsColumnsChannelGroup: TMenuItem
+          Locked = True
           Text = #1050#1072#1085#1072#1083
           object MenuItemEtalonsColumnEnable: TMenuItem
-            TagString = 'CheckColumnEtalonEnable1'
+            Locked = True
             Text = #1042#1082#1083
             OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumnChannel: TMenuItem
-            TagString = 'StringColumnEtalonChanel1'
+            Locked = True
             Text = #1050#1072#1085#1072#1083
             OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumnSignalType: TMenuItem
-            TagString = 'PopupColumnEtalonSignal1'
-            Text = #1058#1080#1087#32#1089#1080#1075#1085#1072#1083#1072
+            Locked = True
+            Text = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
             OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumnSignal: TMenuItem
-            TagString = 'StringColumnEtalonRawValue1'
+            Locked = True
             Text = #1057#1080#1075#1085#1072#1083
             OnClick = EtalonsColumnMenuItemClick
           end
         end
         object MenuItemEtalonsColumnsDeviceGroup: TMenuItem
+          Locked = True
           Text = #1055#1088#1080#1073#1086#1088
           object MenuItemEtalonsColumnDeviceType: TMenuItem
-            TagString = 'StringColumnEtalonType1'
-            Text = #1058#1080#1087#32#1087#1088#1080#1073#1086#1088#1072
+            Locked = True
+            Text = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
             OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumnSize: TMenuItem
-            TagString = 'PopupColumnEtalonDN1'
+            Locked = True
             Text = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
             OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumnDevice: TMenuItem
-            TagString = 'StringColumnEtalonName1'
+            Locked = True
             Text = #1055#1088#1080#1073#1086#1088
             OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumnSerial: TMenuItem
-            TagString = 'StringColumnEtalonSerial1'
+            Locked = True
             Text = #1057#1077#1088#1080#1081#1085#1099#1081
             OnClick = EtalonsColumnMenuItemClick
           end
         end
         object MenuItemEtalonsColumnsMeasurementGroup: TMenuItem
+          Locked = True
           Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
           object MenuItemEtalonsColumnFrequency: TMenuItem
+            Locked = True
             Text = #1063#1072#1089#1090#1086#1090#1072
             OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumnImpulses: TMenuItem
+            Locked = True
             Text = #1048#1084#1087#1091#1083#1100#1089#1099
             OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumnFlow: TMenuItem
-            TagString = 'StringColumnEtalonFlowRate1'
+            Locked = True
             Text = #1056#1072#1089#1093#1086#1076
             OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumnMeanFlow: TMenuItem
-            TagString = 'StringColumnEtalonAvgFlowRate1'
-            Text = #1057#1088#46#32#1088#1072#1089#1093#1086#1076
+            Locked = True
+            Text = #1057#1088'. '#1088#1072#1089#1093#1086#1076
             OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumnVolume: TMenuItem
-            TagString = 'StringColumnEtalonQuantity1'
+            Locked = True
             Text = #1054#1073#1098#1105#1084
             OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumnValue: TMenuItem
-            TagString = 'StringColumnEtalonRawSumValue1'
+            Locked = True
             Text = #1047#1085#1072#1095#1077#1085#1080#1077
             OnClick = EtalonsColumnMenuItemClick
           end
         end
         object MenuItemEtalonsColumnsStatisticsGroup: TMenuItem
+          Locked = True
           Text = #1057#1090#1072#1090#1080#1089#1090#1080#1082#1072
           object MenuItemEtalonsColumnError: TMenuItem
-            TagString = 'StringColumnEtalonError1'
+            Locked = True
             Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100
             OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumnDeviation: TMenuItem
-            TagString = 'StringColumnEtalonStd1'
+            Locked = True
             Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077
             OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumnPressureDelta: TMenuItem
-            TagString = 'StringColumnEtalonPressureDelta1'
+            Locked = True
             Text = #1055#1077#1088#1077#1087#1072#1076
             OnClick = EtalonsColumnMenuItemClick
           end
         end
         object MenuItemEtalonsColumnsOtherGroup: TMenuItem
+          Locked = True
           Text = #1055#1088#1086#1095#1077#1077
           object MenuItemEtalonsColumnStatus: TMenuItem
-            TagString = 'StringColumnEtalonOptions1'
+            Locked = True
             Text = #1057#1090#1072#1090#1091#1089
             OnClick = EtalonsColumnMenuItemClick
           end
@@ -5854,7 +5868,7 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 100.000000000000000000
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
-            Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
+              Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
               TabOrder = 0
             end
             object SpeedButton1: TSpeedButton
@@ -5866,7 +5880,7 @@ object FrameMainTable: TFrameMainTable
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'arrowdowntoolbutton'
-            TextSettings.Trimming = None
+              TextSettings.Trimming = None
             end
             object SpeedButton2: TSpeedButton
               Action = ActionDevicesClearAll
@@ -5877,7 +5891,7 @@ object FrameMainTable: TFrameMainTable
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'pagecurltoolbutton'
-            TextSettings.Trimming = None
+              TextSettings.Trimming = None
             end
             object SpeedButton3: TSpeedButton
               Action = ActionDevicesClearRow
@@ -5888,7 +5902,7 @@ object FrameMainTable: TFrameMainTable
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'trashtoolbutton'
-            TextSettings.Trimming = None
+              TextSettings.Trimming = None
             end
             object SpeedButton4: TSpeedButton
               Action = ActionAddDeviceChannel
@@ -5899,7 +5913,7 @@ object FrameMainTable: TFrameMainTable
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'additembutton'
-            TextSettings.Trimming = None
+              TextSettings.Trimming = None
             end
             object SpeedButton5: TSpeedButton
               Action = ActionOpenDeviceSelect
@@ -5910,7 +5924,7 @@ object FrameMainTable: TFrameMainTable
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'searchtoolbutton'
-            TextSettings.Trimming = None
+              TextSettings.Trimming = None
             end
             object SpeedButton6: TSpeedButton
               Align = Left
@@ -5919,8 +5933,8 @@ object FrameMainTable: TFrameMainTable
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'actiontoolbutton'
-            Text = 'SpeedButton6'
-            TextSettings.Trimming = None
+              Text = 'SpeedButton6'
+              TextSettings.Trimming = None
             end
           end
         end
@@ -6075,7 +6089,7 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 100.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
-            Text = #1069#1090#1072#1083#1086#1085#1099
+              Text = #1069#1090#1072#1083#1086#1085#1099
               TabOrder = 0
             end
           end
