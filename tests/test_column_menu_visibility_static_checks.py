@@ -83,8 +83,13 @@ def test_runtime_completeness_adds_missing_columns_to_other_group():
     assert "FindColumnMenuItem(ARootItem, NormalizedCaption)" in body
     assert "NormalizedCaption = NormalizeColumnCaption('Частота')" in body
     assert "NormalizedCaption = NormalizeColumnCaption('Импульсы')" in body
-    assert "TargetItem := MenuItemDevicesColumnsMeasureGroup" in body
-    assert "TargetItem := MenuItemEtalonsColumnsMeasureGroup" in body
+    assert "MeasureItem := FindColumnMenuGroup(ARootItem" in body
+    assert "OtherItem := FindColumnMenuGroup(ARootItem" in body
+    assert "TargetItem := MeasureItem" in body
+    assert "MenuItemDevicesColumnsMeasureGroup" not in PAS
+    assert "MenuItemEtalonsColumnsMeasureGroup" not in PAS
+    assert "MenuItemDevicesColumnsOtherGroup" not in PAS
+    assert "MenuItemEtalonsColumnsOtherGroup" not in PAS
     assert "MenuItem := TMenuItem.Create(TargetItem);" in body
     assert "MenuItem.Parent := TargetItem;" in body
     assert "MenuItem.OnClick := DevicesColumnMenuItemClick" in body

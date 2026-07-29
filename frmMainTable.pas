@@ -836,8 +836,9 @@ type
       const AMenuText: string): TColumn;
     function FindColumnMenuItem(AParentItem: TMenuItem;
       const ACaption: string): TMenuItem;
-    procedure EnsureGridColumnsMenu(AGrid: TGrid; ARootItem,
-      AOtherItem: TMenuItem);
+    function FindColumnMenuGroup(AParentItem: TMenuItem;
+      const ACaption: string): TMenuItem;
+    procedure EnsureGridColumnsMenu(AGrid: TGrid; ARootItem: TMenuItem);
     procedure SyncColumnMenuBranch(AParentItem: TMenuItem; AGrid: TGrid);
     procedure SyncDevicesColumnsMenu;
     procedure SyncEtalonsColumnsMenu;
@@ -2158,10 +2159,8 @@ begin
   GridEtalons.OnDrawColumnCell := GridEtalonsDrawColumnCell;
   GridDevices.OnDrawColumnCell := GridDevicesDrawColumnCell;
 
-  EnsureGridColumnsMenu(GridDevices, MenuItemDevicesColumnsGroup,
-    MenuItemDevicesColumnsOtherGroup);
-  EnsureGridColumnsMenu(GridEtalons, MenuItemEtalonsColumnsGroup,
-    MenuItemEtalonsColumnsOtherGroup);
+  EnsureGridColumnsMenu(GridDevices, MenuItemDevicesColumnsGroup);
+  EnsureGridColumnsMenu(GridEtalons, MenuItemEtalonsColumnsGroup);
   SyncDevicesColumnsMenu;
   SyncEtalonsColumnsMenu;
 
@@ -3025,8 +3024,7 @@ begin
   FLastPopupGrid := GridDevices;
   PopupMenuWorkTablesPopup(Sender);
   UpdateGridPopupActions;
-  EnsureGridColumnsMenu(GridDevices, MenuItemDevicesColumnsGroup,
-    MenuItemDevicesColumnsOtherGroup);
+  EnsureGridColumnsMenu(GridDevices, MenuItemDevicesColumnsGroup);
   SyncDevicesColumnsMenu;
 end;
 
@@ -3035,8 +3033,7 @@ begin
   FLastPopupGrid := GridEtalons;
   PopupMenuWorkTablesPopup(Sender);
   UpdateGridPopupActions;
-  EnsureGridColumnsMenu(GridEtalons, MenuItemEtalonsColumnsGroup,
-    MenuItemEtalonsColumnsOtherGroup);
+  EnsureGridColumnsMenu(GridEtalons, MenuItemEtalonsColumnsGroup);
   SyncEtalonsColumnsMenu;
 end;
 
@@ -3159,17 +3156,47 @@ begin
   end;
 end;
 
-procedure TFrameMainTable.EnsureGridColumnsMenu(AGrid: TGrid; ARootItem,
-  AOtherItem: TMenuItem);
+function TFrameMainTable.FindColumnMenuGroup(AParentItem: TMenuItem;
+  const ACaption: string): TMenuItem;
+var
+  I: Integer;
+  MenuItem: TMenuItem;
+begin
+  Result := nil;
+  if AParentItem = nil then
+    Exit;
+
+  for I := 0 to AParentItem.ItemsCount - 1 do
+  begin
+    if not (AParentItem.Items[I] is TMenuItem) then
+      Continue;
+    MenuItem := TMenuItem(AParentItem.Items[I]);
+    if (MenuItem.ItemsCount > 0) and
+       SameText(NormalizeColumnCaption(MenuItem.Text), ACaption) then
+      Exit(MenuItem);
+  end;
+end;
+
+procedure TFrameMainTable.EnsureGridColumnsMenu(AGrid: TGrid;
+  ARootItem: TMenuItem);
 var
   I: Integer;
   P: Integer;
   Caption: string;
   NormalizedCaption: string;
   MenuItem: TMenuItem;
+  MeasureItem: TMenuItem;
+  OtherItem: TMenuItem;
   TargetItem: TMenuItem;
 begin
-  if (AGrid = nil) or (ARootItem = nil) or (AOtherItem = nil) then
+  if (AGrid = nil) or (ARootItem = nil) then
+    Exit;
+
+  MeasureItem := FindColumnMenuGroup(ARootItem,
+    NormalizeColumnCaption('Измерение'));
+  OtherItem := FindColumnMenuGroup(ARootItem,
+    NormalizeColumnCaption('Прочее'));
+  if OtherItem = nil then
     Exit;
 
   for I := 0 to AGrid.ColumnCount - 1 do
@@ -3181,7 +3208,7 @@ begin
     if FindColumnMenuItem(ARootItem, NormalizedCaption) <> nil then
       Continue;
 
-    TargetItem := AOtherItem;
+    TargetItem := OtherItem;
     if (NormalizedCaption = NormalizeColumnCaption('Частота')) or
        (NormalizedCaption = NormalizeColumnCaption('Импульсы')) or
        (NormalizedCaption = NormalizeColumnCaption('Расход')) or
@@ -3189,10 +3216,8 @@ begin
        (NormalizedCaption = NormalizeColumnCaption('Объём')) or
        (NormalizedCaption = NormalizeColumnCaption('Значение')) then
     begin
-      if AGrid = GridDevices then
-        TargetItem := MenuItemDevicesColumnsMeasureGroup
-      else if AGrid = GridEtalons then
-        TargetItem := MenuItemEtalonsColumnsMeasureGroup;
+      if MeasureItem <> nil then
+        TargetItem := MeasureItem;
     end;
 
     P := Pos(',', Caption);
