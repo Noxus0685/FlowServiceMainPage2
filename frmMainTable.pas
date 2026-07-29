@@ -805,6 +805,10 @@ type
     procedure EnsureActiveWorkTableMenu;
     procedure MenuSetActiveWorkTableClick(Sender: TObject);
     procedure UpdateGridDevices;
+    procedure ToggleAllChannelRows(AGrid: TGrid;
+      AChannels: TObjectList<TChannel>; const AEtalonChannels: Boolean);
+    procedure ToggleAllDeviceChannels;
+    procedure ToggleAllEtalonChannels;
     procedure EnsureEmptyDevicesForGridRows;
     function ShouldReleaseGridDeviceBeforeSave(AChannel: TChannel; ADevice: TDevice): Boolean;
     function GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
@@ -8310,11 +8314,27 @@ begin
 end;
 
 procedure TFrameMainTable.GridDevicesHeaderClick(Column: TColumn);
+begin
+  if Column = CheckColumnDeviceEnable1 then
+  begin
+    ToggleAllDeviceChannels;
+    Exit;
+  end;
+
+  if Column = CheckColumnEtalonEnable1 then
+  begin
+    ToggleAllEtalonChannels;
+    Exit;
+  end;
+end;
+
+procedure TFrameMainTable.ToggleAllChannelRows(AGrid: TGrid;
+  AChannels: TObjectList<TChannel>; const AEtalonChannels: Boolean);
 var
-  WorkTable: TWorkTable;
-  Row: Integer;
-  AllEnabled: Boolean;
+  I: Integer;
+  HasEnabled: Boolean;
   NewEnabled: Boolean;
+  Channel: TChannel;
 begin
   if not CanEditActiveWorkTable then
   begin
@@ -8322,45 +8342,50 @@ begin
     Exit;
   end;
 
-  if Column = CheckColumnDeviceEnable1 then
-  begin
+  if (AGrid = nil) or (AChannels = nil) or (AChannels.Count = 0) then
+    Exit;
 
-  NormalizeActiveWorkTable;
-  WorkTable := FActiveWorkTable;
-  if WorkTable <> nil then
-  begin
-    AllEnabled := WorkTable.DeviceChannels.Count > 0;
-    for Row := 0 to WorkTable.DeviceChannels.Count - 1 do
-      if not WorkTable.DeviceChannels[Row].Enabled then
-      begin
-        AllEnabled := False;
-        Break;
-      end;
-
-    NewEnabled := not AllEnabled;
-    for Row := 0 to WorkTable.DeviceChannels.Count - 1 do
+  HasEnabled := False;
+  for I := 0 to AChannels.Count - 1 do
+    if (AChannels[I] <> nil) and AChannels[I].Enabled then
     begin
-      WorkTable.DeviceChannels[Row].Enabled := NewEnabled;
-      MarkChannelDeviceModified(WorkTable.DeviceChannels[Row]);
+      HasEnabled := True;
+      Break;
     end;
-  end
-  else
-  begin
-    AllEnabled := Length(FFlowMeterRows) > 0;
-    for Row := 0 to High(FFlowMeterRows) do
-      if not FFlowMeterRows[Row].Enabled then
-      begin
-        AllEnabled := False;
-        Break;
-      end;
 
-    NewEnabled := not AllEnabled;
-    for Row := 0 to High(FFlowMeterRows) do
-      FFlowMeterRows[Row].Enabled := NewEnabled;
+  NewEnabled := not HasEnabled;
+  AGrid.BeginUpdate;
+  try
+    for I := 0 to AChannels.Count - 1 do
+    begin
+      Channel := AChannels[I];
+      if Channel = nil then
+        Continue;
+      Channel.Enabled := NewEnabled;
+      MarkChannelDeviceModified(Channel);
+    end;
+  finally
+    AGrid.EndUpdate;
   end;
 
-  UpdateGridDevices;
-  end;
+  ApplyEnabledChannelSimulationValues(FActiveWorkTable, AEtalonChannels);
+  FActiveWorkTable.RebindAllFlowMeters;
+  if WorkTableManager <> nil then
+    WorkTableManager.Save;
+  AGrid.Repaint;
+  RefreshActiveWorkTableViews(nil);
+end;
+
+procedure TFrameMainTable.ToggleAllDeviceChannels;
+begin
+  if FActiveWorkTable <> nil then
+    ToggleAllChannelRows(GridDevices, FActiveWorkTable.DeviceChannels, False);
+end;
+
+procedure TFrameMainTable.ToggleAllEtalonChannels;
+begin
+  if FActiveWorkTable <> nil then
+    ToggleAllChannelRows(GridEtalons, FActiveWorkTable.EtalonChannels, True);
 end;
 
 procedure TFrameMainTable.GridDevicesCellDblClick(const Column: TColumn;

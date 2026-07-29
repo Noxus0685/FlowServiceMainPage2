@@ -73,6 +73,7 @@ type
     procedure GridMeasurmentRunSetValue(Sender: TObject; const ACol,
       ARow: Integer; const Value: TValue);
     procedure GridMeasurmentRunCellClick(const Column: TColumn; const Row: Integer);
+    procedure GridMeasurmentRunHeaderClick(Column: TColumn);
     procedure SpeedButtonCreatePointsClick(Sender: TObject);
     procedure SpeedButtonPauseClick(Sender: TObject);
     procedure SpeedButtonPointDeleteClick(Sender: TObject);
@@ -442,6 +443,44 @@ begin
     Exit;
 
   SetPointEnabledFromGrid(Point, not Point.Enabled);
+end;
+
+procedure TFrameMeasurementRun.GridMeasurmentRunHeaderClick(Column: TColumn);
+var
+  I: Integer;
+  HasEnabled: Boolean;
+  NewEnabled: Boolean;
+  Point: TDevicePoint;
+begin
+  if (Column <> CheckColumnMREnable) or (MeasurementRun = nil) or
+     (MeasurementRun.Points = nil) or (MeasurementRun.Points.Count = 0) then
+    Exit;
+
+  HasEnabled := False;
+  for I := 0 to MeasurementRun.Points.Count - 1 do
+    if (MeasurementRun.Points[I] <> nil) and MeasurementRun.Points[I].Enabled then
+    begin
+      HasEnabled := True;
+      Break;
+    end;
+
+  NewEnabled := not HasEnabled;
+  GridMeasurmentRun.BeginUpdate;
+  try
+    for I := 0 to MeasurementRun.Points.Count - 1 do
+    begin
+      Point := MeasurementRun.Points[I];
+      if Point <> nil then
+      begin
+        Point.Enabled := NewEnabled;
+        if Point.State = osClean then
+          Point.State := osModified;
+      end;
+    end;
+  finally
+    GridMeasurmentRun.EndUpdate;
+  end;
+  UpdateGridMesurmentRun;
 end;
 
 procedure TFrameMeasurementRun.GridMeasurmentRunSetValue(Sender: TObject;
