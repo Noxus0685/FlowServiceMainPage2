@@ -106,6 +106,8 @@ type
     CheckBoxStabilityEnabled: TCheckBox;
     EditMinSampleCount: TEdit;
     EditSampleSize: TEdit;
+    LabelMinimumSampleIntervalSec: TLabel;
+    EditMinimumSampleIntervalSec: TEdit;
     EditMinWindowDurationSec: TEdit;
     EditMaxSampleAgeSec: TEdit;
     EditExitThresholdFactor: TEdit;
@@ -490,6 +492,7 @@ begin
   CheckBoxStabilityEnabled.OnChange := HandleSettingsChange;
   EditMinSampleCount.OnExit := HandleSettingsChange;
   EditSampleSize.OnExit := HandleSettingsChange;
+  EditMinimumSampleIntervalSec.OnExit := HandleSettingsChange;
   EditMinWindowDurationSec.OnExit := HandleSettingsChange;
   EditMaxSampleAgeSec.OnExit := HandleSettingsChange;
   EditExitThresholdFactor.OnExit := HandleSettingsChange;
@@ -544,6 +547,7 @@ begin
   SetHintFor('LabelMinSampleCount', 'Количество последних точек в окне и минимальное количество точек для подтверждения стабильности.');
   SetHintFor('LabelSampleSize', 'Максимальное количество последних точек, хранящихся в рабочем массиве истории TMeterValue и отображаемых в таблице.');
   SetHintFor('LabelMinWindowDurationSec', 'Минимальное время от первой точки текущего окна до времени анализа, необходимое для подтверждения стабильности.');
+  SetHintFor('LabelMinimumSampleIntervalSec', 'Минимальный интервал между автоматически записанными пробами стабильности. Ноль отключает прореживание.');
   SetHintFor('LabelMaxSampleAgeSec', 'Максимально допустимый возраст самой новой точки относительно времени анализа.');
   SetHintFor('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности, задающий гистерезис выхода.');
   SetHintFor('LabelMaxVariation', 'Максимально допустимый размах значений в окне анализа.');
@@ -2851,6 +2855,7 @@ begin
     CheckBoxAutoAnalyze.IsChecked := FTestSettings.AutoAnalyze;
     EditMinSampleCount.Text := IntToStr(FTestSettings.MinSampleCount);
     EditSampleSize.Text := IntToStr(FTestSettings.SampleSize);
+    EditMinimumSampleIntervalSec.Text := FormatFloat('0.########', FTestSettings.MinimumSampleIntervalSec);
     EditMinWindowDurationSec.Text := FormatFloat('0.########', FTestSettings.MinWindowDurationSec);
     EditMaxSampleAgeSec.Text := FormatFloat('0.########', FTestSettings.MaxSampleAgeSec);
     EditExitThresholdFactor.Text := FormatFloat('0.########', FTestSettings.ExitThresholdFactor);
@@ -2901,6 +2906,7 @@ begin
   ASettings.AutoAnalyze := CheckBoxAutoAnalyze.IsChecked;
   TryReadInteger(EditMinSampleCount.Text, ASettings.MinSampleCount);
   TryReadInteger(EditSampleSize.Text, ASettings.SampleSize);
+  TryReadFloat(EditMinimumSampleIntervalSec.Text, ASettings.MinimumSampleIntervalSec);
   TryReadFloat(EditMinWindowDurationSec.Text, ASettings.MinWindowDurationSec);
   TryReadFloat(EditMaxSampleAgeSec.Text, ASettings.MaxSampleAgeSec);
   TryReadFloat(EditExitThresholdFactor.Text, ASettings.ExitThresholdFactor);
@@ -2932,6 +2938,7 @@ begin
   Result := (ALeft.Enabled = ARight.Enabled) and
     (ALeft.MinSampleCount = ARight.MinSampleCount) and
     (ALeft.SampleSize = ARight.SampleSize) and
+    SameValue(ALeft.MinimumSampleIntervalSec, ARight.MinimumSampleIntervalSec, 1E-9) and
     SameValue(ALeft.MinWindowDurationSec, ARight.MinWindowDurationSec, 1E-9) and
     SameValue(ALeft.MaxSampleAgeSec, ARight.MaxSampleAgeSec, 1E-9) and
     SameValue(ALeft.MaxVariation, ARight.MaxVariation, 1E-9) and
@@ -3038,7 +3045,8 @@ begin
   Result := False;
   AErrorText := '';
 
-  if (EditMinSampleCount = nil) or (EditSampleSize = nil) or (EditMinWindowDurationSec = nil) or
+  if (EditMinSampleCount = nil) or (EditSampleSize = nil) or
+     (EditMinimumSampleIntervalSec = nil) or (EditMinWindowDurationSec = nil) or
      (EditMaxSampleAgeSec = nil) or
      (EditExitThresholdFactor = nil) or (EditMaxVariation = nil) or
      (EditMaxStdDeviation = nil) or (EditMaxTrendRate = nil) or
@@ -3061,6 +3069,9 @@ begin
     AErrorText := 'Размер массива должен быть не меньше 1.'
   else if StrToInt(Trim(EditMinSampleCount.Text)) > IntValue then
     AErrorText := 'Количество отсчётов в окне не может превышать размер массива'
+  else if (not TryReadFloat(EditMinimumSampleIntervalSec.Text, DoubleValue)) or
+          (DoubleValue < 0) then
+    AErrorText := 'Минимальное время обновления не может быть отрицательным.'
   else if (not TryReadFloat(EditMinWindowDurationSec.Text, DoubleValue)) or (DoubleValue < 0) then
     AErrorText := 'Минимальная длительность окна должна быть неотрицательным числом'
   else if not TryReadFloat(EditMaxSampleAgeSec.Text, DoubleValue) then

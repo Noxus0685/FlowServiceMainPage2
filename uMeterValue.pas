@@ -74,6 +74,8 @@ type
     FStabilitySettings: TMeterValueStabilitySettings;
     /// <summary>Chronological history of physical-value samples used only by stability analysis.</summary>
     FSamples: TList<TMeterValueSample>;
+    /// <summary>Monotonic timestamp of the last successfully captured automatic stability sample.</summary>
+    FLastAutomaticStabilitySampleMs: Int64;
     FActiveStabilityStartMs: Int64;
     /// <summary>Last calculated stability-analysis snapshot for consumers that should not recalculate immediately.</summary>
     FLastStabilityInfo: TMeterValueStabilityInfo;
@@ -91,6 +93,7 @@ type
     procedure ResetStabilityInfo;
     /// <summary>Adds a physical-value sample with an externally provided monotonic timestamp.</summary>
     procedure AddSample(const AValue: Double; const ATimeStampMs: Int64); overload;
+    procedure AddSampleLocked(const AValue: Double; const ATimeStampMs: Int64);
     function FindDimIndex(const AName: string): Integer;
     function FormatDisplayValue(const AValue: Double): string;
     class constructor CreateClass;
@@ -494,6 +497,7 @@ begin
   Coefs := TList<TCoef>.Create;
   FAggregateMeterValues := TObjectList<TMeterValue>.Create(False);
   FSamples := TList<TMeterValueSample>.Create;
+  FLastAutomaticStabilitySampleMs := 0;
   FActiveStabilityStartMs := 0;
   FSampleLock := TCriticalSection.Create;
   InitStabilitySettings;
@@ -802,6 +806,8 @@ var
     AMeterValue.IsToSave := Ini.ReadBool(ASection, 'IsToSave', True);
     AMeterValue.FStabilitySettings.Enabled := Ini.ReadBool(ASection, 'StabilityEnabled', AMeterValue.FStabilitySettings.Enabled);
     AMeterValue.FStabilitySettings.MinSampleCount := Ini.ReadInteger(ASection, 'StabilityMinSampleCount', AMeterValue.FStabilitySettings.MinSampleCount);
+    AMeterValue.FStabilitySettings.MinimumSampleIntervalSec := Ini.ReadFloat(ASection,
+      'MinimumSampleIntervalSec', 0);
     AMeterValue.FStabilitySettings.MinWindowDurationSec := Ini.ReadFloat(ASection,
       'Min_Window_Duration_Sec', Ini.ReadFloat(ASection,
       'Window_Duration_Sec', 10.0));
@@ -1192,6 +1198,7 @@ begin
   FillChar(FStabilitySettings, SizeOf(FStabilitySettings), 0);
   FStabilitySettings.Enabled := False;
   FStabilitySettings.MinSampleCount := 10;
+  FStabilitySettings.MinimumSampleIntervalSec := 0;
   FStabilitySettings.MinWindowDurationSec := 10.0;
   FStabilitySettings.SampleSize := 20;
   FStabilitySettings.MaxSampleAgeSec := 20.0;
@@ -1274,7 +1281,8 @@ begin
   FVirtualClockEnabled := False;
 end;
 
-procedure TMeterValue.AddSample(const AValue: Double; const ATimeStampMs: Int64);
+procedure TMeterValue.AddSampleLocked(const AValue: Double;
+  const ATimeStampMs: Int64);
 var
   Sample: TMeterValueSample;
   LastTimeStampMs: Int64;
@@ -1282,28 +1290,57 @@ begin
   Sample.Value := AValue;
   Sample.TimeStampMs := ATimeStampMs;
 
+  if FSamples.Count > 0 then
+  begin
+    LastTimeStampMs := FSamples[FSamples.Count - 1].TimeStampMs;
+    if Sample.TimeStampMs < LastTimeStampMs then
+      Exit;
+    if Sample.TimeStampMs = LastTimeStampMs then
+      Sample.TimeStampMs := LastTimeStampMs + 1;
+  end;
+  if FActiveStabilityStartMs <= 0 then
+    FActiveStabilityStartMs := Sample.TimeStampMs;
+  FSamples.Add(Sample);
+  TrimStabilityHistory;
+  ResetStabilityInfo;
+end;
+
+procedure TMeterValue.AddSample(const AValue: Double; const ATimeStampMs: Int64);
+begin
   FSampleLock.Enter;
   try
-    if FSamples.Count > 0 then
-    begin
-      LastTimeStampMs := FSamples[FSamples.Count - 1].TimeStampMs;
-      if Sample.TimeStampMs < LastTimeStampMs then
-        Exit;
-      if Sample.TimeStampMs = LastTimeStampMs then
-        Sample.TimeStampMs := LastTimeStampMs + 1;
-    end;
-    if FActiveStabilityStartMs <= 0 then
-      FActiveStabilityStartMs := Sample.TimeStampMs;
-    FSamples.Add(Sample);
-    TrimStabilityHistory;
+    AddSampleLocked(AValue, ATimeStampMs);
   finally
     FSampleLock.Leave;
   end;
 end;
 
 procedure TMeterValue.AddCurrentStabilitySample;
+var
+  CurrentTimeMs: Int64;
+  MinimumIntervalMs: Int64;
 begin
-  AddSample(Value, GetMonotonicTimeMs);
+  if not FStabilitySettings.Enabled then
+    Exit;
+
+  CurrentTimeMs := GetMonotonicTimeMs;
+  MinimumIntervalMs := Round(Max(0.0,
+    FStabilitySettings.MinimumSampleIntervalSec) * 1000.0);
+
+  FSampleLock.Enter;
+  try
+    if (FSamples.Count > 0) and
+       (MinimumIntervalMs > 0) and
+       (FLastAutomaticStabilitySampleMs > 0) and
+       (CurrentTimeMs >= FLastAutomaticStabilitySampleMs) and
+       (CurrentTimeMs - FLastAutomaticStabilitySampleMs < MinimumIntervalMs) then
+      Exit;
+
+    AddSampleLocked(Value, CurrentTimeMs);
+    FLastAutomaticStabilitySampleMs := CurrentTimeMs;
+  finally
+    FSampleLock.Leave;
+  end;
 end;
 
 procedure TMeterValue.ClearSamplesHistory;
@@ -1311,6 +1348,7 @@ begin
   FSampleLock.Enter;
   try
     FSamples.Clear;
+    FLastAutomaticStabilitySampleMs := 0;
     FActiveStabilityStartMs := 0;
     ResetStabilityInfo;
   finally
@@ -1405,6 +1443,7 @@ begin
   FSampleLock.Enter;
   try
     FSamples.Clear;
+    FLastAutomaticStabilitySampleMs := 0;
     FActiveStabilityStartMs := 0;
     ResetStabilityInfo;
   finally
@@ -1484,6 +1523,14 @@ begin
   if FStabilitySettings.MinSampleCount > FStabilitySettings.SampleSize then
   begin
     AErrorText := 'Количество отсчётов в окне не может превышать количество отображаемых данных';
+    Exit(False);
+  end;
+
+  if IsNan(FStabilitySettings.MinimumSampleIntervalSec) or
+     IsInfinite(FStabilitySettings.MinimumSampleIntervalSec) or
+     (FStabilitySettings.MinimumSampleIntervalSec < 0) then
+  begin
+    AErrorText := 'Минимальное время обновления не может быть отрицательным';
     Exit(False);
   end;
 
@@ -3748,6 +3795,7 @@ begin
 
       Ini.WriteBool(Section, 'StabilityEnabled', MV.FStabilitySettings.Enabled);
       Ini.WriteInteger(Section, 'StabilityMinSampleCount', MV.FStabilitySettings.MinSampleCount);
+      Ini.WriteFloat(Section, 'MinimumSampleIntervalSec', MV.FStabilitySettings.MinimumSampleIntervalSec);
       Ini.WriteFloat(Section, 'Min_Window_Duration_Sec', MV.FStabilitySettings.MinWindowDurationSec);
       Ini.WriteInteger(Section, 'Sample_Size', MV.FStabilitySettings.SampleSize);
       Ini.WriteFloat(Section, 'Max Sample Age Sec', MV.FStabilitySettings.MaxSampleAgeSec);
@@ -4044,6 +4092,8 @@ begin
 
       MV.FStabilitySettings.Enabled := Ini.ReadBool(Section, 'StabilityEnabled', MV.FStabilitySettings.Enabled);
       MV.FStabilitySettings.MinSampleCount := Ini.ReadInteger(Section, 'StabilityMinSampleCount', MV.FStabilitySettings.MinSampleCount);
+      MV.FStabilitySettings.MinimumSampleIntervalSec := Ini.ReadFloat(Section,
+        'MinimumSampleIntervalSec', 0);
       MV.FStabilitySettings.MinWindowDurationSec := Ini.ReadFloat(Section,
         'Min_Window_Duration_Sec', Ini.ReadFloat(Section,
         'Window_Duration_Sec', 10.0));
@@ -4412,4 +4462,3 @@ begin
 end;
 
 end.
-
