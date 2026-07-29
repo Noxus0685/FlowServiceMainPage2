@@ -3030,7 +3030,7 @@ end;
 procedure TFrameMainTable.DevicesColumnMenuItemClick(Sender: TObject);
 var
   MenuItem: TMenuItem;
-  Column: TColumn;
+  Index: Integer;
 begin
   if not (Sender is TMenuItem) then
     Exit;
@@ -3043,8 +3043,8 @@ begin
     Exit;
   end;
 
-  Column.Visible := not Column.Visible;
-  MenuItem.IsChecked := Column.Visible;
+  GridDevices.Columns[Index].Visible := not GridDevices.Columns[Index].Visible;
+  MenuItem.IsChecked := GridDevices.Columns[Index].Visible;
   SaveLayoutSettingsToWorkTable;
   GridDevices.Repaint;
 end;
@@ -3063,7 +3063,6 @@ begin
   begin
     MenuItem.IsChecked := False;
     Exit;
-  end;
 
   Column.Visible := not Column.Visible;
   MenuItem.IsChecked := Column.Visible;
@@ -3110,7 +3109,7 @@ procedure TFrameMainTable.SyncDevicesColumnsMenu;
 var
   I: Integer;
   MenuItem: TMenuItem;
-  Column: TColumn;
+  ColIndex: Integer;
 begin
   if MenuItemDevicesColumnsGroup = nil then
     Exit;
