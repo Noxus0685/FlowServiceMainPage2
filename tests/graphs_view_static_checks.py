@@ -98,3 +98,26 @@ def test_graph_workspace_uses_public_fmx_api_and_local_for_in_variables():
     assert "for SourcePair in ADictionary do" in FRAME
     assert "for CurrentPair in FFlowGraphHistory.EtalonSeries do" in FRAME
     assert "for DictionaryPair in ADictionary do" in FRAME
+
+
+def extract_method_body(source: str, signature: str) -> str:
+    start = source.index(signature)
+    next_method = source.find("\nprocedure TFrameMainTable.", start + len(signature))
+    if next_method < 0:
+        next_method = len(source)
+    return source[start:next_method]
+
+
+def test_render_does_not_rebuild_popup_menu_or_legend():
+    render_body = extract_method_body(
+        FRAME,
+        "procedure TFrameMainTable.RenderConfiguredGraph"
+    )
+    assert "RebuildGraphPopupMenu" not in render_body
+    assert "TCheckBox.Create" not in render_body
+    assert "TRectangle.Create" not in render_body
+
+
+def test_popup_menu_is_built_on_popup():
+    assert "GraphPopupMenuPopup" in FRAME
+    assert "PopupMenu.OnPopup := GraphPopupMenuPopup" in FRAME

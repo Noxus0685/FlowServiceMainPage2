@@ -163,7 +163,7 @@ type
   private
     FKey: string;
     FCaption: string;
-    FVisible: Boolean;
+    FUserVisible: Boolean;
     FChannelAvailable: Boolean;
     FGraphIndex: Integer;
     FColor: TAlphaColor;
@@ -174,8 +174,7 @@ type
     property Key: string read FKey;
     property Caption: string read FCaption write FCaption;
     function EffectiveVisible: Boolean;
-    property Visible: Boolean read FVisible write FVisible;
-    property UserVisible: Boolean read FVisible write FVisible;
+    property UserVisible: Boolean read FUserVisible write FUserVisible;
     property ChannelAvailable: Boolean read FChannelAvailable write FChannelAvailable;
     property GraphIndex: Integer read FGraphIndex write FGraphIndex;
     property Color: TAlphaColor read FColor write FColor;
@@ -775,12 +774,16 @@ type
     FGraphCountCombo: TComboBox;
     FGraphLayoutCombo: TComboBox;
     FGraphLegendCheck: TCheckBox;
+    FSelectedGraphLegend: TFlowLayout;
     FGraphSettingsToggle: TButton;
     FGraphViews: TObjectList<TGraphPanelView>;
     FGraphSplitters: TObjectList<TSplitter>;
     FGraphLayoutContainers: TObjectList<TLayout>;
     FSelectedGraphIndex: Integer;
     FUpdatingGraphsSettings: Boolean;
+    FInitializingGraphs: Boolean;
+    FRenderingGraphViews: Boolean;
+    FGraphRenderQueued: Boolean;
   FFrameMeasurementRun: TFrameMeasurementRun;
   FFrameMRResults: TFrameMRResults;
   FFrameProtocol: TFrameProtocol;
@@ -887,10 +890,13 @@ type
     procedure EnsureGraphViewCount(const ACount: Integer);
     procedure ClearGraphsLayout;
     procedure RenderGraphViews;
+    procedure QueueRenderGraphViews;
     procedure RenderConfiguredGraph(AView: TGraphPanelView);
     procedure GraphViewClick(Sender: TObject);
+    procedure GraphPopupMenuPopup(Sender: TObject);
     procedure SyncGraphsSettingsControls;
     procedure RebuildGraphPopupMenu(AView: TGraphPanelView);
+    procedure RebuildSelectedGraphLegend;
     procedure GraphMenuClick(Sender: TObject);
     procedure BuildGraphsSettingsPanel;
     function ResolveGraphSeriesMeterValue(
@@ -1129,7 +1135,7 @@ begin
   FKey := AKey;
   FCaption := ACaption;
   FColor := AColor;
-  FVisible := AVisible;
+  FUserVisible := AVisible;
   FChannelAvailable := AVisible;
   FGraphIndex := 0;
   FSamples := TList<TFlowGraphSample>.Create;
@@ -1137,7 +1143,7 @@ end;
 
 function TFlowGraphSeries.EffectiveVisible: Boolean;
 begin
-  Result := FChannelAvailable and FVisible;
+  Result := FUserVisible and FChannelAvailable;
 end;
 
 destructor TFlowGraphSeries.Destroy;
@@ -1150,14 +1156,6 @@ end;
 
 constructor TGraphPanelView.Create(AOwner: TComponent; AParent: TFmxObject;
   const AGraphIndex: Integer);
-  procedure AddCommand(const ACaption: string);
-  var
-    Item: TMenuItem;
-  begin
-    Item := TMenuItem.Create(PopupMenu);
-    Item.Text := ACaption;
-    Item.Parent := PopupMenu;
-  end;
 begin
   inherited Create;
   GraphIndex := AGraphIndex;
@@ -1179,7 +1177,8 @@ begin
   LegendHost := TLayout.Create(Root);
   LegendHost.Parent := Root;
   LegendHost.Align := TAlignLayout.Bottom;
-  LegendHost.Height := 44;
+  LegendHost.Height := 0;
+  LegendHost.Visible := False;
   LegendLayout := TFlowLayout.Create(LegendHost);
   LegendLayout.Parent := LegendHost;
   LegendLayout.Align := TAlignLayout.Client;
@@ -1202,13 +1201,6 @@ begin
   EmptyLabel.TextSettings.HorzAlign := TTextAlign.Center;
 
   PopupMenu := TPopupMenu.Create(AOwner);
-  AddCommand('Добавить серию');
-  AddCommand('Удалить серию');
-  AddCommand('Очистить график');
-  AddCommand('Переименовать график');
-  AddCommand('Автомасштаб');
-  AddCommand('Сброс масштаба');
-  AddCommand('Настроить цвета');
   Root.PopupMenu := PopupMenu;
 end;
 
@@ -1338,6 +1330,7 @@ end;
 
 destructor TFrameMainTable.Destroy;
 begin
+  FGraphRenderQueued := False;
   if FStabilitySampleTimer <> nil then
     FStabilitySampleTimer.Enabled := False;
   FreeAndNil(FStabilitySampleTimer);
@@ -5845,6 +5838,7 @@ begin
     ValidKeys.Free;
   end;
   RefreshFlowGraphCheckBoxes;
+  RebuildSelectedGraphLegend;
   if FActiveWorkTable <> nil then
     RenderFlowGraphs;
 end;
@@ -5855,20 +5849,21 @@ var
   CheckBox: TCheckBox;
   Series: TFlowGraphSeries;
 begin
+  if FInitializingGraphs then
+    Exit;
   if not (Sender is TCheckBox) then
     Exit;
   CheckBox := TCheckBox(Sender);
   if FFlowGraphHistory = nil then
     Exit;
   if FFlowGraphHistory.EtalonSeries.TryGetValue(CheckBox.TagString, Series) then
-    Series.Visible := CheckBox.IsChecked
+    Series.UserVisible := CheckBox.IsChecked
   else if FFlowGraphHistory.DeviceSeries.TryGetValue(CheckBox.TagString, Series) then
-    Series.Visible := CheckBox.IsChecked
+    Series.UserVisible := CheckBox.IsChecked
   else
     Exit;
-  UpdateEtalonFlowChart;
-  UpdateDeviceFlowChart;
-  RenderGraphViews;
+  RebuildSelectedGraphLegend;
+  QueueRenderGraphViews;
 end;
 
 procedure TFrameMainTable.RefreshFlowGraphCheckBoxes;
@@ -5936,11 +5931,18 @@ procedure TFrameMainTable.AddFlowGraphSamples(const ATimeStampMs: Int64);
         LogSample(AKind, Key, RawValue, False, 'ChannelNil', 0, 0);
         Continue;
       end;
+      if not ADict.TryGetValue(Key, S) then
+      begin
+        LogSample(AKind, Key, RawValue, False, 'SeriesKeyNotFound', 0, 0);
+        Continue;
+      end;
       if not C.Enabled then
       begin
+        S.ChannelAvailable := False;
         LogSample(AKind, Key, 0, False, 'ChannelDisabled', 0, 0);
         Continue;
       end;
+      S.ChannelAvailable := True;
       if C.FlowMeter = nil then
       begin
         LogSample(AKind, Key, RawValue, False, 'FlowMeterNil', 0, 0);
@@ -5954,11 +5956,6 @@ procedure TFrameMainTable.AddFlowGraphSamples(const ATimeStampMs: Int64);
       if (C.State = osDeleted) or ((C.FlowMeter.Device <> nil) and (C.FlowMeter.Device.State = osDeleted)) then
       begin
         LogSample(AKind, Key, RawValue, False, 'Deleted', 0, 0);
-        Continue;
-      end;
-      if not ADict.TryGetValue(Key, S) then
-      begin
-        LogSample(AKind, Key, RawValue, False, 'SeriesKeyNotFound', 0, 0);
         Continue;
       end;
       RawValue := C.FlowMeter.ValueFlow.GetDoubleValue;
@@ -6395,11 +6392,15 @@ begin
   FFlowGraphXMin := VisibleXMinMs;
   FFlowGraphXMax := VisibleXMaxMs;
 
-  RenderFlowChart(ChartEtalonFlow, FFlowGraphHistory.EtalonSeries, 'Расход эталонов',
-    VisibleXMinMs, VisibleXMaxMs, AxisMinSec, AxisMaxSec, MeasurementSegment);
-  RenderFlowChart(ChartDeviceFlow, FFlowGraphHistory.DeviceSeries, 'Расход поверяемых приборов',
-    VisibleXMinMs, VisibleXMaxMs, AxisMinSec, AxisMaxSec, MeasurementSegment);
-  RenderGraphViews;
+  if (FGraphViews <> nil) and (FGraphViews.Count > 0) then
+    RenderGraphViews
+  else
+  begin
+    RenderFlowChart(ChartEtalonFlow, FFlowGraphHistory.EtalonSeries, 'Расход эталонов',
+      VisibleXMinMs, VisibleXMaxMs, AxisMinSec, AxisMaxSec, MeasurementSegment);
+    RenderFlowChart(ChartDeviceFlow, FFlowGraphHistory.DeviceSeries, 'Расход поверяемых приборов',
+      VisibleXMinMs, VisibleXMaxMs, AxisMinSec, AxisMaxSec, MeasurementSegment);
+  end;
   FLastGraphRunActive := RunActive;
 end;
 
@@ -6418,54 +6419,61 @@ begin
     FGraphSplitters := TObjectList<TSplitter>.Create(True);
   if FGraphLayoutContainers = nil then
     FGraphLayoutContainers := TObjectList<TLayout>.Create(True);
-  FSelectedGraphIndex := 0;
-  if FGraphsRoot = nil then
-  begin
-    FGraphsRoot := TLayout.Create(Self);
-    FGraphsRoot.Name := 'LayoutGraphsRoot';
-    FGraphsRoot.Align := TAlignLayout.Client;
-    FGraphsSettingsWidth := 340;
-
-    FGraphsSettings := TPanel.Create(FGraphsRoot);
-    FGraphsSettings.Name := 'LayoutGraphsSettings';
-    FGraphsSettings.Parent := FGraphsRoot;
-    FGraphsSettings.Align := TAlignLayout.Right;
-    FGraphsSettings.Width := FGraphsSettingsWidth;
-
-    Splitter := TSplitter.Create(FGraphsRoot);
-    Splitter.Name := 'SplitterGraphsSettings';
-    Splitter.Parent := FGraphsRoot;
-    Splitter.Align := TAlignLayout.Right;
-    Splitter.Width := 6;
-
-    if LayoutGraphsClient <> nil then
+  FInitializingGraphs := True;
+  try
+    FSelectedGraphIndex := 0;
+    if FGraphsRoot = nil then
     begin
-      LayoutGraphsClient.Parent := FGraphsRoot;
-      LayoutGraphsClient.Align := TAlignLayout.Client;
-      for I := 0 to LayoutGraphsClient.ChildrenCount - 1 do
-        if LayoutGraphsClient.Children[I] is TControl then
-          TControl(LayoutGraphsClient.Children[I]).Visible := False;
+      FGraphsRoot := TLayout.Create(Self);
+      FGraphsRoot.Name := 'LayoutGraphsRoot';
+      FGraphsRoot.Align := TAlignLayout.Client;
+      FGraphsSettingsWidth := 340;
+
+      FGraphsSettings := TPanel.Create(FGraphsRoot);
+      FGraphsSettings.Name := 'LayoutGraphsSettings';
+      FGraphsSettings.Parent := FGraphsRoot;
+      FGraphsSettings.Align := TAlignLayout.Right;
+      FGraphsSettings.Width := FGraphsSettingsWidth;
+
+      Splitter := TSplitter.Create(FGraphsRoot);
+      Splitter.Name := 'SplitterGraphsSettings';
+      Splitter.Parent := FGraphsRoot;
+      Splitter.Align := TAlignLayout.Right;
+      Splitter.Width := 6;
+
+      if LayoutGraphsClient <> nil then
+      begin
+        LayoutGraphsClient.Parent := FGraphsRoot;
+        LayoutGraphsClient.Align := TAlignLayout.Client;
+        for I := 0 to LayoutGraphsClient.ChildrenCount - 1 do
+          if LayoutGraphsClient.Children[I] is TControl then
+            TControl(LayoutGraphsClient.Children[I]).Visible := False;
+      end;
+      if LayoutGraphCommands <> nil then
+        LayoutGraphCommands.Visible := False;
+      BuildGraphsSettingsPanel;
     end;
-    if LayoutGraphCommands <> nil then
-      LayoutGraphCommands.Visible := False;
-    BuildGraphsSettingsPanel;
+    FGraphsRoot.Parent := AParent;
+    FGraphsRoot.Align := TAlignLayout.Client;
+    if TabItemWorkTableGraphs <> nil then
+    begin
+      TabItemWorkTableGraphs.Visible := False;
+      TabItemWorkTableGraphs.Parent := nil;
+    end;
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(
+        pcInfo,
+        psForm,
+        'AttachGraphsTo',
+        'Рабочая область графиков перенесена',
+        Format('TargetParent=%s; ActualParent=%s; Align=%d',
+          [AParent.Name, FGraphsRoot.Parent.Name, Ord(FGraphsRoot.Align)]));
+    ApplyGraphsLayout;
+    RebuildSelectedGraphLegend;
+  finally
+    FInitializingGraphs := False;
   end;
-  FGraphsRoot.Parent := AParent;
-  FGraphsRoot.Align := TAlignLayout.Client;
-  if TabItemWorkTableGraphs <> nil then
-  begin
-    TabItemWorkTableGraphs.Visible := False;
-    TabItemWorkTableGraphs.Parent := nil;
-  end;
-  if Assigned(ProtocolManager) then
-    ProtocolManager.AddMessage(
-      pcInfo,
-      psForm,
-      'AttachGraphsTo',
-      'Рабочая область графиков перенесена',
-      Format('TargetParent=%s; ActualParent=%s; Align=%d',
-        [AParent.Name, FGraphsRoot.Parent.Name, Ord(FGraphsRoot.Align)]));
-  ApplyGraphsLayout;
+  QueueRenderGraphViews;
 end;
 
 procedure TFrameMainTable.BuildGraphsSettingsPanel;
@@ -6521,7 +6529,7 @@ begin
   FGraphLegendCheck.Parent := FGraphsSettingsContent;
   FGraphLegendCheck.Position.Point := PointF(12, 144);
   FGraphLegendCheck.Width := 290;
-  FGraphLegendCheck.Text := 'Показывать легенду (под графиком)';
+  FGraphLegendCheck.Text := 'Показывать легенду справа';
   FGraphLegendCheck.IsChecked := FGraphsViewConfig.ShowLegend;
   FGraphLegendCheck.OnChange := GraphLegendChange;
 
@@ -6546,10 +6554,19 @@ begin
   Caption.Height := 32;
   Caption.Text := 'Серии выбранного графика';
   Caption.TextSettings.Font.Style := [TFontStyle.fsBold];
+
+  FSelectedGraphLegend := TFlowLayout.Create(FGraphsSettingsContent);
+  FSelectedGraphLegend.Parent := FGraphsSettingsContent;
+  FSelectedGraphLegend.Position.Point := PointF(12, 330);
+  FSelectedGraphLegend.Width := 290;
+  FSelectedGraphLegend.Height := 300;
+  FSelectedGraphLegend.FlowDirection := TFlowDirection.LeftToRight;
 end;
 
 procedure TFrameMainTable.GraphSettingsToggleClick(Sender: TObject);
 begin
+  if FInitializingGraphs then
+    Exit;
   FGraphsViewConfig.SettingsPanelVisible :=
     not FGraphsViewConfig.SettingsPanelVisible;
   FGraphsSettingsContent.Visible := FGraphsViewConfig.SettingsPanelVisible;
@@ -6568,7 +6585,7 @@ end;
 
 procedure TFrameMainTable.GraphCountChange(Sender: TObject);
 begin
-  if FUpdatingGraphsSettings then
+  if FInitializingGraphs or FUpdatingGraphsSettings then
     Exit;
   if FGraphCountCombo.ItemIndex < 0 then
     Exit;
@@ -6586,7 +6603,7 @@ end;
 
 procedure TFrameMainTable.GraphLayoutChange(Sender: TObject);
 begin
-  if FUpdatingGraphsSettings then
+  if FInitializingGraphs or FUpdatingGraphsSettings then
     Exit;
   if FGraphLayoutCombo.ItemIndex < 0 then
     Exit;
@@ -6604,14 +6621,16 @@ end;
 
 procedure TFrameMainTable.GraphLegendChange(Sender: TObject);
 begin
-  if FUpdatingGraphsSettings then
+  if FInitializingGraphs or FUpdatingGraphsSettings then
     Exit;
   FGraphsViewConfig.ShowLegend := FGraphLegendCheck.IsChecked;
-  ApplyGraphsLayout;
+  RebuildSelectedGraphLegend;
 end;
 
 procedure TFrameMainTable.ResetGraphSettingsClick(Sender: TObject);
 begin
+  if FInitializingGraphs then
+    Exit;
   FGraphsViewConfig.Reset;
   SyncGraphsSettingsControls;
   ApplyGraphsLayout;
@@ -6712,12 +6731,11 @@ begin
       end;
   end;
   for I := 0 to FGraphViews.Count - 1 do
-    FGraphViews[I].LegendHost.Visible := FGraphsViewConfig.ShowLegend and
-      (I < FGraphsViewConfig.GraphCount);
+    FGraphViews[I].LegendHost.Visible := False;
   // Alignment is recalculated automatically after Parent/Align changes.  Realign
   // is protected in FMX and therefore cannot be called from the frame.
   LayoutGraphsClient.Repaint;
-  RenderGraphViews;
+  QueueRenderGraphViews;
   Details := '';
   for I := 0 to FGraphsViewConfig.GraphCount - 1 do
     Details := Details + Format(' G%d=%.0fx%.0f;', [I + 1,
@@ -6738,6 +6756,7 @@ begin
   while FGraphViews.Count < Wanted do
   begin
     View := TGraphPanelView.Create(Self, LayoutGraphsClient, FGraphViews.Count);
+    View.PopupMenu.OnPopup := GraphPopupMenuPopup;
     View.Root.Tag := View.GraphIndex;
     View.Root.OnClick := GraphViewClick;
     View.Header.Tag := View.GraphIndex;
@@ -6781,11 +6800,29 @@ begin
       FGraphViews[I].TitleLabel.TextSettings.FontColor := TAlphaColors.Dodgerblue
     else
       FGraphViews[I].TitleLabel.TextSettings.FontColor := TAlphaColors.Black;
+  RebuildSelectedGraphLegend;
+end;
+
+procedure TFrameMainTable.GraphPopupMenuPopup(Sender: TObject);
+var
+  I: Integer;
+begin
+  if not (Sender is TPopupMenu) then
+    Exit;
+  if FGraphViews = nil then
+    Exit;
+  for I := 0 to FGraphViews.Count - 1 do
+    if (FGraphViews[I] <> nil) and (FGraphViews[I].PopupMenu = Sender) then
+    begin
+      RebuildGraphPopupMenu(FGraphViews[I]);
+      Exit;
+    end;
 end;
 
 procedure TFrameMainTable.RebuildGraphPopupMenu(AView: TGraphPanelView);
 var
   AddRoot, FlowRoot, EtalonRoot, DeviceRoot, RemoveRoot, ColorRoot: TMenuItem;
+  I: Integer;
 
   function AddItem(AParent: TFmxObject; const ACaption, ACommand: string): TMenuItem;
   begin
@@ -6823,10 +6860,11 @@ var
           IntToStr(AView.GraphIndex) + '|' + CurrentPair.Key);
   end;
 begin
-  if (AView = nil) or (FFlowGraphHistory = nil) then
+  if (AView = nil) or (AView.PopupMenu = nil) or
+     (FFlowGraphHistory = nil) then
     Exit;
-  while AView.PopupMenu.ChildrenCount > 0 do
-    AView.PopupMenu.Children[0].Free;
+  for I := AView.PopupMenu.ChildrenCount - 1 downto 0 do
+    AView.PopupMenu.Children[I].Free;
   AddRoot := AddItem(AView.PopupMenu, 'Добавить серию', '');
   FlowRoot := AddItem(AddRoot, 'Расход', '');
   EtalonRoot := AddItem(FlowRoot, 'Эталоны', '');
@@ -6896,32 +6934,99 @@ begin
       Inc(ColorIndex);
     Series.Color := FLOW_GRAPH_COLORS[(ColorIndex + 1) mod Length(FLOW_GRAPH_COLORS)];
   end;
-  RenderGraphViews;
+  RebuildSelectedGraphLegend;
+  QueueRenderGraphViews;
+end;
+
+procedure TFrameMainTable.RebuildSelectedGraphLegend;
+var
+  I: Integer;
+
+  procedure AddDictionary(
+    ADictionary: TObjectDictionary<string, TFlowGraphSeries>);
+  var
+    LegendPair: TPair<string, TFlowGraphSeries>;
+    Marker: TRectangle;
+    CheckBox: TCheckBox;
+  begin
+    if ADictionary = nil then
+      Exit;
+    for LegendPair in ADictionary do
+    begin
+      if (LegendPair.Value = nil) or
+         (LegendPair.Value.GraphIndex <> FSelectedGraphIndex) then
+        Continue;
+      Marker := TRectangle.Create(FSelectedGraphLegend);
+      Marker.Parent := FSelectedGraphLegend;
+      Marker.Width := 16;
+      Marker.Height := 16;
+      Marker.Fill.Color := LegendPair.Value.Color;
+      Marker.Stroke.Kind := TBrushKind.None;
+      CheckBox := TCheckBox.Create(FSelectedGraphLegend);
+      CheckBox.Parent := FSelectedGraphLegend;
+      CheckBox.Width := 250;
+      CheckBox.Height := 28;
+      CheckBox.Text := LegendPair.Value.Caption;
+      CheckBox.TagString := LegendPair.Key;
+      CheckBox.IsChecked := LegendPair.Value.UserVisible;
+      CheckBox.Enabled := LegendPair.Value.ChannelAvailable;
+      CheckBox.OnChange := FlowGraphCheckBoxChange;
+    end;
+  end;
+begin
+  if (FSelectedGraphLegend = nil) or (FFlowGraphHistory = nil) then
+    Exit;
+  for I := FSelectedGraphLegend.ChildrenCount - 1 downto 0 do
+    FSelectedGraphLegend.Children[I].Free;
+  FSelectedGraphLegend.Visible := (FGraphsViewConfig <> nil) and
+    FGraphsViewConfig.ShowLegend;
+  if not FSelectedGraphLegend.Visible then
+    Exit;
+  AddDictionary(FFlowGraphHistory.EtalonSeries);
+  AddDictionary(FFlowGraphHistory.DeviceSeries);
+end;
+
+procedure TFrameMainTable.QueueRenderGraphViews;
+begin
+  if FInitializingGraphs or FGraphRenderQueued then
+    Exit;
+  FGraphRenderQueued := True;
+  TThread.ForceQueue(
+    nil,
+    procedure
+    begin
+      FGraphRenderQueued := False;
+      if csDestroying in ComponentState then
+        Exit;
+      RenderGraphViews;
+    end
+  );
 end;
 
 procedure TFrameMainTable.RenderConfiguredGraph(AView: TGraphPanelView);
 var
   Combined: TObjectDictionary<string, TFlowGraphSeries>;
-  Pair: TPair<string, TFlowGraphSeries>;
   BaseMs: Int64;
   AxisMinSec, AxisMaxSec: Double;
-  CheckBox: TCheckBox;
-  Marker: TRectangle;
-  HasSeries: Boolean;
 
   procedure AddDictionary(ADictionary: TObjectDictionary<string, TFlowGraphSeries>);
   var
     DictionaryPair: TPair<string, TFlowGraphSeries>;
   begin
+    if ADictionary = nil then
+      Exit;
     for DictionaryPair in ADictionary do
       if (DictionaryPair.Value <> nil) and
          (DictionaryPair.Value.GraphIndex = AView.GraphIndex) then
         Combined.AddOrSetValue(DictionaryPair.Key, DictionaryPair.Value);
   end;
 begin
-  if (AView = nil) or (FFlowGraphHistory = nil) then
+  if (AView = nil) or (AView.Chart = nil) or
+     (FFlowGraphHistory = nil) or (FGraphsViewConfig = nil) then
     Exit;
-  RebuildGraphPopupMenu(AView);
+  if (AView.GraphIndex < 0) or
+     (AView.GraphIndex >= FGraphsViewConfig.Panels.Count) then
+    Exit;
   Combined := TObjectDictionary<string, TFlowGraphSeries>.Create([]);
   try
     AddDictionary(FFlowGraphHistory.EtalonSeries);
@@ -6940,30 +7045,7 @@ begin
       FGraphsViewConfig.Panels[AView.GraphIndex].Title, FFlowGraphXMin,
       FFlowGraphXMax, AxisMinSec, AxisMaxSec, FCurrentGraphPointStartMs > 0);
 
-    while AView.LegendLayout.ChildrenCount > 0 do
-      AView.LegendLayout.Children[0].Free;
-    HasSeries := False;
-    for Pair in Combined do
-    begin
-      HasSeries := True;
-      Marker := TRectangle.Create(AView.LegendLayout);
-      Marker.Parent := AView.LegendLayout;
-      Marker.Width := 16;
-      Marker.Height := 16;
-      Marker.Fill.Color := Pair.Value.Color;
-      Marker.Stroke.Kind := TBrushKind.None;
-      CheckBox := TCheckBox.Create(AView.LegendLayout);
-      CheckBox.Parent := AView.LegendLayout;
-      CheckBox.Width := 210;
-      CheckBox.Height := 28;
-      CheckBox.Text := Pair.Value.Caption;
-      CheckBox.TagString := Pair.Key;
-      CheckBox.IsChecked := Pair.Value.UserVisible;
-      CheckBox.Enabled := Pair.Value.ChannelAvailable;
-      CheckBox.OnChange := FlowGraphCheckBoxChange;
-    end;
-    AView.EmptyLabel.Visible := not HasSeries;
-    AView.LegendHost.Visible := FGraphsViewConfig.ShowLegend;
+    AView.EmptyLabel.Visible := Combined.Count = 0;
   finally
     Combined.Free;
   end;
@@ -6971,12 +7053,22 @@ end;
 
 procedure TFrameMainTable.RenderGraphViews;
 var
-  I: Integer;
+  I, Count: Integer;
 begin
-  if FGraphViews = nil then
+  if FRenderingGraphViews then
     Exit;
-  for I := 0 to Min(FGraphsViewConfig.GraphCount, FGraphViews.Count) - 1 do
-    RenderConfiguredGraph(FGraphViews[I]);
+  if (FGraphViews = nil) or (FGraphsViewConfig = nil) then
+    Exit;
+  FRenderingGraphViews := True;
+  try
+    Count := Min(FGraphsViewConfig.GraphCount, FGraphViews.Count);
+    for I := 0 to Count - 1 do
+      if (FGraphViews[I] <> nil) and (FGraphViews[I].Root <> nil) and
+         FGraphViews[I].Root.Visible then
+        RenderConfiguredGraph(FGraphViews[I]);
+  finally
+    FRenderingGraphViews := False;
+  end;
 end;
 
 function TFrameMainTable.ResolveGraphSeriesMeterValue(
