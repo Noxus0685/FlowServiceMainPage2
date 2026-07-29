@@ -29,17 +29,31 @@ def test_current_deviation_examples_and_zero_mean_are_finite():
         assert actual == expected
 
 
-def test_both_deviation_columns_use_their_own_current_and_mean_flow():
+def test_fractional_deviation_examples_keep_value_and_sign():
+    assert math.isclose(_deviation(11.98, 12.03), -0.4156276, abs_tol=1e-7)
+    assert math.isclose(_deviation(12.02, 12.07), -0.4142502, abs_tol=1e-7)
+    assert math.isclose(_deviation(12.22, 12.18), 0.3284072, abs_tol=1e-7)
+
+
+def test_both_deviation_columns_use_shared_average_flow_calculation():
     for channel_collection in ("DeviceChannels", "EtalonChannels"):
-        flow = (
-            rf"WorkTable\.{channel_collection}\[ARow\]\.FlowMeter\.ValueFlow"
-        )
-        assert re.search(
-            rf"CalculateCurrentDeviationPercent\(\s*"
-            rf"{flow}\.GetDoubleValue,\s*"
-            rf"{flow}\.GetDoubleMeanValue\)",
+        block = re.search(
+            rf"FlowMeter := WorkTable\.{channel_collection}\[ARow\]\.FlowMeter;"
+            rf".*?CalculateCurrentDeviationPercent\(\s*CurrentFlow, AverageFlow\),"
+            rf" 2, 0\);",
             SOURCE,
+            re.DOTALL,
         )
+        assert block
+        assert "TryGetAverageFlow(FlowMeter, WorkTable, AverageFlow)" in block.group()
+        assert "CurrentFlow := FlowMeter.ValueFlow.GetDoubleValue" in block.group()
+
+
+def test_average_text_and_deviation_share_try_get_average_flow():
+    assert SOURCE.count("TryGetAverageFlow(") >= 4
+    assert "AAverageFlow := AFlowMeter.ValueQuantity.GetDoubleValue / MeasureTime;" in SOURCE
+    assert "if MeasureTime <= 0 then" in SOURCE
+    assert "GetDoubleMeanValue)," not in SOURCE
 
 
 def test_deviation_calculation_preserves_sign_and_guards_zero_mean():

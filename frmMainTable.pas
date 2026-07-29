@@ -975,6 +975,8 @@ type
     procedure FlowMeterPropertiesChanged(Sender: TObject);
     procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
     procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
+    function TryGetAverageFlow(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable;
+      out AAverageFlow: Double): Boolean;
     function GetAverageFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
     function CalculateCurrentDeviationPercent(const ACurrentValue,
       AMeanValue: Double): Double;
@@ -8538,24 +8540,45 @@ end;
 function TFrameMainTable.GetAverageFlowText(AFlowMeter: TFlowMeter;
   AWorkTable: TWorkTable): string;
 var
-  MeasureTime: Double;
-  AvgFlow: Double;
+  AverageFlow: Double;
 begin
   Result := '-';
-  if (AFlowMeter = nil) or (AFlowMeter.ValueFlow = nil) or
-     (AFlowMeter.ValueQuantity = nil) or (AWorkTable = nil) or
-     (AWorkTable.ValueTime = nil) then
+  if not TryGetAverageFlow(AFlowMeter, AWorkTable, AverageFlow) then
+    Exit;
+
+  if AWorkTable.ValueFlowRate <> nil then
+    Result := AWorkTable.ValueFlowRate.GetStrNum(AverageFlow)
+  else if (AFlowMeter <> nil) and (AFlowMeter.ValueFlow <> nil) then
+    Result := AFlowMeter.ValueFlow.GetStrNum(AverageFlow);
+end;
+
+function TFrameMainTable.TryGetAverageFlow(AFlowMeter: TFlowMeter;
+  AWorkTable: TWorkTable; out AAverageFlow: Double): Boolean;
+var
+  MeasureTime: Double;
+begin
+  Result := False;
+  AAverageFlow := 0;
+
+  if (AFlowMeter = nil) or (AFlowMeter.ValueQuantity = nil) or
+     (AWorkTable = nil) or (AWorkTable.ValueTime = nil) then
     Exit;
 
   MeasureTime := AWorkTable.ValueTime.GetDoubleValue;
   if MeasureTime <= 0 then
     Exit;
 
-  AvgFlow := AFlowMeter.ValueQuantity.GetDoubleValue / MeasureTime;
-  if AWorkTable.ValueFlowRate <> nil then
-    Result := AWorkTable.ValueFlowRate.GetStrNum(AvgFlow)
-  else
-    Result := AFlowMeter.ValueFlow.GetStrNum(AvgFlow);
+  AAverageFlow := AFlowMeter.ValueQuantity.GetDoubleValue / MeasureTime;
+  Result := True;
+end;
+
+function TFrameMainTable.CalculateCurrentDeviationPercent(
+  const ACurrentValue, AMeanValue: Double): Double;
+begin
+  if Abs(AMeanValue) <= CurrentDeviationEpsilon then
+    Exit(0);
+
+  Result := (ACurrentValue - AMeanValue) / Abs(AMeanValue) * 100;
 end;
 
 function TFrameMainTable.CalculateCurrentDeviationPercent(
@@ -8571,6 +8594,9 @@ procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
   WorkTable: TWorkTable;
+  FlowMeter: TFlowMeter;
+  CurrentFlow: Double;
+  AverageFlow: Double;
 begin
   WorkTable := FActiveWorkTable;
 
@@ -8648,11 +8674,14 @@ begin
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceStd1 then
     begin
-      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) then
+      FlowMeter := WorkTable.DeviceChannels[ARow].FlowMeter;
+      if (FlowMeter <> nil) and (FlowMeter.ValueFlow <> nil) and
+         TryGetAverageFlow(FlowMeter, WorkTable, AverageFlow) then
+      begin
+        CurrentFlow := FlowMeter.ValueFlow.GetDoubleValue;
         Value := FormatValue(CalculateCurrentDeviationPercent(
-          WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetDoubleValue,
-          WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetDoubleMeanValue), -1, 10)
+          CurrentFlow, AverageFlow), 2, 0);
+      end
       else
         Value := '-';
     end
@@ -9128,6 +9157,9 @@ procedure TFrameMainTable.GridEtalonsGetValue(Sender: TObject;
   const ACol, ARow: Integer; var Value: TValue);
 var
   WorkTable: TWorkTable;
+  FlowMeter: TFlowMeter;
+  CurrentFlow: Double;
+  AverageFlow: Double;
 begin
 
   WorkTable := FActiveWorkTable;
@@ -9207,11 +9239,14 @@ begin
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonStd1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
+      FlowMeter := WorkTable.EtalonChannels[ARow].FlowMeter;
+      if (FlowMeter <> nil) and (FlowMeter.ValueFlow <> nil) and
+         TryGetAverageFlow(FlowMeter, WorkTable, AverageFlow) then
+      begin
+        CurrentFlow := FlowMeter.ValueFlow.GetDoubleValue;
         Value := FormatValue(CalculateCurrentDeviationPercent(
-          WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetDoubleValue,
-          WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetDoubleMeanValue), -1, 10)
+          CurrentFlow, AverageFlow), 2, 0);
+      end
       else
         Value := '-';
     end
