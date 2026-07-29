@@ -1,0 +1,158 @@
+unit uGraphsViewConfig;
+
+interface
+
+uses
+  System.Generics.Collections,
+  System.SysUtils,
+  System.UITypes;
+
+type
+  TGraphLayoutKind = (glSingle, glTwoRows, glTwoColumns, glGrid2x2);
+  TGraphSourceKind = (gskFlow, gskTemperature, gskPressure, gskMass,
+    gskVolume, gskCustomMeterValue);
+  TGraphSeriesOwnerKind = (gsokEtalon, gsokDevice, gsokWorkTable, gsokSystem);
+
+  { Configuration is deliberately independent of FMX controls and runtime samples. }
+  TGraphSeriesConfig = class
+  public
+    GraphIndex: Integer;
+    OwnerKind: TGraphSeriesOwnerKind;
+    SourceKind: TGraphSourceKind;
+    ChannelUUID: string;
+    MeterValueKey: string;
+    Caption: string;
+    Color: TAlphaColor;
+    Visible: Boolean;
+    Valid: Boolean;
+    constructor Create;
+    function SourceIdentity: string;
+  end;
+
+  TGraphPanelConfig = class
+  private
+    FSeries: TObjectList<TGraphSeriesConfig>;
+  public
+    Title: string;
+    ShowTarget: Boolean;
+    ShowTolerance: Boolean;
+    constructor Create(const ATitle: string);
+    destructor Destroy; override;
+    function FindSeries(const ASeries: TGraphSeriesConfig): TGraphSeriesConfig;
+    function AddSeries(const ASeries: TGraphSeriesConfig): Boolean;
+    property Series: TObjectList<TGraphSeriesConfig> read FSeries;
+  end;
+
+  TGraphsViewConfig = class
+  private
+    FPanels: TObjectList<TGraphPanelConfig>;
+  public
+    GraphCount: Integer;
+    LayoutKind: TGraphLayoutKind;
+    ShowLegend: Boolean;
+    SettingsPanelVisible: Boolean;
+    constructor Create;
+    destructor Destroy; override;
+    procedure Reset;
+    procedure EnsurePanelCount(const ACount: Integer);
+    property Panels: TObjectList<TGraphPanelConfig> read FPanels;
+  end;
+
+implementation
+
+constructor TGraphSeriesConfig.Create;
+begin
+  inherited Create;
+  Color := TAlphaColors.Blue;
+  Visible := True;
+  Valid := True;
+end;
+
+function TGraphSeriesConfig.SourceIdentity: string;
+begin
+  Result := Format('%d|%d|%s|%s', [Ord(OwnerKind), Ord(SourceKind),
+    LowerCase(Trim(ChannelUUID)), LowerCase(Trim(MeterValueKey))]);
+end;
+
+constructor TGraphPanelConfig.Create(const ATitle: string);
+begin
+  inherited Create;
+  Title := ATitle;
+  ShowTarget := True;
+  ShowTolerance := True;
+  FSeries := TObjectList<TGraphSeriesConfig>.Create(True);
+end;
+
+destructor TGraphPanelConfig.Destroy;
+begin
+  FSeries.Free;
+  inherited;
+end;
+
+function TGraphPanelConfig.FindSeries(
+  const ASeries: TGraphSeriesConfig): TGraphSeriesConfig;
+var
+  Item: TGraphSeriesConfig;
+begin
+  Result := nil;
+  if ASeries = nil then
+    Exit;
+  for Item in FSeries do
+    if SameText(Item.SourceIdentity, ASeries.SourceIdentity) then
+      Exit(Item);
+end;
+
+function TGraphPanelConfig.AddSeries(
+  const ASeries: TGraphSeriesConfig): Boolean;
+var
+  Existing: TGraphSeriesConfig;
+begin
+  Result := False;
+  if ASeries = nil then
+    Exit;
+  Existing := FindSeries(ASeries);
+  if Existing <> nil then
+  begin
+    Existing.Visible := True;
+    Exit;
+  end;
+  FSeries.Add(ASeries);
+  Result := True;
+end;
+
+constructor TGraphsViewConfig.Create;
+begin
+  inherited Create;
+  FPanels := TObjectList<TGraphPanelConfig>.Create(True);
+  Reset;
+end;
+
+destructor TGraphsViewConfig.Destroy;
+begin
+  FPanels.Free;
+  inherited;
+end;
+
+procedure TGraphsViewConfig.EnsurePanelCount(const ACount: Integer);
+var
+  Wanted: Integer;
+begin
+  Wanted := ACount;
+  if Wanted < 1 then Wanted := 1;
+  if Wanted > 4 then Wanted := 4;
+  while FPanels.Count < Wanted do
+    FPanels.Add(TGraphPanelConfig.Create(Format('График %d', [FPanels.Count + 1])));
+  GraphCount := Wanted;
+end;
+
+procedure TGraphsViewConfig.Reset;
+begin
+  GraphCount := 2;
+  LayoutKind := glTwoRows;
+  ShowLegend := True;
+  SettingsPanelVisible := True;
+  FPanels.Clear;
+  EnsurePanelCount(GraphCount);
+end;
+
+end.
