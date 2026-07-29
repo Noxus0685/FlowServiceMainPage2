@@ -672,6 +672,9 @@ type
       AWorkTables: TObjectList<TWorkTable>); static;
 
   procedure Rebind;
+  { Clears the current work-table task point without destroying
+    or replacing the CurrentPoint object. }
+  procedure ResetCurrentPoint;
   procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
   function AddPump(const APumpName: string): TPump; overload;
   function AddPump(APump: TPump): Boolean; overload;
@@ -729,7 +732,22 @@ type
     property TimeSet: Integer read FTimeSet write FTimeSet;
     property LimitImpSet: Integer read FLimitImpSet write FLimitImpSet;
     property LimitVolumeSet: Double read FLimitVolumeSet write FLimitVolumeSet;
-    property CurrentPoint:  TDevicePoint read FCurrentPoint write FCurrentPoint;
+    { Current point of the work-table task.
+
+      The object belongs to TWorkTable and exists during the whole lifetime
+      of the work table.
+
+      In automatic measurement mode, its values are formed from the point
+      selected by TMeasurementRun and are used as the currently displayed
+      and executed work-table task.
+
+      In manual mode, TMeasurementRun does not replace this point
+      automatically. Its values are formed from the current work-table
+      settings.
+
+      ResetCurrentPoint clears the point values but does not destroy
+      or replace the object. }
+    property CurrentPoint: TDevicePoint read FCurrentPoint;
     property InstalledMeasurementPointUUID: string read FInstalledMeasurementPointUUID write FInstalledMeasurementPointUUID;
     property InstalledMeasurementPointIndex: Integer read FInstalledMeasurementPointIndex write FInstalledMeasurementPointIndex;
     property InstalledMeasurementTargetFlowLS: Double read FInstalledMeasurementTargetFlowLS write FInstalledMeasurementTargetFlowLS;
@@ -2069,15 +2087,8 @@ begin
   FSimulationTargetFlowBase := 0;
   FDeviceSimulationFlowRate := 0;
   FHasDeviceSimulationFlowRate := False;
-  FInstalledMeasurementPointUUID := '';
-  FInstalledMeasurementPointIndex := -1;
-  FInstalledMeasurementTargetFlowLS := 0;
-
   FCurrentPoint := TDevicePoint.Create(0);
-  FCurrentPoint.LimitTime := -1;
-  FCurrentPoint.LimitImp := -1;
-  FCurrentPoint.LimitVolume := -1;
-  FCurrentPoint.StopCriteria := [];
+  ResetCurrentPoint;
 
   FLayoutFlowRateVisible := True;
   FLayoutPumpVisible := True;
@@ -5472,14 +5483,39 @@ begin
   FInstalledMeasurementPointUUID := APoint.UUID;
   FInstalledMeasurementTargetFlowLS := APoint.Q;
 
-if FCurrentPoint = nil then
-  FCurrentPoint := TDevicePoint.Create;
+  if FCurrentPoint = nil then
+    FCurrentPoint := TDevicePoint.Create(0);
 
-
+  // Publish the selected automatic measurement point as the current
+  // work-table task. CurrentPoint remains owned by TWorkTable.
     FCurrentPoint.Assign(APoint, True);
 
  // Notify(notifyStateChanged, APoint);
   DoProcNextStep(Format('Point %d', [APointIndex + 1]));
+end;
+
+procedure TWorkTable.ResetCurrentPoint;
+var
+  InitialPoint: TDevicePoint;
+begin
+  if FCurrentPoint = nil then
+    FCurrentPoint := TDevicePoint.Create(0);
+
+  InitialPoint := TDevicePoint.Create(0);
+  try
+    FCurrentPoint.Assign(InitialPoint, True);
+  finally
+    InitialPoint.Free;
+  end;
+
+  FCurrentPoint.LimitTime := -1;
+  FCurrentPoint.LimitImp := -1;
+  FCurrentPoint.LimitVolume := -1;
+  FCurrentPoint.StopCriteria := [];
+
+  FInstalledMeasurementPointUUID := '';
+  FInstalledMeasurementPointIndex := -1;
+  FInstalledMeasurementTargetFlowLS := 0;
 end;
 
 procedure TWorkTable.ResetMeasurementValues;

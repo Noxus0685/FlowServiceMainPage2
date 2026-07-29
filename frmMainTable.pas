@@ -7551,7 +7551,8 @@ begin
       FAutoTestStopRequested := False;
       OldState := WT.State;
       OldSimulation := WT.IsSimulationMode;
-      OldPoint := WT.CurrentPoint;
+      OldPoint := TDevicePoint.Create(0);
+      OldPoint.Assign(WT.CurrentPoint, True);
       try
         if WT.FlowRate <> nil then SnapshotMeter(WT.FlowRate.Value, OldFlowSamples, OldFlowValue);
         if WT.FluidTemp <> nil then SnapshotMeter(WT.FluidTemp.Value, OldTempSamples, OldTempValue);
@@ -7797,7 +7798,8 @@ begin
       if WT.FluidPress <> nil then RestoreMeter(WT.FluidPress.Value, OldPressSamples, OldPressValue);
       TMeterValue.DisableVirtualClock;
       WT.IsSimulationMode := OldSimulation;
-      WT.CurrentPoint := OldPoint;
+      WT.CurrentPoint.Assign(OldPoint, True);
+      FreeAndNil(OldPoint);
       WT.State := OldState;
       FAutoTestRealCommandsBlocked := False;
       FAutoTestRunning := False;
