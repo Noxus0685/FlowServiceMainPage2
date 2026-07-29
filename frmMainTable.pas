@@ -3059,6 +3059,7 @@ begin
   Column.Visible := not Column.Visible;
   MenuItem.IsChecked := Column.Visible;
   SaveLayoutSettingsToWorkTable;
+  FLastPopupGrid.Realign;
   FLastPopupGrid.Repaint;
 end;
 
