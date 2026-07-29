@@ -325,6 +325,11 @@ type
     FSetupStartedMs: Int64;
     FStabilityDataStartMs: Int64;
     FLastWaitPointSetupLogMs: Int64;
+    FLastFreshDataLogMs: Int64;
+    FLastPointDecisionLogMs: Int64;
+    FLastPointDecisionText: string;
+    FLastTemperatureReady: Boolean;
+    FLastPressureReady: Boolean;
     FLastWaitPointSetupLogState: EStateWorkTable;
     FDeviceStability: TArray<TDeviceStabilityInfo>;
     FRunCompleted: Boolean;
@@ -407,7 +412,8 @@ type
     function GetRuntimeTargetFlowLS: Double;
     function GetSelectedEtalonUUID: string;
     function IsSetupPointSynchronized(out AReason: string): Boolean;
-    function HasNewStabilityDataSince(const ATimeStampMs: Int64; out AFirstSampleTimeMs: Int64): Boolean;
+    function HasNewStabilityDataSince(const ATimeStampMs: Int64; out AFirstSampleTimeMs,
+      ALastSampleTimeMs: Int64; out ASampleCount: Integer): Boolean;
     function BuildPointSetupIdentityLog: string;
     function CalcStableTimeoutSec: Integer;
     procedure ResetPointSetupState;
@@ -420,6 +426,10 @@ type
     /// </summary>
     procedure ConfigureTargetRangeByPoint(AValue: TMeterValue; APoint: TDevicePoint;
       const ACheckCurrent, ACheckAverage: Boolean);
+    procedure LogPointSetupValueConfigured(const AName: string; AValue: TMeterValue);
+    function BuildPointSetupSignalLog(const AName, ASource, AChannelDetails: string;
+      AValue: TMeterValue; const AInfo: TMeterValueStabilityInfo;
+      const ACurrentMs: Int64): string;
     /// <summary>Находит собственную поверочную точку заданного канала.</summary>
     function FindDevicePoint(AChannel: TChannel): TDevicePoint;
     /// <summary>
@@ -581,6 +591,55 @@ begin
   Settings.RequireMeanValueInRange := ACheckAverage;
   Settings.RequireForecastInRange := False;
   AValue.StabilitySettings := Settings;
+end;
+
+procedure TMeasurementRun.LogPointSetupValueConfigured(const AName: string;
+  AValue: TMeterValue);
+var
+  S: TMeterValueStabilitySettings;
+  LowerLimit, UpperLimit: Double;
+  RangeText: string;
+begin
+  if AValue = nil then
+    Exit;
+  S := AValue.StabilitySettings;
+  if S.RequireCurrentValueInRange or S.RequireMeanValueInRange then
+  begin
+    CalculateTargetLimits(S.TargetValue, S.TargetAccuracyPlusPercent,
+      S.TargetAccuracyMinusPercent, S.TargetToleranceAbsolute, LowerLimit, UpperLimit);
+    RangeText := Format('; LowerLimit=%.6f; UpperLimit=%.6f', [LowerLimit, UpperLimit]);
+  end
+  else
+    RangeText := '; RangeChecksEnabled=False';
+  ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitPointSetup',
+    'Применены настройки стабилизации',
+    Format('PointSetupValueConfigured: Name=%s; Target=%.6f; MaxVariation=%.9f; MaxStdDeviation=%.9f; MaxTrendRate=%.9f; MinSampleCount=%d; MinWindowDurationSec=%.3f; MaxOutlierRatio=%.9f; CheckCurrentRange=%s; CheckMeanRange=%s%s',
+      [AName, S.TargetValue, S.MaxVariation, S.MaxStdDeviation, S.MaxTrendRate,
+       S.MinSampleCount, S.MinWindowDurationSec, S.MaxOutlierFraction,
+       BoolToStr(S.RequireCurrentValueInRange, True),
+       BoolToStr(S.RequireMeanValueInRange, True), RangeText]));
+end;
+
+function TMeasurementRun.BuildPointSetupSignalLog(const AName, ASource,
+  AChannelDetails: string; AValue: TMeterValue;
+  const AInfo: TMeterValueStabilityInfo; const ACurrentMs: Int64): string;
+var
+  S: TMeterValueStabilitySettings;
+begin
+  S := AValue.StabilitySettings;
+  Result := Format('PointSetupSignal: Name=%s; Source=%s; %sObjectAddress=%p; Current=%.6f; Mean=%.6f; Target=%.6f; LowerLimit=%.6f; UpperLimit=%.6f; SampleCount=%d; FirstSampleTimeMs=%d; LastSampleTimeMs=%d; WindowDurationSec=%.3f; RequiredWindowDurationSec=%.3f; Variation=%.9f; MaxVariation=%.9f; StdDeviation=%.9f; MaxStdDeviation=%.9f; TrendRate=%.9f; MaxTrendRate=%.9f; OutlierRatio=%.9f; MaxOutlierRatio=%.9f; IsSignalStable=%s; IsCurrentInRange=%s; IsMeanInRange=%s; IsSuitableForMeasurement=%s; Status=%d; Reason=%s; WaitMs=%d',
+    [AName, ASource, AChannelDetails, Pointer(AValue), AInfo.CurrentValue,
+     AInfo.MeanValue, S.TargetValue, AInfo.StabilityLowerLimit,
+     AInfo.StabilityUpperLimit, AInfo.UsedSampleCount,
+     AInfo.FirstWindowSampleTimeMs, AInfo.LastWindowSampleTimeMs,
+     AInfo.ActualWindowDurationSec, S.MinWindowDurationSec, AInfo.Variation,
+     S.MaxVariation, AInfo.StdDeviation, S.MaxStdDeviation, AInfo.TrendRate,
+     S.MaxTrendRate, AInfo.OutlierFraction, S.MaxOutlierFraction,
+     BoolToStr(AInfo.IsSignalStable, True),
+     BoolToStr(AInfo.IsCurrentValueInRange, True),
+     BoolToStr(AInfo.IsMeanValueInRange, True),
+     BoolToStr(AInfo.IsSuitableForMeasurement, True), Ord(AInfo.Status),
+     AInfo.StatusText, ACurrentMs - FSetupStartedMs]);
 end;
 
 function GetAccuracyWidth(const AAccuracy: string): Double;
@@ -835,6 +894,11 @@ begin
   FSetupStartedMs := 0;
   FStabilityDataStartMs := 0;
   FLastWaitPointSetupLogMs := 0;
+  FLastFreshDataLogMs := 0;
+  FLastPointDecisionLogMs := 0;
+  FLastPointDecisionText := '';
+  FLastTemperatureReady := True;
+  FLastPressureReady := True;
   FLastWaitPointSetupLogState := swtNONE;
 end;
 
@@ -1308,17 +1372,22 @@ var
   I: Integer;
   Channel: TChannel;
   Point: TDevicePoint;
+  CurrentMs: Int64;
+  SelectedCount: Integer;
 begin
   SetCurrentPointStatus(mptsSetupPoint);
   if FWorkTable = nil then
     Exit;
 
   Point := GetCurrentPoint;
+  CurrentMs := TMeterValue.GetMonotonicTimeMs;
+  SelectedCount := 0;
   if (FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.Value <> nil) then
   begin
     ConfigureStabilityByPoint(FWorkTable.FlowRate.Value, Point);
     ConfigureTargetRangeByPoint(FWorkTable.FlowRate.Value, Point, True, True);
     FWorkTable.FlowRate.Value.ResetStabilityRuntimeState;
+    LogPointSetupValueConfigured('SystemFlow', FWorkTable.FlowRate.Value);
   end;
   if FWorkTable.EtalonChannels <> nil then
     for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
@@ -1327,9 +1396,12 @@ begin
       if (Channel <> nil) and (Channel.FlowMeter <> nil) and
          (Channel.FlowMeter.ValueFlow <> nil) then
       begin
+        Inc(SelectedCount);
         ConfigureStabilityByPoint(Channel.FlowMeter.ValueFlow, Point);
         ConfigureTargetRangeByPoint(Channel.FlowMeter.ValueFlow, Point, True, True);
         Channel.FlowMeter.ValueFlow.ResetStabilityRuntimeState;
+        LogPointSetupValueConfigured('Etalon/' + Channel.Name,
+          Channel.FlowMeter.ValueFlow);
       end;
     end;
   // Новое окно поверяемого сигнала начинается при входе в ожидание установки,
@@ -1348,10 +1420,18 @@ begin
     [FSetupPointIndex, FSetupPointUUID, FSetupTargetFlowLS, GetSelectedEtalonUUID,
      TWorkTable.WorkTableStateToString(FWorkTable.State), FAttempt, BoolToStr(FPointSetupCommandSent, True)]));
   if Point <> nil then
+  begin
     ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitPointSetup',
       'Начато ожидание готовности испытательной установки',
-      Format('Point=%s; Q=%.6f; SetupStartedMs=%d',
-        [Point.Name, Point.Q, FSetupStartedMs]));
+      Format('PointSetupStarted: PointIndex=%d; PointName=%s; PointUUID=%s; TargetQ=%.6f; Error=%.6f; FlowAccuracy=%s; SetupStartedMs=%d; StabilityDataStartMs=%d; TimeoutSec=%d; WorkTableState=%s; SelectedEtalonCount=%d',
+        [FCurrentPointIndex, Point.Name, Point.UUID, Point.Q, Point.Error,
+         Point.FlowAccuracy, FSetupStartedMs, FStabilityDataStartMs,
+         CalcStableTimeoutSec, TWorkTable.WorkTableStateToString(FWorkTable.State),
+         SelectedCount]));
+    FLastFreshDataLogMs := 0;
+    FLastPointDecisionLogMs := 0;
+    FLastPointDecisionText := '';
+  end;
   if (FWorkTable <> nil) and (FWorkTable.State <> swtMONITOR) then
     FWorkTable.StartMonitor;
 end;
@@ -1435,11 +1515,15 @@ begin
           FDeviceStability[N].RequiredTimeSec := DevicePoint.Pause;
       end;
       Settings := FDeviceStability[N].Value.StabilitySettings;
-      LogText := Format('DeviceStabilityStarted: Channel=%s; Point=%s; Q=%.6f; Error=%.6f; Mode=%s; MaxVariation=%.9f; MaxStdDeviation=%.9f; MaxTrendRate=%.9f; RequiredSec=%.3f; TimeoutSec=%.3f',
-        [Channel.Name, DevicePoint.Name, DevicePoint.Q, DevicePoint.Error,
+      LogText := Format('DeviceStabilityStarted: Channel=%s; Device=%s; Serial=%s; Point=%s; Mode=%s; TargetQ=%.6f; Error=%.6f; MaxVariation=%.9f; MaxStdDeviation=%.9f; MaxTrendRate=%.9f; RequiredSec=%.3f; TimeoutSec=%.3f; StartedMs=%d; StabilityAnalysisUsed=%s; RangeChecksEnabled=False',
+        [Channel.Name, Channel.FlowMeter.Name, Channel.FlowMeter.SerialNumber,
+         DevicePoint.Name,
          IfThen(FDeviceStability[N].TimeoutSec > 0, 'Auto', 'FixedTime'),
+         DevicePoint.Q, DevicePoint.Error,
          Settings.MaxVariation, Settings.MaxStdDeviation, Settings.MaxTrendRate,
-         FDeviceStability[N].RequiredTimeSec, FDeviceStability[N].TimeoutSec]);
+         FDeviceStability[N].RequiredTimeSec, FDeviceStability[N].TimeoutSec,
+         FWaitStableStartedMs,
+         BoolToStr(FDeviceStability[N].TimeoutSec > 0, True)]);
       AddDiagnosticEvent(LogText);
       ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitStable',
         'Настроено ожидание стабилизации поверяемого прибора', LogText);
@@ -1851,41 +1935,42 @@ end;
 /// </remarks>
 function TMeasurementRun.IsPointSetupReady(out AInfo: RStableInfo): Boolean;
 var
-  I: Integer;
+  I, SelectedCount: Integer;
   Channel: TChannel;
   Value: TMeterValue;
   SignalInfo: TMeterValueStabilityInfo;
   ConditionsInfo: RStableInfo;
-  PrimaryReady, EtalonsReady, HasReadyEtalon: Boolean;
-  Source, LogText: string;
+  PrimaryAvailable, PrimaryReady, EtalonsReady, HasReadyEtalon: Boolean;
+  TemperatureReady, PressureReady, ConditionsReady: Boolean;
+  EffectiveSource, Reason, LogText, ChannelDetails, DecisionKey: string;
   PublishProtocol: Boolean;
+  CurrentMs: Int64;
 begin
   AInfo := Default(RStableInfo);
   Result := False;
+  CurrentMs := TMeterValue.GetMonotonicTimeMs;
   if (FWorkTable = nil) or (GetCurrentPoint = nil) then
     Exit;
-  PublishProtocol := (TMeterValue.GetMonotonicTimeMs - FLastWaitPointSetupLogMs >= 2000);
 
+  PrimaryAvailable := (FWorkTable.FlowRate <> nil) and
+    (FWorkTable.FlowRate.Value <> nil);
   PrimaryReady := False;
-  if (FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.Value <> nil) then
+  EtalonsReady := True;
+  HasReadyEtalon := False;
+  SelectedCount := 0;
+  EffectiveSource := 'None';
+
+  if PrimaryAvailable then
   begin
     Value := FWorkTable.FlowRate.Value;
     Value.AnalyzeStabilityForMeasurement(FStabilityDataStartMs,
       Value.StabilitySettings, SignalInfo);
     PrimaryReady := SignalInfo.IsSuitableForMeasurement;
-    LogText := Format('SetupParameter: Name=SystemFlow; Source=Primary; Current=%.6f; Mean=%.6f; Target=%.6f; Lower=%.6f; Upper=%.6f; IsSignalStable=%s; IsSuitableForMeasurement=%s; Reason=%s; WaitMs=%d',
-      [SignalInfo.CurrentValue, SignalInfo.MeanValue, Value.StabilitySettings.TargetValue,
-       SignalInfo.StabilityLowerLimit, SignalInfo.StabilityUpperLimit,
-       BoolToStr(SignalInfo.IsSignalStable, True), BoolToStr(PrimaryReady, True),
-       SignalInfo.StatusText, TMeterValue.GetMonotonicTimeMs - FSetupStartedMs]);
+    LogText := BuildPointSetupSignalLog('SystemFlow', 'WorkTable.FlowRate', '',
+      Value, SignalInfo, CurrentMs);
     AddDiagnosticEvent(LogText);
-    if PublishProtocol then
-      ProtocolManager.AddMessage(pcProc, psMeasurement, 'IsPointSetupReady',
-        'Проверка основного источника системного расхода', LogText);
   end;
 
-  EtalonsReady := True;
-  HasReadyEtalon := False;
   if FWorkTable.EtalonChannels <> nil then
     for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
     begin
@@ -1893,44 +1978,92 @@ begin
       if (Channel = nil) or not Channel.Enabled or (Channel.State = osDeleted) or
          (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) then
         Continue;
+      Inc(SelectedCount);
       Value := Channel.FlowMeter.ValueFlow;
       Value.AnalyzeStabilityForMeasurement(FStabilityDataStartMs,
         Value.StabilitySettings, SignalInfo);
       HasReadyEtalon := HasReadyEtalon or SignalInfo.IsSuitableForMeasurement;
       EtalonsReady := EtalonsReady and SignalInfo.IsSuitableForMeasurement;
-      LogText := Format('SetupParameter: Name=Etalon/%s; Current=%.6f; Mean=%.6f; Target=%.6f; Lower=%.6f; Upper=%.6f; IsSignalStable=%s; IsSuitableForMeasurement=%s; Reason=%s; WaitMs=%d',
-        [Channel.Name, SignalInfo.CurrentValue, SignalInfo.MeanValue, Value.StabilitySettings.TargetValue,
-         SignalInfo.StabilityLowerLimit, SignalInfo.StabilityUpperLimit,
-         BoolToStr(SignalInfo.IsSignalStable, True),
-         BoolToStr(SignalInfo.IsSuitableForMeasurement, True), SignalInfo.StatusText,
-         TMeterValue.GetMonotonicTimeMs - FSetupStartedMs]);
+      ChannelDetails := Format('ChannelIndex=%d; ChannelName=%s; ChannelGroup=%d; ',
+        [I, Channel.Name, Channel.Group]);
+      LogText := BuildPointSetupSignalLog('Etalon/' + Channel.Name,
+        'EtalonChannel', ChannelDetails, Value, SignalInfo, CurrentMs);
       AddDiagnosticEvent(LogText);
-      if PublishProtocol then
-        ProtocolManager.AddMessage(pcProc, psMeasurement, 'IsPointSetupReady',
-          'Проверка выбранного эталонного канала', LogText);
     end;
-  if PrimaryReady then Source := 'Primary' else Source := 'EtalonFallback';
-  LogText := 'SystemFlowSource=' + Source + '; Suitable=' +
-    BoolToStr(PrimaryReady or HasReadyEtalon, True);
-  AddDiagnosticEvent(LogText);
+
+  ConditionsReady := IsConditionsStable(ConditionsInfo);
+  TemperatureReady := FLastTemperatureReady;
+  PressureReady := FLastPressureReady;
+  { Preserve the existing fallback decision exactly: a ready selected etalon may
+    satisfy system flow, but the algorithm does not select a concrete etalon. }
+  if PrimaryReady then
+    EffectiveSource := 'Primary';
+  Result := (PrimaryReady or HasReadyEtalon) and EtalonsReady and ConditionsReady;
+  if Result then
+    Reason := 'Все обязательные проверки установки выполнены'
+  else if not (PrimaryReady or HasReadyEtalon) then
+    Reason := 'Нет готового источника системного расхода'
+  else if not EtalonsReady then
+    Reason := 'Не все выбранные эталоны готовы'
+  else
+    Reason := ConditionsInfo.StatusText;
+
+  LogText := Format('PointSetupDecision: PointIndex=%d; PointName=%s; WaitMs=%d; TimeoutMs=%d; FreshDataReady=True; PrimaryAvailable=%s; PrimaryReady=%s; FallbackAvailable=%s; FallbackReady=%s; FallbackCandidateReady=%s; EffectiveSystemFlowSource=%s; SelectedEtalonCount=%d; AllEtalonsReady=%s; TemperatureReady=%s; PressureReady=%s; ConditionsReady=%s; Result=%s; Reason=%s',
+    [FCurrentPointIndex, GetCurrentPoint.Name, CurrentMs - FSetupStartedMs,
+     CalcStableTimeoutSec * 1000, BoolToStr(PrimaryAvailable, True),
+     BoolToStr(PrimaryReady, True), BoolToStr(SelectedCount > 0, True),
+     BoolToStr(HasReadyEtalon, True), BoolToStr(HasReadyEtalon, True),
+     EffectiveSource, SelectedCount, BoolToStr(EtalonsReady, True),
+     BoolToStr(TemperatureReady, True), BoolToStr(PressureReady, True),
+     BoolToStr(ConditionsReady, True), BoolToStr(Result, True), Reason]);
+  DecisionKey := Format('%s|%s|%s|%s|%s|%s',
+    [BoolToStr(PrimaryReady, True), BoolToStr(HasReadyEtalon, True),
+     BoolToStr(EtalonsReady, True), BoolToStr(TemperatureReady, True),
+     BoolToStr(PressureReady, True), Reason]);
+  PublishProtocol := Result or (DecisionKey <> FLastPointDecisionText) or
+    (CurrentMs - FLastPointDecisionLogMs >= 2000);
   if PublishProtocol then
   begin
-    FLastWaitPointSetupLogMs := TMeterValue.GetMonotonicTimeMs;
+    { Publish all signal snapshots as one coherent decision group. }
+    if PrimaryAvailable then
+    begin
+      Value := FWorkTable.FlowRate.Value;
+      Value.AnalyzeStabilityForMeasurement(FStabilityDataStartMs,
+        Value.StabilitySettings, SignalInfo);
+      ProtocolManager.AddMessage(pcProc, psMeasurement, 'IsPointSetupReady',
+        'Диагностика системного расхода', BuildPointSetupSignalLog('SystemFlow',
+        'WorkTable.FlowRate', '', Value, SignalInfo, CurrentMs));
+    end;
+    if FWorkTable.EtalonChannels <> nil then
+      for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+      begin
+        Channel := FWorkTable.EtalonChannels[I];
+        if (Channel = nil) or not Channel.Enabled or (Channel.State = osDeleted) or
+           (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) then Continue;
+        Value := Channel.FlowMeter.ValueFlow;
+        Value.AnalyzeStabilityForMeasurement(FStabilityDataStartMs,
+          Value.StabilitySettings, SignalInfo);
+        ChannelDetails := Format('ChannelIndex=%d; ChannelName=%s; ChannelGroup=%d; ',
+          [I, Channel.Name, Channel.Group]);
+        ProtocolManager.AddMessage(pcProc, psMeasurement, 'IsPointSetupReady',
+          'Диагностика выбранного эталона', BuildPointSetupSignalLog(
+          'Etalon/' + Channel.Name, 'EtalonChannel', ChannelDetails, Value,
+          SignalInfo, CurrentMs));
+      end;
     ProtocolManager.AddMessage(pcProc, psMeasurement, 'IsPointSetupReady',
-      'Выбран источник системного расхода', LogText);
+      'Итоговое решение о готовности установки', LogText);
+    FLastPointDecisionLogMs := CurrentMs;
+    FLastPointDecisionText := DecisionKey;
   end;
-  Result := (PrimaryReady or HasReadyEtalon) and EtalonsReady and
-    IsConditionsStable(ConditionsInfo);
-  if not Result then
+  if Result then
   begin
-    AInfo := ConditionsInfo;
-    if AInfo.StatusText = '' then
-      AInfo.StatusText := 'System flow or selected etalon is not suitable for measurement';
+    AInfo.Status := sOk;
+    AInfo.StatusText := Reason;
   end
   else
   begin
-    AInfo.Status := sOk;
-    AInfo.StatusText := 'PointSetupReady=True';
+    AInfo := ConditionsInfo;
+    AInfo.StatusText := Reason;
   end;
 end;
 
@@ -1988,6 +2121,8 @@ var
   Point: TDevicePoint;
   ParamInfo: RStableInfo;
   TemperatureStable, PressureStable: Boolean;
+  LogText: string;
+  PublishProtocol: Boolean;
 begin
   StableInfo := Default(RStableInfo);
   Point := GetCurrentPoint;
@@ -1995,30 +2130,51 @@ begin
     Exit(False);
 
   TemperatureStable := True;
+  PublishProtocol := TMeterValue.GetMonotonicTimeMs - FLastPointDecisionLogMs >= 2000;
   if (FWorkTable.FluidTemp <> nil) and (Point.Temp > 0) then
   begin
     TemperatureStable := FWorkTable.FluidTemp.IsStable(ParamInfo);
-    AddDiagnosticEvent(Format('TemperatureStable=%s; Actual=%.6f; Target=%.6f; Lower=%.6f; Upper=%.6f; Reason=%s',
-      [BoolToStr(TemperatureStable, True), ParamInfo.CurrentValue, ParamInfo.TargetValue,
-       ParamInfo.LowerLimit, ParamInfo.UpperLimit, ParamInfo.StatusText]));
+    LogText := Format('PointSetupCondition: Name=FluidTemp; Enabled=True; Current=%.6f; Mean=%.6f; Target=%.6f; LowerLimit=%.6f; UpperLimit=%.6f; IsSignalStable=%s; IsCurrentInRange=%s; IsMeanInRange=%s; IsSuitableForMeasurement=%s; Reason=%s',
+      [ParamInfo.CurrentValue, ParamInfo.MeanValue, ParamInfo.TargetValue,
+       ParamInfo.LowerLimit, ParamInfo.UpperLimit,
+       BoolToStr(ParamInfo.IsSignalStable, True), BoolToStr(ParamInfo.IsCurrentInRange, True),
+       BoolToStr(ParamInfo.IsMeanInRange, True), BoolToStr(TemperatureStable, True), ParamInfo.StatusText]);
+    AddDiagnosticEvent(LogText);
+    if PublishProtocol then ProtocolManager.AddMessage(pcProc, psMeasurement,
+      'IsConditionsStable', 'Диагностика температуры', LogText);
     if not TemperatureStable then
       StableInfo := ParamInfo;
   end
-  else
-    AddDiagnosticEvent('TemperatureStable=True; NotRequired=True');
+  else begin
+    LogText := 'PointSetupCondition: Name=FluidTemp; Enabled=False; Skipped=True; Reason=Parameter is not configured';
+    AddDiagnosticEvent(LogText);
+    if PublishProtocol then ProtocolManager.AddMessage(pcProc, psMeasurement,
+      'IsConditionsStable', 'Температура не контролируется', LogText);
+  end;
+  FLastTemperatureReady := TemperatureStable;
 
   PressureStable := True;
   if (FWorkTable.FluidPress <> nil) and (Point.Pressure > 0) then
   begin
     PressureStable := FWorkTable.FluidPress.IsStable(ParamInfo);
-    AddDiagnosticEvent(Format('PressureStable=%s; Actual=%.6f; Target=%.6f; Lower=%.6f; Upper=%.6f; Reason=%s',
-      [BoolToStr(PressureStable, True), ParamInfo.CurrentValue, ParamInfo.TargetValue,
-       ParamInfo.LowerLimit, ParamInfo.UpperLimit, ParamInfo.StatusText]));
+    LogText := Format('PointSetupCondition: Name=FluidPress; Enabled=True; Current=%.6f; Mean=%.6f; Target=%.6f; LowerLimit=%.6f; UpperLimit=%.6f; IsSignalStable=%s; IsCurrentInRange=%s; IsMeanInRange=%s; IsSuitableForMeasurement=%s; Reason=%s',
+      [ParamInfo.CurrentValue, ParamInfo.MeanValue, ParamInfo.TargetValue,
+       ParamInfo.LowerLimit, ParamInfo.UpperLimit,
+       BoolToStr(ParamInfo.IsSignalStable, True), BoolToStr(ParamInfo.IsCurrentInRange, True),
+       BoolToStr(ParamInfo.IsMeanInRange, True), BoolToStr(PressureStable, True), ParamInfo.StatusText]);
+    AddDiagnosticEvent(LogText);
+    if PublishProtocol then ProtocolManager.AddMessage(pcProc, psMeasurement,
+      'IsConditionsStable', 'Диагностика давления', LogText);
     if PressureStable = False then
       StableInfo := ParamInfo;
   end
-  else
-    AddDiagnosticEvent('PressureStable=True; NotRequired=True');
+  else begin
+    LogText := 'PointSetupCondition: Name=FluidPress; Enabled=False; Skipped=True; Reason=Parameter is not configured';
+    AddDiagnosticEvent(LogText);
+    if PublishProtocol then ProtocolManager.AddMessage(pcProc, psMeasurement,
+      'IsConditionsStable', 'Давление не контролируется', LogText);
+  end;
+  FLastPressureReady := PressureStable;
 
   Result := TemperatureStable and PressureStable;
   if Result then
@@ -4458,7 +4614,8 @@ begin
 end;
 
 function TMeasurementRun.HasNewStabilityDataSince(const ATimeStampMs: Int64;
-  out AFirstSampleTimeMs: Int64): Boolean;
+  out AFirstSampleTimeMs, ALastSampleTimeMs: Int64;
+  out ASampleCount: Integer): Boolean;
 var
   I, J: Integer;
   Channel: TChannel;
@@ -4466,6 +4623,8 @@ var
 begin
   Result := False;
   AFirstSampleTimeMs := 0;
+  ALastSampleTimeMs := 0;
+  ASampleCount := 0;
   if (FWorkTable = nil) or (FWorkTable.EtalonChannels = nil) then
     Exit;
   for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
@@ -4478,8 +4637,12 @@ begin
     for J := 0 to High(Samples) do
       if Samples[J].TimeStampMs > ATimeStampMs then
       begin
-        AFirstSampleTimeMs := Samples[J].TimeStampMs;
-        Exit(True);
+        Inc(ASampleCount);
+        if (AFirstSampleTimeMs = 0) or (Samples[J].TimeStampMs < AFirstSampleTimeMs) then
+          AFirstSampleTimeMs := Samples[J].TimeStampMs;
+        if Samples[J].TimeStampMs > ALastSampleTimeMs then
+          ALastSampleTimeMs := Samples[J].TimeStampMs;
+        Result := True;
       end;
   end;
 end;
@@ -4613,8 +4776,14 @@ var
   Reason: string;
   SetupInfo: RStableInfo;
   FirstSampleTimeMs: Int64;
+  LastSampleTimeMs: Int64;
+  FreshSampleCount: Integer;
   CurrentMs: Int64;
+  FreshLog: string;
+  Point: TDevicePoint;
 begin
+  CurrentMs := TMeterValue.GetMonotonicTimeMs;
+  Point := GetCurrentPoint;
   if FMode = mrmManual then
   begin
     SetStage(msWaitMeasureStart);
@@ -4629,10 +4798,18 @@ begin
 
   if FWorkTable.State <> swtMONITOR then
   begin
-    CurrentMs := TMeterValue.GetMonotonicTimeMs;
     if (FSetupStartedMs > 0) and (CurrentMs - FSetupStartedMs > SETUP_TIMEOUT_S * 1000) then
+    begin
+      ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitPointSetup',
+        'Тайм-аут запуска мониторинга', Format('PointSetupTimeout: PointIndex=%d; PointName=%s; ElapsedMs=%d; TimeoutMs=%d; WorkTableState=%s; FreshDataReady=False; LastDecisionResult=False; Reason=Мониторинг не запущен; Action=ContinueAfterPointError',
+        [FCurrentPointIndex, Point.Name, CurrentMs - FSetupStartedMs,
+         SETUP_TIMEOUT_S * 1000, TWorkTable.WorkTableStateToString(FWorkTable.State)]));
       ContinueAfterPointError(mptsSetupError, mePointNotSet, BuildError(1211,
-        'Мониторинг не запустился после установки точки'))
+        'Мониторинг не запустился после установки точки'));
+      ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitPointSetup',
+        'Тайм-аут обработан', Format('PointSetupTimeoutHandled: PointStatus=%d; MeasurementError=%s; NextStage=%s; ContinueMeasurement=%s',
+        [Ord(mptsSetupError), 'Мониторинг не запустился', MeasurementStateToString(FCurrentStage), BoolToStr(FCurrentStage <> msDone, True)]));
+    end
     else
       if (FLastWaitPointSetupLogState <> FWorkTable.State) or (CurrentMs - FLastWaitPointSetupLogMs >= 1000) then
       begin
@@ -4651,29 +4828,59 @@ begin
     Exit;
   end;
 
-  if not HasNewStabilityDataSince(FSetupStartedMs, FirstSampleTimeMs) then
+  if not HasNewStabilityDataSince(FSetupStartedMs, FirstSampleTimeMs,
+    LastSampleTimeMs, FreshSampleCount) then
   begin
-    CurrentMs := TMeterValue.GetMonotonicTimeMs;
-    if CurrentMs - FLastWaitPointSetupLogMs >= 1000 then
+    if CurrentMs - FLastFreshDataLogMs >= 2000 then
     begin
-      FLastWaitPointSetupLogMs := CurrentMs;
-      AddDiagnosticEvent('WaitPointSetup: history is not updated yet; ' + BuildPointSetupIdentityLog);
+      FLastFreshDataLogMs := CurrentMs;
+      FreshLog := Format('PointSetupFreshData: Ready=False; SinceMs=%d; CheckedSources=SelectedEtalonsOnly; SystemFlowFresh=False; EtalonsFresh=False; TemperatureFresh=False; PressureFresh=False; MissingSources=SelectedEtalons; FirstFreshSampleMs=0; LastFreshSampleMs=0; SampleCount=0; WaitMs=%d',
+        [FSetupStartedMs, CurrentMs - FSetupStartedMs]);
+      AddDiagnosticEvent(FreshLog);
+      ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitPointSetup',
+        'Ожидание новых данных после установки точки', FreshLog);
     end;
     Exit;
   end;
 
+  if FLastFreshDataLogMs <> -1 then
+  begin
+    FreshLog := Format('PointSetupFreshData: Ready=True; SinceMs=%d; CheckedSources=SelectedEtalonsOnly; ReadyTimeMs=%d; FirstFreshSampleMs=%d; LastFreshSampleMs=%d; SampleCount=%d; WaitMs=%d',
+      [FSetupStartedMs, CurrentMs, FirstSampleTimeMs, LastSampleTimeMs,
+       FreshSampleCount, CurrentMs - FSetupStartedMs]);
+    AddDiagnosticEvent(FreshLog);
+    ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitPointSetup',
+      'Получены новые данные после установки точки', FreshLog);
+    FLastFreshDataLogMs := -1;
+  end;
+
   if not IsPointSetupReady(SetupInfo) then
   begin
-    CurrentMs := TMeterValue.GetMonotonicTimeMs;
     if CurrentMs - FSetupStartedMs > SETUP_TIMEOUT_S * 1000 then
+    begin
+      ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitPointSetup',
+        'Тайм-аут стабилизации установки', Format('PointSetupTimeout: PointIndex=%d; PointName=%s; ElapsedMs=%d; TimeoutMs=%d; WorkTableState=%s; FreshDataReady=True; LastDecisionResult=False; Reason=%s; Action=ContinueAfterPointError',
+        [FCurrentPointIndex, Point.Name, CurrentMs - FSetupStartedMs,
+         SETUP_TIMEOUT_S * 1000, TWorkTable.WorkTableStateToString(FWorkTable.State), SetupInfo.StatusText]));
       ContinueAfterPointError(mptsStabilityError, meStableTimeout, BuildError(1213,
         'Установка не достигла стабильности или диапазона: ' + SetupInfo.StatusText));
+      ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitPointSetup',
+        'Тайм-аут обработан', Format('PointSetupTimeoutHandled: PointStatus=%d; MeasurementError=%s; NextStage=%s; ContinueMeasurement=%s',
+        [Ord(mptsStabilityError), SetupInfo.StatusText, MeasurementStateToString(FCurrentStage), BoolToStr(FCurrentStage <> msDone, True)]));
+    end;
     Exit;
   end;
   AddDiagnosticEvent(Format(
     'PointSetupConfirmed: WaitMs=%d; ActualFlowLS=%.6f; WorkTableState=%s; FirstSampleTimeMs=%d; StabilityDataStartMs=%d',
-    [TMeterValue.GetMonotonicTimeMs - FSetupStartedMs, GetRuntimeTargetFlowLS,
+    [CurrentMs - FSetupStartedMs, GetRuntimeTargetFlowLS,
      TWorkTable.WorkTableStateToString(FWorkTable.State), FirstSampleTimeMs, FStabilityDataStartMs]));
+  ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitPointSetup',
+    'Установка готова; переход к ожиданию приборов',
+    Format('PointSetupCompleted: PointIndex=%d; PointName=%s; Result=Ready; WaitMs=%d; EffectiveSystemFlowSource=%s; AllEtalonsReady=True; ConditionsReady=True; NextStage=msWaitStable',
+      [FCurrentPointIndex, Point.Name, CurrentMs - FSetupStartedMs,
+       IfThen((FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.Value <> nil) and
+         FWorkTable.FlowRate.Value.LastStabilityInfo.IsSuitableForMeasurement,
+         'Primary', 'None')]));
   SetStage(msWaitStable);
 end;
 
@@ -4695,6 +4902,7 @@ var
   AllCompleted, IsAuto: Boolean;
   ResultText, LogText: string;
   PublishProgress: Boolean;
+  FixedCount, StableCount, TimeoutCount: Integer;
 begin
   if FMode = mrmManual then
   begin
@@ -4743,11 +4951,14 @@ begin
             [FDeviceStability[I].Channel.Name, FDeviceStability[I].DevicePoint.Name,
              SignalInfo.StatusText]));
       end;
-      LogText := Format('DeviceStability: Channel=%s; Point=%s; WaitSec=%.3f; TimeoutSec=%.3f; IsSignalStable=%s; Current=%.6f; Mean=%.6f; Result=%d; Reason=%s',
-        [FDeviceStability[I].Channel.Name, FDeviceStability[I].DevicePoint.Name,
-         ElapsedMs / 1000, FDeviceStability[I].TimeoutSec,
-         BoolToStr(SignalInfo.IsSignalStable, True), SignalInfo.CurrentValue,
-         SignalInfo.MeanValue, Ord(FDeviceStability[I].Result), SignalInfo.StatusText]);
+      LogText := Format('DeviceStabilityProgress: Channel=%s; WaitSec=%.3f; TimeoutSec=%.3f; SampleCount=%d; WindowDurationSec=%.3f; Variation=%.9f; MaxVariation=%.9f; StdDeviation=%.9f; MaxStdDeviation=%.9f; TrendRate=%.9f; MaxTrendRate=%.9f; IsSignalStable=%s; RangeChecksEnabled=False; Reason=%s',
+        [FDeviceStability[I].Channel.Name, ElapsedMs / 1000,
+         FDeviceStability[I].TimeoutSec, SignalInfo.UsedSampleCount,
+         SignalInfo.ActualWindowDurationSec, SignalInfo.Variation,
+         FDeviceStability[I].Value.StabilitySettings.MaxVariation,
+         SignalInfo.StdDeviation, FDeviceStability[I].Value.StabilitySettings.MaxStdDeviation,
+         SignalInfo.TrendRate, FDeviceStability[I].Value.StabilitySettings.MaxTrendRate,
+         BoolToStr(SignalInfo.IsSignalStable, True), SignalInfo.StatusText]);
       AddDiagnosticEvent(LogText);
       if PublishProgress then
         ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitStable',
@@ -4757,8 +4968,13 @@ begin
     begin
       ResultText := GetEnumName(TypeInfo(TDeviceStabilityResult),
         Ord(FDeviceStability[I].Result));
-      LogText := Format('DeviceStabilityCompleted: Channel=%s; Result=%s; WaitSec=%.3f; Diagnostic=%s',
-        [FDeviceStability[I].Channel.Name, ResultText, ElapsedMs / 1000,
+      LogText := Format('DeviceStabilityCompleted: Channel=%s; Mode=%s; Result=%s; RequiredSec=%.3f; ActualWaitSec=%.3f; TimeoutSec=%.3f; IsSignalStable=%s; MeasurementWillContinue=True; NextAction=WaitOtherDevices; Reason=%s',
+        [FDeviceStability[I].Channel.Name, IfThen(IsAuto, 'Auto', 'FixedTime'),
+         IfThen(FDeviceStability[I].Result = dsrFixedTimeCompleted, 'FixedTimeCompleted',
+           IfThen(FDeviceStability[I].Result = dsrAutoStable, 'AutoStable', 'AutoTimeout')),
+         FDeviceStability[I].RequiredTimeSec, ElapsedMs / 1000,
+         FDeviceStability[I].TimeoutSec,
+         BoolToStr(FDeviceStability[I].Result = dsrAutoStable, True),
          FDeviceStability[I].DiagnosticText]);
       AddDiagnosticEvent(LogText);
       ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitStable',
@@ -4774,6 +4990,17 @@ begin
       AllCompleted := False;
   if not AllCompleted then
     Exit;
+  FixedCount := 0; StableCount := 0; TimeoutCount := 0;
+  for I := 0 to High(FDeviceStability) do
+    case FDeviceStability[I].Result of
+      dsrFixedTimeCompleted: Inc(FixedCount);
+      dsrAutoStable: Inc(StableCount);
+      dsrAutoTimeout: Inc(TimeoutCount);
+    end;
+  ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitStable',
+    'Итог ожидания поверяемых приборов',
+    Format('DeviceStabilityDecision: DeviceCount=%d; FixedTimeCompletedCount=%d; AutoStableCount=%d; AutoTimeoutCount=%d; AllDevicesCompleted=True; MeasurementWillStart=True; NextStage=msWaitMeasureStart; Reason=Все приборы завершили ожидание; автоматический тайм-аут некритичен',
+      [Length(FDeviceStability), FixedCount, StableCount, TimeoutCount]));
   FireEvent(meStableReached);
   SetStage(msWaitMeasureStart);
 end;
