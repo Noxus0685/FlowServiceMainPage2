@@ -259,6 +259,10 @@
             <Form>FormMeterValues</Form>
             <FormType>fmx</FormType>
         </DCCReference>
+        <DCCReference Include="fuMain.pas">
+            <Form>FormMain</Form>
+            <FormType>fmx</FormType>
+        </DCCReference>
         <DCCReference Include="fuTable_Main.pas">
             <Form>TableMainForm</Form>
             <FormType>fmx</FormType>
@@ -278,6 +282,7 @@
         <DCCReference Include="uDeviceClass.pas"/>
         <DCCReference Include="uMKSDebug.pas"/>
         <DCCReference Include="uFlowMeter.pas"/>
+        <DCCReference Include="uGraphsViewConfig.pas"/>
         <DCCReference Include="uMeasurementRun.pas"/>
         <DCCReference Include="uAutoMeasurementTestRunner.pas"/>
         <DCCReference Include="uMeterValue.pas"/>

@@ -11,6 +11,7 @@ uses
   fuDeviceEdit in 'fuDeviceEdit.pas' {FormDeviceEditor},
   fuDeviceSelect in 'fuDeviceSelect.pas' {FormDeviceSelect},
   fuMeterValues in 'fuMeterValues.pas' {FormMeterValues},
+  fuMain in 'fuMain.pas' {FormMain},
   fuTable_Main in 'fuTable_Main.pas' {TableMainForm},
   fuTypeEditor in 'fuTypeEditor.pas' {FormTypeEditor},
   fuTypeSelect in 'fuTypeSelect.pas' {FormTypeSelect},
@@ -23,6 +24,7 @@ uses
   uDeviceClass in 'uDeviceClass.pas',
   uMKSDebug in 'uMKSDebug.pas',
   uFlowMeter in 'uFlowMeter.pas',
+  uGraphsViewConfig in 'uGraphsViewConfig.pas',
   uMeasurementRun in 'uMeasurementRun.pas',
   uAutoMeasurementTestRunner in 'uAutoMeasurementTestRunner.pas',
   uMeterValue in 'uMeterValue.pas',
@@ -59,7 +61,7 @@ begin
  // Application.CreateForm(TFormDeviceSelect, FormDeviceSelect);
  // Application.CreateForm(TFormTypeSelect, FormTypeSelect);
 //  Application.CreateForm(TFormTypeEditor, FormTypeEditor);
-  Application.CreateForm(TTableMainForm, TableMainForm);
+  Application.CreateForm(TFormMain, FormMain);
   Application.CreateForm(TFormMeterValues, FormMeterValues);
   //  Application.CreateForm(TFormDeviceEditor, FormDeviceEditor);
 //  Application.CreateForm(TDM, DM);
