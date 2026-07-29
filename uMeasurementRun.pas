@@ -339,6 +339,7 @@ type
     FFinalized: Boolean;
 
     procedure ResetRuntimeContext;
+    procedure ResetPointSelectionContext;
     procedure FinalizeMeasurementRun(AResult: TMeasurementRunResult; AReason: TMeasurementRunDoneReason);
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
@@ -459,6 +460,7 @@ type
 
     procedure CreateSession;
     procedure CreateSessionPoints;
+    procedure RebuildMeasurementPoints;
     function IsSessionPointFit(ADevice: TDevice; APoint: TDevicePoint): Boolean;
 
 
@@ -479,6 +481,7 @@ type
     class function MeasurementStateToString(AState: EMeasurementState): string; static;
     class function MeasurementStateFromString(const AValue: string): EMeasurementState; static;
     class function MeasurementEventToString(AEvent: EMeasurementEvent): string; static;
+    class function MeasurementRunModeToString(AMode: EMeasurementRunMode): string; static;
 
     property WorkTable: TWorkTable read FWorkTable;
     property Points: TObjectList<TDevicePoint> read FPoints;
@@ -486,7 +489,7 @@ type
     property Stage: EMeasurementState read FCurrentStage;
 
     property Mode: EMeasurementRunMode read FMode write FMode;
-    property CurrentPointIndex: Integer read FCurrentPointIndex;
+    property CurrentPointIndex: Integer read FCurrentPointIndex write FCurrentPointIndex;
     property CurrentPoint: TDevicePoint read GetCurrentPoint;
     property CurrentRepeat: Integer read FCurrentRepeat;
     property StopRequested: Boolean read FStopRequested;
@@ -1735,6 +1738,22 @@ begin
       FWorkTable.FlowRate.ValueSet.Value := 0;
     FWorkTable.TimeResult := 0;
   end;
+end;
+
+procedure TMeasurementRun.ResetPointSelectionContext;
+var
+  Point: TDevicePoint;
+begin
+  FCurrentPointIndex := -1;
+  FCurrentRepeat := 0;
+  FForceNextPoint := -1;
+  FNextStageAfterSave := msNone;
+  for Point in FPoints do
+    if Point <> nil then
+    begin
+      Point.Status := mptsNone;
+      Point.RepeatsCompleted := 0;
+    end;
 end;
 
 procedure TMeasurementRun.FinalizeMeasurementRun(AResult: TMeasurementRunResult;
@@ -3072,11 +3091,27 @@ begin
   Result := (FThread = nil) or FThread.CheckTerminated;
 end;
 
+class function TMeasurementRun.MeasurementRunModeToString(
+  AMode: EMeasurementRunMode): string;
+begin
+  Result := GetEnumName(TypeInfo(EMeasurementRunMode), Ord(AMode));
+end;
+
 procedure TMeasurementRun.CreateSession;
+begin
+  RebuildMeasurementPoints;
+
+  ProtocolManager.AddMessage(pcInfo, psMeasurement, 'CreateSession',
+    'Создание сессии измерения',
+    Format('Mode=%d; Points=%d', [Ord(FMode), FPoints.Count]));
+end;
+
+procedure TMeasurementRun.RebuildMeasurementPoints;
 var
   Point: TDevicePoint;
 begin
   FPoints.Clear;
+  ResetPointSelectionContext;
   if FWorkTable = nil then
     Exit;
 
@@ -3085,9 +3120,18 @@ begin
       if ShouldUseAllPoints then
         CreateSessionPoints;
     mrmManual:
+      if FWorkTable.CurrentPoint <> nil then
       begin
-        // Manual mode measures the current worktable point as-is.
-        // Do not create or select a session point here.
+        Point := TDevicePoint.Create(0);
+        Point.Assign(FWorkTable.CurrentPoint, False);
+        if Trim(Point.Name) = '' then
+          Point.Name := 'Ручная точка';
+        Point.Enabled := True;
+        Point.Status := mptsNone;
+        Point.RepeatsCompleted := 0;
+        FPoints.Add(Point);
+        FCurrentPointIndex := 0;
+        FWorkTable.CurrentPoint.Assign(Point, False);
       end;
     mrmHalfAutomatic:
       begin
@@ -3096,10 +3140,6 @@ begin
           FPoints.Add(Point);
       end;
   end;
-
-  ProtocolManager.AddMessage(pcInfo, psMeasurement, 'CreateSession',
-    'Создание сессии измерения',
-    Format('Mode=%d; Points=%d', [Ord(FMode), FPoints.Count]));
 end;
 
 function TMeasurementRun.ShouldUseAllPoints: Boolean;
