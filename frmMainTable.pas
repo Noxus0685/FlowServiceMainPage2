@@ -5164,9 +5164,9 @@ var
 begin
   { The registry owns only live objects: TMeterValue.Destroy removes an item before
     releasing its state. The timer never retains a meter value or its sample lock. }
-  for MV in TMeterValue.GetMeterValues do
+ { for MV in TMeterValue.GetMeterValues do
     if (MV <> nil) and MV.StabilitySettings.Enabled then
-      MV.AddCurrentStabilitySample;
+      MV.AddCurrentStabilitySample;  }
 end;
 
 procedure TFrameMainTable.TimerMainTimer(Sender: TObject);

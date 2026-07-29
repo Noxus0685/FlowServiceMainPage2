@@ -2743,6 +2743,7 @@ begin
 
   if ARRAY_SIZE > 0 then
   begin
+    AddCurrentStabilitySample;
     Values.Insert(0, InputValue);
     if Values.Count > ARRAY_SIZE then
       Values.Delete(Values.Count - 1);
