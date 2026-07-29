@@ -628,6 +628,7 @@ begin
     swtCOMPLETE: Result := 'Завершен';
     swtFINALREAD: Result := 'Финальное чтение';
     swtFAILURE: Result := 'Ошибка';
+    swtSaveConfirmation: Result := 'Ожидание подтверждения сохранения';
   else
     Result := 'Не задано';
   end;
