@@ -1729,7 +1729,7 @@ begin
   ResetPointSetupState;
   if FWorkTable <> nil then
   begin
-    FWorkTable.CurrentPoint := nil;
+    FWorkTable.ResetCurrentPoint;
     if (FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.ValueSet <> nil) then
       FWorkTable.FlowRate.ValueSet.Value := 0;
     FWorkTable.TimeResult := 0;
@@ -1863,6 +1863,8 @@ begin
   if FMode = mrmManual then
   begin
     if FWorkTable <> nil then
+      // In manual mode, use the current work-table task point.
+      // TMeasurementRun does not replace it with a point from FPoints.
       Result := FWorkTable.CurrentPoint;
     Exit;
   end;
@@ -4274,7 +4276,11 @@ begin
 
     FCurrentRepeat := Point.RepeatsCompleted;
     if FWorkTable <> nil then
+    begin
+      // Publish the selected automatic measurement point as the current
+      // work-table task. CurrentPoint remains owned by TWorkTable.
       FWorkTable.MeasurementRunPointChanged(Self, Point, FCurrentPointIndex);
+    end;
     AddDiagnosticEvent('SetPoint success: ' + BuildPointSelectionLog(Point));
 
   end else
