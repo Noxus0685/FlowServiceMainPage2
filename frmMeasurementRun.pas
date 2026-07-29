@@ -49,6 +49,10 @@ type
     SpeedButtonPause: TSpeedButton;
     SpeedButtonPointDelete: TSpeedButton;
     SpeedButtonCreatePoints: TSpeedButton;
+    SpeedButtonMovePointUp: TSpeedButton;
+    SpeedButtonMovePointDown: TSpeedButton;
+    SpeedButtonSortFlowDescending: TSpeedButton;
+    SpeedButtonSortFlowAscending: TSpeedButton;
     StringColumnLimitTime: TStringColumn;
     StringColumnLimitImp: TStringColumn;
     StringColumnLimitVolume: TStringColumn;
@@ -79,6 +83,10 @@ type
     procedure SpeedButtonPointDeleteClick(Sender: TObject);
     procedure SpeedButtonPointNextClick(Sender: TObject);
     procedure SpeedButtonPointPrevClick(Sender: TObject);
+    procedure SpeedButtonMovePointUpClick(Sender: TObject);
+    procedure SpeedButtonMovePointDownClick(Sender: TObject);
+    procedure SpeedButtonSortFlowDescendingClick(Sender: TObject);
+    procedure SpeedButtonSortFlowAscendingClick(Sender: TObject);
     procedure ButtonRunAutoTestScenarioClick(Sender: TObject);
     procedure ButtonRunAllAutoTestScenariosClick(Sender: TObject);
     procedure GridAutoTestResultsGetValue(Sender: TObject; const ACol,
@@ -138,6 +146,10 @@ begin
   SpeedButtonPause.OnClick := SpeedButtonPauseClick;
   SpeedButtonPointDelete.OnClick := SpeedButtonPointDeleteClick;
   SpeedButtonCreatePoints.OnClick := SpeedButtonCreatePointsClick;
+  SpeedButtonMovePointUp.OnClick := SpeedButtonMovePointUpClick;
+  SpeedButtonMovePointDown.OnClick := SpeedButtonMovePointDownClick;
+  SpeedButtonSortFlowDescending.OnClick := SpeedButtonSortFlowDescendingClick;
+  SpeedButtonSortFlowAscending.OnClick := SpeedButtonSortFlowAscendingClick;
   ButtonRunAutoTestScenario.OnClick := ButtonRunAutoTestScenarioClick;
   ButtonRunAllAutoTestScenarios.OnClick := ButtonRunAllAutoTestScenariosClick;
   GridAutoTestResults.OnGetValue := GridAutoTestResultsGetValue;
