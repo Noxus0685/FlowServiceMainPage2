@@ -4975,159 +4975,141 @@ object FrameMainTable: TFrameMainTable
         object MenuItemDevicesColumnsChannelGroup: TMenuItem
           Locked = True
           Text = #1050#1072#1085#1072#1083
-          object MenuItemDevicesColumn1: TMenuItem
-            Tag = 1
+          object MenuItemDevicesColumn0: TMenuItem
             Locked = True
-            IsChecked = True
+            TagString = 'CheckColumnDeviceEnable1'
+            Text = #1042#1082#1083
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn1: TMenuItem
+            Locked = True
+            TagString = 'StringColumnDeviceChanel1'
             Text = #1050#1072#1085#1072#1083
-            OnClick = MenuGridLayOutClick
+            OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumn6: TMenuItem
-            Tag = 6
             Locked = True
-            IsChecked = True
-            Text = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
-            OnClick = MenuGridLayOutClick
+            TagString = 'PopupColumnDeviceSignal1'
+            Text = #1058#1080#1087#32#1089#1080#1075#1085#1072#1083#1072
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn7: TMenuItem
+            Locked = True
+            TagString = 'StringColumnDeviceRawValue1'
+            Text = #1057#1080#1075#1085#1072#1083
+            OnClick = DevicesColumnMenuItemClick
           end
         end
         object MenuItemDevicesColumnsDeviceGroup: TMenuItem
           Locked = True
           Text = #1055#1088#1080#1073#1086#1088
           object MenuItemDevicesColumn2: TMenuItem
-            Tag = 2
             Locked = True
-            IsChecked = True
-            Text = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
-            OnClick = MenuGridLayOutClick
+            TagString = 'ColumnDeviceType1'
+            Text = #1058#1080#1087#32#1087#1088#1080#1073#1086#1088#1072
+            OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumn3: TMenuItem
-            Tag = 3
             Locked = True
-            IsChecked = True
+            TagString = 'PopupColumnDeviceDN1'
             Text = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
-            OnClick = MenuGridLayOutClick
+            OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumn4: TMenuItem
-            Tag = 4
             Locked = True
-            IsChecked = True
+            TagString = 'StringColumnDeviceName1'
             Text = #1055#1088#1080#1073#1086#1088
-            OnClick = MenuGridLayOutClick
+            OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumn5: TMenuItem
-            Tag = 5
             Locked = True
-            IsChecked = True
+            TagString = 'StringColumnDeviceSerial1'
             Text = #1057#1077#1088#1080#1081#1085#1099#1081
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn18: TMenuItem
-            Tag = 18
-            Locked = True
-            IsChecked = True
-            Text = #1050#1086#1101#1092'-'#1085#1090
-            OnClick = MenuGridLayOutClick
+            OnClick = DevicesColumnMenuItemClick
           end
         end
         object MenuItemDevicesColumnsMeasureGroup: TMenuItem
           Locked = True
           Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
-          object MenuItemDevicesColumn7: TMenuItem
-            Tag = 7
-            Locked = True
-            IsChecked = True
-            Text = #1057#1080#1075#1085#1072#1083
-            OnClick = MenuGridLayOutClick
-          end
           object MenuItemDevicesColumn8: TMenuItem
-            Tag = 8
             Locked = True
-            IsChecked = True
-            Text = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
-            OnClick = MenuGridLayOutClick
+            TagString = 'StringColumnDeviceFlowRate1'
+            Text = #1056#1072#1089#1093#1086#1076
+            OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumnMeanFlow: TMenuItem
-            AutoCheck = False
             Locked = True
-            Text = #1057#1088'. '#1088#1072#1089#1093#1086#1076
-            OnClick = MenuGridLayOutClick
+            TagString = 'StringColumnDeviceAvgFlowRate1'
+            Text = #1057#1088#46#32#1088#1072#1089#1093#1086#1076
+            OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumn9: TMenuItem
-            Tag = 9
             Locked = True
-            IsChecked = True
-            Text = #1054#1073#1098#1077#1084', '#1084'3'
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn12: TMenuItem
-            Tag = 12
-            Locked = True
-            IsChecked = True
-            Text = #1054#1073#1098#1077#1084' '#1076#1086
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn13: TMenuItem
-            Tag = 13
-            Locked = True
-            IsChecked = True
-            Text = #1054#1073#1098#1077#1084' '#1087#1086#1089#1083#1077
-            OnClick = MenuGridLayOutClick
+            TagString = 'StringColumnDeviceQuantity1'
+            Text = #1054#1073#1098#1105#1084
+            OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumn16: TMenuItem
-            Tag = 16
             Locked = True
-            IsChecked = True
+            TagString = 'StringColumnDeviceRawSumValue1'
             Text = #1047#1085#1072#1095#1077#1085#1080#1077
-            OnClick = MenuGridLayOutClick
+            OnClick = DevicesColumnMenuItemClick
           end
         end
         object MenuItemDevicesColumnsStatGroup: TMenuItem
           Locked = True
           Text = #1057#1090#1072#1090#1080#1089#1090#1080#1082#1072
           object MenuItemDevicesColumn10: TMenuItem
-            Tag = 10
             Locked = True
-            IsChecked = True
-            Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
-            OnClick = MenuGridLayOutClick
+            TagString = 'StringColumnDeviceError1'
+            Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100
+            OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumn11: TMenuItem
-            Tag = 11
             Locked = True
-            IsChecked = True
-            Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077', %'
-            OnClick = MenuGridLayOutClick
+            TagString = 'StringColumnDeviceStd1'
+            Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn12: TMenuItem
+            Locked = True
+            TagString = 'StringColumnDeviceQuantityBefore1'
+            Text = #1054#1073#1098#1105#1084#32#1076#1086
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn13: TMenuItem
+            Locked = True
+            TagString = 'StringColumnDeviceQuantityAfter1'
+            Text = #1054#1073#1098#1105#1084#32#1087#1086#1089#1083#1077
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn14: TMenuItem
+            Locked = True
+            TagString = 'StringColumnDevicePressureDelta1'
+            Text = #1055#1077#1088#1077#1087#1072#1076
+            OnClick = DevicesColumnMenuItemClick
           end
         end
         object MenuItemDevicesColumnsOtherGroup: TMenuItem
           Locked = True
           Text = #1055#1088#1086#1095#1077#1077
-          object MenuItemDevicesColumn0: TMenuItem
-            Locked = True
-            IsChecked = True
-            Text = #1042#1082#1083
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn14: TMenuItem
-            Tag = 14
-            Locked = True
-            IsChecked = True
-            Text = #1055#1088#1077#1087#1072#1076
-            OnClick = MenuGridLayOutClick
-          end
           object MenuItemDevicesColumn15: TMenuItem
-            Tag = 15
             Locked = True
-            IsChecked = True
+            TagString = 'StringColumnDeviceOptions1'
             Text = #1057#1090#1072#1090#1091#1089
-            OnClick = MenuGridLayOutClick
+            OnClick = DevicesColumnMenuItemClick
           end
           object MenuItemDevicesColumn17: TMenuItem
-            Tag = 17
             Locked = True
-            IsChecked = True
-            Text = 'UUID'
-            OnClick = MenuGridLayOutClick
+            TagString = 'StringColumnUUID1'
+            Text = #85#85#73#68
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn18: TMenuItem
+            Locked = True
+            TagString = 'StringColumnDeviceCoef1'
+            Text = #1050#1086#1101#1092#45#1085#1090
+            OnClick = DevicesColumnMenuItemClick
           end
         end
       end
@@ -5247,131 +5229,117 @@ object FrameMainTable: TFrameMainTable
         object MenuItemEtalonsColumnsChannelGroup: TMenuItem
           Locked = True
           Text = #1050#1072#1085#1072#1083
-          object MenuItemEtalonsColumn1: TMenuItem
-            Tag = 1
+          object MenuItemEtalonsColumn0: TMenuItem
             Locked = True
-            IsChecked = True
+            TagString = 'CheckColumnEtalonEnable1'
+            Text = #1042#1082#1083
+            OnClick = EtalonsColumnMenuItemClick
+          end
+          object MenuItemEtalonsColumn1: TMenuItem
+            Locked = True
+            TagString = 'StringColumnEtalonChanel1'
             Text = #1050#1072#1085#1072#1083
-            OnClick = MenuGridLayOutClick
+            OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumn5: TMenuItem
-            Tag = 5
             Locked = True
-            IsChecked = True
-            Text = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
-            OnClick = MenuGridLayOutClick
+            TagString = 'PopupColumnEtalonSignal1'
+            Text = #1058#1080#1087#32#1089#1080#1075#1085#1072#1083#1072
+            OnClick = EtalonsColumnMenuItemClick
+          end
+          object MenuItemEtalonsColumn6: TMenuItem
+            Locked = True
+            TagString = 'StringColumnEtalonRawValue1'
+            Text = #1057#1080#1075#1085#1072#1083
+            OnClick = EtalonsColumnMenuItemClick
           end
         end
         object MenuItemEtalonsColumnsDeviceGroup: TMenuItem
           Locked = True
           Text = #1055#1088#1080#1073#1086#1088
           object MenuItemEtalonsColumn2: TMenuItem
-            Tag = 2
             Locked = True
-            IsChecked = True
-            Text = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
-            OnClick = MenuGridLayOutClick
+            TagString = 'StringColumnEtalonType1'
+            Text = #1058#1080#1087#32#1087#1088#1080#1073#1086#1088#1072
+            OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumn3: TMenuItem
-            Tag = 3
             Locked = True
-            IsChecked = True
+            TagString = 'PopupColumnEtalonDN1'
             Text = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
-            OnClick = MenuGridLayOutClick
+            OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumn4: TMenuItem
-            Tag = 4
             Locked = True
-            IsChecked = True
+            TagString = 'StringColumnEtalonName1'
             Text = #1055#1088#1080#1073#1086#1088
-            OnClick = MenuGridLayOutClick
+            OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumn9: TMenuItem
-            Tag = 9
             Locked = True
-            IsChecked = True
-            Text = #1057#1077#1088#1080#1081#1085#1099#1081' '
-            OnClick = MenuGridLayOutClick
+            TagString = 'StringColumnEtalonSerial1'
+            Text = #1057#1077#1088#1080#1081#1085#1099#1081
+            OnClick = EtalonsColumnMenuItemClick
           end
         end
         object MenuItemEtalonsColumnsMeasureGroup: TMenuItem
           Locked = True
           Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
-          object MenuItemEtalonsColumn6: TMenuItem
-            Tag = 6
-            Locked = True
-            IsChecked = True
-            Text = #1057#1080#1075#1085#1072#1083
-            OnClick = MenuGridLayOutClick
-          end
           object MenuItemEtalonsColumn7: TMenuItem
-            Tag = 7
             Locked = True
-            IsChecked = True
-            Text = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
-            OnClick = MenuGridLayOutClick
+            TagString = 'StringColumnEtalonFlowRate1'
+            Text = #1056#1072#1089#1093#1086#1076
+            OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumnMeanFlow: TMenuItem
-            AutoCheck = False
             Locked = True
-            Text = #1057#1088'. '#1088#1072#1089#1093#1086#1076
-            OnClick = MenuGridLayOutClick
+            TagString = 'StringColumnEtalonAvgFlowRate1'
+            Text = #1057#1088#46#32#1088#1072#1089#1093#1086#1076
+            OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumn8: TMenuItem
-            Tag = 8
             Locked = True
-            IsChecked = True
-            Text = #1054#1073#1098#1077#1084', '#1084'3'
-            OnClick = MenuGridLayOutClick
+            TagString = 'StringColumnEtalonQuantity1'
+            Text = #1054#1073#1098#1105#1084
+            OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumn14: TMenuItem
-            Tag = 14
             Locked = True
-            IsChecked = True
+            TagString = 'StringColumnEtalonRawSumValue1'
             Text = #1047#1085#1072#1095#1077#1085#1080#1077
-            OnClick = MenuGridLayOutClick
+            OnClick = EtalonsColumnMenuItemClick
           end
         end
         object MenuItemEtalonsColumnsStatGroup: TMenuItem
           Locked = True
           Text = #1057#1090#1072#1090#1080#1089#1090#1080#1082#1072
           object MenuItemEtalonsColumn10: TMenuItem
-            Tag = 10
             Locked = True
-            IsChecked = True
-            Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
-            OnClick = MenuGridLayOutClick
+            TagString = 'StringColumnEtalonError1'
+            Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100
+            OnClick = EtalonsColumnMenuItemClick
           end
           object MenuItemEtalonsColumn11: TMenuItem
-            Tag = 11
             Locked = True
-            IsChecked = True
-            Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077', %'
-            OnClick = MenuGridLayOutClick
+            TagString = 'StringColumnEtalonStd1'
+            Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077
+            OnClick = EtalonsColumnMenuItemClick
+          end
+          object MenuItemEtalonsColumn12: TMenuItem
+            Locked = True
+            TagString = 'StringColumnEtalonPressureDelta1'
+            Text = #1055#1077#1088#1077#1087#1072#1076
+            OnClick = EtalonsColumnMenuItemClick
           end
         end
         object MenuItemEtalonsColumnsOtherGroup: TMenuItem
           Locked = True
           Text = #1055#1088#1086#1095#1077#1077
-          object MenuItemEtalonsColumn0: TMenuItem
-            Locked = True
-            IsChecked = True
-            Text = #1042#1082#1083
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemEtalonsColumn12: TMenuItem
-            Tag = 12
-            Locked = True
-            IsChecked = True
-            Text = #1055#1077#1088#1077#1087#1072#1076
-            OnClick = MenuGridLayOutClick
-          end
           object MenuItemEtalonsColumn13: TMenuItem
-            Tag = 13
             Locked = True
-            IsChecked = True
+            TagString = 'StringColumnEtalonOptions1'
             Text = #1057#1090#1072#1090#1091#1089
-            OnClick = MenuGridLayOutClick
+            OnClick = EtalonsColumnMenuItemClick
           end
         end
       end
@@ -5849,7 +5817,7 @@ object FrameMainTable: TFrameMainTable
             end
             object StringColumnDeviceQuantity1: TStringColumn
               Tag = 3
-              Header = #1054#1073#1098#1077#1084', '#1084'3'
+              Header = #1054#1073#1098#1105#1084', '#1084'3'
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
               ReadOnly = True
@@ -5869,17 +5837,17 @@ object FrameMainTable: TFrameMainTable
             end
             object StringColumnDeviceQuantityBefore1: TStringColumn
               Tag = 3
-              Header = #1054#1073#1098#1077#1084' '#1076#1086
+              Header = #1054#1073#1098#1105#1084' '#1076#1086
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnDeviceQuantityAfter1: TStringColumn
               Tag = 3
-              Header = #1054#1073#1098#1077#1084' '#1087#1086#1089#1083#1077
+              Header = #1054#1073#1098#1105#1084' '#1087#1086#1089#1083#1077
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnDevicePressureDelta1: TStringColumn
               Tag = 5
-              Header = #1055#1088#1077#1087#1072#1076
+              Header = #1055#1077#1088#1077#1087#1072#1076
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
             end
@@ -6084,7 +6052,7 @@ object FrameMainTable: TFrameMainTable
               end
               object StringColumnEtalonQuantity1: TStringColumn
                 Tag = 3
-                Header = #1054#1073#1098#1077#1084', '#1084'3'
+                Header = #1054#1073#1098#1105#1084', '#1084'3'
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
               end
