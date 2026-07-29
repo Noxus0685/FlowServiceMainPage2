@@ -151,8 +151,11 @@ end;
 
 procedure TFrameMRResults.SpeedButtonCreatePointsClick(Sender: TObject);
 begin
-       MeasurementRun.CreateSession;
-        UpdateUI;
+  if MeasurementRun = nil then
+    Exit;
+  MeasurementRun.InvalidatePreparedPoints;
+  MeasurementRun.RebuildMeasurementPoints;
+  UpdateUI;
 end;
 
 procedure TFrameMRResults.OnNotify(Sender: TObject; Event: Integer; Data: TObject);

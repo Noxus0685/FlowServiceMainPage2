@@ -91,6 +91,7 @@ type
     FInvalidPointIndexes: TList<Integer>;
     FAutoTestResults: TList<TAutoMeasurementTestResult>;
     FAutoTestRunning: Boolean;
+    FPointFlowSortDirection: Integer;
     function GetMeasurementRun: TMeasurementRun;
     function GetStopCriteriaText(APoint: TDevicePoint): string;
 
@@ -104,6 +105,7 @@ type
     procedure SetPointEnabledFromGrid(APoint: TDevicePoint; const AEnabled: Boolean);
     procedure UpdateGridMRHeaders;
     procedure UpdateStopCriteriaColumns;
+    procedure UpdatePointOrderControls;
     function IsPointInvalid(APoint: TDevicePoint): Boolean;
     function GetRowColor(const ARow: Integer): TAlphaColor;
     procedure SetAutoTestControlsEnabled(const AEnabled: Boolean);
@@ -116,6 +118,7 @@ type
     destructor Destroy; override;
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
     procedure UpdateUI;
+    procedure RefreshFromMeasurementRun;
     property MeasurementRun: TMeasurementRun read GetMeasurementRun;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
 
@@ -143,6 +146,7 @@ begin
   ComboBoxAutoTestScenario.ItemIndex := 0;
   GridMeasurmentRun.ShowHint := True;
   GridMeasurmentRun.OnCellClick := GridMeasurmentRunCellClick;
+  FPointFlowSortDirection := 0;
 end;
 
 destructor TFrameMeasurementRun.Destroy;
@@ -359,12 +363,7 @@ begin
   end;
 
   if GridMeasurmentRun.Columns[ACol] = StringColumnPointer then
-  begin
-    if MeasurementRun.CurrentPointIndex = ARow then
-      Value := '▶'
-    else
-      Value := '';
-  end
+    Value := ARow + 1
   else if GridMeasurmentRun.Columns[ACol] = StringColumnMRPointName then
     Value := Point.Name
   else if GridMeasurmentRun.Columns[ACol] = StringColumnMRFlowRate then
@@ -429,6 +428,7 @@ procedure TFrameMeasurementRun.GridMeasurmentRunCellClick(const Column: TColumn;
 var
   Point: TDevicePoint;
 begin
+  UpdatePointOrderControls;
   if Column <> CheckColumnMREnable then
     Exit;
 
@@ -451,9 +451,37 @@ var
   HasEnabled: Boolean;
   NewEnabled: Boolean;
   Point: TDevicePoint;
+  SelectedPoint: TDevicePoint;
 begin
-  if (Column <> CheckColumnMREnable) or (MeasurementRun = nil) or
+  if (MeasurementRun = nil) or
      (MeasurementRun.Points = nil) or (MeasurementRun.Points.Count = 0) then
+    Exit;
+
+  if Column = StringColumnMRFlowRate then
+  begin
+    if not (MeasurementRun.Stage in [msNone, msDone]) then
+      Exit;
+    SelectedPoint := nil;
+    if (GridMeasurmentRun.Selected >= 0) and
+       (GridMeasurmentRun.Selected < MeasurementRun.Points.Count) then
+      SelectedPoint := MeasurementRun.Points[GridMeasurmentRun.Selected];
+    if FPointFlowSortDirection <> 1 then
+    begin
+      MeasurementRun.SortPointsByFlow(False);
+      FPointFlowSortDirection := 1;
+    end
+    else
+    begin
+      MeasurementRun.SortPointsByFlow(True);
+      FPointFlowSortDirection := -1;
+    end;
+    if SelectedPoint <> nil then
+      GridMeasurmentRun.Selected := MeasurementRun.Points.IndexOf(SelectedPoint);
+    UpdateGridMesurmentRun;
+    Exit;
+  end;
+
+  if Column <> CheckColumnMREnable then
     Exit;
 
   HasEnabled := False;
@@ -507,6 +535,12 @@ begin
      UpdateGridMesurmentRun;
 end;
 
+procedure TFrameMeasurementRun.RefreshFromMeasurementRun;
+begin
+  FPointFlowSortDirection := 0;
+  UpdateUI;
+end;
+
 
 procedure TFrameMeasurementRun.UpdateGridMRHeaders;
 begin
@@ -545,12 +579,14 @@ end;
 procedure TFrameMeasurementRun.UpdateGridMesurmentRun;
 var
   Rows: Integer;
+  SelectedRow: Integer;
 begin
   if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) then
     Rows := MeasurementRun.Points.Count
   else
     Rows := 0;
 
+  SelectedRow := GridMeasurmentRun.Selected;
   UpdateStopCriteriaColumns;
 
   GridMeasurmentRun.BeginUpdate;
@@ -561,7 +597,29 @@ begin
     GridMeasurmentRun.EndUpdate;
   end;
 
+  if Rows = 0 then
+    GridMeasurmentRun.Selected := -1
+  else if SelectedRow >= Rows then
+    GridMeasurmentRun.Selected := Rows - 1;
+
   GridMeasurmentRun.Repaint;
+  UpdatePointOrderControls;
+end;
+
+procedure TFrameMeasurementRun.UpdatePointOrderControls;
+var
+  Row, Count: Integer;
+  CanEditOrder: Boolean;
+begin
+  Row := GridMeasurmentRun.Selected;
+  if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) then
+    Count := MeasurementRun.Points.Count
+  else
+    Count := 0;
+  CanEditOrder := (MeasurementRun <> nil) and
+    (MeasurementRun.Stage in [msNone, msDone]);
+  SpeedButtonPointPrev.Enabled := CanEditOrder and (Row > 0) and (Row < Count);
+  SpeedButtonPointNext.Enabled := CanEditOrder and (Row >= 0) and (Row < Count - 1);
 end;
 
 
@@ -684,15 +742,33 @@ begin
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointPrevClick(Sender: TObject);
+var
+  Row: Integer;
 begin
-  if MeasurementRun <> nil then
-    MeasurementRun.Execute(mcPreviousPoint, Unassigned);
+  if (MeasurementRun = nil) or not (MeasurementRun.Stage in [msNone, msDone]) then
+    Exit;
+  Row := GridMeasurmentRun.Selected;
+  if MeasurementRun.MovePointUp(Row) then
+  begin
+    GridMeasurmentRun.Selected := Row - 1;
+    FPointFlowSortDirection := 0;
+    UpdateGridMesurmentRun;
+  end;
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointNextClick(Sender: TObject);
+var
+  Row: Integer;
 begin
-  if MeasurementRun <> nil then
-    MeasurementRun.Execute(mcNextPoint, Null);
+  if (MeasurementRun = nil) or not (MeasurementRun.Stage in [msNone, msDone]) then
+    Exit;
+  Row := GridMeasurmentRun.Selected;
+  if MeasurementRun.MovePointDown(Row) then
+  begin
+    GridMeasurmentRun.Selected := Row + 1;
+    FPointFlowSortDirection := 0;
+    UpdateGridMesurmentRun;
+  end;
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPauseClick(Sender: TObject);
@@ -725,7 +801,11 @@ begin
   if MeasurementRun = nil then
     Exit;
 
-  MeasurementRun.CreateSession;
+  if not (MeasurementRun.Stage in [msNone, msDone]) then
+    Exit;
+  MeasurementRun.InvalidatePreparedPoints;
+  MeasurementRun.RebuildMeasurementPoints;
+  FPointFlowSortDirection := 0;
   FInvalidPointIndexes.Clear;
   UpdateGridMesurmentRun;
 end;
