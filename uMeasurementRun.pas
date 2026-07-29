@@ -1730,7 +1730,7 @@ begin
   ResetPointSetupState;
   if FWorkTable <> nil then
   begin
-    FWorkTable.ResetCurrentPoint;
+   // FWorkTable.ResetCurrentPoint;
     if (FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.ValueSet <> nil) then
       FWorkTable.FlowRate.ValueSet.Value := 0;
     FWorkTable.TimeResult := 0;
