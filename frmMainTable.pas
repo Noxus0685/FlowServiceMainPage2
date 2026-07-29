@@ -3042,7 +3042,6 @@ begin
   GridDevices.Columns[Index].Visible := not GridDevices.Columns[Index].Visible;
   MenuItem.IsChecked := GridDevices.Columns[Index].Visible;
   SaveLayoutSettingsToWorkTable;
-  GridDevices.Realign;
   GridDevices.Repaint;
 end;
 
@@ -3062,7 +3061,6 @@ begin
   GridEtalons.Columns[Index].Visible := not GridEtalons.Columns[Index].Visible;
   MenuItem.IsChecked := GridEtalons.Columns[Index].Visible;
   SaveLayoutSettingsToWorkTable;
-  GridEtalons.Realign;
   GridEtalons.Repaint;
 end;
 

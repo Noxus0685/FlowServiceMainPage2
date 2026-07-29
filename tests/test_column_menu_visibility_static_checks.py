@@ -72,3 +72,21 @@ def test_popup_sync_is_last_operation():
                         ("PopupMenuEtalonsGridPopup", "SyncEtalonsColumnsMenu")):
         body = re.search(rf"procedure TFrameMainTable\.{popup}\(.*?\);(.*?)end;", PAS, re.S).group(1)
         assert body.rstrip().endswith(sync + ";")
+
+
+def test_handlers_do_not_call_protected_realign():
+    for handler in ("DevicesColumnMenuItemClick", "EtalonsColumnMenuItemClick"):
+        body = re.search(
+            rf"procedure TFrameMainTable\.{handler}\(.*?\);(.*?)end;",
+            PAS,
+            re.S,
+        ).group(1)
+        assert ".Realign" not in body
+        assert ".Repaint" in body
+
+
+def test_fmx_keeps_ascii_text_serialization():
+    # Text FMX files in this project serialize Russian captions as numeric code
+    # points so they are independent of the compiler's source code page.
+    (ROOT / "frmMainTable.fmx").read_bytes().decode("ascii")
+    assert "Text = #1057#1088#46#32#1088#1072#1089#1093#1086#1076" in FMX
