@@ -11,6 +11,8 @@ object FrameMeasurementRun: TFrameMeasurementRun
     Size.PlatformDefault = False
     TabOrder = 0
     RowCount = 1
+    Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
+    OnHeaderClick = GridMeasurmentRunHeaderClick
     OnDrawColumnCell = GridMeasurmentRunDrawColumnCell
     OnGetValue = GridMeasurmentRunGetValue
     OnCellClick = GridMeasurmentRunCellClick

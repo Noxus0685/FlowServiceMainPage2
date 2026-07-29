@@ -464,6 +464,7 @@ object FrameProceed: TFrameProceed
               Size.Height = 219.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
+              Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
               Viewport.Width = 277.000000000000000000
               Viewport.Height = 194.000000000000000000
               object StringColumnCoefTableName: TStringColumn
@@ -542,6 +543,7 @@ object FrameProceed: TFrameProceed
         object ButtonSessionDeleteDataPoint: TButton
           Align = Left
           Hint = #1059#1076#1072#1083#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
+          ShowHint = True
           Position.X = 49.000000000000000000
           Size.Width = 40.000000000000000000
           Size.Height = 32.000000000000000000
@@ -556,6 +558,7 @@ object FrameProceed: TFrameProceed
           Action = ActionSessionNew
           Align = Left
           Hint = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
+          ShowHint = True
           ImageIndex = -1
           Position.X = 89.000000000000000000
           Size.Width = 39.000000000000000000
@@ -569,6 +572,7 @@ object FrameProceed: TFrameProceed
         object ButtonSessionClearPoints: TButton
           Align = Left
           Hint = #1054#1095#1080#1089#1090#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
+          ShowHint = True
           Position.X = 5.000000000000000000
           Size.Width = 44.000000000000000000
           Size.Height = 32.000000000000000000
@@ -581,6 +585,7 @@ object FrameProceed: TFrameProceed
         end
         object ButtonSessionClose: TButton
           Action = ActionSessionClose
+          ShowHint = True
           Align = Left
           ImageIndex = -1
           Position.X = 128.000000000000000000
@@ -595,6 +600,7 @@ object FrameProceed: TFrameProceed
           Action = ActionSessionSynchTable
           Align = Left
           Hint = #1057#1080#1085#1093#1088#1086#1085#1080#1079#1080#1088#1086#1074#1072#1090#1100' '#1089#1086' '#1089#1090#1086#1083#1086#1084
+          ShowHint = True
           ImageIndex = -1
           Position.X = 175.000000000000000000
           Size.Width = 47.000000000000000000
@@ -699,6 +705,7 @@ object FrameProceed: TFrameProceed
         TabOrder = 37
         object Button3: TButton
           Action = ActionSessionPointDelete
+          ShowHint = True
           Align = Left
           ImageIndex = -1
           Position.X = 49.000000000000000000
@@ -713,6 +720,7 @@ object FrameProceed: TFrameProceed
           Action = ActionSessionNew
           Align = Left
           Hint = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
+          ShowHint = True
           ImageIndex = -1
           Position.X = 89.000000000000000000
           Size.Width = 39.000000000000000000
@@ -727,6 +735,7 @@ object FrameProceed: TFrameProceed
           Action = ActionSessionPointsClear
           Align = Left
           Hint = #1054#1095#1080#1089#1090#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
+          ShowHint = True
           ImageIndex = -1
           Position.X = 5.000000000000000000
           Size.Width = 44.000000000000000000
@@ -739,6 +748,7 @@ object FrameProceed: TFrameProceed
         end
         object Button6: TButton
           Action = ActionSessionClose
+          ShowHint = True
           Align = Left
           ImageIndex = -1
           Position.X = 128.000000000000000000

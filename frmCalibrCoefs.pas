@@ -134,6 +134,7 @@ type
     destructor Destroy; override;
 
     procedure Init(AFlowMeter: TFlowMeter; ADefaultType: TCalibrCoefTableType; ASpillages: TObjectList<TPointSpillage> = nil);
+    procedure SetGridReadOnly;
     property FlowMeter: TFlowMeter read FFlowMeter;
     property CurrentType: TCalibrCoefTableType read FCurrentType;
     property CurrentTable: TCalibrCoefTable read FCurrentTable;
@@ -168,6 +169,17 @@ begin
 
   EnsureChartSeries;
   FillCoefTypes;
+end;
+
+procedure TFrameCalibrCoefs.SetGridReadOnly;
+var
+  I: Integer;
+begin
+  GridCoefs.Options := GridCoefs.Options - [TGridOption.Editing];
+  GridCoefs.OnSetValue := nil;
+  for I := 0 to GridCoefs.ColumnCount - 1 do
+    if GridCoefs.Columns[I] <> nil then
+      GridCoefs.Columns[I].ReadOnly := True;
 end;
 
 procedure TFrameCalibrCoefs.GridCoefsKeyDown(Sender: TObject; var Key: Word;

@@ -805,6 +805,10 @@ type
     procedure EnsureActiveWorkTableMenu;
     procedure MenuSetActiveWorkTableClick(Sender: TObject);
     procedure UpdateGridDevices;
+    procedure ToggleAllChannelRows(AGrid: TGrid;
+      AChannels: TObjectList<TChannel>; const AEtalonChannels: Boolean);
+    procedure ToggleAllDeviceChannels;
+    procedure ToggleAllEtalonChannels;
     procedure EnsureEmptyDevicesForGridRows;
     function ShouldReleaseGridDeviceBeforeSave(AChannel: TChannel; ADevice: TDevice): Boolean;
     function GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
@@ -975,7 +979,11 @@ type
     procedure FlowMeterPropertiesChanged(Sender: TObject);
     procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
     procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
+    function TryGetAverageFlow(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable;
+      out AAverageFlow: Double): Boolean;
     function GetAverageFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
+    function CalculateCurrentDeviationPercent(const ACurrentValue,
+      AMeanValue: Double): Double;
     function GetErrorCellColor(AChannel: TChannel; const AText: string; out AColor: TAlphaColor): Boolean;
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
@@ -990,6 +998,7 @@ uses
   fuTable_Main;
 
 const
+  CurrentDeviationEpsilon = 1E-12;
   GraphSampleIntervalMs = 1000;
   GraphVisibleWindowSec = 60.0;
   GraphVisibleWindowMs = 60000;
@@ -8305,11 +8314,27 @@ begin
 end;
 
 procedure TFrameMainTable.GridDevicesHeaderClick(Column: TColumn);
+begin
+  if Column = CheckColumnDeviceEnable1 then
+  begin
+    ToggleAllDeviceChannels;
+    Exit;
+  end;
+
+  if Column = CheckColumnEtalonEnable1 then
+  begin
+    ToggleAllEtalonChannels;
+    Exit;
+  end;
+end;
+
+procedure TFrameMainTable.ToggleAllChannelRows(AGrid: TGrid;
+  AChannels: TObjectList<TChannel>; const AEtalonChannels: Boolean);
 var
-  WorkTable: TWorkTable;
-  Row: Integer;
-  AllEnabled: Boolean;
+  I: Integer;
+  HasEnabled: Boolean;
   NewEnabled: Boolean;
+  Channel: TChannel;
 begin
   if not CanEditActiveWorkTable then
   begin
@@ -8317,45 +8342,50 @@ begin
     Exit;
   end;
 
-  if Column = CheckColumnDeviceEnable1 then
-  begin
+  if (AGrid = nil) or (AChannels = nil) or (AChannels.Count = 0) then
+    Exit;
 
-  NormalizeActiveWorkTable;
-  WorkTable := FActiveWorkTable;
-  if WorkTable <> nil then
-  begin
-    AllEnabled := WorkTable.DeviceChannels.Count > 0;
-    for Row := 0 to WorkTable.DeviceChannels.Count - 1 do
-      if not WorkTable.DeviceChannels[Row].Enabled then
-      begin
-        AllEnabled := False;
-        Break;
-      end;
-
-    NewEnabled := not AllEnabled;
-    for Row := 0 to WorkTable.DeviceChannels.Count - 1 do
+  HasEnabled := False;
+  for I := 0 to AChannels.Count - 1 do
+    if (AChannels[I] <> nil) and AChannels[I].Enabled then
     begin
-      WorkTable.DeviceChannels[Row].Enabled := NewEnabled;
-      MarkChannelDeviceModified(WorkTable.DeviceChannels[Row]);
+      HasEnabled := True;
+      Break;
     end;
-  end
-  else
-  begin
-    AllEnabled := Length(FFlowMeterRows) > 0;
-    for Row := 0 to High(FFlowMeterRows) do
-      if not FFlowMeterRows[Row].Enabled then
-      begin
-        AllEnabled := False;
-        Break;
-      end;
 
-    NewEnabled := not AllEnabled;
-    for Row := 0 to High(FFlowMeterRows) do
-      FFlowMeterRows[Row].Enabled := NewEnabled;
+  NewEnabled := not HasEnabled;
+  AGrid.BeginUpdate;
+  try
+    for I := 0 to AChannels.Count - 1 do
+    begin
+      Channel := AChannels[I];
+      if Channel = nil then
+        Continue;
+      Channel.Enabled := NewEnabled;
+      MarkChannelDeviceModified(Channel);
+    end;
+  finally
+    AGrid.EndUpdate;
   end;
 
-  UpdateGridDevices;
-  end;
+  ApplyEnabledChannelSimulationValues(FActiveWorkTable, AEtalonChannels);
+  FActiveWorkTable.RebindAllFlowMeters;
+  if WorkTableManager <> nil then
+    WorkTableManager.Save;
+  AGrid.Repaint;
+  RefreshActiveWorkTableViews(nil);
+end;
+
+procedure TFrameMainTable.ToggleAllDeviceChannels;
+begin
+  if FActiveWorkTable <> nil then
+    ToggleAllChannelRows(GridDevices, FActiveWorkTable.DeviceChannels, False);
+end;
+
+procedure TFrameMainTable.ToggleAllEtalonChannels;
+begin
+  if FActiveWorkTable <> nil then
+    ToggleAllChannelRows(GridEtalons, FActiveWorkTable.EtalonChannels, True);
 end;
 
 procedure TFrameMainTable.GridDevicesCellDblClick(const Column: TColumn;
@@ -8537,30 +8567,55 @@ end;
 function TFrameMainTable.GetAverageFlowText(AFlowMeter: TFlowMeter;
   AWorkTable: TWorkTable): string;
 var
-  MeasureTime: Double;
-  AvgFlow: Double;
+  AverageFlow: Double;
 begin
   Result := '-';
-  if (AFlowMeter = nil) or (AFlowMeter.ValueFlow = nil) or
-     (AFlowMeter.ValueQuantity = nil) or (AWorkTable = nil) or
-     (AWorkTable.ValueTime = nil) then
+  if not TryGetAverageFlow(AFlowMeter, AWorkTable, AverageFlow) then
+    Exit;
+
+  if AWorkTable.ValueFlowRate <> nil then
+    Result := AWorkTable.ValueFlowRate.GetStrNum(AverageFlow)
+  else if (AFlowMeter <> nil) and (AFlowMeter.ValueFlow <> nil) then
+    Result := AFlowMeter.ValueFlow.GetStrNum(AverageFlow);
+end;
+
+function TFrameMainTable.TryGetAverageFlow(AFlowMeter: TFlowMeter;
+  AWorkTable: TWorkTable; out AAverageFlow: Double): Boolean;
+var
+  MeasureTime: Double;
+begin
+  Result := False;
+  AAverageFlow := 0;
+
+  if (AFlowMeter = nil) or (AFlowMeter.ValueQuantity = nil) or
+     (AWorkTable = nil) or (AWorkTable.ValueTime = nil) then
     Exit;
 
   MeasureTime := AWorkTable.ValueTime.GetDoubleValue;
   if MeasureTime <= 0 then
     Exit;
 
-  AvgFlow := AFlowMeter.ValueQuantity.GetDoubleValue / MeasureTime;
-  if AWorkTable.ValueFlowRate <> nil then
-    Result := AWorkTable.ValueFlowRate.GetStrNum(AvgFlow)
-  else
-    Result := AFlowMeter.ValueFlow.GetStrNum(AvgFlow);
+  AAverageFlow := AFlowMeter.ValueQuantity.GetDoubleValue / MeasureTime;
+  Result := True;
 end;
+
+function TFrameMainTable.CalculateCurrentDeviationPercent(
+  const ACurrentValue, AMeanValue: Double): Double;
+begin
+  if Abs(AMeanValue) <= CurrentDeviationEpsilon then
+    Exit(0);
+
+  Result := (ACurrentValue - AMeanValue) / Abs(AMeanValue) * 100;
+end;
+
 
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
   WorkTable: TWorkTable;
+  FlowMeter: TFlowMeter;
+  CurrentFlow: Double;
+  AverageFlow: Double;
 begin
   WorkTable := FActiveWorkTable;
 
@@ -8638,9 +8693,14 @@ begin
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceStd1 then
     begin
-      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStrStdDeviationPercent
+      FlowMeter := WorkTable.DeviceChannels[ARow].FlowMeter;
+      if (FlowMeter <> nil) and (FlowMeter.ValueFlow <> nil) and
+         TryGetAverageFlow(FlowMeter, WorkTable, AverageFlow) then
+      begin
+        CurrentFlow := FlowMeter.ValueFlow.GetDoubleValue;
+        Value := FormatValue(CalculateCurrentDeviationPercent(
+          CurrentFlow, AverageFlow), 2, 0);
+      end
       else
         Value := '-';
     end
@@ -9116,6 +9176,9 @@ procedure TFrameMainTable.GridEtalonsGetValue(Sender: TObject;
   const ACol, ARow: Integer; var Value: TValue);
 var
   WorkTable: TWorkTable;
+  FlowMeter: TFlowMeter;
+  CurrentFlow: Double;
+  AverageFlow: Double;
 begin
 
   WorkTable := FActiveWorkTable;
@@ -9195,9 +9258,14 @@ begin
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonStd1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStrStdDeviationPercent
+      FlowMeter := WorkTable.EtalonChannels[ARow].FlowMeter;
+      if (FlowMeter <> nil) and (FlowMeter.ValueFlow <> nil) and
+         TryGetAverageFlow(FlowMeter, WorkTable, AverageFlow) then
+      begin
+        CurrentFlow := FlowMeter.ValueFlow.GetDoubleValue;
+        Value := FormatValue(CalculateCurrentDeviationPercent(
+          CurrentFlow, AverageFlow), 2, 0);
+      end
       else
         Value := '-';
     end
