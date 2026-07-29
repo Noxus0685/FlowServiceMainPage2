@@ -17,6 +17,7 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       Size.PlatformDefault = False
       TabOrder = 0
       OnGetValue = GridCoefsGetValue
+      OnHeaderClick = GridCoefsHeaderClick
       Viewport.Width = 907.000000000000000000
       Viewport.Height = 563.000000000000000000
       object CheckColumnCoefEnable: TCheckColumn

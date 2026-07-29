@@ -1488,9 +1488,30 @@ end;
 
 
 procedure TFormTypeSelect.GridTypesHeaderClick(Column: TColumn);
+var
+  I: Integer;
+  HasEnabledRow: Boolean;
 begin
   if Column = nil then
     Exit;
+
+  if Column = CheckColumnTypeEnable then
+  begin
+    HasEnabledRow := False;
+    if FDevFilteredTypes <> nil then
+      for I := 0 to FDevFilteredTypes.Count - 1 do
+        if (FDevFilteredTypes[I] <> nil) and FDevFilteredTypes[I].Enable then
+        begin
+          HasEnabledRow := True;
+          Break;
+        end;
+    if FDevFilteredTypes <> nil then
+      for I := 0 to FDevFilteredTypes.Count - 1 do
+        if FDevFilteredTypes[I] <> nil then
+          FDevFilteredTypes[I].Enable := not HasEnabledRow;
+    UpdateGridTypes;
+    Exit;
+  end;
 
   {----------------------------------}
   { Логика сортировки (утверждённая) }
@@ -2827,4 +2848,3 @@ end;
 
 
 end.
-

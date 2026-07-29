@@ -5950,6 +5950,7 @@ object FrameMainTable: TFrameMainTable
               OnDrawColumnCell = GridEtalonsDrawColumnCell
               OnGetValue = GridEtalonsGetValue
               OnSetValue = GridEtalonsSetValue
+              OnHeaderClick = GridEtalonsHeaderClick
               OnCellClick = GridEtalonsCellClick
               OnCellDblClick = GridEtalonsCellDblClick
               Viewport.Width = 1255.000000000000000000

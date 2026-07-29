@@ -2928,9 +2928,39 @@ begin
 end;
 
 procedure TFormDeviceSelect.GridDevicesHeaderClick(Column: TColumn);
+var
+  I: Integer;
+  HasCheckedRow: Boolean;
+  Device: TDevice;
 begin
   if Column = nil then
     Exit;
+
+  if Column = CheckColumnDeviceEnable then
+  begin
+    HasCheckedRow := False;
+    if FDevFilteredDevices <> nil then
+      for I := 0 to FDevFilteredDevices.Count - 1 do
+        if FCheckedDevices.IndexOf(FDevFilteredDevices[I]) >= 0 then
+        begin
+          HasCheckedRow := True;
+          Break;
+        end;
+
+    if FDevFilteredDevices <> nil then
+      for I := 0 to FDevFilteredDevices.Count - 1 do
+      begin
+        Device := FDevFilteredDevices[I];
+        if Device = nil then
+          Continue;
+        if HasCheckedRow then
+          FCheckedDevices.Remove(Device)
+        else if FCheckedDevices.IndexOf(Device) < 0 then
+          FCheckedDevices.Add(Device);
+      end;
+    UpdateGridDevices;
+    Exit;
+  end;
 
   {----------------------------------}
   { Логика сортировки (утверждённая) }

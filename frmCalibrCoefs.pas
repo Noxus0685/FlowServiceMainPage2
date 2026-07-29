@@ -78,6 +78,7 @@ type
     procedure ComboBoxUnitsCoefsChange(Sender: TObject);
     procedure GridCoefsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridCoefsSetValue(Sender: TObject; const ACol, ARow: Integer; const Value: TValue);
+    procedure GridCoefsHeaderClick(Column: TColumn);
     procedure SpeedButtonCefAddClick(Sender: TObject);
     procedure SpeedButtonCoefDeleteClick(Sender: TObject);
     procedure SpeedButtonCoefsClearClick(Sender: TObject);
@@ -154,6 +155,7 @@ begin
 
   GridCoefs.OnGetValue := GridCoefsGetValue;
   GridCoefs.OnSetValue := GridCoefsSetValue;
+  GridCoefs.OnHeaderClick := GridCoefsHeaderClick;
   GridCoefs.OnKeyDown := GridCoefsKeyDown;
 
   ComboBoxCoefType.OnChange := ComboBoxCoefTypeChange;
@@ -1088,6 +1090,39 @@ begin
   RecalculateCurrentTable;
   SyncTableToMeterValue;
 
+  UpdateGrid;
+  UpdateChart;
+end;
+
+procedure TFrameCalibrCoefs.GridCoefsHeaderClick(Column: TColumn);
+var
+  I: Integer;
+  HasEnabledRow: Boolean;
+  Item: TCalibrCoefItem;
+begin
+  if (Column <> CheckColumnCoefEnable) or (FCurrentTable = nil) or
+     (FCurrentTable.Items = nil) then
+    Exit;
+
+  HasEnabledRow := False;
+  for I := 0 to FCurrentTable.Items.Count - 1 do
+  begin
+    Item := FCurrentTable.Items[I];
+    if (Item <> nil) and Item.Enable then
+    begin
+      HasEnabledRow := True;
+      Break;
+    end;
+  end;
+  GridCoefs.BeginUpdate;
+  try
+    for I := 0 to FCurrentTable.Items.Count - 1 do
+      if FCurrentTable.Items[I] <> nil then
+        FCurrentTable.Items[I].Enable := not HasEnabledRow;
+  finally
+    GridCoefs.EndUpdate;
+  end;
+  SyncTableToMeterValue;
   UpdateGrid;
   UpdateChart;
 end;

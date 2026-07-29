@@ -266,6 +266,7 @@ type
     procedure GridResultsSelChanged(Sender: TObject);
     procedure GridDataPointsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridDataPointsCellClick(const Column: TColumn; const Row: Integer);
+    procedure GridDataPointsHeaderClick(Column: TColumn);
     procedure GridDataPointsDrawColumnCell(Sender: TObject; const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF; const Row: Integer; const Value: TValue; const State: TGridDrawStates);
     procedure GridDataPointsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Single);
     procedure UpdateGridDataPointsHeaders(QuantityDimName: string; FlowDimName: string);
@@ -3710,6 +3711,51 @@ begin
   if (Device <> nil) and (Device.State = osClean) then
     Device.State := osModified;
 
+  UpdateGridDataPoints;
+end;
+
+procedure TFrameProceed.GridDataPointsHeaderClick(Column: TColumn);
+var
+  I: Integer;
+  HasEnabledRow: Boolean;
+  NewEnabled: Boolean;
+  Point: TPointSpillage;
+  Device: TDevice;
+begin
+  if Column <> CheckColumnSpillageEnable then
+    Exit;
+
+  HasEnabledRow := False;
+  for I := 0 to High(FCurrentSpillages) do
+    if (FCurrentSpillages[I] <> nil) and
+       (FCurrentSpillages[I].State <> osDeleted) and
+       FCurrentSpillages[I].Enabled then
+    begin
+      HasEnabledRow := True;
+      Break;
+    end;
+
+  NewEnabled := not HasEnabledRow;
+  GridDataPoints.BeginUpdate;
+  try
+    for I := 0 to High(FCurrentSpillages) do
+    begin
+      Point := FCurrentSpillages[I];
+      if (Point = nil) or (Point.State = osDeleted) then
+        Continue;
+      if Point.Enabled <> NewEnabled then
+      begin
+        Point.Enabled := NewEnabled;
+        Point.State := osModified;
+      end;
+    end;
+  finally
+    GridDataPoints.EndUpdate;
+  end;
+
+  Device := ResolveSelectedDevice;
+  if (Device <> nil) and (Device.State = osClean) then
+    Device.State := osModified;
   UpdateGridDataPoints;
 end;
 procedure TFrameProceed.GridDataPointsColumnMoved(Column: TColumn; FromIndex,
