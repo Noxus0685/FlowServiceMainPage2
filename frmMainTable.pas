@@ -832,10 +832,11 @@ type
     procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
     procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
     function NormalizeColumnCaption(const ACaption: string): string;
-    function FindGridColumnByMenuText(AGrid: TGrid;
-      const AMenuText: string): TColumn;
+    function BaseColumnCaption(const AHeader: string): string;
+    function FindGridColumnByName(AGrid: TGrid;
+      const AColumnName: string): TColumn;
     function FindColumnMenuItem(AParentItem: TMenuItem;
-      const ACaption: string): TMenuItem;
+      const AColumnName: string): TMenuItem;
     function FindColumnMenuGroup(AParentItem: TMenuItem;
       const ACaption: string): TMenuItem;
     procedure EnsureGridColumnsMenu(AGrid: TGrid; ARootItem: TMenuItem);
@@ -3049,7 +3050,7 @@ begin
   if MenuItem.ItemsCount > 0 then
     Exit;
 
-  GridColumn := FindGridColumnByMenuText(GridDevices, MenuItem.Text);
+  GridColumn := FindGridColumnByName(GridDevices, MenuItem.TagString);
   if GridColumn = nil then
   begin
     MenuItem.IsChecked := False;
@@ -3074,7 +3075,7 @@ begin
   if MenuItem.ItemsCount > 0 then
     Exit;
 
-  GridColumn := FindGridColumnByMenuText(GridEtalons, MenuItem.Text);
+  GridColumn := FindGridColumnByName(GridEtalons, MenuItem.TagString);
   if GridColumn = nil then
   begin
     MenuItem.IsChecked := False;
@@ -3107,31 +3108,32 @@ begin
   Result := StringReplace(Result, 'ё', 'е', [rfReplaceAll]);
 end;
 
-function TFrameMainTable.FindGridColumnByMenuText(AGrid: TGrid;
-  const AMenuText: string): TColumn;
+function TFrameMainTable.BaseColumnCaption(const AHeader: string): string;
+var
+  P: Integer;
+begin
+  Result := Trim(AHeader);
+  P := Pos(',', Result);
+  if P > 0 then
+    Result := Trim(Copy(Result, 1, P - 1));
+end;
+
+function TFrameMainTable.FindGridColumnByName(AGrid: TGrid;
+  const AColumnName: string): TColumn;
 var
   I: Integer;
-  MenuCaption: string;
-  ColumnCaption: string;
 begin
   Result := nil;
-  if AGrid = nil then
-    Exit;
-
-  MenuCaption := NormalizeColumnCaption(AMenuText);
-  if MenuCaption = '' then
+  if (AGrid = nil) or (Trim(AColumnName) = '') then
     Exit;
 
   for I := 0 to AGrid.ColumnCount - 1 do
-  begin
-    ColumnCaption := NormalizeColumnCaption(AGrid.Columns[I].Header);
-    if SameText(MenuCaption, ColumnCaption) then
+    if SameText(AGrid.Columns[I].Name, AColumnName) then
       Exit(AGrid.Columns[I]);
-  end;
 end;
 
 function TFrameMainTable.FindColumnMenuItem(AParentItem: TMenuItem;
-  const ACaption: string): TMenuItem;
+  const AColumnName: string): TMenuItem;
 var
   I: Integer;
   MenuItem: TMenuItem;
@@ -3147,11 +3149,11 @@ begin
     MenuItem := TMenuItem(AParentItem.Items[I]);
     if MenuItem.ItemsCount > 0 then
     begin
-      Result := FindColumnMenuItem(MenuItem, ACaption);
+      Result := FindColumnMenuItem(MenuItem, AColumnName);
       if Result <> nil then
         Exit;
     end
-    else if SameText(NormalizeColumnCaption(MenuItem.Text), ACaption) then
+    else if SameText(MenuItem.TagString, AColumnName) then
       Exit(MenuItem);
   end;
 end;
@@ -3181,7 +3183,6 @@ procedure TFrameMainTable.EnsureGridColumnsMenu(AGrid: TGrid;
   ARootItem: TMenuItem);
 var
   I: Integer;
-  P: Integer;
   Caption: string;
   NormalizedCaption: string;
   MenuItem: TMenuItem;
@@ -3205,7 +3206,7 @@ begin
     NormalizedCaption := NormalizeColumnCaption(Caption);
     if NormalizedCaption = '' then
       Continue;
-    if FindColumnMenuItem(ARootItem, NormalizedCaption) <> nil then
+    if FindColumnMenuItem(ARootItem, AGrid.Columns[I].Name) <> nil then
       Continue;
 
     TargetItem := OtherItem;
@@ -3220,12 +3221,11 @@ begin
         TargetItem := MeasureItem;
     end;
 
-    P := Pos(',', Caption);
-    if P > 0 then
-      Caption := Trim(Copy(Caption, 1, P - 1));
+    Caption := BaseColumnCaption(Caption);
     MenuItem := TMenuItem.Create(TargetItem);
     MenuItem.Stored := False;
     MenuItem.Text := Caption;
+    MenuItem.TagString := AGrid.Columns[I].Name;
     MenuItem.AutoCheck := False;
     if AGrid = GridDevices then
       MenuItem.OnClick := DevicesColumnMenuItemClick
@@ -3256,9 +3256,12 @@ begin
       Continue;
     end;
 
-    GridColumn := FindGridColumnByMenuText(AGrid, MenuItem.Text);
+    GridColumn := FindGridColumnByName(AGrid, MenuItem.TagString);
     if GridColumn <> nil then
-      MenuItem.IsChecked := GridColumn.Visible
+    begin
+      MenuItem.IsChecked := GridColumn.Visible;
+      MenuItem.Text := BaseColumnCaption(GridColumn.Header);
+    end
     else
       MenuItem.IsChecked := False;
   end;
@@ -6540,6 +6543,9 @@ begin
       StringColumnEtalonQuantity1.TagString := '0';
 
 
+
+  SyncDevicesColumnsMenu;
+  SyncEtalonsColumnsMenu;
 
   if WorkTable.State in [swtSTARTMONITORWAIT, swtMONITOR, swtSTOPMONITOR] then
     RefreshMonitorIndicator;
