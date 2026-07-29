@@ -278,6 +278,7 @@
         <DCCReference Include="uDeviceClass.pas"/>
         <DCCReference Include="uMKSDebug.pas"/>
         <DCCReference Include="uFlowMeter.pas"/>
+        <DCCReference Include="uGraphsViewConfig.pas"/>
         <DCCReference Include="uMeasurementRun.pas"/>
         <DCCReference Include="uAutoMeasurementTestRunner.pas"/>
         <DCCReference Include="uMeterValue.pas"/>
