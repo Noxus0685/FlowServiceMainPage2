@@ -1498,7 +1498,7 @@ end;
 procedure TFrameMainTable.RefreshMeasurementRunFrame;
 begin
   if FFrameMeasurementRun <> nil then
-    FFrameMeasurementRun.UpdateUI;
+    FFrameMeasurementRun.RefreshFromMeasurementRun;
 end;
 
 procedure TFrameMainTable.BuildManualMeasurementPoint;
@@ -4420,7 +4420,9 @@ begin
   if (MeasurementRun = nil) then
     Exit;
 
-   MeasurementRun.CreateSession;
+   MeasurementRun.InvalidatePreparedPoints;
+   MeasurementRun.RebuildMeasurementPoints;
+   RefreshMeasurementRunFrame;
 
 end;
 
@@ -7639,9 +7641,10 @@ begin
           [TMeasurementRun.MeasurementStateToString(Run.Stage), TWorkTable.WorkTableStateToString(WT.State),
            VirtualTimeStartMs - 1, MaxExistingSampleTimeMs, VirtualTimeStartMs]));
         Run.Mode := mrmAutomatic;
-        Run.CreateSession;
+        Run.InvalidatePreparedPoints;
+        Run.RebuildMeasurementPoints;
         if (Run.Points = nil) or (Run.Points.Count = 0) then
-          FinalReason := 'FAIL — штатный CreateSession не сформировал точки'
+          FinalReason := 'FAIL — штатный RebuildMeasurementPoints не сформировал точки'
         else
         begin
           Run.Start;

@@ -265,6 +265,8 @@ type
     FThread: TThread;
     FCriticalSection: TCriticalSection;
     FMode: EMeasurementRunMode;
+    FPointsPrepared: Boolean;
+    FPreparedPointsMode: EMeasurementRunMode;
 
     FManualFlowRate: Double;
     FManualFluidTemp: Double;
@@ -461,6 +463,10 @@ type
     procedure CreateSession;
     procedure CreateSessionPoints;
     procedure RebuildMeasurementPoints;
+    function MovePointUp(AIndex: Integer): Boolean;
+    function MovePointDown(AIndex: Integer): Boolean;
+    procedure SortPointsByFlow(const ADescending: Boolean);
+    procedure InvalidatePreparedPoints;
     function IsSessionPointFit(ADevice: TDevice; APoint: TDevicePoint): Boolean;
 
 
@@ -485,6 +491,8 @@ type
 
     property WorkTable: TWorkTable read FWorkTable;
     property Points: TObjectList<TDevicePoint> read FPoints;
+    property PointsPrepared: Boolean read FPointsPrepared;
+    property PreparedPointsMode: EMeasurementRunMode read FPreparedPointsMode;
 
     property Stage: EMeasurementState read FCurrentStage;
 
@@ -856,6 +864,8 @@ begin
 
   FCurrentPointIndex := -1;
   FMode := mrmManual;
+  FPointsPrepared := False;
+  FPreparedPointsMode := mrmManual;
 
   FManualFlowRate := 0;
   FManualFluidTemp := 20;
@@ -3099,10 +3109,8 @@ end;
 
 procedure TMeasurementRun.CreateSession;
 begin
-  RebuildMeasurementPoints;
-
   ProtocolManager.AddMessage(pcInfo, psMeasurement, 'CreateSession',
-    'Создание сессии измерения',
+    'Подготовка запуска измерения',
     Format('Mode=%d; Points=%d', [Ord(FMode), FPoints.Count]));
 end;
 
@@ -3110,6 +3118,7 @@ procedure TMeasurementRun.RebuildMeasurementPoints;
 var
   Point: TDevicePoint;
 begin
+  FPointsPrepared := False;
   FPoints.Clear;
   ResetPointSelectionContext;
   if FWorkTable = nil then
@@ -3140,6 +3149,75 @@ begin
           FPoints.Add(Point);
       end;
   end;
+  FPreparedPointsMode := FMode;
+  FPointsPrepared := True;
+end;
+
+procedure TMeasurementRun.InvalidatePreparedPoints;
+begin
+  FPointsPrepared := False;
+end;
+
+function TMeasurementRun.MovePointUp(AIndex: Integer): Boolean;
+var
+  PointName: string;
+begin
+  Result := False;
+  if not (FCurrentStage in [msNone, msDone]) or (FPoints = nil) or
+     (AIndex <= 0) or (AIndex >= FPoints.Count) then
+    Exit;
+  PointName := FPoints[AIndex].Name;
+  FPoints.Exchange(AIndex, AIndex - 1);
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'MeasurementPointMoved',
+    'Изменён порядок поверочных точек',
+    Format('Point=%s; OldIndex=%d; NewIndex=%d', [PointName, AIndex, AIndex - 1]));
+  Result := True;
+end;
+
+function TMeasurementRun.MovePointDown(AIndex: Integer): Boolean;
+var
+  PointName: string;
+begin
+  Result := False;
+  if not (FCurrentStage in [msNone, msDone]) or (FPoints = nil) or
+     (AIndex < 0) or (AIndex >= FPoints.Count - 1) then
+    Exit;
+  PointName := FPoints[AIndex].Name;
+  FPoints.Exchange(AIndex, AIndex + 1);
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'MeasurementPointMoved',
+    'Изменён порядок поверочных точек',
+    Format('Point=%s; OldIndex=%d; NewIndex=%d', [PointName, AIndex, AIndex + 1]));
+  Result := True;
+end;
+
+procedure TMeasurementRun.SortPointsByFlow(const ADescending: Boolean);
+var
+  I, J: Integer;
+  DirectionText: string;
+begin
+  if not (FCurrentStage in [msNone, msDone]) or (FPoints = nil) or
+     (FPoints.Count < 2) then
+    Exit;
+
+  { Stable insertion sort: equal Q values are never exchanged. }
+  for I := 1 to FPoints.Count - 1 do
+  begin
+    J := I;
+    while (J > 0) and
+      ((ADescending and (FPoints[J].Q > FPoints[J - 1].Q)) or
+       ((not ADescending) and (FPoints[J].Q < FPoints[J - 1].Q))) do
+    begin
+      FPoints.Exchange(J, J - 1);
+      Dec(J);
+    end;
+  end;
+  if ADescending then
+    DirectionText := 'Descending'
+  else
+    DirectionText := 'Ascending';
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'MeasurementPointsSorted',
+    'Отсортированы поверочные точки',
+    Format('Direction=%s; PointsCount=%d', [DirectionText, FPoints.Count]));
 end;
 
 function TMeasurementRun.ShouldUseAllPoints: Boolean;
@@ -3692,11 +3770,9 @@ begin
      DuplicateParticipantCount, LostSourcePointCount]));
 
   if FPoints.Count = 0 then
-  begin
-    PointName := 'NoAutomaticMeasurementPoints: Points.Count=0';
-    ProtocolManager.AddMessage(pcError, psMeasurement, 'NoAutomaticMeasurementPoints', 'Не сформированы точки автоматической сессии', PointName);
-    raise Exception.Create(PointName);
-  end;
+    ProtocolManager.AddMessage(pcWarning, psMeasurement,
+      'NoAutomaticMeasurementPoints', 'Не сформированы точки автоматического запуска',
+      'Points.Count=0');
 
   if (LostSourcePointCount > 0) or (ParticipantCount <> ProcessingDevicePointCount) then
   begin
@@ -3753,6 +3829,9 @@ begin
     FPhysicalMeasureStarted := False;
     FPhysicalStopRequested := False;
     FActualStopEventFired := False;
+    if (not FPointsPrepared) or (FPreparedPointsMode <> FMode) then
+      RebuildMeasurementPoints;
+    ResetPointSelectionContext;
     CreateSession;
     if FWorkTable = nil then
     begin
@@ -3764,7 +3843,8 @@ begin
       Exit;
     end;
 
-    if (FMode = mrmManual) and (FWorkTable.CurrentPoint = nil) then
+    if (FMode = mrmManual) and ((FWorkTable.CurrentPoint = nil) or
+       (FPoints.Count = 0)) then
     begin
       ProtocolManager.AddMessage(pcWarning, psMeasurement, 'Start',
         'Измерение не запущено', 'В ручном режиме не задана текущая точка измерения');
@@ -3774,8 +3854,7 @@ begin
       Exit;
     end;
 
-    if (FMode <> mrmManual) and ((FPoints.Count = 0) or
-       ((FMode = mrmAutomatic) and (FindNextEnabledPointIndex(0) < 0))) then
+    if (FPoints.Count = 0) or (FindNextEnabledPointIndex(0) < 0) then
     begin
       ProtocolManager.AddMessage(pcWarning, psMeasurement, 'Start',
         'Измерение не запущено', 'Нет включенных точек измерения');

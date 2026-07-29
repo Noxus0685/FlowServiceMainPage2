@@ -49,6 +49,10 @@ type
     SpeedButtonPause: TSpeedButton;
     SpeedButtonPointDelete: TSpeedButton;
     SpeedButtonCreatePoints: TSpeedButton;
+    SpeedButtonMovePointUp: TSpeedButton;
+    SpeedButtonMovePointDown: TSpeedButton;
+    SpeedButtonSortFlowDescending: TSpeedButton;
+    SpeedButtonSortFlowAscending: TSpeedButton;
     StringColumnLimitTime: TStringColumn;
     StringColumnLimitImp: TStringColumn;
     StringColumnLimitVolume: TStringColumn;
@@ -79,6 +83,10 @@ type
     procedure SpeedButtonPointDeleteClick(Sender: TObject);
     procedure SpeedButtonPointNextClick(Sender: TObject);
     procedure SpeedButtonPointPrevClick(Sender: TObject);
+    procedure SpeedButtonMovePointUpClick(Sender: TObject);
+    procedure SpeedButtonMovePointDownClick(Sender: TObject);
+    procedure SpeedButtonSortFlowDescendingClick(Sender: TObject);
+    procedure SpeedButtonSortFlowAscendingClick(Sender: TObject);
     procedure ButtonRunAutoTestScenarioClick(Sender: TObject);
     procedure ButtonRunAllAutoTestScenariosClick(Sender: TObject);
     procedure GridAutoTestResultsGetValue(Sender: TObject; const ACol,
@@ -104,6 +112,7 @@ type
     procedure SetPointEnabledFromGrid(APoint: TDevicePoint; const AEnabled: Boolean);
     procedure UpdateGridMRHeaders;
     procedure UpdateStopCriteriaColumns;
+    procedure UpdatePointOrderControls;
     function IsPointInvalid(APoint: TDevicePoint): Boolean;
     function GetRowColor(const ARow: Integer): TAlphaColor;
     procedure SetAutoTestControlsEnabled(const AEnabled: Boolean);
@@ -116,6 +125,7 @@ type
     destructor Destroy; override;
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
     procedure UpdateUI;
+    procedure RefreshFromMeasurementRun;
     property MeasurementRun: TMeasurementRun read GetMeasurementRun;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
 
@@ -135,6 +145,10 @@ begin
   SpeedButtonPause.OnClick := SpeedButtonPauseClick;
   SpeedButtonPointDelete.OnClick := SpeedButtonPointDeleteClick;
   SpeedButtonCreatePoints.OnClick := SpeedButtonCreatePointsClick;
+  SpeedButtonMovePointUp.OnClick := SpeedButtonMovePointUpClick;
+  SpeedButtonMovePointDown.OnClick := SpeedButtonMovePointDownClick;
+  SpeedButtonSortFlowDescending.OnClick := SpeedButtonSortFlowDescendingClick;
+  SpeedButtonSortFlowAscending.OnClick := SpeedButtonSortFlowAscendingClick;
   ButtonRunAutoTestScenario.OnClick := ButtonRunAutoTestScenarioClick;
   ButtonRunAllAutoTestScenarios.OnClick := ButtonRunAllAutoTestScenariosClick;
   GridAutoTestResults.OnGetValue := GridAutoTestResultsGetValue;
@@ -359,12 +373,7 @@ begin
   end;
 
   if GridMeasurmentRun.Columns[ACol] = StringColumnPointer then
-  begin
-    if MeasurementRun.CurrentPointIndex = ARow then
-      Value := '▶'
-    else
-      Value := '';
-  end
+    Value := ARow + 1
   else if GridMeasurmentRun.Columns[ACol] = StringColumnMRPointName then
     Value := Point.Name
   else if GridMeasurmentRun.Columns[ACol] = StringColumnMRFlowRate then
@@ -429,6 +438,7 @@ procedure TFrameMeasurementRun.GridMeasurmentRunCellClick(const Column: TColumn;
 var
   Point: TDevicePoint;
 begin
+  UpdatePointOrderControls;
   if Column <> CheckColumnMREnable then
     Exit;
 
@@ -507,6 +517,11 @@ begin
      UpdateGridMesurmentRun;
 end;
 
+procedure TFrameMeasurementRun.RefreshFromMeasurementRun;
+begin
+  UpdateUI;
+end;
+
 
 procedure TFrameMeasurementRun.UpdateGridMRHeaders;
 begin
@@ -545,12 +560,14 @@ end;
 procedure TFrameMeasurementRun.UpdateGridMesurmentRun;
 var
   Rows: Integer;
+  SelectedRow: Integer;
 begin
   if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) then
     Rows := MeasurementRun.Points.Count
   else
     Rows := 0;
 
+  SelectedRow := GridMeasurmentRun.Selected;
   UpdateStopCriteriaColumns;
 
   GridMeasurmentRun.BeginUpdate;
@@ -561,7 +578,87 @@ begin
     GridMeasurmentRun.EndUpdate;
   end;
 
+  if Rows = 0 then
+    GridMeasurmentRun.Selected := -1
+  else if SelectedRow >= Rows then
+    GridMeasurmentRun.Selected := Rows - 1;
+
   GridMeasurmentRun.Repaint;
+  UpdatePointOrderControls;
+end;
+
+procedure TFrameMeasurementRun.UpdatePointOrderControls;
+var
+  Row, Count: Integer;
+  CanEditOrder: Boolean;
+begin
+  Row := GridMeasurmentRun.Selected;
+  if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) then
+    Count := MeasurementRun.Points.Count
+  else
+    Count := 0;
+  CanEditOrder := (MeasurementRun <> nil) and
+    (MeasurementRun.Stage in [msNone, msDone]);
+  SpeedButtonMovePointUp.Enabled := CanEditOrder and (Row > 0) and (Row < Count);
+  SpeedButtonMovePointDown.Enabled := CanEditOrder and (Row >= 0) and (Row < Count - 1);
+  SpeedButtonSortFlowDescending.Enabled := CanEditOrder and (Count > 1);
+  SpeedButtonSortFlowAscending.Enabled := CanEditOrder and (Count > 1);
+end;
+
+procedure TFrameMeasurementRun.SpeedButtonMovePointUpClick(Sender: TObject);
+var
+  Row: Integer;
+begin
+  if MeasurementRun = nil then Exit;
+  Row := GridMeasurmentRun.Selected;
+  if MeasurementRun.MovePointUp(Row) then
+  begin
+    GridMeasurmentRun.Selected := Row - 1;
+    UpdateGridMesurmentRun;
+  end;
+end;
+
+procedure TFrameMeasurementRun.SpeedButtonMovePointDownClick(Sender: TObject);
+var
+  Row: Integer;
+begin
+  if MeasurementRun = nil then Exit;
+  Row := GridMeasurmentRun.Selected;
+  if MeasurementRun.MovePointDown(Row) then
+  begin
+    GridMeasurmentRun.Selected := Row + 1;
+    UpdateGridMesurmentRun;
+  end;
+end;
+
+procedure TFrameMeasurementRun.SpeedButtonSortFlowDescendingClick(Sender: TObject);
+var
+  SelectedPoint: TDevicePoint;
+begin
+  if MeasurementRun = nil then Exit;
+  SelectedPoint := nil;
+  if (GridMeasurmentRun.Selected >= 0) and
+     (GridMeasurmentRun.Selected < MeasurementRun.Points.Count) then
+    SelectedPoint := MeasurementRun.Points[GridMeasurmentRun.Selected];
+  MeasurementRun.SortPointsByFlow(True);
+  if SelectedPoint <> nil then
+    GridMeasurmentRun.Selected := MeasurementRun.Points.IndexOf(SelectedPoint);
+  UpdateGridMesurmentRun;
+end;
+
+procedure TFrameMeasurementRun.SpeedButtonSortFlowAscendingClick(Sender: TObject);
+var
+  SelectedPoint: TDevicePoint;
+begin
+  if MeasurementRun = nil then Exit;
+  SelectedPoint := nil;
+  if (GridMeasurmentRun.Selected >= 0) and
+     (GridMeasurmentRun.Selected < MeasurementRun.Points.Count) then
+    SelectedPoint := MeasurementRun.Points[GridMeasurmentRun.Selected];
+  MeasurementRun.SortPointsByFlow(False);
+  if SelectedPoint <> nil then
+    GridMeasurmentRun.Selected := MeasurementRun.Points.IndexOf(SelectedPoint);
+  UpdateGridMesurmentRun;
 end;
 
 
@@ -725,7 +822,10 @@ begin
   if MeasurementRun = nil then
     Exit;
 
-  MeasurementRun.CreateSession;
+  if not (MeasurementRun.Stage in [msNone, msDone]) then
+    Exit;
+  MeasurementRun.InvalidatePreparedPoints;
+  MeasurementRun.RebuildMeasurementPoints;
   FInvalidPointIndexes.Clear;
   UpdateGridMesurmentRun;
 end;
