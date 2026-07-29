@@ -330,6 +330,8 @@ type
     FLastFreshDataLogMs: Int64;
     FLastPointDecisionLogMs: Int64;
     FLastPointSetupReadyProtocolMs: Int64;
+    FPressureNotControlledLogged: Boolean;
+    FTemperatureNotControlledLogged: Boolean;
     FLastTemperatureReady: Boolean;
     FLastPressureReady: Boolean;
     FLastWaitPointSetupLogState: EStateWorkTable;
@@ -915,6 +917,8 @@ begin
   FLastFreshDataLogMs := 0;
   FLastPointDecisionLogMs := 0;
   FLastPointSetupReadyProtocolMs := -1;
+  FPressureNotControlledLogged := False;
+  FTemperatureNotControlledLogged := False;
   FLastTemperatureReady := True;
   FLastPressureReady := True;
   FLastWaitPointSetupLogState := swtNONE;
@@ -1392,6 +1396,10 @@ var
   Point: TDevicePoint;
   CurrentMs: Int64;
 begin
+  // Эти сообщения описывают текущую точку, поэтому для новой точки их можно
+  // опубликовать снова, но не следует повторять при каждом опросе готовности.
+  FPressureNotControlledLogged := False;
+  FTemperatureNotControlledLogged := False;
   SetCurrentPointStatus(mptsSetupPoint);
   if FWorkTable = nil then
     Exit;
@@ -2006,7 +2014,7 @@ begin
      BoolToStr(PressureReady, True), BoolToStr(ConditionsReady, True),
      BoolToStr(Result, True), Reason]);
   PublishProtocol := (FLastPointSetupReadyProtocolMs < 0) or
-    (CurrentMs - FLastPointSetupReadyProtocolMs >= 1000);
+    (CurrentMs - FLastPointSetupReadyProtocolMs >= 2000);
   if PublishProtocol then
   begin
     ProtocolManager.AddMessage(pcProc, psMeasurement, 'IsPointSetupReady',
@@ -2117,9 +2125,16 @@ begin
   else begin
     LogText := 'PointSetupCondition: Name=FluidTemp; Enabled=False; Skipped=True; Reason=Parameter is not configured';
     AddDiagnosticEvent(LogText);
-    if PublishProtocol then ProtocolManager.AddMessage(pcProc, psMeasurement,
-      'IsConditionsStable', 'Температура не контролируется', LogText);
+    if not FTemperatureNotControlledLogged then
+    begin
+      ProtocolManager.AddMessage(pcProc, psMeasurement, 'IsPointSetupReady',
+        'Температура не контролируется',
+        'Контроль температуры для текущей точки отключён');
+      FTemperatureNotControlledLogged := True;
+    end;
   end;
+  if (FWorkTable.FluidTemp <> nil) and (Point.Temp > 0) then
+    FTemperatureNotControlledLogged := False;
   FLastTemperatureReady := TemperatureStable;
 
   PressureStable := True;
@@ -2140,10 +2155,20 @@ begin
   else begin
     LogText := 'PointSetupCondition: Name=FluidPress; Enabled=False; Skipped=True; Reason=Parameter is not configured';
     AddDiagnosticEvent(LogText);
-    if PublishProtocol then ProtocolManager.AddMessage(pcProc, psMeasurement,
-      'IsConditionsStable', 'Давление не контролируется', LogText);
+    if not FPressureNotControlledLogged then
+    begin
+      ProtocolManager.AddMessage(pcProc, psMeasurement, 'IsPointSetupReady',
+        'Давление не контролируется',
+        'Контроль давления для текущей точки отключён');
+      FPressureNotControlledLogged := True;
+    end;
   end;
+  if (FWorkTable.FluidPress <> nil) and (Point.Pressure > 0) then
+    FPressureNotControlledLogged := False;
   FLastPressureReady := PressureStable;
+
+  if PublishProtocol then
+    FLastPointDecisionLogMs := TMeterValue.GetMonotonicTimeMs;
 
   Result := TemperatureStable and PressureStable;
   if Result then
@@ -4721,6 +4746,8 @@ begin
   FLastWaitPointSetupLogMs := 0;
   FLastWaitPointSetupLogState := swtNONE;
   FLastPointSetupReadyProtocolMs := -1;
+  FPressureNotControlledLogged := False;
+  FTemperatureNotControlledLogged := False;
 end;
 
 procedure TMeasurementRun.StartNewStabilityAttempt;
