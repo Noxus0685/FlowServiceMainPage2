@@ -976,6 +976,8 @@ type
     procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
     procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
     function GetAverageFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
+    function CalculateCurrentDeviationPercent(const ACurrentValue,
+      AMeanValue: Double): Double;
     function GetErrorCellColor(AChannel: TChannel; const AText: string; out AColor: TAlphaColor): Boolean;
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
@@ -990,6 +992,7 @@ uses
   fuTable_Main;
 
 const
+  CurrentDeviationEpsilon = 1E-12;
   GraphSampleIntervalMs = 1000;
   GraphVisibleWindowSec = 60.0;
   GraphVisibleWindowMs = 60000;
@@ -8555,6 +8558,15 @@ begin
     Result := AFlowMeter.ValueFlow.GetStrNum(AvgFlow);
 end;
 
+function TFrameMainTable.CalculateCurrentDeviationPercent(
+  const ACurrentValue, AMeanValue: Double): Double;
+begin
+  if Abs(AMeanValue) <= CurrentDeviationEpsilon then
+    Exit(0);
+
+  Result := (ACurrentValue - AMeanValue) / Abs(AMeanValue) * 100;
+end;
+
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
@@ -8638,7 +8650,9 @@ begin
     begin
       if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStrStdDeviationPercent
+        Value := FormatValue(CalculateCurrentDeviationPercent(
+          WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetDoubleValue,
+          WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetDoubleMeanValue), -1, 10)
       else
         Value := '-';
     end
@@ -9195,7 +9209,9 @@ begin
     begin
       if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStrStdDeviationPercent
+        Value := FormatValue(CalculateCurrentDeviationPercent(
+          WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetDoubleValue,
+          WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetDoubleMeanValue), -1, 10)
       else
         Value := '-';
     end
