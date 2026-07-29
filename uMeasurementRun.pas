@@ -1417,10 +1417,7 @@ begin
          (Channel.FlowMeter.ValueFlow <> nil) then
         Channel.FlowMeter.ValueFlow.ResetStabilityRuntimeState;
     end;
-  AddDiagnosticEvent(Format(
-    'PointSetupWaitStarted: PointIndex=%d; PointUUID=%s; TargetFlowLS=%.6f; SelectedEtalonUUID=%s; WorkTableState=%s; Attempt=%d; CommandSent=%s',
-    [FSetupPointIndex, FSetupPointUUID, FSetupTargetFlowLS, GetSelectedEtalonUUID,
-     TWorkTable.WorkTableStateToString(FWorkTable.State), FAttempt, BoolToStr(FPointSetupCommandSent, True)]));
+
   if Point <> nil then
   begin
     ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitPointSetup',
@@ -1433,6 +1430,7 @@ begin
     FLastPointDecisionLogMs := 0;
     FLastPointSetupReadyProtocolMs := -1;
   end;
+
   if FWorkTable.State <> swtMONITOR then
     FWorkTable.StartMonitor;
 end;
@@ -1476,6 +1474,8 @@ begin
   FWaitStableStartedMs := TMeterValue.GetMonotonicTimeMs;
   if FStabilityDataStartMs <= 0 then
     FStabilityDataStartMs := FWaitStableStartedMs;
+
+   FWorkTable.DeviceChannels[0].FlowMeter.ValueFlow.ProtocolValueChanges := True;
 
   SetLength(FDeviceStability, 0);
   if (FWorkTable <> nil) and (FWorkTable.DeviceChannels <> nil) then

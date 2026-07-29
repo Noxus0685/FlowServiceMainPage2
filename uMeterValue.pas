@@ -11,6 +11,7 @@ uses
   System.SyncObjs,
   System.Diagnostics,
   System.SysUtils,
+    uProtocols,
   uBaseProcedures;
 
   const
@@ -59,6 +60,12 @@ type
     class var FInitDensity: Double;
 
   private
+
+/// <summary>
+/// Включает протоколирование каждого присваивания значения через SetValue.
+/// </summary>
+    FProtocolValueChanges: Boolean;
+
     FFilterOrder: Integer;
     FFilterRd: Integer;
     FFilterWr: Integer;
@@ -95,7 +102,10 @@ type
     function FormatDisplayValue(const AValue: Double): string;
     class constructor CreateClass;
     class destructor DestroyClass;
-
+    procedure ProtocolValueChange(
+  const AInputValue,
+  APreviousValue,
+  AResultValue: Double);
 
 
   public
@@ -391,6 +401,14 @@ type
     property StabilitySettings: TMeterValueStabilitySettings read FStabilitySettings write SetStabilitySettings;
     /// <summary>Last analysis result; useful for UI/status code that should avoid immediate recalculation.</summary>
     property LastStabilityInfo: TMeterValueStabilityInfo read FLastStabilityInfo;
+
+/// <summary>
+/// Протоколировать изменение значения данного экземпляра TMeterValue.
+/// </summary>
+property ProtocolValueChanges: Boolean
+  read FProtocolValueChanges
+  write FProtocolValueChanges;
+
   end;
 
 implementation
@@ -399,6 +417,8 @@ implementation
 uses
   FmxHelper,
   uDebugLog;
+
+
 
 function MedianValue(const AValues: TArray<Double>): Double;
 var
@@ -573,6 +593,53 @@ begin
   for C in AMeterValue.Coefs do Coefs.Add(C);
   FStabilitySettings := AMeterValue.FStabilitySettings;
   ClearSamplesHistory;
+end;
+
+
+procedure TMeterValue.ProtocolValueChange(
+  const AInputValue,
+  APreviousValue,
+  AResultValue: Double);
+var
+  ValueIdentity: string;
+begin
+  if not FProtocolValueChanges then
+    Exit;
+
+  if ProtocolManager = nil then
+    Exit;
+
+  ValueIdentity := Name;
+
+  if ValueIdentity = '' then
+    ValueIdentity := ShrtName;
+
+  if ValueIdentity = '' then
+    ValueIdentity := Hash;
+
+  ProtocolManager.AddMessage(
+    pcInfo,
+    psParameters,
+    'TMeterValue.SetValue',
+    ValueIdentity,
+    Format(
+      'Owner=%s; Hash=%s; Input=%.12g; Previous=%.12g; ' +
+      'Result=%.12g; FilterOrder=%d; FinalValue=%s; ' +
+      'HistoryCount=%d; HistoryLimit=%d',
+      [
+        NameOwner,
+        Hash,
+        AInputValue,
+        APreviousValue,
+        AResultValue,
+        FFilterOrder,
+        BoolToStr(FFinalValue, 'True', 'False'),
+        Values.Count,
+        ARRAY_SIZE
+      ],
+      TFormatSettings.Invariant
+    )
+  );
 end;
 
 { Finds an existing meter value by hash (and optional owner context). }
@@ -2735,9 +2802,10 @@ end;
 { Assigns value, applies range limits, and updates history/mean buffers. }
 procedure TMeterValue.SetValue(AValue: Double);
 var
-  InputValue: Double;
+  InputValue,PreviousValue : Double;
 begin
   //InputValue := EnsureRange(AValue, MinValue, MaxValue);
+  PreviousValue:= Value;
   InputValue :=   AValue;
 
 
@@ -2755,6 +2823,12 @@ begin
   end
   else
     Value := InputValue;
+
+    ProtocolValueChange(
+    InputValue,
+    PreviousValue,
+    Value
+  );
 
 end;
 
