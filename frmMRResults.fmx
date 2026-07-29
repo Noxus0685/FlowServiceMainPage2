@@ -10,23 +10,28 @@ object FrameMRResults: TFrameMRResults
     Size.Height = 688.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
+    Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, AutoDisplacement]
     OnDrawColumnCell = GridMRResultsDrawColumnCell
     OnGetValue = GridMRResultsGetValue
     Viewport.Width = 1230.000000000000000000
     Viewport.Height = 688.000000000000000000
     object StringColumnName: TStringColumn
+      ReadOnly = True
       Header = #1055#1088#1080#1073#1086#1088
       HeaderSettings.TextSettings.WordWrap = False
     end
     object StringColumnPoint1: TStringColumn
+      ReadOnly = True
       Header = #1058#1086#1095#1082#1072' 1'
       HeaderSettings.TextSettings.WordWrap = False
     end
     object StringColumnPoint2: TStringColumn
+      ReadOnly = True
       Header = #1058#1086#1095#1082#1072' 2'
       HeaderSettings.TextSettings.WordWrap = False
     end
     object StringColumnResult: TStringColumn
+      ReadOnly = True
       Header = #1056#1077#1079#1091#1083#1100#1090#1072#1090
       HeaderSettings.TextSettings.WordWrap = False
     end

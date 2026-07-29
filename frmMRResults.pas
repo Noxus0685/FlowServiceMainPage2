@@ -94,9 +94,24 @@ type
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
   end;
 
+procedure SetGridReadOnly(AGrid: TGrid);
+
 implementation
 
 {$R *.fmx}
+
+procedure SetGridReadOnly(AGrid: TGrid);
+var
+  I: Integer;
+begin
+  if AGrid = nil then
+    Exit;
+
+  AGrid.Options := AGrid.Options - [TGridOption.Editing];
+  for I := 0 to AGrid.ColumnCount - 1 do
+    if AGrid.Columns[I] <> nil then
+      AGrid.Columns[I].ReadOnly := True;
+end;
 
 constructor TFrameMRResults.Create(AOwner: TComponent);
 begin
@@ -106,6 +121,8 @@ begin
 
   GridMRResults.OnGetValue := GridMRResultsGetValue;
   GridMRResults.OnDrawColumnCell := GridMRResultsDrawColumnCell;
+  GridMRResults.OnSetValue := nil;
+  SetGridReadOnly(GridMRResults);
 end;
 
 destructor TFrameMRResults.Destroy;
@@ -151,8 +168,11 @@ end;
 
 procedure TFrameMRResults.SpeedButtonCreatePointsClick(Sender: TObject);
 begin
-       MeasurementRun.CreateSession;
-        UpdateUI;
+  if MeasurementRun = nil then
+    Exit;
+  MeasurementRun.InvalidatePreparedPoints;
+  MeasurementRun.RebuildMeasurementPoints;
+  UpdateUI;
 end;
 
 procedure TFrameMRResults.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
@@ -220,6 +240,7 @@ begin
   finally
     GridMRResults.EndUpdate;
   end;
+  SetGridReadOnly(GridMRResults);
 end;
 
 procedure TFrameMRResults.RefreshRows;

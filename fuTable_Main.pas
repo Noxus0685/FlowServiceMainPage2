@@ -41,6 +41,7 @@ type
   TTableMainForm = class(TForm, IEventObserver, IWorkTableObserverHost)
     tcMain: TTabControl;
     tiTable: TTabItem;
+    TabItemMainGraphs: TTabItem;
     tiResults: TTabItem;
     tiMnemo: TTabItem;
     TimerSetValues: TTimer;
@@ -643,6 +644,7 @@ begin
   FFrameMainTable.OnWorkTableCommand := WorkTableCommandHandler;
   ApplyInstrumentName;
   FFrameMainTable.Initialize;
+  FFrameMainTable.AttachGraphsTo(TabItemMainGraphs);
 
 
 

@@ -71,6 +71,7 @@ uses
   uParameter,
   uProtocols,
   uRepositories,
+  uGraphsViewConfig,
   uWorkTable;
 
 
@@ -573,7 +574,7 @@ type
     StyleBook1: TStyleBook;
     PanelControlWorkTables: TPanel;
     TabItemWorkTable1: TTabItem;
-    TabItemGraphs: TTabItem;
+    TabItemWorkTableGraphs: TTabItem;
     LayoutGraphsClient: TLayout;
     LayoutEtalonGraphSection: TLayout;
     LayoutEtalonChart: TLayout;
@@ -744,6 +745,15 @@ type
     FGraphChannelsReady: Boolean;
     FGraphSamplingActive: Boolean;
     FLastGraphRunActive: Boolean;
+    FGraphsViewConfig: TGraphsViewConfig;
+    FGraphsRoot: TLayout;
+    FGraphsSettings: TPanel;
+    FGraphsSettingsContent: TVertScrollBox;
+    FGraphsSettingsWidth: Single;
+    FGraphCountCombo: TComboBox;
+    FGraphLayoutCombo: TComboBox;
+    FGraphLegendCheck: TCheckBox;
+    FGraphSettingsToggle: TButton;
   FFrameMeasurementRun: TFrameMeasurementRun;
   FFrameMRResults: TFrameMRResults;
   FFrameProtocol: TFrameProtocol;
@@ -764,6 +774,7 @@ type
   FRows: array of TRowData;
   IsUpdating: Boolean;
   FUpdatingChannelEnabled: Boolean;
+  FUpdatingAutoSwitch: Boolean;
   FLastAutoStatusText: string;
   FAutoTestTab: TTabItem;
   FAutoTestInfoLabel: TLabel;
@@ -805,6 +816,10 @@ type
     procedure EnsureActiveWorkTableMenu;
     procedure MenuSetActiveWorkTableClick(Sender: TObject);
     procedure UpdateGridDevices;
+    procedure ToggleAllChannelRows(AGrid: TGrid;
+      AChannels: TObjectList<TChannel>; const AEtalonChannels: Boolean);
+    procedure ToggleAllDeviceChannels;
+    procedure ToggleAllEtalonChannels;
     procedure EnsureEmptyDevicesForGridRows;
     function ShouldReleaseGridDeviceBeforeSave(AChannel: TChannel; ADevice: TDevice): Boolean;
     function GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
@@ -835,7 +850,16 @@ type
     function FlowGraphDisplayValue(AWorkTable: TWorkTable; const ABaseFlowLS: Double): Double;
     function FlowGraphSamplesCount(ADict: TObjectDictionary<string, TFlowGraphSeries>): Integer;
     procedure SetFlowChartYAxis(AChart: TSimpleChart; const AYMin, AYMax: Double);
-   procedure ButtonClearFlowGraphsClick(Sender: TObject);
+    procedure ButtonClearFlowGraphsClick(Sender: TObject);
+    procedure GraphSettingsToggleClick(Sender: TObject);
+    procedure GraphCountChange(Sender: TObject);
+    procedure GraphLayoutChange(Sender: TObject);
+    procedure GraphLegendChange(Sender: TObject);
+    procedure ResetGraphSettingsClick(Sender: TObject);
+    procedure ApplyGraphsLayout;
+    procedure BuildGraphsSettingsPanel;
+    function ResolveGraphSeriesMeterValue(
+      const ASeries: TGraphSeriesConfig): TMeterValue;
 
     procedure UpdateUIFromValues;
     procedure SetValues;
@@ -872,6 +896,9 @@ type
     procedure StopMonitor;
     procedure StartMeasurement;
     procedure StopMeasurement;
+    procedure ApplyMeasurementModeFromSwitch;
+    procedure BuildManualMeasurementPoint;
+    procedure RefreshMeasurementRunFrame;
     procedure UpdateTestButton;
     procedure UpdateTestButtonByWorkTableState;
     procedure UpdateTestButtonByMeasurementRun;
@@ -931,6 +958,7 @@ type
       AMainVisible, AMesureVisible, AConditionsVisible, AProceduresVisible: Boolean;
       const AOrder: string = '');
   public
+    procedure AttachGraphsTo(AParent: TFmxObject);
     { Public declarations }
     procedure Initialize;
     destructor Destroy; override;
@@ -975,7 +1003,11 @@ type
     procedure FlowMeterPropertiesChanged(Sender: TObject);
     procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
     procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
+    function TryGetAverageFlow(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable;
+      out AAverageFlow: Double): Boolean;
     function GetAverageFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
+    function CalculateCurrentDeviationPercent(const ACurrentValue,
+      AMeanValue: Double): Double;
     function GetErrorCellColor(AChannel: TChannel; const AText: string; out AColor: TAlphaColor): Boolean;
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
@@ -990,6 +1022,7 @@ uses
   fuTable_Main;
 
 const
+  CurrentDeviationEpsilon = 1E-12;
   GraphSampleIntervalMs = 1000;
   GraphVisibleWindowSec = 60.0;
   GraphVisibleWindowMs = 60000;
@@ -1194,6 +1227,7 @@ begin
     FStabilitySampleTimer.Enabled := False;
   FreeAndNil(FStabilitySampleTimer);
   FreeAndNil(FFlowGraphHistory);
+  FreeAndNil(FGraphsViewConfig);
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
@@ -1479,26 +1513,80 @@ begin
 
  procedure TFrameMainTable.SwitchAutoSwitch(Sender: TObject);
 begin
-        if MeasurementRun=nil then
-        begin
-            SwitchAuto.IsChecked:=False;
-            Exit;
-        end;
+  ApplyMeasurementModeFromSwitch;
+end;
 
-           if SwitchAuto.IsChecked then
-           begin
-             MeasurementRun.Mode:= EMeasurementRunMode.mrmAutomatic;
-             if FActiveWorkTable <> nil then
-               FActiveWorkTable.MeasurementMode := EMeasurementRunMode.mrmAutomatic;
-           end
-           else
-           begin
-             MeasurementRun.Mode:= EMeasurementRunMode.mrmManual;
-             if FActiveWorkTable <> nil then
-               FActiveWorkTable.MeasurementMode := EMeasurementRunMode.mrmManual;
-           end;
+procedure TFrameMainTable.RefreshMeasurementRunFrame;
+begin
+  if FFrameMeasurementRun <> nil then
+    FFrameMeasurementRun.RefreshFromMeasurementRun;
+end;
 
+procedure TFrameMainTable.BuildManualMeasurementPoint;
+begin
+  if (FActiveWorkTable = nil) or (MeasurementRun = nil) or
+     (FActiveWorkTable.CurrentPoint = nil) then
+    Exit;
+
+  { Q is stored in base units.  Use the user's setpoint, never ValueFlow. }
+  if (FActiveWorkTable.FlowRate <> nil) and
+     (FActiveWorkTable.FlowRate.ValueSet <> nil) then
+    FActiveWorkTable.CurrentPoint.Q := FActiveWorkTable.FlowRate.ValueSet.Value;
+  if (FActiveWorkTable.FluidTemp <> nil) and
+     (FActiveWorkTable.FluidTemp.ValueSet <> nil) then
+    FActiveWorkTable.CurrentPoint.Temp := FActiveWorkTable.FluidTemp.ValueSet.Value;
+  if (FActiveWorkTable.FluidPress <> nil) and
+     (FActiveWorkTable.FluidPress.ValueSet <> nil) then
+    FActiveWorkTable.CurrentPoint.Pressure := FActiveWorkTable.FluidPress.ValueSet.Value;
+
+  MeasurementRun.RebuildMeasurementPoints;
+end;
+
+procedure TFrameMainTable.ApplyMeasurementModeFromSwitch;
+var
+  Run: TMeasurementRun;
+  NewMode, PreviousMode: EMeasurementRunMode;
+begin
+  if FUpdatingAutoSwitch or (FActiveWorkTable = nil) then
+    Exit;
+  Run := MeasurementRun;
+  if Run = nil then
+    Exit;
+
+  PreviousMode := Run.Mode;
+  if not (Run.Stage in [msNone, msDone]) then
+  begin
+    FUpdatingAutoSwitch := True;
+    try
+      SwitchAuto.IsChecked := PreviousMode = mrmAutomatic;
+    finally
+      FUpdatingAutoSwitch := False;
+    end;
+    Exit;
+  end;
+
+  if SwitchAuto.IsChecked then
+    NewMode := mrmAutomatic
+  else
+    NewMode := mrmManual;
+  if NewMode = PreviousMode then
+    Exit;
+
+  Run.Mode := NewMode;
+  FActiveWorkTable.MeasurementMode := NewMode;
+  if NewMode = mrmManual then
+    BuildManualMeasurementPoint
+  else
+    Run.RebuildMeasurementPoints;
+
+  RefreshMeasurementRunFrame;
   UpdateTestButton;
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'MeasurementModeChanged',
+    'Изменён режим измерения',
+    Format('Mode=%s; PointsCount=%d; ManualPointAssigned=%s',
+      [TMeasurementRun.MeasurementRunModeToString(Run.Mode), Run.Points.Count,
+       BoolToStr((Run.Mode = mrmManual) and
+         (FActiveWorkTable.CurrentPoint <> nil), True)]));
 end;
 
 procedure TFrameMainTable.UpdateForm;
@@ -4353,7 +4441,9 @@ begin
   if (MeasurementRun = nil) then
     Exit;
 
-   MeasurementRun.CreateSession;
+   MeasurementRun.InvalidatePreparedPoints;
+   MeasurementRun.RebuildMeasurementPoints;
+   RefreshMeasurementRunFrame;
 
 end;
 
@@ -5464,12 +5554,6 @@ procedure TFrameMainTable.EnsureFlowGraphDictionaries;
 begin
   if FFlowGraphHistory = nil then
     FFlowGraphHistory := TFlowGraphHistory.Create;
-  if LayoutEtalonGraphSection <> nil then
-    LayoutEtalonGraphSection.Visible := True;
-  if SplitterFlowGraphs <> nil then
-    SplitterFlowGraphs.Visible := True;
-  if LayoutDeviceGraphSection <> nil then
-    LayoutDeviceGraphSection.Visible := True;
 end;
 
 function TFrameMainTable.FlowGraphSamplesCount(ADict: TObjectDictionary<string, TFlowGraphSeries>): Integer;
@@ -6140,6 +6224,264 @@ begin
   RenderFlowChart(ChartDeviceFlow, FFlowGraphHistory.DeviceSeries, 'Расход поверяемых приборов',
     VisibleXMinMs, VisibleXMaxMs, AxisMinSec, AxisMaxSec, MeasurementSegment);
   FLastGraphRunActive := RunActive;
+end;
+
+procedure TFrameMainTable.AttachGraphsTo(AParent: TFmxObject);
+var
+  Splitter: TSplitter;
+begin
+  if AParent = nil then
+    Exit;
+  if FGraphsViewConfig = nil then
+    FGraphsViewConfig := TGraphsViewConfig.Create;
+  if FGraphsRoot = nil then
+  begin
+    FGraphsRoot := TLayout.Create(Self);
+    FGraphsRoot.Name := 'LayoutGraphsRoot';
+    FGraphsRoot.Align := TAlignLayout.Client;
+    FGraphsSettingsWidth := 340;
+
+    FGraphsSettings := TPanel.Create(FGraphsRoot);
+    FGraphsSettings.Name := 'LayoutGraphsSettings';
+    FGraphsSettings.Parent := FGraphsRoot;
+    FGraphsSettings.Align := TAlignLayout.Right;
+    FGraphsSettings.Width := FGraphsSettingsWidth;
+
+    Splitter := TSplitter.Create(FGraphsRoot);
+    Splitter.Name := 'SplitterGraphsSettings';
+    Splitter.Parent := FGraphsRoot;
+    Splitter.Align := TAlignLayout.Right;
+    Splitter.Width := 6;
+
+    if LayoutGraphsClient <> nil then
+    begin
+      LayoutGraphsClient.Parent := FGraphsRoot;
+      LayoutGraphsClient.Align := TAlignLayout.Client;
+    end;
+    if LayoutGraphCommands <> nil then
+      LayoutGraphCommands.Visible := False;
+    BuildGraphsSettingsPanel;
+  end;
+  FGraphsRoot.Parent := AParent;
+  FGraphsRoot.Align := TAlignLayout.Client;
+  if TabItemWorkTableGraphs <> nil then
+  begin
+    TabItemWorkTableGraphs.Visible := False;
+    TabItemWorkTableGraphs.Parent := nil;
+  end;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(
+      pcInfo,
+      psForm,
+      'AttachGraphsTo',
+      'Рабочая область графиков перенесена',
+      Format('TargetParent=%s; ActualParent=%s; Align=%d',
+        [AParent.Name, FGraphsRoot.Parent.Name, Ord(FGraphsRoot.Align)]));
+  ApplyGraphsLayout;
+end;
+
+procedure TFrameMainTable.BuildGraphsSettingsPanel;
+var
+  Caption: TLabel;
+  ClearButton, ResetButton: TButton;
+begin
+  if FGraphsSettings = nil then
+    Exit;
+  FGraphSettingsToggle := TButton.Create(FGraphsSettings);
+  FGraphSettingsToggle.Parent := FGraphsSettings;
+  FGraphSettingsToggle.Align := TAlignLayout.Top;
+  FGraphSettingsToggle.Height := 36;
+  FGraphSettingsToggle.Text := '<';
+  FGraphSettingsToggle.OnClick := GraphSettingsToggleClick;
+
+  FGraphsSettingsContent := TVertScrollBox.Create(FGraphsSettings);
+  FGraphsSettingsContent.Parent := FGraphsSettings;
+  FGraphsSettingsContent.Align := TAlignLayout.Client;
+
+  Caption := TLabel.Create(FGraphsSettingsContent);
+  Caption.Parent := FGraphsSettingsContent;
+  Caption.Position.Point := PointF(12, 12);
+  Caption.Width := 290;
+  Caption.Height := 32;
+  Caption.Text := 'Общие настройки графиков';
+  Caption.TextSettings.Font.Style := [TFontStyle.fsBold];
+
+  FGraphCountCombo := TComboBox.Create(FGraphsSettingsContent);
+  FGraphCountCombo.Parent := FGraphsSettingsContent;
+  FGraphCountCombo.Position.Point := PointF(12, 52);
+  FGraphCountCombo.Width := 290;
+  FGraphCountCombo.Items.Add('1 график');
+  FGraphCountCombo.Items.Add('2 графика');
+  FGraphCountCombo.Items.Add('3 графика');
+  FGraphCountCombo.Items.Add('4 графика');
+  FGraphCountCombo.ItemIndex := FGraphsViewConfig.GraphCount - 1;
+  FGraphCountCombo.OnChange := GraphCountChange;
+
+  FGraphLayoutCombo := TComboBox.Create(FGraphsSettingsContent);
+  FGraphLayoutCombo.Parent := FGraphsSettingsContent;
+  FGraphLayoutCombo.Position.Point := PointF(12, 98);
+  FGraphLayoutCombo.Width := 290;
+  FGraphLayoutCombo.Items.Add('1 область');
+  FGraphLayoutCombo.Items.Add('2 области по вертикали');
+  FGraphLayoutCombo.Items.Add('2 области по горизонтали');
+  FGraphLayoutCombo.Items.Add('4 области сеткой 2x2');
+  FGraphLayoutCombo.ItemIndex := Ord(FGraphsViewConfig.LayoutKind);
+  FGraphLayoutCombo.OnChange := GraphLayoutChange;
+
+  FGraphLegendCheck := TCheckBox.Create(FGraphsSettingsContent);
+  FGraphLegendCheck.Parent := FGraphsSettingsContent;
+  FGraphLegendCheck.Position.Point := PointF(12, 144);
+  FGraphLegendCheck.Width := 290;
+  FGraphLegendCheck.Text := 'Показывать легенду (под графиком)';
+  FGraphLegendCheck.IsChecked := FGraphsViewConfig.ShowLegend;
+  FGraphLegendCheck.OnChange := GraphLegendChange;
+
+  ClearButton := TButton.Create(FGraphsSettingsContent);
+  ClearButton.Parent := FGraphsSettingsContent;
+  ClearButton.Position.Point := PointF(12, 194);
+  ClearButton.Width := 290;
+  ClearButton.Text := 'Очистить все графики';
+  ClearButton.OnClick := ButtonClearFlowGraphsClick;
+
+  ResetButton := TButton.Create(FGraphsSettingsContent);
+  ResetButton.Parent := FGraphsSettingsContent;
+  ResetButton.Position.Point := PointF(12, 240);
+  ResetButton.Width := 290;
+  ResetButton.Text := 'Сбросить настройки графиков';
+  ResetButton.OnClick := ResetGraphSettingsClick;
+
+  Caption := TLabel.Create(FGraphsSettingsContent);
+  Caption.Parent := FGraphsSettingsContent;
+  Caption.Position.Point := PointF(12, 294);
+  Caption.Width := 290;
+  Caption.Height := 32;
+  Caption.Text := 'Серии выбранного графика';
+  Caption.TextSettings.Font.Style := [TFontStyle.fsBold];
+end;
+
+procedure TFrameMainTable.GraphSettingsToggleClick(Sender: TObject);
+begin
+  FGraphsViewConfig.SettingsPanelVisible :=
+    not FGraphsViewConfig.SettingsPanelVisible;
+  FGraphsSettingsContent.Visible := FGraphsViewConfig.SettingsPanelVisible;
+  if FGraphsViewConfig.SettingsPanelVisible then
+  begin
+    FGraphsSettings.Width := FGraphsSettingsWidth;
+    FGraphSettingsToggle.Text := '<';
+  end
+  else
+  begin
+    FGraphsSettings.Width := 38;
+    FGraphSettingsToggle.Text := '>';
+  end;
+end;
+
+procedure TFrameMainTable.GraphCountChange(Sender: TObject);
+begin
+  if FGraphCountCombo.ItemIndex < 0 then
+    Exit;
+  FGraphsViewConfig.EnsurePanelCount(FGraphCountCombo.ItemIndex + 1);
+  if FGraphsViewConfig.GraphCount = 1 then
+    FGraphsViewConfig.LayoutKind := glSingle;
+  ApplyGraphsLayout;
+end;
+
+procedure TFrameMainTable.GraphLayoutChange(Sender: TObject);
+begin
+  if FGraphLayoutCombo.ItemIndex < 0 then
+    Exit;
+  FGraphsViewConfig.LayoutKind := TGraphLayoutKind(FGraphLayoutCombo.ItemIndex);
+  if FGraphsViewConfig.LayoutKind = glSingle then
+    FGraphsViewConfig.GraphCount := 1
+  else if FGraphsViewConfig.GraphCount < 2 then
+    FGraphsViewConfig.GraphCount := 2;
+  ApplyGraphsLayout;
+end;
+
+procedure TFrameMainTable.GraphLegendChange(Sender: TObject);
+begin
+  FGraphsViewConfig.ShowLegend := FGraphLegendCheck.IsChecked;
+  LayoutEtalonSelection.Visible := FGraphsViewConfig.ShowLegend;
+  LayoutDeviceSelection.Visible := FGraphsViewConfig.ShowLegend;
+end;
+
+procedure TFrameMainTable.ResetGraphSettingsClick(Sender: TObject);
+begin
+  FGraphsViewConfig.Reset;
+  FGraphCountCombo.ItemIndex := FGraphsViewConfig.GraphCount - 1;
+  FGraphLayoutCombo.ItemIndex := Ord(FGraphsViewConfig.LayoutKind);
+  FGraphLegendCheck.IsChecked := FGraphsViewConfig.ShowLegend;
+  ApplyGraphsLayout;
+end;
+
+procedure TFrameMainTable.ApplyGraphsLayout;
+begin
+  if (FGraphsViewConfig = nil) or (LayoutEtalonGraphSection = nil) then
+    Exit;
+  LayoutEtalonGraphSection.Visible := True;
+  LayoutDeviceGraphSection.Visible := FGraphsViewConfig.GraphCount > 1;
+  SplitterFlowGraphs.Visible := FGraphsViewConfig.GraphCount > 1;
+  LayoutEtalonSelection.Visible := FGraphsViewConfig.ShowLegend;
+  LayoutDeviceSelection.Visible := FGraphsViewConfig.ShowLegend;
+  case FGraphsViewConfig.LayoutKind of
+    glSingle:
+      LayoutEtalonGraphSection.Align := TAlignLayout.Client;
+    glTwoColumns:
+      begin
+        LayoutEtalonGraphSection.Align := TAlignLayout.Left;
+        LayoutEtalonGraphSection.Width := Max(300, LayoutGraphsClient.Width / 2);
+        SplitterFlowGraphs.Align := TAlignLayout.Left;
+        SplitterFlowGraphs.Cursor := crHSplit;
+        LayoutDeviceGraphSection.Align := TAlignLayout.Client;
+      end;
+  else
+    begin
+      LayoutEtalonGraphSection.Align := TAlignLayout.Top;
+      LayoutEtalonGraphSection.Height := Max(180, LayoutGraphsClient.Height / 2);
+      SplitterFlowGraphs.Align := TAlignLayout.Top;
+      SplitterFlowGraphs.Cursor := crVSplit;
+      LayoutDeviceGraphSection.Align := TAlignLayout.Client;
+    end;
+  end;
+end;
+
+function TFrameMainTable.ResolveGraphSeriesMeterValue(
+  const ASeries: TGraphSeriesConfig): TMeterValue;
+var
+  Channels: TObjectList<TChannel>;
+  Channel: TChannel;
+begin
+  Result := nil;
+  if (ASeries = nil) or (FActiveWorkTable = nil) then
+    Exit;
+  if ASeries.OwnerKind = gsokWorkTable then
+  begin
+    if SameText(ASeries.MeterValueKey, 'FlowRate') or
+       SameText(ASeries.MeterValueKey, 'ValueFlow') then
+      Exit(FActiveWorkTable.ValueFlowRate);
+    if SameText(ASeries.MeterValueKey, 'FluidTemp') and
+       (FActiveWorkTable.FluidTemp <> nil) then
+      Exit(FActiveWorkTable.FluidTemp.Value);
+    if SameText(ASeries.MeterValueKey, 'FluidPress') and
+       (FActiveWorkTable.FluidPress <> nil) then
+      Exit(FActiveWorkTable.FluidPress.Value);
+    Exit;
+  end;
+  if ASeries.OwnerKind = gsokEtalon then
+    Channels := FActiveWorkTable.EtalonChannels
+  else if ASeries.OwnerKind = gsokDevice then
+    Channels := FActiveWorkTable.DeviceChannels
+  else
+    Exit;
+  for Channel in Channels do
+    if (Channel <> nil) and SameText(Channel.UUID, ASeries.ChannelUUID) then
+    begin
+      if (Channel.FlowMeter <> nil) and
+         (SameText(ASeries.MeterValueKey, 'FlowRate') or
+          SameText(ASeries.MeterValueKey, 'ValueFlow')) then
+        Result := Channel.FlowMeter.ValueFlow;
+      Exit;
+    end;
 end;
 
 procedure TFrameMainTable.ButtonClearFlowGraphsClick(Sender: TObject);
@@ -7572,9 +7914,10 @@ begin
           [TMeasurementRun.MeasurementStateToString(Run.Stage), TWorkTable.WorkTableStateToString(WT.State),
            VirtualTimeStartMs - 1, MaxExistingSampleTimeMs, VirtualTimeStartMs]));
         Run.Mode := mrmAutomatic;
-        Run.CreateSession;
+        Run.InvalidatePreparedPoints;
+        Run.RebuildMeasurementPoints;
         if (Run.Points = nil) or (Run.Points.Count = 0) then
-          FinalReason := 'FAIL — штатный CreateSession не сформировал точки'
+          FinalReason := 'FAIL — штатный RebuildMeasurementPoints не сформировал точки'
         else
         begin
           Run.Start;
@@ -8305,11 +8648,27 @@ begin
 end;
 
 procedure TFrameMainTable.GridDevicesHeaderClick(Column: TColumn);
+begin
+  if Column = CheckColumnDeviceEnable1 then
+  begin
+    ToggleAllDeviceChannels;
+    Exit;
+  end;
+
+  if Column = CheckColumnEtalonEnable1 then
+  begin
+    ToggleAllEtalonChannels;
+    Exit;
+  end;
+end;
+
+procedure TFrameMainTable.ToggleAllChannelRows(AGrid: TGrid;
+  AChannels: TObjectList<TChannel>; const AEtalonChannels: Boolean);
 var
-  WorkTable: TWorkTable;
-  Row: Integer;
-  AllEnabled: Boolean;
+  I: Integer;
+  HasEnabled: Boolean;
   NewEnabled: Boolean;
+  Channel: TChannel;
 begin
   if not CanEditActiveWorkTable then
   begin
@@ -8317,45 +8676,50 @@ begin
     Exit;
   end;
 
-  if Column = CheckColumnDeviceEnable1 then
-  begin
+  if (AGrid = nil) or (AChannels = nil) or (AChannels.Count = 0) then
+    Exit;
 
-  NormalizeActiveWorkTable;
-  WorkTable := FActiveWorkTable;
-  if WorkTable <> nil then
-  begin
-    AllEnabled := WorkTable.DeviceChannels.Count > 0;
-    for Row := 0 to WorkTable.DeviceChannels.Count - 1 do
-      if not WorkTable.DeviceChannels[Row].Enabled then
-      begin
-        AllEnabled := False;
-        Break;
-      end;
-
-    NewEnabled := not AllEnabled;
-    for Row := 0 to WorkTable.DeviceChannels.Count - 1 do
+  HasEnabled := False;
+  for I := 0 to AChannels.Count - 1 do
+    if (AChannels[I] <> nil) and AChannels[I].Enabled then
     begin
-      WorkTable.DeviceChannels[Row].Enabled := NewEnabled;
-      MarkChannelDeviceModified(WorkTable.DeviceChannels[Row]);
+      HasEnabled := True;
+      Break;
     end;
-  end
-  else
-  begin
-    AllEnabled := Length(FFlowMeterRows) > 0;
-    for Row := 0 to High(FFlowMeterRows) do
-      if not FFlowMeterRows[Row].Enabled then
-      begin
-        AllEnabled := False;
-        Break;
-      end;
 
-    NewEnabled := not AllEnabled;
-    for Row := 0 to High(FFlowMeterRows) do
-      FFlowMeterRows[Row].Enabled := NewEnabled;
+  NewEnabled := not HasEnabled;
+  AGrid.BeginUpdate;
+  try
+    for I := 0 to AChannels.Count - 1 do
+    begin
+      Channel := AChannels[I];
+      if Channel = nil then
+        Continue;
+      Channel.Enabled := NewEnabled;
+      MarkChannelDeviceModified(Channel);
+    end;
+  finally
+    AGrid.EndUpdate;
   end;
 
-  UpdateGridDevices;
-  end;
+  ApplyEnabledChannelSimulationValues(FActiveWorkTable, AEtalonChannels);
+  FActiveWorkTable.RebindAllFlowMeters;
+  if WorkTableManager <> nil then
+    WorkTableManager.Save;
+  AGrid.Repaint;
+  RefreshActiveWorkTableViews(nil);
+end;
+
+procedure TFrameMainTable.ToggleAllDeviceChannels;
+begin
+  if FActiveWorkTable <> nil then
+    ToggleAllChannelRows(GridDevices, FActiveWorkTable.DeviceChannels, False);
+end;
+
+procedure TFrameMainTable.ToggleAllEtalonChannels;
+begin
+  if FActiveWorkTable <> nil then
+    ToggleAllChannelRows(GridEtalons, FActiveWorkTable.EtalonChannels, True);
 end;
 
 procedure TFrameMainTable.GridDevicesCellDblClick(const Column: TColumn;
@@ -8537,30 +8901,55 @@ end;
 function TFrameMainTable.GetAverageFlowText(AFlowMeter: TFlowMeter;
   AWorkTable: TWorkTable): string;
 var
-  MeasureTime: Double;
-  AvgFlow: Double;
+  AverageFlow: Double;
 begin
   Result := '-';
-  if (AFlowMeter = nil) or (AFlowMeter.ValueFlow = nil) or
-     (AFlowMeter.ValueQuantity = nil) or (AWorkTable = nil) or
-     (AWorkTable.ValueTime = nil) then
+  if not TryGetAverageFlow(AFlowMeter, AWorkTable, AverageFlow) then
+    Exit;
+
+  if AWorkTable.ValueFlowRate <> nil then
+    Result := AWorkTable.ValueFlowRate.GetStrNum(AverageFlow)
+  else if (AFlowMeter <> nil) and (AFlowMeter.ValueFlow <> nil) then
+    Result := AFlowMeter.ValueFlow.GetStrNum(AverageFlow);
+end;
+
+function TFrameMainTable.TryGetAverageFlow(AFlowMeter: TFlowMeter;
+  AWorkTable: TWorkTable; out AAverageFlow: Double): Boolean;
+var
+  MeasureTime: Double;
+begin
+  Result := False;
+  AAverageFlow := 0;
+
+  if (AFlowMeter = nil) or (AFlowMeter.ValueQuantity = nil) or
+     (AWorkTable = nil) or (AWorkTable.ValueTime = nil) then
     Exit;
 
   MeasureTime := AWorkTable.ValueTime.GetDoubleValue;
   if MeasureTime <= 0 then
     Exit;
 
-  AvgFlow := AFlowMeter.ValueQuantity.GetDoubleValue / MeasureTime;
-  if AWorkTable.ValueFlowRate <> nil then
-    Result := AWorkTable.ValueFlowRate.GetStrNum(AvgFlow)
-  else
-    Result := AFlowMeter.ValueFlow.GetStrNum(AvgFlow);
+  AAverageFlow := AFlowMeter.ValueQuantity.GetDoubleValue / MeasureTime;
+  Result := True;
 end;
+
+function TFrameMainTable.CalculateCurrentDeviationPercent(
+  const ACurrentValue, AMeanValue: Double): Double;
+begin
+  if Abs(AMeanValue) <= CurrentDeviationEpsilon then
+    Exit(0);
+
+  Result := (ACurrentValue - AMeanValue) / Abs(AMeanValue) * 100;
+end;
+
 
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
   WorkTable: TWorkTable;
+  FlowMeter: TFlowMeter;
+  CurrentFlow: Double;
+  AverageFlow: Double;
 begin
   WorkTable := FActiveWorkTable;
 
@@ -8638,9 +9027,14 @@ begin
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceStd1 then
     begin
-      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStrStdDeviationPercent
+      FlowMeter := WorkTable.DeviceChannels[ARow].FlowMeter;
+      if (FlowMeter <> nil) and (FlowMeter.ValueFlow <> nil) and
+         TryGetAverageFlow(FlowMeter, WorkTable, AverageFlow) then
+      begin
+        CurrentFlow := FlowMeter.ValueFlow.GetDoubleValue;
+        Value := FormatValue(CalculateCurrentDeviationPercent(
+          CurrentFlow, AverageFlow), 2, 0);
+      end
       else
         Value := '-';
     end
@@ -9116,6 +9510,9 @@ procedure TFrameMainTable.GridEtalonsGetValue(Sender: TObject;
   const ACol, ARow: Integer; var Value: TValue);
 var
   WorkTable: TWorkTable;
+  FlowMeter: TFlowMeter;
+  CurrentFlow: Double;
+  AverageFlow: Double;
 begin
 
   WorkTable := FActiveWorkTable;
@@ -9195,9 +9592,14 @@ begin
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonStd1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStrStdDeviationPercent
+      FlowMeter := WorkTable.EtalonChannels[ARow].FlowMeter;
+      if (FlowMeter <> nil) and (FlowMeter.ValueFlow <> nil) and
+         TryGetAverageFlow(FlowMeter, WorkTable, AverageFlow) then
+      begin
+        CurrentFlow := FlowMeter.ValueFlow.GetDoubleValue;
+        Value := FormatValue(CalculateCurrentDeviationPercent(
+          CurrentFlow, AverageFlow), 2, 0);
+      end
       else
         Value := '-';
     end
