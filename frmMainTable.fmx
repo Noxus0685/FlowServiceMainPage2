@@ -5046,6 +5046,12 @@ object FrameMainTable: TFrameMainTable
             Text = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
             OnClick = MenuGridLayOutClick
           end
+          object MenuItemDevicesColumnMeanFlow: TMenuItem
+            AutoCheck = False
+            Locked = True
+            Text = #1057#1088'. '#1088#1072#1089#1093#1086#1076
+            OnClick = MenuGridLayOutClick
+          end
           object MenuItemDevicesColumn9: TMenuItem
             Tag = 9
             Locked = True
@@ -5303,6 +5309,12 @@ object FrameMainTable: TFrameMainTable
             Locked = True
             IsChecked = True
             Text = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemEtalonsColumnMeanFlow: TMenuItem
+            AutoCheck = False
+            Locked = True
+            Text = #1057#1088'. '#1088#1072#1089#1093#1086#1076
             OnClick = MenuGridLayOutClick
           end
           object MenuItemEtalonsColumn8: TMenuItem
