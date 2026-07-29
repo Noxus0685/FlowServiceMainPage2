@@ -327,7 +327,7 @@ type
     FLastWaitPointSetupLogMs: Int64;
     FLastFreshDataLogMs: Int64;
     FLastPointDecisionLogMs: Int64;
-    FLastPointDecisionText: string;
+    FLastPointSetupReadyProtocolMs: Int64;
     FLastTemperatureReady: Boolean;
     FLastPressureReady: Boolean;
     FLastWaitPointSetupLogState: EStateWorkTable;
@@ -900,7 +900,7 @@ begin
   FLastWaitPointSetupLogMs := 0;
   FLastFreshDataLogMs := 0;
   FLastPointDecisionLogMs := 0;
-  FLastPointDecisionText := '';
+  FLastPointSetupReadyProtocolMs := -1;
   FLastTemperatureReady := True;
   FLastPressureReady := True;
   FLastWaitPointSetupLogState := swtNONE;
@@ -1417,7 +1417,7 @@ begin
          CalcStableTimeoutSec, TWorkTable.WorkTableStateToString(FWorkTable.State)]));
     FLastFreshDataLogMs := 0;
     FLastPointDecisionLogMs := 0;
-    FLastPointDecisionText := '';
+    FLastPointSetupReadyProtocolMs := -1;
   end;
   if FWorkTable.State <> swtMONITOR then
     FWorkTable.StartMonitor;
@@ -1718,6 +1718,7 @@ begin
   FActualStopEventFired := False;
   FNextStageAfterSave := msNone;
   FWaitStartedTick := 0;
+  FLastPointSetupReadyProtocolMs := -1;
   FStableSinceMs := 0;
   FDevicesStableSinceMs := 0;
   FLastDeviceStableStateKnown := False;
@@ -1926,7 +1927,7 @@ var
   ConditionsInfo: RStableInfo;
   TableFlowAvailable, TableFlowReady: Boolean;
   TemperatureReady, PressureReady, ConditionsReady: Boolean;
-  Reason, LogText, DecisionKey: string;
+  Reason, FlowLogText, LogText: string;
   PublishProtocol: Boolean;
   CurrentMs: Int64;
 begin
@@ -1945,9 +1946,13 @@ begin
     Value.AnalyzeStabilityForMeasurement(FStabilityDataStartMs,
       Value.StabilitySettings, SignalInfo);
     TableFlowReady := SignalInfo.IsSuitableForMeasurement;
-    AddDiagnosticEvent(BuildPointSetupSignalLog('TableFlow',
-      'WorkTable.FlowRate.Value', '', Value, SignalInfo, CurrentMs));
+    FlowLogText := BuildPointSetupSignalLog('TableFlow',
+      'WorkTable.FlowRate.Value', '', Value, SignalInfo, CurrentMs);
+    AddDiagnosticEvent(FlowLogText);
   end;
+  if not TableFlowAvailable then
+    FlowLogText := 'PointSetupSignal: Name=TableFlow; Available=False; ' +
+      'Reason=WorkTable.FlowRate.Value is not assigned';
 
   ConditionsInfo := Default(RStableInfo);
   ConditionsReady := IsConditionsStable(ConditionsInfo);
@@ -1970,21 +1975,15 @@ begin
      BoolToStr(TableFlowReady, True), BoolToStr(TemperatureReady, True),
      BoolToStr(PressureReady, True), BoolToStr(ConditionsReady, True),
      BoolToStr(Result, True), Reason]);
-  DecisionKey := Format('%s|%s|%s|%s|%s',
-    [BoolToStr(TableFlowAvailable, True), BoolToStr(TableFlowReady, True),
-     BoolToStr(TemperatureReady, True), BoolToStr(PressureReady, True), Reason]);
-  PublishProtocol := Result or (DecisionKey <> FLastPointDecisionText) or
-    (CurrentMs - FLastPointDecisionLogMs >= 2000);
+  PublishProtocol := (FLastPointSetupReadyProtocolMs < 0) or
+    (CurrentMs - FLastPointSetupReadyProtocolMs >= 1000);
   if PublishProtocol then
   begin
-    if TableFlowAvailable then
-      ProtocolManager.AddMessage(pcProc, psMeasurement, 'IsPointSetupReady',
-        'Диагностика расхода стола', BuildPointSetupSignalLog('TableFlow',
-        'WorkTable.FlowRate.Value', '', Value, SignalInfo, CurrentMs));
+    ProtocolManager.AddMessage(pcProc, psMeasurement, 'IsPointSetupReady',
+      'Диагностика расхода стола', FlowLogText);
     ProtocolManager.AddMessage(pcProc, psMeasurement, 'IsPointSetupReady',
       'Итоговое решение о готовности установки', LogText);
-    FLastPointDecisionLogMs := CurrentMs;
-    FLastPointDecisionText := DecisionKey;
+    FLastPointSetupReadyProtocolMs := CurrentMs;
   end;
 
 if Result then
@@ -4595,6 +4594,7 @@ begin
   FStabilityDataStartMs := 0;
   FLastWaitPointSetupLogMs := 0;
   FLastWaitPointSetupLogState := swtNONE;
+  FLastPointSetupReadyProtocolMs := -1;
 end;
 
 procedure TMeasurementRun.StartNewStabilityAttempt;
