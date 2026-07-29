@@ -90,3 +90,11 @@ def test_disabled_channels_and_dynamic_graph_views_are_runtime_safe():
         "'Настроить цвета'",
     ):
         assert feature in FRAME
+
+
+def test_graph_workspace_uses_public_fmx_api_and_local_for_in_variables():
+    assert "TControl(LayoutGraphsClient.Children[I]).Visible := False" in FRAME
+    assert "LayoutGraphsClient.Realign" not in FRAME
+    assert "for SourcePair in ADictionary do" in FRAME
+    assert "for CurrentPair in FFlowGraphHistory.EtalonSeries do" in FRAME
+    assert "for DictionaryPair in ADictionary do" in FRAME

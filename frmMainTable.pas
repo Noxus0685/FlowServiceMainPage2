@@ -6443,7 +6443,8 @@ begin
       LayoutGraphsClient.Parent := FGraphsRoot;
       LayoutGraphsClient.Align := TAlignLayout.Client;
       for I := 0 to LayoutGraphsClient.ChildrenCount - 1 do
-        LayoutGraphsClient.Children[I].Visible := False;
+        if LayoutGraphsClient.Children[I] is TControl then
+          TControl(LayoutGraphsClient.Children[I]).Visible := False;
     end;
     if LayoutGraphCommands <> nil then
       LayoutGraphCommands.Visible := False;
@@ -6713,7 +6714,8 @@ begin
   for I := 0 to FGraphViews.Count - 1 do
     FGraphViews[I].LegendHost.Visible := FGraphsViewConfig.ShowLegend and
       (I < FGraphsViewConfig.GraphCount);
-  LayoutGraphsClient.Realign;
+  // Alignment is recalculated automatically after Parent/Align changes.  Realign
+  // is protected in FMX and therefore cannot be called from the frame.
   LayoutGraphsClient.Repaint;
   RenderGraphViews;
   Details := '';
@@ -6784,7 +6786,6 @@ end;
 procedure TFrameMainTable.RebuildGraphPopupMenu(AView: TGraphPanelView);
 var
   AddRoot, FlowRoot, EtalonRoot, DeviceRoot, RemoveRoot, ColorRoot: TMenuItem;
-  Pair: TPair<string, TFlowGraphSeries>;
 
   function AddItem(AParent: TFmxObject; const ACaption, ACommand: string): TMenuItem;
   begin
@@ -6797,23 +6798,29 @@ var
 
   procedure AddSources(ADictionary: TObjectDictionary<string, TFlowGraphSeries>;
     AParent: TMenuItem);
+  var
+    SourcePair: TPair<string, TFlowGraphSeries>;
   begin
-    for Pair in ADictionary do
-      if (Pair.Value <> nil) and Pair.Value.ChannelAvailable then
-        AddItem(AParent, Pair.Value.Caption,
-          Format('add|%d|%s', [AView.GraphIndex, Pair.Key]));
+    for SourcePair in ADictionary do
+      if (SourcePair.Value <> nil) and SourcePair.Value.ChannelAvailable then
+        AddItem(AParent, SourcePair.Value.Caption,
+          Format('add|%d|%s', [AView.GraphIndex, SourcePair.Key]));
   end;
 
   procedure AddCurrent(ARoot: TMenuItem; const ACommand: string);
+  var
+    CurrentPair: TPair<string, TFlowGraphSeries>;
   begin
-    for Pair in FFlowGraphHistory.EtalonSeries do
-      if (Pair.Value <> nil) and (Pair.Value.GraphIndex = AView.GraphIndex) then
-        AddItem(ARoot, Pair.Value.Caption, ACommand + '|' +
-          IntToStr(AView.GraphIndex) + '|' + Pair.Key);
-    for Pair in FFlowGraphHistory.DeviceSeries do
-      if (Pair.Value <> nil) and (Pair.Value.GraphIndex = AView.GraphIndex) then
-        AddItem(ARoot, Pair.Value.Caption, ACommand + '|' +
-          IntToStr(AView.GraphIndex) + '|' + Pair.Key);
+    for CurrentPair in FFlowGraphHistory.EtalonSeries do
+      if (CurrentPair.Value <> nil) and
+         (CurrentPair.Value.GraphIndex = AView.GraphIndex) then
+        AddItem(ARoot, CurrentPair.Value.Caption, ACommand + '|' +
+          IntToStr(AView.GraphIndex) + '|' + CurrentPair.Key);
+    for CurrentPair in FFlowGraphHistory.DeviceSeries do
+      if (CurrentPair.Value <> nil) and
+         (CurrentPair.Value.GraphIndex = AView.GraphIndex) then
+        AddItem(ARoot, CurrentPair.Value.Caption, ACommand + '|' +
+          IntToStr(AView.GraphIndex) + '|' + CurrentPair.Key);
   end;
 begin
   if (AView = nil) or (FFlowGraphHistory = nil) then
@@ -6903,10 +6910,13 @@ var
   HasSeries: Boolean;
 
   procedure AddDictionary(ADictionary: TObjectDictionary<string, TFlowGraphSeries>);
+  var
+    DictionaryPair: TPair<string, TFlowGraphSeries>;
   begin
-    for Pair in ADictionary do
-      if (Pair.Value <> nil) and (Pair.Value.GraphIndex = AView.GraphIndex) then
-        Combined.AddOrSetValue(Pair.Key, Pair.Value);
+    for DictionaryPair in ADictionary do
+      if (DictionaryPair.Value <> nil) and
+         (DictionaryPair.Value.GraphIndex = AView.GraphIndex) then
+        Combined.AddOrSetValue(DictionaryPair.Key, DictionaryPair.Value);
   end;
 begin
   if (AView = nil) or (FFlowGraphHistory = nil) then
