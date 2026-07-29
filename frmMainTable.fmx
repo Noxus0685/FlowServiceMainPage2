@@ -4980,12 +4980,26 @@ object FrameMainTable: TFrameMainTable
         object MenuItemDevicesColumn1: TMenuItem
           Locked = True
           Text = #1050#1072#1085#1072#1083
-          OnClick = DevicesColumnMenuItemClick
-        end
-        object MenuItemDevicesColumn2: TMenuItem
-          Locked = True
-          Text = #1058#1080#1087#32#1087#1088#1080#1073#1086#1088#1072
-          OnClick = DevicesColumnMenuItemClick
+          object MenuItemDevicesColumn0: TMenuItem
+            Locked = True
+            Text = #1042#1082#1083
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn1: TMenuItem
+            Locked = True
+            Text = #1050#1072#1085#1072#1083
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn6: TMenuItem
+            Locked = True
+            Text = #1058#1080#1087#32#1089#1080#1075#1085#1072#1083#1072
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn7: TMenuItem
+            Locked = True
+            Text = #1057#1080#1075#1085#1072#1083
+            OnClick = DevicesColumnMenuItemClick
+          end
         end
         object MenuItemDevicesColumn3: TMenuItem
           Locked = True
@@ -4995,82 +5009,98 @@ object FrameMainTable: TFrameMainTable
         object MenuItemDevicesColumn4: TMenuItem
           Locked = True
           Text = #1055#1088#1080#1073#1086#1088
-          OnClick = DevicesColumnMenuItemClick
+          object MenuItemDevicesColumn2: TMenuItem
+            Locked = True
+            Text = #1058#1080#1087#32#1087#1088#1080#1073#1086#1088#1072
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn3: TMenuItem
+            Locked = True
+            Text = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn4: TMenuItem
+            Locked = True
+            Text = #1055#1088#1080#1073#1086#1088
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn5: TMenuItem
+            Locked = True
+            Text = #1057#1077#1088#1080#1081#1085#1099#1081
+            OnClick = DevicesColumnMenuItemClick
+          end
         end
         object MenuItemDevicesColumn5: TMenuItem
           Locked = True
-          Text = #1057#1077#1088#1080#1081#1085#1099#1081
-          OnClick = DevicesColumnMenuItemClick
+          Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
+          object MenuItemDevicesColumn8: TMenuItem
+            Locked = True
+            Text = #1056#1072#1089#1093#1086#1076
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumnMeanFlow: TMenuItem
+            Locked = True
+            Text = #1057#1088#46#32#1088#1072#1089#1093#1086#1076
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn9: TMenuItem
+            Locked = True
+            Text = #1054#1073#1098#1105#1084
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn16: TMenuItem
+            Locked = True
+            Text = #1047#1085#1072#1095#1077#1085#1080#1077
+            OnClick = DevicesColumnMenuItemClick
+          end
         end
         object MenuItemDevicesColumn6: TMenuItem
           Locked = True
-          Text = #1058#1080#1087#32#1089#1080#1075#1085#1072#1083#1072
-          OnClick = DevicesColumnMenuItemClick
+          Text = #1057#1090#1072#1090#1080#1089#1090#1080#1082#1072
+          object MenuItemDevicesColumn10: TMenuItem
+            Locked = True
+            Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn11: TMenuItem
+            Locked = True
+            Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn12: TMenuItem
+            Locked = True
+            Text = #1054#1073#1098#1105#1084#32#1076#1086
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn13: TMenuItem
+            Locked = True
+            Text = #1054#1073#1098#1105#1084#32#1087#1086#1089#1083#1077
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn14: TMenuItem
+            Locked = True
+            Text = #1055#1077#1088#1077#1087#1072#1076
+            OnClick = DevicesColumnMenuItemClick
+          end
         end
-        object MenuItemDevicesColumn7: TMenuItem
+        object MenuItemDevicesColumnsOtherGroup: TMenuItem
           Locked = True
-          Text = #1057#1080#1075#1085#1072#1083
-          OnClick = DevicesColumnMenuItemClick
-        end
-        object MenuItemDevicesColumn8: TMenuItem
-          Locked = True
-          Text = #1056#1072#1089#1093#1086#1076
-          OnClick = DevicesColumnMenuItemClick
-        end
-        object MenuItemDevicesColumnMeanFlow: TMenuItem
-          Locked = True
-          Text = #1057#1088#46#32#1088#1072#1089#1093#1086#1076
-          OnClick = DevicesColumnMenuItemClick
-        end
-        object MenuItemDevicesColumn9: TMenuItem
-          Locked = True
-          Text = #1054#1073#1098#1105#1084
-          OnClick = DevicesColumnMenuItemClick
-        end
-        object MenuItemDevicesColumn10: TMenuItem
-          Locked = True
-          Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100
-          OnClick = DevicesColumnMenuItemClick
-        end
-        object MenuItemDevicesColumn11: TMenuItem
-          Locked = True
-          Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077
-          OnClick = DevicesColumnMenuItemClick
-        end
-        object MenuItemDevicesColumn12: TMenuItem
-          Locked = True
-          Text = #1054#1073#1098#1105#1084#32#1076#1086
-          OnClick = DevicesColumnMenuItemClick
-        end
-        object MenuItemDevicesColumn13: TMenuItem
-          Locked = True
-          Text = #1054#1073#1098#1105#1084#32#1087#1086#1089#1083#1077
-          OnClick = DevicesColumnMenuItemClick
-        end
-        object MenuItemDevicesColumn14: TMenuItem
-          Locked = True
-          Text = #1055#1077#1088#1077#1087#1072#1076
-          OnClick = DevicesColumnMenuItemClick
-        end
-        object MenuItemDevicesColumn15: TMenuItem
-          Locked = True
-          Text = #1057#1090#1072#1090#1091#1089
-          OnClick = DevicesColumnMenuItemClick
-        end
-        object MenuItemDevicesColumn16: TMenuItem
-          Locked = True
-          Text = #1047#1085#1072#1095#1077#1085#1080#1077
-          OnClick = DevicesColumnMenuItemClick
-        end
-        object MenuItemDevicesColumn17: TMenuItem
-          Locked = True
-          Text = 'UUID'
-          OnClick = DevicesColumnMenuItemClick
-        end
-        object MenuItemDevicesColumn18: TMenuItem
-          Locked = True
-          Text = #1050#1086#1101#1092#45#1085#1090
-          OnClick = DevicesColumnMenuItemClick
+          Text = #1055#1088#1086#1095#1077#1077
+          object MenuItemDevicesColumn15: TMenuItem
+            Locked = True
+            Text = #1057#1090#1072#1090#1091#1089
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn17: TMenuItem
+            Locked = True
+            Text = #85#85#73#68
+            OnClick = DevicesColumnMenuItemClick
+          end
+          object MenuItemDevicesColumn18: TMenuItem
+            Locked = True
+            Text = #1050#1086#1101#1092#45#1085#1090
+            OnClick = DevicesColumnMenuItemClick
+          end
         end
       end
       object MenuItemDevicesOtherGroup: TMenuItem
@@ -5194,77 +5224,102 @@ object FrameMainTable: TFrameMainTable
         object MenuItemEtalonsColumn1: TMenuItem
           Locked = True
           Text = #1050#1072#1085#1072#1083
-          OnClick = EtalonsColumnMenuItemClick
-        end
-        object MenuItemEtalonsColumn2: TMenuItem
-          Locked = True
-          Text = #1058#1080#1087#32#1087#1088#1080#1073#1086#1088#1072
-          OnClick = EtalonsColumnMenuItemClick
-        end
-        object MenuItemEtalonsColumn3: TMenuItem
-          Locked = True
-          Text = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
-          OnClick = EtalonsColumnMenuItemClick
+          object MenuItemEtalonsColumn0: TMenuItem
+            Locked = True
+            Text = #1042#1082#1083
+            OnClick = EtalonsColumnMenuItemClick
+          end
+          object MenuItemEtalonsColumn1: TMenuItem
+            Locked = True
+            Text = #1050#1072#1085#1072#1083
+            OnClick = EtalonsColumnMenuItemClick
+          end
+          object MenuItemEtalonsColumn5: TMenuItem
+            Locked = True
+            Text = #1058#1080#1087#32#1089#1080#1075#1085#1072#1083#1072
+            OnClick = EtalonsColumnMenuItemClick
+          end
+          object MenuItemEtalonsColumn6: TMenuItem
+            Locked = True
+            Text = #1057#1080#1075#1085#1072#1083
+            OnClick = EtalonsColumnMenuItemClick
+          end
         end
         object MenuItemEtalonsColumn4: TMenuItem
           Locked = True
           Text = #1055#1088#1080#1073#1086#1088
-          OnClick = EtalonsColumnMenuItemClick
+          object MenuItemEtalonsColumn2: TMenuItem
+            Locked = True
+            Text = #1058#1080#1087#32#1087#1088#1080#1073#1086#1088#1072
+            OnClick = EtalonsColumnMenuItemClick
+          end
+          object MenuItemEtalonsColumn3: TMenuItem
+            Locked = True
+            Text = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
+            OnClick = EtalonsColumnMenuItemClick
+          end
+          object MenuItemEtalonsColumn4: TMenuItem
+            Locked = True
+            Text = #1055#1088#1080#1073#1086#1088
+            OnClick = EtalonsColumnMenuItemClick
+          end
+          object MenuItemEtalonsColumn9: TMenuItem
+            Locked = True
+            Text = #1057#1077#1088#1080#1081#1085#1099#1081
+            OnClick = EtalonsColumnMenuItemClick
+          end
         end
         object MenuItemEtalonsColumn5: TMenuItem
           Locked = True
-          Text = #1058#1080#1087#32#1089#1080#1075#1085#1072#1083#1072
-          OnClick = EtalonsColumnMenuItemClick
+          Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
+          object MenuItemEtalonsColumn7: TMenuItem
+            Locked = True
+            Text = #1056#1072#1089#1093#1086#1076
+            OnClick = EtalonsColumnMenuItemClick
+          end
+          object MenuItemEtalonsColumnMeanFlow: TMenuItem
+            Locked = True
+            Text = #1057#1088#46#32#1088#1072#1089#1093#1086#1076
+            OnClick = EtalonsColumnMenuItemClick
+          end
+          object MenuItemEtalonsColumn8: TMenuItem
+            Locked = True
+            Text = #1054#1073#1098#1105#1084
+            OnClick = EtalonsColumnMenuItemClick
+          end
+          object MenuItemEtalonsColumn14: TMenuItem
+            Locked = True
+            Text = #1047#1085#1072#1095#1077#1085#1080#1077
+            OnClick = EtalonsColumnMenuItemClick
+          end
         end
         object MenuItemEtalonsColumn6: TMenuItem
           Locked = True
-          Text = #1057#1080#1075#1085#1072#1083
-          OnClick = EtalonsColumnMenuItemClick
+          Text = #1057#1090#1072#1090#1080#1089#1090#1080#1082#1072
+          object MenuItemEtalonsColumn10: TMenuItem
+            Locked = True
+            Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100
+            OnClick = EtalonsColumnMenuItemClick
+          end
+          object MenuItemEtalonsColumn11: TMenuItem
+            Locked = True
+            Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077
+            OnClick = EtalonsColumnMenuItemClick
+          end
+          object MenuItemEtalonsColumn12: TMenuItem
+            Locked = True
+            Text = #1055#1077#1088#1077#1087#1072#1076
+            OnClick = EtalonsColumnMenuItemClick
+          end
         end
-        object MenuItemEtalonsColumn7: TMenuItem
+        object MenuItemEtalonsColumnsOtherGroup: TMenuItem
           Locked = True
-          Text = #1056#1072#1089#1093#1086#1076
-          OnClick = EtalonsColumnMenuItemClick
-        end
-        object MenuItemEtalonsColumnMeanFlow: TMenuItem
-          Locked = True
-          Text = #1057#1088#46#32#1088#1072#1089#1093#1086#1076
-          OnClick = EtalonsColumnMenuItemClick
-        end
-        object MenuItemEtalonsColumn8: TMenuItem
-          Locked = True
-          Text = #1054#1073#1098#1105#1084
-          OnClick = EtalonsColumnMenuItemClick
-        end
-        object MenuItemEtalonsColumn9: TMenuItem
-          Locked = True
-          Text = #1057#1077#1088#1080#1081#1085#1099#1081
-          OnClick = EtalonsColumnMenuItemClick
-        end
-        object MenuItemEtalonsColumn10: TMenuItem
-          Locked = True
-          Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100
-          OnClick = EtalonsColumnMenuItemClick
-        end
-        object MenuItemEtalonsColumn11: TMenuItem
-          Locked = True
-          Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077
-          OnClick = EtalonsColumnMenuItemClick
-        end
-        object MenuItemEtalonsColumn12: TMenuItem
-          Locked = True
-          Text = #1055#1077#1088#1077#1087#1072#1076
-          OnClick = EtalonsColumnMenuItemClick
-        end
-        object MenuItemEtalonsColumn13: TMenuItem
-          Locked = True
-          Text = #1057#1090#1072#1090#1091#1089
-          OnClick = EtalonsColumnMenuItemClick
-        end
-        object MenuItemEtalonsColumn14: TMenuItem
-          Locked = True
-          Text = #1047#1085#1072#1095#1077#1085#1080#1077
-          OnClick = EtalonsColumnMenuItemClick
+          Text = #1055#1088#1086#1095#1077#1077
+          object MenuItemEtalonsColumn13: TMenuItem
+            Locked = True
+            Text = #1057#1090#1072#1090#1091#1089
+            OnClick = EtalonsColumnMenuItemClick
+          end
         end
       end
       object MenuItemEtalonsOtherGroup: TMenuItem
