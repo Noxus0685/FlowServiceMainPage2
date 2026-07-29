@@ -2037,9 +2037,37 @@ end;
 
 
 procedure TFormTypeEditor.GridDiametersHeaderClick(Column: TColumn);
+var
+  I: Integer;
+  HasEnabled: Boolean;
+  NewEnabled: Boolean;
 begin
   if Column = nil then
     Exit;
+
+  if Column = CheckColumnDNEnable then
+  begin
+    if (FDiametersLocal = nil) or (FDiametersLocal.Count = 0) then
+      Exit;
+    HasEnabled := False;
+    for I := 0 to FDiametersLocal.Count - 1 do
+      if (FDiametersLocal[I] <> nil) and FDiametersLocal[I].Enable then
+      begin
+        HasEnabled := True;
+        Break;
+      end;
+    NewEnabled := not HasEnabled;
+    for I := 0 to FDiametersLocal.Count - 1 do
+      if FDiametersLocal[I] <> nil then
+      begin
+        FDiametersLocal[I].Enable := NewEnabled;
+        if FDiametersLocal[I].State <> osNew then
+          FDiametersLocal[I].State := osModified;
+      end;
+    UpdateDiametersGrid;
+    SetModified;
+    Exit;
+  end;
 
   // Клик по заголовку делегируем в единый метод сортировки.
   SortGridDiametersByColumn(Column.Index);
@@ -2142,10 +2170,37 @@ end;
 
 procedure TFormTypeEditor.GridPointsHeaderClick(Column: TColumn);
 var
+  I: Integer;
+  HasEnabled: Boolean;
+  NewEnabled: Boolean;
   SortColumn: Integer;
 begin
   if (Column = nil) or (FPointsLocal = nil) then
     Exit;
+
+  if Column = CheckColumnPointEnable then
+  begin
+    if FPointsLocal.Count = 0 then
+      Exit;
+    HasEnabled := False;
+    for I := 0 to FPointsLocal.Count - 1 do
+      if (FPointsLocal[I] <> nil) and FPointsLocal[I].Enable then
+      begin
+        HasEnabled := True;
+        Break;
+      end;
+    NewEnabled := not HasEnabled;
+    for I := 0 to FPointsLocal.Count - 1 do
+      if FPointsLocal[I] <> nil then
+      begin
+        FPointsLocal[I].Enable := NewEnabled;
+        if FPointsLocal[I].State <> osNew then
+          FPointsLocal[I].State := osModified;
+      end;
+    UpdatePointsGrid;
+    SetModified;
+    Exit;
+  end;
 
   SortColumn := Column.Index;
   if SortColumn = FPointsSortColumn then
