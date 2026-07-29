@@ -4972,163 +4972,105 @@ object FrameMainTable: TFrameMainTable
       end
       object MenuItemDevicesColumnsGroup: TMenuItem
         Text = #1050#1086#1083#1086#1085#1082#1080
-        object MenuItemDevicesColumnsChannelGroup: TMenuItem
+        object MenuItemDevicesColumn0: TMenuItem
           Locked = True
-          Text = #1050#1072#1085#1072#1083
-          object MenuItemDevicesColumn1: TMenuItem
-            Tag = 1
-            Locked = True
-            IsChecked = True
-            Text = #1050#1072#1085#1072#1083
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn6: TMenuItem
-            Tag = 6
-            Locked = True
-            IsChecked = True
-            Text = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
-            OnClick = MenuGridLayOutClick
-          end
+          Text = 'Вкл'
+          OnClick = DevicesColumnMenuItemClick
         end
-        object MenuItemDevicesColumnsDeviceGroup: TMenuItem
+        object MenuItemDevicesColumn1: TMenuItem
           Locked = True
-          Text = #1055#1088#1080#1073#1086#1088
-          object MenuItemDevicesColumn2: TMenuItem
-            Tag = 2
-            Locked = True
-            IsChecked = True
-            Text = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn3: TMenuItem
-            Tag = 3
-            Locked = True
-            IsChecked = True
-            Text = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn4: TMenuItem
-            Tag = 4
-            Locked = True
-            IsChecked = True
-            Text = #1055#1088#1080#1073#1086#1088
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn5: TMenuItem
-            Tag = 5
-            Locked = True
-            IsChecked = True
-            Text = #1057#1077#1088#1080#1081#1085#1099#1081
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn18: TMenuItem
-            Tag = 18
-            Locked = True
-            IsChecked = True
-            Text = #1050#1086#1101#1092'-'#1085#1090
-            OnClick = MenuGridLayOutClick
-          end
+          Text = 'Канал'
+          OnClick = DevicesColumnMenuItemClick
         end
-        object MenuItemDevicesColumnsMeasureGroup: TMenuItem
+        object MenuItemDevicesColumn2: TMenuItem
           Locked = True
-          Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
-          object MenuItemDevicesColumn7: TMenuItem
-            Tag = 7
-            Locked = True
-            IsChecked = True
-            Text = #1057#1080#1075#1085#1072#1083
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn8: TMenuItem
-            Tag = 8
-            Locked = True
-            IsChecked = True
-            Text = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumnMeanFlow: TMenuItem
-            AutoCheck = False
-            Locked = True
-            Text = #1057#1088'. '#1088#1072#1089#1093#1086#1076
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn9: TMenuItem
-            Tag = 9
-            Locked = True
-            IsChecked = True
-            Text = #1054#1073#1098#1077#1084', '#1084'3'
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn12: TMenuItem
-            Tag = 12
-            Locked = True
-            IsChecked = True
-            Text = #1054#1073#1098#1077#1084' '#1076#1086
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn13: TMenuItem
-            Tag = 13
-            Locked = True
-            IsChecked = True
-            Text = #1054#1073#1098#1077#1084' '#1087#1086#1089#1083#1077
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn16: TMenuItem
-            Tag = 16
-            Locked = True
-            IsChecked = True
-            Text = #1047#1085#1072#1095#1077#1085#1080#1077
-            OnClick = MenuGridLayOutClick
-          end
+          Text = 'Тип прибора'
+          OnClick = DevicesColumnMenuItemClick
         end
-        object MenuItemDevicesColumnsStatGroup: TMenuItem
+        object MenuItemDevicesColumn3: TMenuItem
           Locked = True
-          Text = #1057#1090#1072#1090#1080#1089#1090#1080#1082#1072
-          object MenuItemDevicesColumn10: TMenuItem
-            Tag = 10
-            Locked = True
-            IsChecked = True
-            Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn11: TMenuItem
-            Tag = 11
-            Locked = True
-            IsChecked = True
-            Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077', %'
-            OnClick = MenuGridLayOutClick
-          end
+          Text = 'Типоразмер'
+          OnClick = DevicesColumnMenuItemClick
         end
-        object MenuItemDevicesColumnsOtherGroup: TMenuItem
+        object MenuItemDevicesColumn4: TMenuItem
           Locked = True
-          Text = #1055#1088#1086#1095#1077#1077
-          object MenuItemDevicesColumn0: TMenuItem
-            Locked = True
-            IsChecked = True
-            Text = #1042#1082#1083
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn14: TMenuItem
-            Tag = 14
-            Locked = True
-            IsChecked = True
-            Text = #1055#1088#1077#1087#1072#1076
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn15: TMenuItem
-            Tag = 15
-            Locked = True
-            IsChecked = True
-            Text = #1057#1090#1072#1090#1091#1089
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemDevicesColumn17: TMenuItem
-            Tag = 17
-            Locked = True
-            IsChecked = True
-            Text = 'UUID'
-            OnClick = MenuGridLayOutClick
-          end
+          Text = 'Прибор'
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn5: TMenuItem
+          Locked = True
+          Text = 'Серийный'
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn6: TMenuItem
+          Locked = True
+          Text = 'Тип сигнала'
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn7: TMenuItem
+          Locked = True
+          Text = 'Сигнал'
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn8: TMenuItem
+          Locked = True
+          Text = 'Расход'
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumnMeanFlow: TMenuItem
+          Locked = True
+          Text = 'Ср. расход'
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn9: TMenuItem
+          Locked = True
+          Text = 'Объём'
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn10: TMenuItem
+          Locked = True
+          Text = 'Погрешность'
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn11: TMenuItem
+          Locked = True
+          Text = 'Отклонение'
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn12: TMenuItem
+          Locked = True
+          Text = 'Объём до'
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn13: TMenuItem
+          Locked = True
+          Text = 'Объём после'
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn14: TMenuItem
+          Locked = True
+          Text = 'Перепад'
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn15: TMenuItem
+          Locked = True
+          Text = 'Статус'
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn16: TMenuItem
+          Locked = True
+          Text = 'Значение'
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn17: TMenuItem
+          Locked = True
+          Text = 'UUID'
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn18: TMenuItem
+          Locked = True
+          Text = 'Коэф-нт'
+          OnClick = DevicesColumnMenuItemClick
         end
       end
       object MenuItemDevicesOtherGroup: TMenuItem
@@ -5244,135 +5186,85 @@ object FrameMainTable: TFrameMainTable
       end
       object MenuItemEtalonsColumnsGroup: TMenuItem
         Text = #1050#1086#1083#1086#1085#1082#1080
-        object MenuItemEtalonsColumnsChannelGroup: TMenuItem
+        object MenuItemEtalonsColumn0: TMenuItem
           Locked = True
-          Text = #1050#1072#1085#1072#1083
-          object MenuItemEtalonsColumn1: TMenuItem
-            Tag = 1
-            Locked = True
-            IsChecked = True
-            Text = #1050#1072#1085#1072#1083
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemEtalonsColumn5: TMenuItem
-            Tag = 5
-            Locked = True
-            IsChecked = True
-            Text = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
-            OnClick = MenuGridLayOutClick
-          end
+          Text = 'Вкл'
+          OnClick = EtalonsColumnMenuItemClick
         end
-        object MenuItemEtalonsColumnsDeviceGroup: TMenuItem
+        object MenuItemEtalonsColumn1: TMenuItem
           Locked = True
-          Text = #1055#1088#1080#1073#1086#1088
-          object MenuItemEtalonsColumn2: TMenuItem
-            Tag = 2
-            Locked = True
-            IsChecked = True
-            Text = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemEtalonsColumn3: TMenuItem
-            Tag = 3
-            Locked = True
-            IsChecked = True
-            Text = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemEtalonsColumn4: TMenuItem
-            Tag = 4
-            Locked = True
-            IsChecked = True
-            Text = #1055#1088#1080#1073#1086#1088
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemEtalonsColumn9: TMenuItem
-            Tag = 9
-            Locked = True
-            IsChecked = True
-            Text = #1057#1077#1088#1080#1081#1085#1099#1081' '
-            OnClick = MenuGridLayOutClick
-          end
+          Text = 'Канал'
+          OnClick = EtalonsColumnMenuItemClick
         end
-        object MenuItemEtalonsColumnsMeasureGroup: TMenuItem
+        object MenuItemEtalonsColumn2: TMenuItem
           Locked = True
-          Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
-          object MenuItemEtalonsColumn6: TMenuItem
-            Tag = 6
-            Locked = True
-            IsChecked = True
-            Text = #1057#1080#1075#1085#1072#1083
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemEtalonsColumn7: TMenuItem
-            Tag = 7
-            Locked = True
-            IsChecked = True
-            Text = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemEtalonsColumnMeanFlow: TMenuItem
-            AutoCheck = False
-            Locked = True
-            Text = #1057#1088'. '#1088#1072#1089#1093#1086#1076
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemEtalonsColumn8: TMenuItem
-            Tag = 8
-            Locked = True
-            IsChecked = True
-            Text = #1054#1073#1098#1077#1084', '#1084'3'
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemEtalonsColumn14: TMenuItem
-            Tag = 14
-            Locked = True
-            IsChecked = True
-            Text = #1047#1085#1072#1095#1077#1085#1080#1077
-            OnClick = MenuGridLayOutClick
-          end
+          Text = 'Тип прибора'
+          OnClick = EtalonsColumnMenuItemClick
         end
-        object MenuItemEtalonsColumnsStatGroup: TMenuItem
+        object MenuItemEtalonsColumn3: TMenuItem
           Locked = True
-          Text = #1057#1090#1072#1090#1080#1089#1090#1080#1082#1072
-          object MenuItemEtalonsColumn10: TMenuItem
-            Tag = 10
-            Locked = True
-            IsChecked = True
-            Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemEtalonsColumn11: TMenuItem
-            Tag = 11
-            Locked = True
-            IsChecked = True
-            Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077', %'
-            OnClick = MenuGridLayOutClick
-          end
+          Text = 'Типоразмер'
+          OnClick = EtalonsColumnMenuItemClick
         end
-        object MenuItemEtalonsColumnsOtherGroup: TMenuItem
+        object MenuItemEtalonsColumn4: TMenuItem
           Locked = True
-          Text = #1055#1088#1086#1095#1077#1077
-          object MenuItemEtalonsColumn0: TMenuItem
-            Locked = True
-            IsChecked = True
-            Text = #1042#1082#1083
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemEtalonsColumn12: TMenuItem
-            Tag = 12
-            Locked = True
-            IsChecked = True
-            Text = #1055#1077#1088#1077#1087#1072#1076
-            OnClick = MenuGridLayOutClick
-          end
-          object MenuItemEtalonsColumn13: TMenuItem
-            Tag = 13
-            Locked = True
-            IsChecked = True
-            Text = #1057#1090#1072#1090#1091#1089
-            OnClick = MenuGridLayOutClick
-          end
+          Text = 'Прибор'
+          OnClick = EtalonsColumnMenuItemClick
+        end
+        object MenuItemEtalonsColumn5: TMenuItem
+          Locked = True
+          Text = 'Тип сигнала'
+          OnClick = EtalonsColumnMenuItemClick
+        end
+        object MenuItemEtalonsColumn6: TMenuItem
+          Locked = True
+          Text = 'Сигнал'
+          OnClick = EtalonsColumnMenuItemClick
+        end
+        object MenuItemEtalonsColumn7: TMenuItem
+          Locked = True
+          Text = 'Расход'
+          OnClick = EtalonsColumnMenuItemClick
+        end
+        object MenuItemEtalonsColumnMeanFlow: TMenuItem
+          Locked = True
+          Text = 'Ср. расход'
+          OnClick = EtalonsColumnMenuItemClick
+        end
+        object MenuItemEtalonsColumn8: TMenuItem
+          Locked = True
+          Text = 'Объём'
+          OnClick = EtalonsColumnMenuItemClick
+        end
+        object MenuItemEtalonsColumn9: TMenuItem
+          Locked = True
+          Text = 'Серийный'
+          OnClick = EtalonsColumnMenuItemClick
+        end
+        object MenuItemEtalonsColumn10: TMenuItem
+          Locked = True
+          Text = 'Погрешность'
+          OnClick = EtalonsColumnMenuItemClick
+        end
+        object MenuItemEtalonsColumn11: TMenuItem
+          Locked = True
+          Text = 'Отклонение'
+          OnClick = EtalonsColumnMenuItemClick
+        end
+        object MenuItemEtalonsColumn12: TMenuItem
+          Locked = True
+          Text = 'Перепад'
+          OnClick = EtalonsColumnMenuItemClick
+        end
+        object MenuItemEtalonsColumn13: TMenuItem
+          Locked = True
+          Text = 'Статус'
+          OnClick = EtalonsColumnMenuItemClick
+        end
+        object MenuItemEtalonsColumn14: TMenuItem
+          Locked = True
+          Text = 'Значение'
+          OnClick = EtalonsColumnMenuItemClick
         end
       end
       object MenuItemEtalonsOtherGroup: TMenuItem
