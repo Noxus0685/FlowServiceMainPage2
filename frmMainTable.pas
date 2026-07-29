@@ -394,11 +394,6 @@ type
     MenuItemDevicesWorkTablesAddScale: TMenuItem;
     MenuItemDevicesWorkTablesDeleteScale: TMenuItem;
     MenuItemDevicesColumnsGroup: TMenuItem;
-    MenuItemDevicesColumnsChannelGroup: TMenuItem;
-    MenuItemDevicesColumnsDeviceGroup: TMenuItem;
-    MenuItemDevicesColumnsMeasureGroup: TMenuItem;
-    MenuItemDevicesColumnsStatGroup: TMenuItem;
-    MenuItemDevicesColumnsOtherGroup: TMenuItem;
     MenuItemDevicesColumn0: TMenuItem;
     MenuItemDevicesColumn1: TMenuItem;
     MenuItemDevicesColumn2: TMenuItem;
@@ -433,11 +428,6 @@ type
     MenuItemEtalonsWorkTablesAddScale: TMenuItem;
     MenuItemEtalonsWorkTablesDeleteScale: TMenuItem;
     MenuItemEtalonsColumnsGroup: TMenuItem;
-    MenuItemEtalonsColumnsChannelGroup: TMenuItem;
-    MenuItemEtalonsColumnsDeviceGroup: TMenuItem;
-    MenuItemEtalonsColumnsMeasureGroup: TMenuItem;
-    MenuItemEtalonsColumnsStatGroup: TMenuItem;
-    MenuItemEtalonsColumnsOtherGroup: TMenuItem;
     MenuItemEtalonsColumn0: TMenuItem;
     MenuItemEtalonsColumn1: TMenuItem;
     MenuItemEtalonsColumn2: TMenuItem;
