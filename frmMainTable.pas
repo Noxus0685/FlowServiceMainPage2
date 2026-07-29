@@ -1647,7 +1647,7 @@ begin
 
   NewState := EStateWorkTable(Notification.NewState);
 
-  if NewState in [swtCOMPLETE, swtFINALREAD] then
+  if NewState in [swtCOMPLETE, swtFINALREAD, swtSaveConfirmation] then
     AWorkTable.RecalculateAllMeterValues;
 
   if AWorkTable <> FActiveWorkTable then
@@ -2177,6 +2177,24 @@ begin
         GlowMesYellow.Enabled := False;
         GlowMesRed.Enabled := False;
         GlowMesGreen.Enabled := True;
+        TestButton.Text := 'Сохранение';
+        TestButton.Tag := 5;
+        TestButton.Enabled := False;
+        ButtonCancel.Text := 'Отмена';
+        ButtonCancel.Enabled := False;
+        ButtonCancel.Visible := False;
+        GlowEffectCancelRed.Enabled := False;
+
+      end;
+
+    swtSaveConfirmation:
+      begin
+        // Запрос сохранения показывается только по специальному состоянию стола.
+        SetValues;
+        UpdateForm;
+        GlowMesYellow.Enabled := False;
+        GlowMesRed.Enabled := False;
+        GlowMesGreen.Enabled := True;
         TestButton.Text := 'Сохранить?';
         TestButton.Tag := 6;
         TestButton.Enabled := True;
@@ -2184,7 +2202,6 @@ begin
         ButtonCancel.Enabled := True;
         ButtonCancel.Visible := True;
         GlowEffectCancelRed.Enabled := True;
-
       end;
 
     swtFAILURE:
@@ -7291,6 +7308,20 @@ begin
 
     swtCOMPLETE:
       begin
+        TestButton.Text := 'Сохранение';
+        TestButton.Tag := 5;
+        TestButton.Enabled := False;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := False;
+          ButtonCancel.Visible := False;
+        end;
+      end;
+
+    swtSaveConfirmation:
+      begin
+        // Решение запрашивается только во время ожидания в msSave.
         TestButton.Text := 'Сохранить?';
         TestButton.Tag := 6;
         TestButton.Enabled := True;
@@ -8249,6 +8280,8 @@ end;
 function TFrameMainTable.IsTestButtonSaveMode: Boolean;
 begin
   Result :=
+    (FActiveWorkTable <> nil) and
+    (FActiveWorkTable.State = swtSaveConfirmation) and
     (TestButton <> nil) and
     (TestButton.Tag = 6) and
     SameText(Trim(TestButton.Text), 'Сохранить?');
@@ -8302,36 +8335,12 @@ begin
     end;
 end;
 
-// Accepts pending measurement results after user confirmation.
-// This method persists measurement results and managers,
-// then returns the active work table to the connected state.
+// Передаёт подтверждение в TMeasurementRun; сам интерфейс данные не сохраняет.
 procedure TFrameMainTable.AcceptMeasurementResults;
-var
-  WorkTable: TWorkTable;
 begin
-  WorkTable := FActiveWorkTable;
-  if WorkTable = nil then
-    Exit;
-
-  if not (WorkTable.State in [swtCOMPLETE, swtFINALREAD]) then
-    Exit;
-
-  if not NeedSaveMeasurementResults(WorkTable) then
-    Exit;
-
-  ProtocolManager.AddMessage(pcAction, psForm, 'AcceptResults',
-    'Пользователь подтвердил сохранение результатов измерения',
-    WorkTable.Name);
-
-  WorkTable.SaveMeasurementResults;
-
-  if DataManager <> nil then
-    DataManager.Save;
-
-  if WorkTableManager <> nil then
-    WorkTableManager.Save;
-
-  WorkTable.State := swtCONNECTED;
+  // Интерфейс только передаёт решение текущему сценарию измерения.
+  if MeasurementRun <> nil then
+    MeasurementRun.AcceptMeasurementResults;
 end;
 
 // Handles the main measurement button click.
@@ -8395,13 +8404,11 @@ begin
         // Уже останавливаемся. Повторно ничего не делаем.
       end;
 
-    swtCOMPLETE,
-    swtFINALREAD:
+    swtSaveConfirmation:
       begin
-        // Это не остановка измерения, а отказ от сохранения/финального результата.
-        // Здесь лучше вызвать отдельную команду отмены результата,
-        // а не просто менять State.
-        FActiveWorkTable.State := swtCONNECTED;
+        // Интерфейс только передаёт отказ; выход из msSave выполняет автомат.
+        if MeasurementRun <> nil then
+          MeasurementRun.RejectMeasurementResults;
       end;
 
     swtSTARTMONITOR,

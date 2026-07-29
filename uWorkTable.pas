@@ -138,7 +138,13 @@ type
     /// Ошибка выполнения.
     /// Процесс завершён сбоем или некорректным состоянием.
     /// </summary>
-    swtFAILURE
+    swtFAILURE,
+
+    /// <summary>
+    /// Измерение завершено и ожидает решения пользователя о сохранении.
+    /// Это состояние интерфейса, а не этап автомата измерения.
+    /// </summary>
+    swtSaveConfirmation
   );
 
   EActionWorkTable = (
@@ -4990,6 +4996,8 @@ begin
     Exit(swtFINALREAD);
   if SameText(AValue, 'swtFAILURE') then
     Exit(swtFAILURE);
+  if SameText(AValue, 'swtSaveConfirmation') then
+    Exit(swtSaveConfirmation);
 
   Result := swtNONE;
 end;
@@ -5014,6 +5022,7 @@ begin
     swtCOMPLETE: Result := 'swtCOMPLETE';
     swtFINALREAD: Result := 'swtFINALREAD';
     swtFAILURE: Result := 'swtFAILURE';
+    swtSaveConfirmation: Result := 'swtSaveConfirmation';
   else
     Result := 'swtNONE';
   end;

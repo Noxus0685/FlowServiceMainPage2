@@ -277,6 +277,8 @@ type
     FManualTimeSet: Integer;
 
     FCurrentStage: EMeasurementState;
+    // Решение о сохранении действует только для текущего входа в msSave.
+    FSaveConfirmationResult: TSaveConfirmationResult;
 
     FWaitStartedTick: UInt64;
     FLastStableProtocolTick: UInt64;
@@ -497,6 +499,12 @@ type
     procedure Process;
     procedure ProcessStage;
     procedure SaveMeasurementResults;
+    /// <summary>Проверяет необходимость решения пользователя перед сохранением.</summary>
+    function RequiresSaveConfirmation: Boolean;
+    /// <summary>Фиксирует подтверждение пользователя без сохранения данных.</summary>
+    procedure AcceptMeasurementResults;
+    /// <summary>Фиксирует отказ пользователя без изменения этапа.</summary>
+    procedure RejectMeasurementResults;
     function BuildDiagnosticSnapshot(const ASwitchAutoText: string): string;
     function DrainDiagnosticEvents: TArray<string>;
 
@@ -511,6 +519,8 @@ type
     property PreparedPointsMode: EMeasurementRunMode read FPreparedPointsMode;
 
     property Stage: EMeasurementState read FCurrentStage;
+    property SaveConfirmationResult: TSaveConfirmationResult
+      read FSaveConfirmationResult;
 
     property Mode: EMeasurementRunMode read FMode write FMode;
     property CurrentPointIndex: Integer read FCurrentPointIndex write FCurrentPointIndex;
@@ -935,6 +945,8 @@ begin
   FManualTimeSet := 60;
 
   FCurrentStage := msNone;
+  // До первого этапа msSave решение о сохранении отсутствует.
+  FSaveConfirmationResult := scrNone;
   FForceNextPoint := -1;
   FMaxAttemptCount := 3;
   FAttempt := 0;
@@ -1709,69 +1721,18 @@ begin
 end;
 
 procedure TMeasurementRun.EnterSave;
-var
-  Point: TDevicePoint;
-  RepeatsTarget: Integer;
-  IsLastRepeat: Boolean;
-  SavedRepeat: Integer;
 begin
   FNextStageAfterSave := msDone;
   SetCurrentPointStatus(mptsSave);
 
+  // Каждое новое измерение начинает этап сохранения без решения пользователя.
+  FSaveConfirmationResult := scrNone;
+  ProtocolManager.AddMessage(pcInfo, psMeasurement, 'EnterSave',
+    'Вход в этап сохранения: решение пользователя сброшено',
+    MeasurementStateToString(FCurrentStage));
+
   FLastMeasureCompletedEventSent := True;
   FireEvent(meMeasureCompleted);
-
-  Point := GetCurrentPoint;
-
-  SaveMeasurementResults;
-  FLastSaveDoneEventSent := True;
-  FireEvent(meSaveDone);
-
-  if IsStopRequested then
-  begin
-    MarkInterruptedPointIfNeeded;
-    ProtocolManager.AddMessage(pcInfo, psMeasurement, 'EnterSave',
-      'После Stop продолжение серии запрещено',
-      Format('Stage=%s; Reason=%s', [MeasurementStateToString(FCurrentStage),
-        MeasurementStopReasonToString(GetStopReason)]));
-    FNextStageAfterSave := msDone;
-    Exit;
-  end;
-
-  RepeatsTarget := 1;
-  if (FMode <> mrmManual) and (Point <> nil) then
-    RepeatsTarget := Max(Point.Repeats, 1);
-  Inc(FCurrentRepeat);
-  IsLastRepeat := FCurrentRepeat >= RepeatsTarget;
-  SavedRepeat := FCurrentRepeat;
-
-  if IsLastRepeat then
-  begin
-    if Point <> nil then
-    begin
-      FLastProcessedPointIndex := FCurrentPointIndex;
-      FLastProcessedPointName := Point.Name;
-      SetCurrentPointStatus(mptsSaved);
-    end;
-    FCurrentRepeat := 0;
-    FLastPointDoneEventSent := True;
-    AddDiagnosticEvent('mePointDone');
-    FireEvent(mePointDone);
-    if FMode = mrmManual then
-      FNextStageAfterSave := msDone
-    else if FindNextEnabledPointIndex(FCurrentPointIndex + 1) < 0 then
-      FNextStageAfterSave := msDone
-    else
-      FNextStageAfterSave := msSelectPoint;
-  end
-  else
-    FNextStageAfterSave := msWaitMeasureStart;
-
-  AddDiagnosticEvent(Format(
-    'RepeatTransition: PointName=%s; CurrentRepeat=%d; RepeatsTarget=%d; IsLastRepeat=%s; NextStage=%s; StabilizationSkipped=%s',
-    [IfThen(Point <> nil, Point.Name, '<none>'), SavedRepeat, RepeatsTarget,
-     BoolToStr(IsLastRepeat, True), MeasurementStateToString(FNextStageAfterSave),
-     BoolToStr(FNextStageAfterSave = msWaitMeasureStart, True)]));
 end;
 
 procedure TMeasurementRun.EnterDone;
@@ -5539,9 +5500,134 @@ begin
 end;
 
 procedure TMeasurementRun.ProcessSave;
+var
+  Point: TDevicePoint;
+  RepeatsTarget: Integer;
+  IsLastRepeat: Boolean;
+  SavedRepeat: Integer;
+  ResultsSaved: Boolean;
 begin
-  if FNextStageAfterSave <> msNone then
+  // Одиночное ручное измерение остаётся в msSave до решения пользователя.
+  if RequiresSaveConfirmation then
+    case FSaveConfirmationResult of
+      scrNone:
+        begin
+          if (FWorkTable <> nil) and
+             (FWorkTable.State <> swtSaveConfirmation) then
+          begin
+            FWorkTable.State := swtSaveConfirmation;
+            ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessSave',
+              'Стол ожидает подтверждения сохранения результата',
+              MeasurementStateToString(FCurrentStage));
+          end;
+          Exit;
+        end;
+      scrAccepted:
+        ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessSave',
+          'Сохранение результата после подтверждения пользователя', '');
+      scrRejected:
+        ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessSave',
+          'Сохранение результата пропущено после отказа пользователя', '');
+    end
+  else
+    ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessSave',
+      'Автоматическое сохранение результата без подтверждения', '');
+
+  ResultsSaved := not RequiresSaveConfirmation or
+    (FSaveConfirmationResult = scrAccepted);
+  if ResultsSaved then
+  begin
+    SaveMeasurementResults;
+    FLastSaveDoneEventSent := True;
+    FireEvent(meSaveDone);
+  end;
+
+  Point := GetCurrentPoint;
+  if IsStopRequested then
+  begin
+    MarkInterruptedPointIfNeeded;
+    ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessSave',
+      'После Stop продолжение серии запрещено',
+      Format('Stage=%s; Reason=%s', [MeasurementStateToString(FCurrentStage),
+        MeasurementStopReasonToString(GetStopReason)]));
+    FNextStageAfterSave := msDone;
     SetStage(FNextStageAfterSave);
+    Exit;
+  end;
+
+  RepeatsTarget := 1;
+  if Point <> nil then
+    RepeatsTarget := Max(Point.Repeats, 1);
+  Inc(FCurrentRepeat);
+  IsLastRepeat := FCurrentRepeat >= RepeatsTarget;
+  SavedRepeat := FCurrentRepeat;
+
+  if IsLastRepeat then
+  begin
+    if Point <> nil then
+    begin
+      FLastProcessedPointIndex := FCurrentPointIndex;
+      FLastProcessedPointName := Point.Name;
+      // Отказ завершает обработку точки, но не помечает её как сохранённую.
+      if ResultsSaved then
+        SetCurrentPointStatus(mptsSaved);
+    end;
+    FCurrentRepeat := 0;
+    FLastPointDoneEventSent := True;
+    AddDiagnosticEvent('mePointDone');
+    FireEvent(mePointDone);
+    if FMode = mrmManual then
+      FNextStageAfterSave := msDone
+    else if FindNextEnabledPointIndex(FCurrentPointIndex + 1) < 0 then
+      FNextStageAfterSave := msDone
+    else
+      FNextStageAfterSave := msSelectPoint;
+  end
+  else
+    FNextStageAfterSave := msWaitMeasureStart;
+
+  AddDiagnosticEvent(Format(
+    'RepeatTransition: PointName=%s; CurrentRepeat=%d; RepeatsTarget=%d; IsLastRepeat=%s; NextStage=%s; StabilizationSkipped=%s',
+    [IfThen(Point <> nil, Point.Name, '<none>'), SavedRepeat, RepeatsTarget,
+     BoolToStr(IsLastRepeat, True), MeasurementStateToString(FNextStageAfterSave),
+     BoolToStr(FNextStageAfterSave = msWaitMeasureStart, True)]));
+  SetStage(FNextStageAfterSave);
+end;
+
+function TMeasurementRun.RequiresSaveConfirmation: Boolean;
+var
+  Point: TDevicePoint;
+  RepeatsTarget: Integer;
+begin
+  Point := GetCurrentPoint;
+  RepeatsTarget := 1;
+  if Point <> nil then
+    RepeatsTarget := Max(Point.Repeats, 1);
+
+  // Подтверждение требуется только для одного повтора в ручном режиме.
+  Result := (FMode = mrmManual) and (RepeatsTarget = 1);
+end;
+
+procedure TMeasurementRun.AcceptMeasurementResults;
+begin
+  // Метод фиксирует решение; сохранение выполнит следующий ProcessSave.
+  if (FCurrentStage <> msSave) or not RequiresSaveConfirmation or
+     (FSaveConfirmationResult <> scrNone) then
+    Exit;
+  FSaveConfirmationResult := scrAccepted;
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'AcceptResults',
+    'Пользователь подтвердил сохранение результата измерения', '');
+end;
+
+procedure TMeasurementRun.RejectMeasurementResults;
+begin
+  // Метод фиксирует решение; завершение обработки выполнит ProcessSave.
+  if (FCurrentStage <> msSave) or not RequiresSaveConfirmation or
+     (FSaveConfirmationResult <> scrNone) then
+    Exit;
+  FSaveConfirmationResult := scrRejected;
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'RejectResults',
+    'Пользователь отказался от сохранения результата измерения', '');
 end;
 
 procedure TMeasurementRun.ProcessDone;
