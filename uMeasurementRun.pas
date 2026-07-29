@@ -255,6 +255,9 @@ type
       STABILITY_STDDEV_ERROR_FACTOR = 0.15;
       STABILITY_TREND_ERROR_FACTOR = 0.25;
       STABILITY_FORECAST_HORIZON_SEC = 5.0;
+      DEFAULT_SAMPLE_INTERVAL_MS = 100.0;
+      STABILITY_SAMPLE_SIZE_RESERVE_FACTOR = 1.25;
+      HISTORY_RESERVE_SEC = 5.0;
 
   private
 
@@ -277,6 +280,13 @@ type
 
     FWaitStartedTick: UInt64;
     FLastStableProtocolTick: UInt64;
+
+    FLastConfiguredStabilityValue: TMeterValue;
+    FLastPreviousSampleSize: Integer;
+    FLastRequiredSampleSize: Integer;
+    FLastSampleCountInBuffer: Integer;
+    FLastEstimatedSampleIntervalMs: Double;
+    FLastBufferExpanded: Boolean;
 
 
     FCurrentRepeat: Integer;
@@ -423,7 +433,10 @@ type
     function CalcStableTimeoutSec: Integer;
     procedure ResetPointSetupState;
     procedure StartNewStabilityAttempt;
-    /// <summary>Изменяет только три порога стабильности по Q и Error точки.</summary>
+    /// <summary>
+    /// Настраивает три порога по Q/Error и при необходимости
+    /// расширяет историю для минимального временного окна.
+    /// </summary>
     procedure ConfigureStabilityByPoint(AValue: TMeterValue; APoint: TDevicePoint);
     /// <summary>
     /// Настраивает целевой диапазон по FlowAccuracy и независимо включает
@@ -566,6 +579,10 @@ procedure TMeasurementRun.ConfigureStabilityByPoint(AValue: TMeterValue;
 var
   Settings: TMeterValueStabilitySettings;
   ErrorAbsolute: Double;
+  Samples: TArray<TMeterValueSample>;
+  DeltaMs, TotalDeltaMs: Int64;
+  PositiveIntervalCount, I, RequiredSampleCount: Integer;
+  AverageSampleIntervalMs: Double;
 begin
   if (AValue = nil) or (APoint = nil) then
     Exit;
@@ -576,6 +593,40 @@ begin
   Settings.MaxStdDeviation := ErrorAbsolute * STABILITY_STDDEV_ERROR_FACTOR;
   Settings.MaxTrendRate := ErrorAbsolute * STABILITY_TREND_ERROR_FACTOR /
     STABILITY_FORECAST_HORIZON_SEC;
+
+  Samples := AValue.GetStabilitySamples;
+  TotalDeltaMs := 0;
+  PositiveIntervalCount := 0;
+  for I := 1 to High(Samples) do
+  begin
+    DeltaMs := Samples[I].TimeStampMs - Samples[I - 1].TimeStampMs;
+    if DeltaMs > 0 then
+    begin
+      Inc(TotalDeltaMs, DeltaMs);
+      Inc(PositiveIntervalCount);
+    end;
+  end;
+  if PositiveIntervalCount > 0 then
+    AverageSampleIntervalMs := TotalDeltaMs / PositiveIntervalCount
+  else
+    AverageSampleIntervalMs := DEFAULT_SAMPLE_INTERVAL_MS;
+
+  RequiredSampleCount := Ceil(Settings.MinWindowDurationSec * 1000.0 /
+    AverageSampleIntervalMs);
+  RequiredSampleCount := Ceil(RequiredSampleCount *
+    STABILITY_SAMPLE_SIZE_RESERVE_FACTOR);
+  RequiredSampleCount := Max(RequiredSampleCount, Settings.MinSampleCount + 5);
+
+  FLastConfiguredStabilityValue := AValue;
+  FLastPreviousSampleSize := Settings.SampleSize;
+  FLastRequiredSampleSize := RequiredSampleCount;
+  FLastSampleCountInBuffer := Length(Samples);
+  FLastEstimatedSampleIntervalMs := AverageSampleIntervalMs;
+  FLastBufferExpanded := RequiredSampleCount > Settings.SampleSize;
+
+  Settings.SampleSize := Max(Settings.SampleSize, RequiredSampleCount);
+  Settings.MaxSampleAgeSec := Max(Settings.MaxSampleAgeSec,
+    Settings.MinWindowDurationSec + HISTORY_RESERVE_SEC);
   AValue.StabilitySettings := Settings;
 end;
 
@@ -612,7 +663,7 @@ procedure TMeasurementRun.LogPointSetupValueConfigured(const AName: string;
 var
   S: TMeterValueStabilitySettings;
   LowerLimit, UpperLimit: Double;
-  RangeText: string;
+  RangeText, BufferText: string;
 begin
   if AValue = nil then
     Exit;
@@ -625,13 +676,21 @@ begin
   end
   else
     RangeText := '; RangeChecksEnabled=False';
+  if FLastConfiguredStabilityValue = AValue then
+    BufferText := Format('; PreviousSampleSize=%d; ConfiguredSampleSize=%d; SampleCountInBuffer=%d; EstimatedSampleIntervalMs=%.3f; EstimatedSampleRateHz=%.3f; RequiredSampleSize=%d; MinWindowDurationSec=%.3f; MaxSampleAgeSec=%.3f; BufferExpanded=%s',
+      [FLastPreviousSampleSize, S.SampleSize, FLastSampleCountInBuffer,
+       FLastEstimatedSampleIntervalMs, 1000.0 / FLastEstimatedSampleIntervalMs,
+       FLastRequiredSampleSize, S.MinWindowDurationSec, S.MaxSampleAgeSec,
+       BoolToStr(FLastBufferExpanded, True)])
+  else
+    BufferText := '';
   ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitPointSetup',
     'Применены настройки стабилизации',
-    Format('PointSetupValueConfigured: Name=%s; Target=%.6f; MaxVariation=%.9f; MaxStdDeviation=%.9f; MaxTrendRate=%.9f; MinSampleCount=%d; MinWindowDurationSec=%.3f; MaxOutlierRatio=%.9f; CheckCurrentRange=%s; CheckMeanRange=%s%s',
+    Format('PointSetupValueConfigured: Name=%s; Target=%.6f; MaxVariation=%.9f; MaxStdDeviation=%.9f; MaxTrendRate=%.9f; MinSampleCount=%d; MaxOutlierRatio=%.9f; CheckCurrentRange=%s; CheckMeanRange=%s%s%s',
       [AName, S.TargetValue, S.MaxVariation, S.MaxStdDeviation, S.MaxTrendRate,
-       S.MinSampleCount, S.MinWindowDurationSec, S.MaxOutlierFraction,
+       S.MinSampleCount, S.MaxOutlierFraction,
        BoolToStr(S.RequireCurrentValueInRange, True),
-       BoolToStr(S.RequireMeanValueInRange, True), RangeText]));
+       BoolToStr(S.RequireMeanValueInRange, True), RangeText, BufferText]));
 end;
 
 function TMeasurementRun.BuildPointSetupSignalLog(const AName, ASource,
