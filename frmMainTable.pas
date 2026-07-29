@@ -8583,14 +8583,6 @@ begin
   Result := (ACurrentValue - AMeanValue) / Abs(AMeanValue) * 100;
 end;
 
-function TFrameMainTable.CalculateCurrentDeviationPercent(
-  const ACurrentValue, AMeanValue: Double): Double;
-begin
-  if Abs(AMeanValue) <= CurrentDeviationEpsilon then
-    Exit(0);
-
-  Result := (ACurrentValue - AMeanValue) / Abs(AMeanValue) * 100;
-end;
 
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
