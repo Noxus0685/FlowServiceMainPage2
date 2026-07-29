@@ -759,6 +759,7 @@ type
   FLastClickCol: TColumn;
   FLastClickTick: Cardinal;
   FLastPopupGrid: TGrid;
+  FRefreshingGridColumns: Boolean;
 
   FRows: array of TRowData;
   IsUpdating: Boolean;
@@ -845,6 +846,7 @@ type
     procedure UpdateGridPopupActions;
     procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
     procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
+    procedure RefreshGridColumns(AGrid: TGrid);
     function NormalizeColumnCaption(const ACaption: string): string;
     function FindGridColumnByName(AGrid: TGrid;
       const AColumnName: string): TColumn;
@@ -3065,8 +3067,8 @@ begin
 
   GridColumn.Visible := not GridColumn.Visible;
   MenuItem.IsChecked := GridColumn.Visible;
+  RefreshGridColumns(GridDevices);
   SaveLayoutSettingsToWorkTable;
-  GridDevices.Repaint;
 end;
 
 procedure TFrameMainTable.EtalonsColumnMenuItemClick(Sender: TObject);
@@ -3090,8 +3092,8 @@ begin
 
   GridColumn.Visible := not GridColumn.Visible;
   MenuItem.IsChecked := GridColumn.Visible;
+  RefreshGridColumns(GridEtalons);
   SaveLayoutSettingsToWorkTable;
-  GridEtalons.Repaint;
 end;
 
 function TFrameMainTable.NormalizeColumnCaption(
@@ -3248,6 +3250,32 @@ begin
   end;
 end;
 
+procedure TFrameMainTable.RefreshGridColumns(AGrid: TGrid);
+var
+  ViewportY: Single;
+begin
+  if FRefreshingGridColumns or (AGrid = nil) then
+    Exit;
+
+  FRefreshingGridColumns := True;
+  try
+    ViewportY := AGrid.ViewportPosition.Y;
+
+    AGrid.Model.BeginUpdate;
+    try
+      AGrid.Model.InvalidateContentSize;
+      AGrid.Model.ContentChanged;
+    finally
+      AGrid.Model.EndUpdate;
+    end;
+
+    AGrid.ViewportPosition := PointF(0, ViewportY);
+    AGrid.Repaint;
+  finally
+    FRefreshingGridColumns := False;
+  end;
+end;
+
 procedure TFrameMainTable.EnforceDataPointsColumnsLayout;
 begin
   if (FFrameProceed = nil) or (FFrameProceed.GridDataPoints = nil) then
@@ -3307,13 +3335,21 @@ begin
   );
 
   ApplyGridColumnsLayout(GridEtalons, WorkTable.EtalonsGridColumns);
+  RefreshGridColumns(GridEtalons);
   SyncEtalonsColumnsMenu;
   ApplyGridColumnsLayout(GridDevices, WorkTable.DevicesGridColumns);
+  RefreshGridColumns(GridDevices);
   SyncDevicesColumnsMenu;
   if FFrameProceed <> nil then
+  begin
     ApplyGridColumnsLayout(FFrameProceed.GridDataPoints, WorkTable.DataPointsGridColumns);
+    RefreshGridColumns(FFrameProceed.GridDataPoints);
+  end;
   if FFrameProceed <> nil then
+  begin
     ApplyGridColumnsLayout(FFrameProceed.GridResults, WorkTable.ResultsGridColumns);
+    RefreshGridColumns(FFrameProceed.GridResults);
+  end;
 
   EnforceDataPointsColumnsLayout;
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);

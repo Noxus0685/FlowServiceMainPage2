@@ -119,7 +119,11 @@ def test_click_and_recursive_sync_resolve_leaves_independently_of_order():
         assert "if MenuItem.ItemsCount > 0 then" in body
         assert f"FindGridColumnForMenuItem({grid}, MenuItem)" in body
         assert "GridColumn.Visible := not GridColumn.Visible;" in body
+        assert f"RefreshGridColumns({grid});" in body
         assert "SaveLayoutSettingsToWorkTable;" in body
+        assert body.index("GridColumn.Visible := not GridColumn.Visible;") < body.index("MenuItem.IsChecked := GridColumn.Visible;")
+        assert body.index("MenuItem.IsChecked := GridColumn.Visible;") < body.index(f"RefreshGridColumns({grid});")
+        assert body.index(f"RefreshGridColumns({grid});") < body.index("SaveLayoutSettingsToWorkTable;")
 
     sync = procedure_body("SyncColumnMenuBranch")
     assert "SyncColumnMenuBranch(MenuItem, AGrid);" in sync
@@ -145,3 +149,32 @@ def test_popups_only_sync_existing_column_items():
 
 def test_fmx_remains_ascii_safe():
     FMX_BYTES.decode("ascii")
+
+
+def test_grid_model_and_viewport_are_refreshed_after_structural_changes():
+    body = procedure_body("RefreshGridColumns")
+    assert "FRefreshingGridColumns or (AGrid = nil)" in body
+    assert "ViewportY := AGrid.ViewportPosition.Y;" in body
+    assert "AGrid.Model.BeginUpdate;" in body
+    assert "AGrid.Model.InvalidateContentSize;" in body
+    assert "AGrid.Model.ContentChanged;" in body
+    assert "AGrid.Model.EndUpdate;" in body
+    assert "AGrid.ViewportPosition := PointF(0, ViewportY);" in body
+    assert "AGrid.Repaint;" in body
+    assert "AGrid.Realign" not in body
+    assert body.index("AGrid.Model.InvalidateContentSize;") < body.index("AGrid.Model.ContentChanged;")
+    assert body.index("AGrid.Model.ContentChanged;") < body.index("AGrid.ViewportPosition := PointF(0, ViewportY);")
+
+    load = procedure_body("LoadLayoutSettingsFromWorkTable")
+    for grid in ("GridEtalons", "GridDevices", "FFrameProceed.GridDataPoints", "FFrameProceed.GridResults"):
+        apply = f"ApplyGridColumnsLayout({grid},"
+        refresh = f"RefreshGridColumns({grid});"
+        assert apply in load
+        assert refresh in load
+        assert load.index(apply) < load.index(refresh)
+
+
+def test_model_refresh_is_not_called_from_hot_grid_callbacks():
+    for callback in ("GridDevicesGetValue", "GridEtalonsGetValue", "GridDevicesDrawColumnCell",
+                     "GridEtalonsDrawColumnCell", "TimerMainTimer"):
+        assert "RefreshGridColumns" not in procedure_body(callback)
