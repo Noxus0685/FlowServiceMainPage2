@@ -4972,7 +4972,12 @@ object FrameMainTable: TFrameMainTable
       end
       object MenuItemDevicesColumnsGroup: TMenuItem
         Text = #1050#1086#1083#1086#1085#1082#1080
-        object MenuItemDevicesColumnsChannelGroup: TMenuItem
+        object MenuItemDevicesColumn0: TMenuItem
+          Locked = True
+          Text = #1042#1082#1083
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn1: TMenuItem
           Locked = True
           Text = #1050#1072#1085#1072#1083
           object MenuItemDevicesColumn0: TMenuItem
@@ -5000,7 +5005,12 @@ object FrameMainTable: TFrameMainTable
             OnClick = DevicesColumnMenuItemClick
           end
         end
-        object MenuItemDevicesColumnsDeviceGroup: TMenuItem
+        object MenuItemDevicesColumn3: TMenuItem
+          Locked = True
+          Text = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
+          OnClick = DevicesColumnMenuItemClick
+        end
+        object MenuItemDevicesColumn4: TMenuItem
           Locked = True
           Text = #1055#1088#1080#1073#1086#1088
           object MenuItemDevicesColumn2: TMenuItem
@@ -5028,7 +5038,7 @@ object FrameMainTable: TFrameMainTable
             OnClick = DevicesColumnMenuItemClick
           end
         end
-        object MenuItemDevicesColumnsMeasureGroup: TMenuItem
+        object MenuItemDevicesColumn5: TMenuItem
           Locked = True
           Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
           object MenuItemDevicesColumn8: TMenuItem
@@ -5056,7 +5066,7 @@ object FrameMainTable: TFrameMainTable
             OnClick = DevicesColumnMenuItemClick
           end
         end
-        object MenuItemDevicesColumnsStatGroup: TMenuItem
+        object MenuItemDevicesColumn6: TMenuItem
           Locked = True
           Text = #1057#1090#1072#1090#1080#1089#1090#1080#1082#1072
           object MenuItemDevicesColumn10: TMenuItem
@@ -5226,7 +5236,12 @@ object FrameMainTable: TFrameMainTable
       end
       object MenuItemEtalonsColumnsGroup: TMenuItem
         Text = #1050#1086#1083#1086#1085#1082#1080
-        object MenuItemEtalonsColumnsChannelGroup: TMenuItem
+        object MenuItemEtalonsColumn0: TMenuItem
+          Locked = True
+          Text = #1042#1082#1083
+          OnClick = EtalonsColumnMenuItemClick
+        end
+        object MenuItemEtalonsColumn1: TMenuItem
           Locked = True
           Text = #1050#1072#1085#1072#1083
           object MenuItemEtalonsColumn0: TMenuItem
@@ -5254,7 +5269,7 @@ object FrameMainTable: TFrameMainTable
             OnClick = EtalonsColumnMenuItemClick
           end
         end
-        object MenuItemEtalonsColumnsDeviceGroup: TMenuItem
+        object MenuItemEtalonsColumn4: TMenuItem
           Locked = True
           Text = #1055#1088#1080#1073#1086#1088
           object MenuItemEtalonsColumn2: TMenuItem
@@ -5282,7 +5297,7 @@ object FrameMainTable: TFrameMainTable
             OnClick = EtalonsColumnMenuItemClick
           end
         end
-        object MenuItemEtalonsColumnsMeasureGroup: TMenuItem
+        object MenuItemEtalonsColumn5: TMenuItem
           Locked = True
           Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
           object MenuItemEtalonsColumn7: TMenuItem
@@ -5310,7 +5325,7 @@ object FrameMainTable: TFrameMainTable
             OnClick = EtalonsColumnMenuItemClick
           end
         end
-        object MenuItemEtalonsColumnsStatGroup: TMenuItem
+        object MenuItemEtalonsColumn6: TMenuItem
           Locked = True
           Text = #1057#1090#1072#1090#1080#1089#1090#1080#1082#1072
           object MenuItemEtalonsColumn10: TMenuItem
