@@ -26,8 +26,8 @@ def test_automatic_sampling_is_atomic_monotonic_and_separate_from_manual_samplin
     automatic = body("AddCurrentStabilitySample")
     manual = body("AddSample")
     assert "FLastAutomaticStabilitySampleMs: Int64;" in METER
-    assert "TMeterValueSampleSource = (" in BASE
-    assert "mssAutomatic" in BASE and "mssManual" in BASE
+    assert "TMeterValueSampleSource = (" in METER
+    assert "mssAutomatic" in METER and "mssManual" in METER
     assert "AddSampleLocked" not in METER
     assert re.search(r"function AddStabilitySample\s*\([^)]*\)\s*:\s*Boolean;", METER, re.S)
     assert "AddStabilitySample(Value, GetMonotonicTimeMs, mssAutomatic);" in automatic

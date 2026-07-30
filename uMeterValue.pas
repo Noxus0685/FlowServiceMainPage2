@@ -51,6 +51,13 @@ type
 
   TMeterValue = class
   private
+    type
+      /// <summary>Identifies whether a stability sample was recorded automatically or manually.</summary>
+      TMeterValueSampleSource = (
+        mssAutomatic,
+        mssManual
+      );
+
     class var FVirtualClockEnabled: Boolean;
     class var FVirtualClockMs: Int64;
     class var FMeterValues: TObjectList<TMeterValue>;
@@ -1284,7 +1291,7 @@ end;
 
 function TMeterValue.AddStabilitySample(const AValue: Double;
   const ATimeStampMs: Int64;
-  const ASource: TMeterValueSampleSource): Boolean;
+  const ASource: TMeterValue.TMeterValueSampleSource): Boolean;
 var
   Sample: TMeterValueSample;
   LastTimeStampMs: Int64;
@@ -1294,21 +1301,6 @@ begin
 
   if IsNan(AValue) or IsInfinite(AValue) then
     Exit;
-
-  if FSamples.Count > 0 then
-  begin
-    LastTimeStampMs := FSamples[FSamples.Count - 1].TimeStampMs;
-    if Sample.TimeStampMs < LastTimeStampMs then
-      Exit;
-    if Sample.TimeStampMs = LastTimeStampMs then
-      Sample.TimeStampMs := LastTimeStampMs + 1;
-  end;
-  if FActiveStabilityStartMs <= 0 then
-    FActiveStabilityStartMs := Sample.TimeStampMs;
-  FSamples.Add(Sample);
-  TrimStabilityHistory;
-  Result := True;
-end;
 
 procedure TMeterValue.AddSample(const AValue: Double; const ATimeStampMs: Int64);
 begin

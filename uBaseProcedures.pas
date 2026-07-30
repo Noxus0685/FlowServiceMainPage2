@@ -150,13 +150,6 @@ type
     Value: Double;
   end;
 
-  /// <summary>Identifies whether a stability sample was recorded automatically or manually.</summary>
-  TMeterValueSampleSource = (
-    mssAutomatic,
-    mssManual
-  );
-
-
   /// <summary>Per-source-sample diagnostic flags calculated by stability analysis.</summary>
   TMeterValueSampleAnalysis = record
     SourceIndex: Integer;
