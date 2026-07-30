@@ -5417,12 +5417,15 @@ begin
         if IsStopRequested and HasPhysicalMeasurementStarted then
         begin
           ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessWaitMeasureStop',
-            'Остановка подтверждена, результат будет сохранён как прерванный',
+            'Физическая остановка завершена; доступный результат передаётся в msSave',
             MeasurementStopReasonToString(GetStopReason));
+          // После физического старта не завершаем процесс досрочно:
+          // пользователь должен принять решение о сохранении результата в msSave.
           MarkInterruptedPointIfNeeded;
         end;
-        if IsStopRequested then
+        if IsStopRequested and not HasPhysicalMeasurementStarted then
         begin
+          // При Stop до физического старта сохранять нечего — оставляем штатную отмену.
           FinalizeMeasurementRun(mrrCancelled, mdrUserCancelled);
           Exit;
         end;
@@ -5468,12 +5471,18 @@ begin
     swtCOMPLETE:
       begin
         FireEvent(meResultReady);
-        if IsStopRequested then
+        if IsStopRequested and HasPhysicalMeasurementStarted then
         begin
           ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessResultsRead',
-            'Результат прерванного измерения прочитан',
+            'Результат прерванного после физического старта измерения прочитан и передаётся в msSave',
             MeasurementStopReasonToString(GetStopReason));
+          // Досрочное завершение отменено: решение о сохранении доступного
+          // результата принимает пользователь в штатном ProcessSave.
           MarkInterruptedPointIfNeeded;
+        end;
+        if IsStopRequested and not HasPhysicalMeasurementStarted then
+        begin
+          // Защитная ветка сохраняет отмену без msSave, если физического старта не было.
           FinalizeMeasurementRun(mrrCancelled, mdrUserCancelled);
           Exit;
         end;
