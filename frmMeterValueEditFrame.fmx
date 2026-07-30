@@ -699,7 +699,7 @@
               Align = Top
               Margins.Bottom = 8.000000000000000000
               Size.Width = 704.000000000000000000
-              Size.Height = 220.000000000000000000
+              Size.Height = 250.000000000000000000
               Size.PlatformDefault = False
               Text = #1054#1073#1097#1080#1077' '#1087#1072#1088#1072#1084#1077#1090#1088#1099
               TabOrder = 0
@@ -746,15 +746,15 @@
                 Size.Height = 24.000000000000000000
                 Size.PlatformDefault = False
               end
-              object LabelMinWindowDurationSec: TLabel
+              object LabelMinimumSampleIntervalSec: TLabel
                 Position.X = 12.000000000000000000
                 Position.Y = 122.000000000000000000
-                Size.Width = 240.000000000000000000
+                Size.Width = 260.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
-                Text = 'Минимальная длительность окна, с'
+                Text = 'Минимальный интервал автоматических проб, с'
               end
-              object EditMinWindowDurationSec: TEdit
+              object EditMinimumSampleIntervalSec: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
                 TabOrder = 3
                 Position.X = 280.000000000000000000
@@ -763,15 +763,15 @@
                 Size.Height = 24.000000000000000000
                 Size.PlatformDefault = False
               end
-              object LabelMaxSampleAgeSec: TLabel
+              object LabelMinWindowDurationSec: TLabel
                 Position.X = 12.000000000000000000
                 Position.Y = 152.000000000000000000
                 Size.Width = 240.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
-                Text = #1052#1072#1082#1089#1080#1084#1072#1083#1100#1085#1099#1081' '#1074#1086#1079#1088#1072#1089#1090' '#1076#1072#1085#1085#1099#1093', '#1089
+                Text = 'Минимальная длительность окна, с'
               end
-              object EditMaxSampleAgeSec: TEdit
+              object EditMinWindowDurationSec: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
                 TabOrder = 4
                 Position.X = 280.000000000000000000
@@ -780,9 +780,26 @@
                 Size.Height = 24.000000000000000000
                 Size.PlatformDefault = False
               end
-              object LabelExitThresholdFactor: TLabel
+              object LabelMaxSampleAgeSec: TLabel
                 Position.X = 12.000000000000000000
                 Position.Y = 182.000000000000000000
+                Size.Width = 240.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = #1052#1072#1082#1089#1080#1084#1072#1083#1100#1085#1099#1081' '#1074#1086#1079#1088#1072#1089#1090' '#1076#1072#1085#1085#1099#1093', '#1089
+              end
+              object EditMaxSampleAgeSec: TEdit
+                Touch.InteractiveGestures = [LongTap, DoubleTap]
+                TabOrder = 5
+                Position.X = 280.000000000000000000
+                Position.Y = 180.000000000000000000
+                Size.Width = 120.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+              end
+              object LabelExitThresholdFactor: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 212.000000000000000000
                 Size.Width = 240.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
@@ -790,9 +807,9 @@
               end
               object EditExitThresholdFactor: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
-                TabOrder = 5
+                TabOrder = 6
                 Position.X = 280.000000000000000000
-                Position.Y = 180.000000000000000000
+                Position.Y = 210.000000000000000000
                 Size.Width = 120.000000000000000000
                 Size.Height = 24.000000000000000000
                 Size.PlatformDefault = False
