@@ -197,6 +197,10 @@ type
     RequiredStabilizationSec: Double;  // Runtime: максимальный неотрицательный Pause исходных точек
     Participants: TArray<TMeasurementPointParticipant>;
     SourcePointCount: Integer;
+    CommonMinQ: Double;          // Runtime: common admissible flow interval of all participants
+    CommonMaxQ: Double;
+    MinEtalonDeltaQ: Double;     // Runtime: strictest absolute etalon tolerance in the group
+    EtalonRangeValid: Boolean;   // Runtime: false when the source etalon error is invalid
 
     {====================================================================}
     { ПОВТОРЫ И СЕРИИ }
@@ -1194,6 +1198,10 @@ begin
   FlowRate := 0.0;
   Q := 0.0;
   FlowAccuracy := '';
+  CommonMinQ := 0.0;
+  CommonMaxQ := 0.0;
+  MinEtalonDeltaQ := 0.0;
+  EtalonRangeValid := False;
 
   { Условия измерения }
   Pressure := 0.0;
@@ -3166,8 +3174,6 @@ begin
 end;
 
 end.
-
-
 
 
 
