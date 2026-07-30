@@ -1420,6 +1420,55 @@ begin
     FGraphRenderTimer.Enabled := False;
     FGraphRenderTimer.OnTimer := nil;
   end;
+
+  if FStabilitySampleTimer <> nil then
+  begin
+    FStabilitySampleTimer.Enabled := False;
+    FStabilitySampleTimer.OnTimer := nil;
+  end;
+
+  if FGraphViews <> nil then
+    for View in FGraphViews do
+    begin
+      if View = nil then
+        Continue;
+
+      if View.Root <> nil then
+      begin
+        View.Root.OnClick := nil;
+        View.Root.PopupMenu := nil;
+        View.Root.Parent := nil;
+      end;
+
+      if View.Header <> nil then
+        View.Header.OnClick := nil;
+
+      if View.TitleLabel <> nil then
+        View.TitleLabel.OnClick := nil;
+
+      if View.Chart <> nil then
+        View.Chart.OnClick := nil;
+
+      if View.LegendHost <> nil then
+        View.LegendHost.OnClick := nil;
+
+      if View.PopupMenu <> nil then
+        View.PopupMenu.OnPopup := nil;
+    end;
+
+  inherited;
+end;
+
+destructor TFrameMainTable.Destroy;
+begin
+  FDestroying := True;
+  FGraphRenderQueued := False;
+
+  if FGraphRenderTimer <> nil then
+  begin
+    FGraphRenderTimer.Enabled := False;
+    FGraphRenderTimer.OnTimer := nil;
+  end;
   FreeAndNil(FGraphRenderTimer);
 
   if FStabilitySampleTimer <> nil then
