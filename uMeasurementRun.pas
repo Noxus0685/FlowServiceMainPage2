@@ -3356,6 +3356,7 @@ end;
 procedure TMeasurementRun.CreateSessionPoints;
 const
   QmaxMismatchRelativeTolerance = 1E-3;
+  FloatTolerance = 1E-9;
 var
   Channel: TChannel;
   Device: TDevice;
@@ -3366,6 +3367,9 @@ var
   ExistingPoint: TDevicePoint;
   Participant: TMeasurementPointParticipant;
   StoredQLS, CalculatedQLS, TargetQLS, MergeTolerance: Double;
+  EtalonErrorPercent, EtalonDeltaQ, PointMinQ, PointMaxQ: Double;
+  NewCommonMinQ, NewCommonMaxQ, IntersectionDeltaQ, ControlEtalonDeltaQ: Double;
+  BestIntersectionDeltaQ, BestDistance, CandidateDistance: Double;
   DerivedQmaxLS, EffectiveDeviceQmaxLS, PointQValidationToleranceLS, RelativeQmaxDiff: Double;
   ProcessingDeviceCount, ProcessingDevicePointCount, ParticipantCount: Integer;
   I, J, DuplicateParticipantCount, LostSourcePointCount: Integer;
@@ -3376,7 +3380,7 @@ var
   IncludedInAutomaticSession: Boolean;
   QmaxMismatch: Boolean;
   SkipReason, DeviceResolveSource: string;
-  Action, Reason, PointName: string;
+  Action, Reason, PointName, MergeReason: string;
   ChannelUUIDText, ChannelDeviceUUIDText, ChannelDeviceNameText: string;
   SelectedDeviceUUIDText, SelectedDeviceNameText, RepoDeviceUUIDText: string;
   ChannelDeviceQmax, SelectedDeviceQmax, RepoDeviceQmax: Double;
@@ -3393,6 +3397,39 @@ var
   function FlowMergeTolerance(const AQ1, AQ2: Double): Double;
   begin
     Result := Max(1E-6, Max(Abs(AQ1), Abs(AQ2)) * 1E-4);
+  end;
+
+  function CalculatePointEtalonRange(const APointQ, AEtalonErrorPercent: Double;
+    out ADeltaQ, AMinQ, AMaxQ: Double): Boolean;
+  begin
+    ADeltaQ := 0;
+    AMinQ := APointQ;
+    AMaxQ := APointQ;
+    Result := (not IsNan(AEtalonErrorPercent)) and
+      (not IsInfinite(AEtalonErrorPercent)) and (AEtalonErrorPercent > 0) and
+      (not IsNan(APointQ)) and (not IsInfinite(APointQ));
+    if not Result then
+      Exit;
+    ADeltaQ := Abs(APointQ) * AEtalonErrorPercent / 100;
+    Result := (ADeltaQ > 0) and (not IsNan(ADeltaQ)) and (not IsInfinite(ADeltaQ));
+    if Result then
+    begin
+      AMinQ := APointQ - ADeltaQ;
+      AMaxQ := APointQ + ADeltaQ;
+    end;
+  end;
+
+  function TryCalculateMergedRange(APoint: TDevicePoint;
+    const APointMinQ, APointMaxQ, APointEtalonDeltaQ: Double;
+    out ANewMinQ, ANewMaxQ, AIntersectionQ, AControlDeltaQ: Double): Boolean;
+  begin
+    ANewMinQ := Max(APoint.CommonMinQ, APointMinQ);
+    ANewMaxQ := Min(APoint.CommonMaxQ, APointMaxQ);
+    AIntersectionQ := ANewMaxQ - ANewMinQ;
+    AControlDeltaQ := Min(APoint.MinEtalonDeltaQ, APointEtalonDeltaQ);
+    Result := APoint.EtalonRangeValid and
+      (AIntersectionQ > FloatTolerance) and
+      (AIntersectionQ + FloatTolerance >= AControlDeltaQ);
   end;
 
   function PtrText(AObject: TObject): string;
@@ -3487,33 +3524,56 @@ var
 
   procedure RefreshSessionPointParams(APoint: TDevicePoint);
   var
-    K: Integer;
-    SameNames: Boolean;
-    FirstName: string;
+    K, N: Integer;
+    Names, Flows: TStringList;
+    Value: string;
   begin
     if (APoint = nil) or (Length(APoint.Participants) = 0) then
       Exit;
 
     APoint.RequireAutoStabilization := False;
     APoint.RequiredStabilizationSec := 0;
-    FirstName := APoint.Participants[0].SourcePointName;
-    SameNames := True;
-    for K := 0 to High(APoint.Participants) do
-    begin
-      if APoint.Participants[K].SourcePauseSec < 0 then
-        APoint.RequireAutoStabilization := True
+    Names := TStringList.Create;
+    Flows := TStringList.Create;
+    try
+      Names.CaseSensitive := False;
+      Names.Duplicates := dupIgnore;
+      Flows.Duplicates := dupIgnore;
+      for K := 0 to High(APoint.Participants) do
+      begin
+        if APoint.Participants[K].SourcePauseSec < 0 then
+          APoint.RequireAutoStabilization := True
+        else
+          APoint.RequiredStabilizationSec := Max(APoint.RequiredStabilizationSec, APoint.Participants[K].SourcePauseSec);
+        Value := Trim(APoint.Participants[K].SourcePointName);
+        if (Value <> '') and (Names.IndexOf(Value) < 0) then
+          Names.Add(Value);
+        Value := Format('%.4f', [APoint.Participants[K].SelectedSourceTargetQLS]);
+        if Flows.IndexOf(Value) < 0 then
+          Flows.Add(Value);
+      end;
+      Value := '';
+      if Names.Count > 0 then
+        for N := 0 to Names.Count - 1 do
+        begin
+          if Value <> '' then Value := Value + ' → ';
+          Value := Value + Names[N];
+        end
       else
-        APoint.RequiredStabilizationSec := Max(APoint.RequiredStabilizationSec, APoint.Participants[K].SourcePauseSec);
-      SameNames := SameNames and SameText(FirstName, APoint.Participants[K].SourcePointName);
+        for N := 0 to Flows.Count - 1 do
+        begin
+          if Value <> '' then Value := Value + ' → ';
+          Value := Value + Flows[N];
+        end;
+      APoint.Name := Value;
+    finally
+      Flows.Free;
+      Names.Free;
     end;
     if APoint.RequireAutoStabilization then
       APoint.Pause := -1
     else
       APoint.Pause := Round(APoint.RequiredStabilizationSec);
-    if SameNames and (Trim(FirstName) <> '') then
-      APoint.Name := FirstName
-    else
-      APoint.Name := Format('Q=%.6f л/с', [APoint.Q]);
   end;
 
 begin
@@ -3694,13 +3754,67 @@ begin
       Participant.SourceErrorPercent := SourcePoint.Error;
       Participant.SourcePauseSec := SourcePoint.Pause;
 
+      EtalonErrorPercent := SourcePoint.Error;
+      if not CalculatePointEtalonRange(TargetQLS, EtalonErrorPercent,
+        EtalonDeltaQ, PointMinQ, PointMaxQ) then
+        MergeReason := 'InvalidEtalonError'
+      else
+        MergeReason := '';
+      AddDiagnosticEvent(Format('SessionPointRange: DeviceUUID=%s; ChannelUUID=%s; SourcePointUUID=%s; SourcePointName=%s; SourceFlowRate=%.9f; PointQ=%.9f; EtalonErrorPercent=%.9f; EtalonDeltaQ=%.9f; PointMinQ=%.9f; PointMaxQ=%.9f',
+        [Device.UUID, Channel.UUID, SourcePoint.UUID, SourcePoint.Name,
+         SourcePoint.FlowRate, TargetQLS, EtalonErrorPercent, EtalonDeltaQ,
+         PointMinQ, PointMaxQ]));
+
       ExistingPoint := nil;
+      BestIntersectionDeltaQ := -MaxDouble;
+      BestDistance := MaxDouble;
       for SessionPoint in FPoints do
-        if Abs(SessionPoint.Q - TargetQLS) <= FlowMergeTolerance(SessionPoint.Q, TargetQLS) then
+      begin
+        if ParticipantExists(SessionPoint, Participant) then
         begin
-          ExistingPoint := SessionPoint;
-          Break;
+          Inc(DuplicateParticipantCount);
+          AddDiagnosticEvent(Format('SessionPointMergeCheck: SourcePointUUID=%s; CandidateSessionPointUUID=%s; CandidateSessionPointName=%s; CandidateQ=%.9f; CurrentCommonMinQ=%.9f; CurrentCommonMaxQ=%.9f; PointMinQ=%.9f; PointMaxQ=%.9f; NewCommonMinQ=0; NewCommonMaxQ=0; IntersectionDeltaQ=0; CurrentMinEtalonDeltaQ=%.9f; PointEtalonDeltaQ=%.9f; ControlEtalonDeltaQ=0; CanMerge=False; Reason=DuplicateParticipant',
+            [SourcePoint.UUID, SessionPoint.UUID, SessionPoint.Name, SessionPoint.Q,
+             SessionPoint.CommonMinQ, SessionPoint.CommonMaxQ, PointMinQ, PointMaxQ,
+             SessionPoint.MinEtalonDeltaQ, EtalonDeltaQ]));
+          Continue;
         end;
+        if MergeReason = 'InvalidEtalonError' then
+        begin
+          NewCommonMinQ := 0; NewCommonMaxQ := 0; IntersectionDeltaQ := 0; ControlEtalonDeltaQ := 0;
+          Reason := 'InvalidEtalonError';
+        end
+        else if TryCalculateMergedRange(SessionPoint, PointMinQ, PointMaxQ,
+          EtalonDeltaQ, NewCommonMinQ, NewCommonMaxQ, IntersectionDeltaQ,
+          ControlEtalonDeltaQ) then
+          Reason := 'MergedByCommonRange'
+        else if not SessionPoint.EtalonRangeValid then
+          Reason := 'InvalidEtalonError'
+        else if IntersectionDeltaQ < -FloatTolerance then
+          Reason := 'NoIntersection'
+        else if IntersectionDeltaQ <= FloatTolerance then
+          Reason := 'TouchOnly'
+        else
+          Reason := 'IntersectionNarrowerThanEtalonTolerance';
+        AddDiagnosticEvent(Format('SessionPointMergeCheck: SourcePointUUID=%s; CandidateSessionPointUUID=%s; CandidateSessionPointName=%s; CandidateQ=%.9f; CurrentCommonMinQ=%.9f; CurrentCommonMaxQ=%.9f; PointMinQ=%.9f; PointMaxQ=%.9f; NewCommonMinQ=%.9f; NewCommonMaxQ=%.9f; IntersectionDeltaQ=%.9f; CurrentMinEtalonDeltaQ=%.9f; PointEtalonDeltaQ=%.9f; ControlEtalonDeltaQ=%.9f; CanMerge=%s; Reason=%s',
+          [SourcePoint.UUID, SessionPoint.UUID, SessionPoint.Name, SessionPoint.Q,
+           SessionPoint.CommonMinQ, SessionPoint.CommonMaxQ, PointMinQ, PointMaxQ,
+           NewCommonMinQ, NewCommonMaxQ, IntersectionDeltaQ, SessionPoint.MinEtalonDeltaQ,
+           EtalonDeltaQ, ControlEtalonDeltaQ, BoolText(Reason = 'MergedByCommonRange'), Reason]));
+        if Reason = 'MergedByCommonRange' then
+        begin
+          CandidateDistance := Abs(SessionPoint.Q - TargetQLS);
+          if (ExistingPoint = nil) or
+             (IntersectionDeltaQ > BestIntersectionDeltaQ + FloatTolerance) or
+             (SameValue(IntersectionDeltaQ, BestIntersectionDeltaQ, FloatTolerance) and
+              (CandidateDistance < BestDistance - FloatTolerance)) then
+          begin
+            ExistingPoint := SessionPoint;
+            BestIntersectionDeltaQ := IntersectionDeltaQ;
+            BestDistance := CandidateDistance;
+          end;
+        end;
+      end;
 
       if ExistingPoint = nil then
       begin
@@ -3709,6 +3823,10 @@ begin
         SetLength(SessionPoint.Participants, 0);
         SessionPoint.SourcePointCount := 0;
         SessionPoint.Q := TargetQLS;
+        SessionPoint.CommonMinQ := PointMinQ;
+        SessionPoint.CommonMaxQ := PointMaxQ;
+        SessionPoint.MinEtalonDeltaQ := EtalonDeltaQ;
+        SessionPoint.EtalonRangeValid := MergeReason <> 'InvalidEtalonError';
         SessionPoint.DeviceUUID := '';
         SessionPoint.Status := mptsNone;
         SessionPoint.RepeatsCompleted := 0;
@@ -3719,28 +3837,31 @@ begin
         Inc(DeviceAddedParticipantCount);
         Inc(DeviceCreatedPointCount);
         Action := 'Created';
-        Reason := 'NewPhysicalPoint';
+        if MergeReason = 'InvalidEtalonError' then
+          Reason := MergeReason
+        else
+          Reason := 'NewPhysicalPoint';
       end
       else
       begin
         MergePointParams(ExistingPoint, SourcePoint);
-        if ParticipantExists(ExistingPoint, Participant) then
-        begin
-          Inc(DuplicateParticipantCount);
-          Action := 'Skipped';
-          Reason := 'DuplicateParticipant';
-        end
-        else
-        begin
-          AddParticipant(ExistingPoint, Participant);
-          Inc(DeviceAddedParticipantCount);
-          Inc(DeviceMergedParticipantCount);
-          Action := 'Merged';
-          Reason := 'MergedByAbsoluteQ';
-        end;
+        AddParticipant(ExistingPoint, Participant);
+        Inc(DeviceAddedParticipantCount);
+        Inc(DeviceMergedParticipantCount);
+        ExistingPoint.CommonMinQ := Max(ExistingPoint.CommonMinQ, PointMinQ);
+        ExistingPoint.CommonMaxQ := Min(ExistingPoint.CommonMaxQ, PointMaxQ);
+        ExistingPoint.MinEtalonDeltaQ := Min(ExistingPoint.MinEtalonDeltaQ, EtalonDeltaQ);
+        ExistingPoint.Q := (ExistingPoint.CommonMinQ + ExistingPoint.CommonMaxQ) / 2;
+        Action := 'Merged';
+        Reason := 'MergedByCommonRange';
         RefreshSessionPointParams(ExistingPoint);
         SessionPoint := ExistingPoint;
         MergeTolerance := FlowMergeTolerance(SessionPoint.Q, TargetQLS);
+        AddDiagnosticEvent(Format('SessionPointMerged: SessionPointUUID=%s; SessionPointName=%s; ParticipantCount=%d; CommonMinQ=%.9f; CommonMaxQ=%.9f; IntersectionWidthQ=%.9f; TargetQ=%.9f; MinEtalonDeltaQ=%.9f',
+          [SessionPoint.UUID, SessionPoint.Name, Length(SessionPoint.Participants),
+           SessionPoint.CommonMinQ, SessionPoint.CommonMaxQ,
+           SessionPoint.CommonMaxQ - SessionPoint.CommonMinQ, SessionPoint.Q,
+           SessionPoint.MinEtalonDeltaQ]));
       end;
 
       AddDiagnosticEvent(Format('SessionSourcePoint: DeviceUUID=%s; DeviceChannelUUID=%s; SourcePointUUID=%s; SourcePointName=%s; SourceFlowRate=%.9f; DeviceQmaxLS=%.6f; StoredPointQLS=%.6f; CalculatedTargetQLS=%.6f; DerivedQmaxLS=%.6f; SelectedTargetQLS=%.6f; MatchedSessionPointUUID=%s; MatchedSessionPointQLS=%.6f; MergeToleranceLS=%.9f; Action=%s; Reason=%s',
@@ -3806,8 +3927,9 @@ begin
 
   for I := 0 to FPoints.Count - 1 do
     for J := 0 to High(FPoints[I].Participants) do
-      if Abs(FPoints[I].Participants[J].SelectedSourceTargetQLS - FPoints[I].Q) >
-         FlowMergeTolerance(FPoints[I].Participants[J].SelectedSourceTargetQLS, FPoints[I].Q) then
+      if FPoints[I].EtalonRangeValid and
+         ((FPoints[I].Q < FPoints[I].CommonMinQ - FloatTolerance) or
+          (FPoints[I].Q > FPoints[I].CommonMaxQ + FloatTolerance)) then
         Inc(LostSourcePointCount);
 
   AddDiagnosticEvent(Format('CreateSessionSummary: TotalDeviceChannelCount=%d; EnabledDeviceChannelCount=%d; DisabledDeviceChannelCount=%d; ResolvedUniqueDeviceCount=%d; DistinctDeviceQmaxCount=%d; ProcessingDeviceCount=%d; ProcessingDevicePointCount=%d; SessionPointCount=%d; ParticipantCount=%d; UniqueParticipantCount=%d; DuplicateParticipantCount=%d; LostSourcePointCount=%d',
