@@ -1,4 +1,4 @@
-object FrameCalibrCoefs: TFrameCalibrCoefs
+﻿object FrameCalibrCoefs: TFrameCalibrCoefs
   Size.Width = 907.000000000000000000
   Size.Height = 651.000000000000000000
   Size.PlatformDefault = False
@@ -212,52 +212,26 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
         Size.Height = 242.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
-        object ChartCoefs: TChart
-          Foot.Font.StyleExt = {00040000000200000004000000}
-          Legend.Title.Font.StyleExt = {00070000000000000004000000}
-          Legend.Visible = False
-          SubFoot.Font.StyleExt = {00040000000200000004000000}
-          Title.Text.Strings = (
-            'TChart')
-          View3D = False
-          View3DOptions.Orthogonal = False
-          Zoom.Brush.Kind = None
-          Zoom.Pen.Fill.Color = claSilver
+        object ChartCoefs: TSimpleChart
           Align = Client
-          TabOrder = 0
-          Cursor = crCross
           Size.Width = 907.000000000000000000
           Size.Height = 242.000000000000000000
           Size.PlatformDefault = False
-          ColorPaletteIndex = 13
-          object Series1: TFastLineSeries
-            HoverElement = []
-            Cursor = crArrow
-            Depth = 3
-            Marks.Transparency = 100
-            Marks.Visible = True
-            Marks.Margins.Units = maPixels
-            Marks.Style = smsLabel
-            Marks.Angle = 5
-            Marks.BackColor = xFF808026
-            Marks.Callout.ArrowHead = ahLine
-            Marks.Callout.Distance = 1
-            Marks.DrawEvery = 4
-            Marks.Symbol.Brush.Color = x00D68C8C
-            Marks.Symbol.Emboss.Visible = True
-            Marks.Symbol.Transparency = 44
-            Marks.Symbol.Visible = True
-            Marks.Tail.Visible = True
-            Marks.Color = xFF808026
-            SeriesColor = xFFA6B9DB
-            LinePen.Color = x00FFFFFF
-            LinePen.Width = 4.651162624359131000
-            LinePen.EndStyle = esRound
-            XValues.Name = 'X'
-            XValues.Order = loAscending
-            YValues.Name = 'Y'
-            YValues.Order = loNone
-          end
+          XMax = 100.000000000000000000
+          YMax = 100.000000000000000000
+          LineColor = xFFA6B9DB
+          LineThickness = 4.500000000000000000
+          ShowMarkers = True
+          MarkerRadius = 3.000000000000000000
+          GridColor = xFFCCCCCC
+          AxisColor = claBlack
+          BackgroundColor = claWhite
+          MarginLeft = 55.000000000000000000
+          MarginRight = 20.000000000000000000
+          MarginTop = 20.000000000000000000
+          MarginBottom = 50.000000000000000000
+          XTitleOffset = 5.000000000000000000
+          YTitleOffset = 40.000000000000000000
         end
       end
     end
