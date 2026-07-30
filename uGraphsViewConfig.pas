@@ -8,7 +8,9 @@ uses
   System.UITypes;
 
 type
-  TGraphLayoutKind = (glSingle, glTwoRows, glTwoColumns, glGrid2x2);
+  TGraphLayoutKind = (glSingle, glTwoRows, glTwoColumns, glThreePanels,
+    glGrid2x2);
+  TGraphAutoScaleMode = (gasWorkingValues, gasAllSeries, gasTargetTolerance);
   TGraphSourceKind = (gskFlow, gskTemperature, gskPressure, gskMass,
     gskVolume, gskCustomMeterValue);
   TGraphSeriesOwnerKind = (gsokEtalon, gsokDevice, gsokWorkTable, gsokSystem);
@@ -36,6 +38,8 @@ type
     Title: string;
     ShowTarget: Boolean;
     ShowTolerance: Boolean;
+    ShowLegend: Boolean;
+    AutoScaleMode: TGraphAutoScaleMode;
     constructor Create(const ATitle: string);
     destructor Destroy; override;
     function FindSeries(const ASeries: TGraphSeriesConfig): TGraphSeriesConfig;
@@ -70,7 +74,7 @@ end;
 
 function TGraphSeriesConfig.SourceIdentity: string;
 begin
-  Result := Format('%d|%d|%s|%s', [Ord(OwnerKind), Ord(SourceKind),
+  Result := Format('%d|%d|%d|%s|%s', [GraphIndex, Ord(OwnerKind), Ord(SourceKind),
     LowerCase(Trim(ChannelUUID)), LowerCase(Trim(MeterValueKey))]);
 end;
 
@@ -80,6 +84,8 @@ begin
   Title := ATitle;
   ShowTarget := True;
   ShowTolerance := True;
+  ShowLegend := True;
+  AutoScaleMode := gasWorkingValues;
   FSeries := TObjectList<TGraphSeriesConfig>.Create(True);
 end;
 
