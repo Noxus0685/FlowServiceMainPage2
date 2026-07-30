@@ -17,6 +17,7 @@ uses
   System.IniFiles,
   System.Generics.Collections,
   System.IOUtils,
+  System.StrUtils,
   System.SysUtils,
   System.UITypes,
   uProtocols,
@@ -79,6 +80,9 @@ constructor TFrameProtocol.Create(AOwner: TComponent);
 var
   BtnExport: TSpeedButton;
   BtnCopy: TSpeedButton;
+  ActiveWorkTable: TWorkTable;
+  SimulationModeText: string;
+  EffectiveSimulationText: string;
 begin
   inherited;
   FMessages := TObjectList<TProtocolMessage>.Create(True);
@@ -116,10 +120,21 @@ begin
     end;
 
   ProtocolManager.Subscribe(FListener);
+  ActiveWorkTable := nil;
+  if WorkTableManager <> nil then
+    ActiveWorkTable := WorkTableManager.ActiveWorkTable;
+  SimulationModeText := 'False';
+  EffectiveSimulationText := 'False';
+  if ActiveWorkTable <> nil then
+  begin
+    SimulationModeText := IfThen(ActiveWorkTable.IsSimulationMode, 'True', 'False');
+    EffectiveSimulationText := IfThen(ActiveWorkTable.SimulationActive, 'True', 'False');
+  end;
   ProtocolManager.AddMessage(pcInfo, psEngine, 'ApplicationVersion',
     'Версия программы',
-    Format('Version=%s; Executable=%s; BuildDate=; GitCommit=; SimulationMode=False',
-      [APP_VERSION, ExpandFileName(ParamStr(0))]));
+    Format('Version=%s; Executable=%s; BuildDate=; GitCommit=; SimulationMode=%s; EffectiveSimulationActive=%s',
+      [APP_VERSION, ExpandFileName(ParamStr(0)), SimulationModeText,
+       EffectiveSimulationText]));
 end;
 
 
@@ -255,11 +270,25 @@ var
   I: Integer;
   FileName: string;
   Item: TListBoxItem;
+  ActiveWorkTable: TWorkTable;
+  SimulationModeText: string;
+  EffectiveSimulationText: string;
 begin
   Lines := TStringList.Create;
   try
-    Lines.Add(Format('ApplicationVersion | Версия программы | Version=%s; Executable=%s; BuildDate=; GitCommit=; SimulationMode=False',
-      [APP_VERSION, ExpandFileName(ParamStr(0))]));
+    ActiveWorkTable := nil;
+    if WorkTableManager <> nil then
+      ActiveWorkTable := WorkTableManager.ActiveWorkTable;
+    SimulationModeText := 'False';
+    EffectiveSimulationText := 'False';
+    if ActiveWorkTable <> nil then
+    begin
+      SimulationModeText := IfThen(ActiveWorkTable.IsSimulationMode, 'True', 'False');
+      EffectiveSimulationText := IfThen(ActiveWorkTable.SimulationActive, 'True', 'False');
+    end;
+    Lines.Add(Format('ApplicationVersion | Версия программы | Version=%s; Executable=%s; BuildDate=; GitCommit=; SimulationMode=%s; EffectiveSimulationActive=%s',
+      [APP_VERSION, ExpandFileName(ParamStr(0)), SimulationModeText,
+       EffectiveSimulationText]));
     for I := 0 to ListBoxProtocol.Count - 1 do
       if ListBoxProtocol.ItemByIndex(I) is TListBoxItem then
       begin

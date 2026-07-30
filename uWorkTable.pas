@@ -500,6 +500,9 @@ type
     FSimulationLastFlowRejectReason: string;
     FSimulationLastNoiseMs: Int64;
     FSimulationLastFlowOutcomeMs: Int64;
+    FSimulationStateInitialized: Boolean;
+    FLastEffectiveSimulationActive: Boolean;
+    FLastDiagnosticIsSimulationMode: Boolean;
     FSimulationLastFlowUnitsLogTarget: Double;
     FSimulationTargetFlowBase: Double;
     FDeviceSimulationFlowRate: Double;
@@ -854,6 +857,7 @@ type
     procedure FireEvent(AEvent: TWorkTableEvent; const AMsg: String ); overload;
     procedure FireEvent(AEvent: TWorkTableEvent); overload;
     procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
+    function GetSimulationActive: Boolean;
 
   public
 
@@ -885,6 +889,7 @@ type
   procedure SaveMeasurementResults;
 
   property IsSimulationMode: Boolean read FIsSimulationMode write FIsSimulationMode;
+  property SimulationActive: Boolean read GetSimulationActive;
 
   end;
 
@@ -2105,6 +2110,9 @@ begin
   FSimulationLastFlowRejectReason := '';
   FSimulationLastNoiseMs := 0;
   FSimulationLastFlowOutcomeMs := 0;
+  FSimulationStateInitialized := False;
+  FLastEffectiveSimulationActive := False;
+  FLastDiagnosticIsSimulationMode := False;
   FSimulationLastFlowUnitsLogTarget := 0;
   FSimulationTargetFlowBase := 0;
   FDeviceSimulationFlowRate := 0;
@@ -2506,6 +2514,34 @@ begin
     Result := FlowRate.Value.Value
   else
     Result := FlowRate.Min;
+end;
+
+function TWorkTable.GetSimulationActive: Boolean;
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  Result := False;
+  if (FlowRate = nil) or (not FlowRate.IsRunning) then
+    Exit;
+
+  { This is the same channel eligibility used by the active ramp/noise
+    generator.  IsSimulationMode belongs to the automated test scenario and
+    is intentionally not an independent gate for simple channel simulation. }
+  for I := 0 to FEtalonChannels.Count - 1 do
+  begin
+    Channel := FEtalonChannels[I];
+    if (Channel <> nil) and Channel.Enabled and (Channel.State <> osDeleted) and
+       (Channel.FlowMeter <> nil) and (Channel.FlowMeter.Device <> nil) then
+      Exit(True);
+  end;
+  for I := 0 to FDeviceChannels.Count - 1 do
+  begin
+    Channel := FDeviceChannels[I];
+    if (Channel <> nil) and Channel.Enabled and (Channel.State <> osDeleted) and
+       (Channel.FlowMeter <> nil) and (Channel.FlowMeter.Device <> nil) then
+      Exit(True);
+  end;
 end;
 
 function TWorkTable.GetValueTempertureAfter: TMeterValue;
@@ -6852,6 +6888,36 @@ procedure TWorkTableManager.UpdateSimulation;
  HasLimits: Boolean;
  LimitReached: Boolean;   // Флаг: достигнут хотя бы один критерий остановки
 
+procedure LogSimulationState(const AWorkTable: TWorkTable; const ASource: string);
+var
+  CurrentActive: Boolean;
+  PreviousText: string;
+begin
+  if AWorkTable = nil then
+    Exit;
+  CurrentActive := AWorkTable.SimulationActive;
+  if AWorkTable.FSimulationStateInitialized and
+     (CurrentActive = AWorkTable.FLastEffectiveSimulationActive) and
+     (AWorkTable.IsSimulationMode = AWorkTable.FLastDiagnosticIsSimulationMode) then
+    Exit;
+
+  if AWorkTable.FSimulationStateInitialized then
+    PreviousText := IfThen(AWorkTable.FLastEffectiveSimulationActive, 'True', 'False')
+  else
+    PreviousText := 'Unknown';
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcState, psWorkTable,
+      'SimulationStateChanged', 'Simulation state changed',
+      Format('Version=%s; Previous=%s; Current=%s; Source=%s; ChannelSimulationEnabled=%s; IsSimulationMode=%s; EffectiveSimulationActive=%s',
+        [APP_VERSION, PreviousText, IfThen(CurrentActive, 'True', 'False'),
+         ASource, IfThen(CurrentActive, 'True', 'False'),
+         IfThen(AWorkTable.IsSimulationMode, 'True', 'False'),
+         IfThen(CurrentActive, 'True', 'False')]));
+  AWorkTable.FSimulationStateInitialized := True;
+  AWorkTable.FLastEffectiveSimulationActive := CurrentActive;
+  AWorkTable.FLastDiagnosticIsSimulationMode := AWorkTable.IsSimulationMode;
+end;
+
 
 function PressureRandomAroundBase(const ABaseValue: Double;
   const ARelativeDeviation: Double): Double;
@@ -7226,6 +7292,16 @@ var
 begin
   if (AChannel = nil) or AChannel.SimulationRampActive then
     Exit;
+  if (AWorkTable = nil) or (not AWorkTable.SimulationActive) then
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcError, psWorkTable,
+        'SimulationStateMismatch', 'Simulation noise state mismatch',
+        Format('Version=%s; EffectiveSimulationActive=False; IsSimulationMode=%s',
+          [APP_VERSION, IfThen((AWorkTable <> nil) and AWorkTable.IsSimulationMode,
+            'True', 'False')]));
+    Exit;
+  end;
 
   TargetImpSec := AChannel.SimulationTargetImpSec;
   if TargetImpSec <= 0 then
@@ -7423,14 +7499,15 @@ begin
   if ProtocolManager <> nil then
     ProtocolManager.AddMessage(pcState, psWorkTable, 'SimulationFlowApplyEnter',
       'Simulation flow apply entered',
-      Format('Version=%s; IsSimulationMode=%s; WorkTablePtr=%s; FlowRatePtr=%s; FlowValuePtr=%s; EnabledEtalonCount=%d; CurrentStage=%s; StabilityDataStartMs=%d',
+      Format('Version=%s; IsSimulationMode=%s; EffectiveSimulationActive=%s; WorkTablePtr=%s; FlowRatePtr=%s; FlowValuePtr=%s; EnabledEtalonCount=%d; CurrentStage=%s; StabilityDataStartMs=%d',
         [APP_VERSION, IfThen(AWorkTable.IsSimulationMode, 'True', 'False'),
+         IfThen(AWorkTable.SimulationActive, 'True', 'False'),
          PointerText(AWorkTable), PointerText(FlowRatePtr), PointerText(TargetValue),
          ASourceChannelCount, CurrentStage, StabilityDataStartMs]));
 
-  if not AWorkTable.IsSimulationMode then
+  if not AWorkTable.SimulationActive then
   begin
-    Reject('SimulationModeFalse');
+    Reject('SimulationInactive');
     Exit;
   end;
   if AWorkTable.FlowRate = nil then
@@ -7778,6 +7855,22 @@ begin
   end;
   if not AWorkTable.FlowRate.IsRunning then
     Exit;
+  if not AWorkTable.SimulationActive then
+    Exit;
+
+  MonotonicNowMs := TMeterValue.GetMonotonicTimeMs;
+  if (AWorkTable.SimulationLastNoiseMs > 0) and
+     (AWorkTable.SimulationLastNoiseMs > AWorkTable.SimulationLastFlowOutcomeMs) and
+     (MonotonicNowMs - AWorkTable.SimulationLastNoiseMs >= 2000) then
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcError, psWorkTable,
+        'SimulationFlowSampleNotCalled', 'Simulation flow integration watchdog',
+        Format('Version=%s; LastSimulationNoiseMs=%d; LastFlowOutcomeMs=%d',
+          [APP_VERSION, AWorkTable.SimulationLastNoiseMs,
+           AWorkTable.SimulationLastFlowOutcomeMs]));
+    AWorkTable.SimulationLastFlowOutcomeMs := MonotonicNowMs;
+  end;
 
   MonotonicNowMs := TMeterValue.GetMonotonicTimeMs;
   if (AWorkTable.SimulationLastNoiseMs > 0) and
@@ -7954,6 +8047,7 @@ begin
 
      for WorkTable in WorkTableManager.WorkTables do
    begin
+  LogSimulationState(WorkTable, 'UpdateSimulationCycle');
 
   // ============================================================
   // 2. Эмуляция физического процесса (стенд)
