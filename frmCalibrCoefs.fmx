@@ -1,4 +1,4 @@
-﻿object FrameCalibrCoefs: TFrameCalibrCoefs
+object FrameCalibrCoefs: TFrameCalibrCoefs
   Size.Width = 907.000000000000000000
   Size.Height = 651.000000000000000000
   Size.PlatformDefault = False
@@ -214,9 +214,6 @@
         TabOrder = 1
         object ChartCoefs: TSimpleChart
           Align = Client
-          Size.Width = 907.000000000000000000
-          Size.Height = 242.000000000000000000
-          Size.PlatformDefault = False
           XMax = 100.000000000000000000
           YMax = 100.000000000000000000
           LineColor = xFFA6B9DB

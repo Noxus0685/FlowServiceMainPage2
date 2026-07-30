@@ -1,4 +1,4 @@
-﻿object FormMeterValues: TFormMeterValues
+object FormMeterValues: TFormMeterValues
   Left = 0
   Top = 0
   Caption = #1053#1072#1089#1090#1088#1086#1081#1082#1080' '#1084#1077#1090#1088#1086#1083#1086#1075#1080#1095#1077#1089#1082#1080#1093' '#1074#1077#1083#1080#1095#1080#1085
@@ -4698,8 +4698,8 @@
                   Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
                   OnSelChanged = StringGridCoefsDataSelChanged
                   OnEditingDone = StringGridCoefsDataEditingDone
-                  Viewport.Width = 880.000000000000000000
-                  Viewport.Height = 193.000000000000000000
+                  Viewport.Width = 860.000000000000000000
+                  Viewport.Height = 152.000000000000000000
                   object CheckColumn1: TCheckColumn
                     HeaderSettings.TextSettings.WordWrap = False
                   end
@@ -4876,8 +4876,8 @@
                   TabOrder = 0
                   RowCount = 20
                   Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
-                  Viewport.Width = 880.000000000000000000
-                  Viewport.Height = 193.000000000000000000
+                  Viewport.Width = 860.000000000000000000
+                  Viewport.Height = 152.000000000000000000
                   object CheckColumn2: TCheckColumn
                     HeaderSettings.TextSettings.WordWrap = False
                   end
@@ -5195,9 +5195,6 @@
             end
             object Chart1: TSimpleChart
               Align = Client
-              Size.Width = 880.000000000000000000
-              Size.Height = 278.000000000000000000
-              Size.PlatformDefault = False
               XMax = 100.000000000000000000
               YMax = 100.000000000000000000
               LineColor = claBlue
@@ -5250,8 +5247,8 @@
           RowCount = 20
           Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = StringGridDimensionsSelChanged
-          Viewport.Width = 896.000000000000000000
-          Viewport.Height = 193.000000000000000000
+          Viewport.Width = 876.000000000000000000
+          Viewport.Height = 168.000000000000000000
           object StringColumn8: TStringColumn
             Header = #8470
             HeaderSettings.TextSettings.WordWrap = False
@@ -5562,8 +5559,8 @@
           RowCount = 20
           Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = StringGridValuesListSelChanged
-          Viewport.Width = 896.000000000000000000
-          Viewport.Height = 399.000000000000000000
+          Viewport.Width = 876.000000000000000000
+          Viewport.Height = 358.000000000000000000
           object StringColumnNum: TStringColumn
             Header = #8470
             HeaderSettings.TextSettings.WordWrap = False
