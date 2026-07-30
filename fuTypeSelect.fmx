@@ -597,7 +597,7 @@ object FormTypeSelect: TFormTypeSelect
       OnClick = mpCollapseAllClick
     end
     object mpRefresh: TMenuItem
-      Text = #1054#1073#1085#1086#1074#1080#1090#1100
+      Text = 'Action1'
     end
     object MenuItem8: TMenuItem
       Action = actTypeCopy
@@ -685,6 +685,9 @@ object FormTypeSelect: TFormTypeSelect
     object aRefreshRepository: TAction
       Text = #1054#1073#1085#1086#1074#1080#1090#1100
       OnExecute = aRefreshRepositoryExecute
+    end
+    object Action1: TAction
+      Text = 'Action1'
     end
   end
   object NetHTTPClient1: TNetHTTPClient
