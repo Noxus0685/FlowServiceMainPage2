@@ -7034,14 +7034,29 @@ end;
 
 procedure TFrameMainTable.GraphViewMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+var
+  ScreenPoint: TPointF;
 begin
   if not (Sender is TControl) then Exit;
   FGraphPopupIndex := TControl(Sender).Tag;
   FGraphPopupMouse := PointF(X, Y);
-  if Button = mbRight then
+  if Button = TMouseButton.mbRight then
   begin
     FSelectedGraphIndex := FGraphPopupIndex;
     RebuildSelectedGraphLegend;
+    { FMX does not consistently invoke an assigned PopupMenu for TSimpleChart
+      and its styled children.  Open the menu explicitly at the mouse point;
+      OnPopup will rebuild it for this exact graph before it is displayed. }
+    if (FGraphViews <> nil) and
+       (FGraphPopupIndex >= 0) and
+       (FGraphPopupIndex < FGraphViews.Count) and
+       (FGraphViews[FGraphPopupIndex] <> nil) and
+       (FGraphViews[FGraphPopupIndex].PopupMenu <> nil) then
+    begin
+      ScreenPoint := TControl(Sender).LocalToScreen(PointF(X, Y));
+      FGraphViews[FGraphPopupIndex].PopupMenu.Popup(ScreenPoint.X,
+        ScreenPoint.Y);
+    end;
   end;
 end;
 

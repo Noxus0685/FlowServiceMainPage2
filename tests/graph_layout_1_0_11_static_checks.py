@@ -44,6 +44,9 @@ def test_context_menu_commands_mouse_binding_and_audit_events():
         assert f"View.{control}.OnMouseDown := GraphViewMouseDown;" in FRAME
     for event in ("GraphContextMenuOpened", "GraphSeriesAdded", "GraphSeriesRemoved", "GraphSeriesMoved"):
         assert event in FRAME
+    assert "if Button = TMouseButton.mbRight then" in FRAME
+    assert "ScreenPoint := TControl(Sender).LocalToScreen(PointF(X, Y));" in FRAME
+    assert "FGraphViews[FGraphPopupIndex].PopupMenu.Popup(ScreenPoint.X," in FRAME
 
 
 def test_visual_series_share_samples_but_keep_local_state():
