@@ -519,6 +519,7 @@ type
     property PreparedPointsMode: EMeasurementRunMode read FPreparedPointsMode;
 
     property Stage: EMeasurementState read FCurrentStage;
+    property StabilityDataStartMs: Int64 read FStabilityDataStartMs;
     property SaveConfirmationResult: TSaveConfirmationResult
       read FSaveConfirmationResult;
 
