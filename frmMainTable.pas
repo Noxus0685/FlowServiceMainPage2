@@ -784,6 +784,8 @@ type
     FInitializingGraphs: Boolean;
     FRenderingGraphViews: Boolean;
     FGraphRenderQueued: Boolean;
+    FGraphRenderTimer: TTimer;
+    FDestroying: Boolean;
   FFrameMeasurementRun: TFrameMeasurementRun;
   FFrameMRResults: TFrameMRResults;
   FFrameProtocol: TFrameProtocol;
@@ -889,8 +891,10 @@ type
     procedure ApplyGraphsLayout;
     procedure EnsureGraphViewCount(const ACount: Integer);
     procedure ClearGraphsLayout;
+    procedure DetachGraphViewEvents;
     procedure RenderGraphViews;
     procedure QueueRenderGraphViews;
+    procedure GraphRenderTimerTimer(Sender: TObject);
     procedure RenderConfiguredGraph(AView: TGraphPanelView);
     procedure GraphViewClick(Sender: TObject);
     procedure GraphPopupMenuPopup(Sender: TObject);
@@ -1159,7 +1163,7 @@ constructor TGraphPanelView.Create(AOwner: TComponent; AParent: TFmxObject;
 begin
   inherited Create;
   GraphIndex := AGraphIndex;
-  Root := TLayout.Create(AOwner);
+  Root := TLayout.Create(nil);
   Root.Parent := AParent;
   Root.Align := TAlignLayout.None;
   Root.Padding.Rect := RectF(4, 4, 4, 4);
@@ -1168,7 +1172,7 @@ begin
   Header.Parent := Root;
   Header.Align := TAlignLayout.Top;
   Header.Height := 32;
-  TitleLabel := TLabel.Create(Header);
+  TitleLabel := TLabel.Create(Root);
   TitleLabel.Parent := Header;
   TitleLabel.Align := TAlignLayout.Client;
   TitleLabel.Text := Format('График %d', [GraphIndex + 1]);
@@ -1179,7 +1183,7 @@ begin
   LegendHost.Align := TAlignLayout.Bottom;
   LegendHost.Height := 0;
   LegendHost.Visible := False;
-  LegendLayout := TFlowLayout.Create(LegendHost);
+  LegendLayout := TFlowLayout.Create(Root);
   LegendLayout.Parent := LegendHost;
   LegendLayout.Align := TAlignLayout.Client;
   LegendLayout.FlowDirection := TFlowDirection.LeftToRight;
@@ -1200,14 +1204,26 @@ begin
     'Добавьте серию через правую кнопку мыши.';
   EmptyLabel.TextSettings.HorzAlign := TTextAlign.Center;
 
-  PopupMenu := TPopupMenu.Create(AOwner);
+  PopupMenu := TPopupMenu.Create(Root);
   Root.PopupMenu := PopupMenu;
 end;
 
 destructor TGraphPanelView.Destroy;
 begin
-  PopupMenu.Free;
-  Root.Free;
+  if Root <> nil then
+  begin
+    Root.PopupMenu := nil;
+    Root.Free;
+    Root := nil;
+  end;
+
+  PopupMenu := nil;
+  Header := nil;
+  TitleLabel := nil;
+  Chart := nil;
+  EmptyLabel := nil;
+  LegendHost := nil;
+  LegendLayout := nil;
   inherited;
 end;
 
@@ -1329,14 +1345,38 @@ begin
 end;
 
 destructor TFrameMainTable.Destroy;
+var
+  View: TGraphPanelView;
 begin
+  FDestroying := True;
   FGraphRenderQueued := False;
+
+  if FGraphRenderTimer <> nil then
+  begin
+    FGraphRenderTimer.Enabled := False;
+    FGraphRenderTimer.OnTimer := nil;
+  end;
+  FreeAndNil(FGraphRenderTimer);
+
   if FStabilitySampleTimer <> nil then
+  begin
     FStabilitySampleTimer.Enabled := False;
+    FStabilitySampleTimer.OnTimer := nil;
+  end;
   FreeAndNil(FStabilitySampleTimer);
-  FreeAndNil(FGraphViews);
+
+  DetachGraphViewEvents;
+  if FGraphViews <> nil then
+    for View in FGraphViews do
+      if (View <> nil) and (View.Root <> nil) then
+      begin
+        View.Root.Align := TAlignLayout.None;
+        View.Root.Parent := nil;
+      end;
+
   FreeAndNil(FGraphSplitters);
   FreeAndNil(FGraphLayoutContainers);
+  FreeAndNil(FGraphViews);
   FreeAndNil(FFlowGraphHistory);
   FreeAndNil(FGraphsViewConfig);
   FreeAndNil(FFrameMeasurementRun);
@@ -6788,6 +6828,36 @@ begin
   FGraphLayoutContainers.Clear;
 end;
 
+procedure TFrameMainTable.DetachGraphViewEvents;
+var
+  View: TGraphPanelView;
+begin
+  if FGraphViews = nil then
+    Exit;
+
+  for View in FGraphViews do
+  begin
+    if View = nil then
+      Continue;
+
+    if View.Root <> nil then
+    begin
+      View.Root.OnClick := nil;
+      View.Root.PopupMenu := nil;
+    end;
+    if View.Header <> nil then
+      View.Header.OnClick := nil;
+    if View.TitleLabel <> nil then
+      View.TitleLabel.OnClick := nil;
+    if View.Chart <> nil then
+      View.Chart.OnClick := nil;
+    if View.LegendHost <> nil then
+      View.LegendHost.OnClick := nil;
+    if View.PopupMenu <> nil then
+      View.PopupMenu.OnPopup := nil;
+  end;
+end;
+
 procedure TFrameMainTable.GraphViewClick(Sender: TObject);
 var
   I: Integer;
@@ -6988,19 +7058,29 @@ end;
 
 procedure TFrameMainTable.QueueRenderGraphViews;
 begin
-  if FInitializingGraphs or FGraphRenderQueued then
+  if FDestroying or FInitializingGraphs or FGraphRenderQueued then
     Exit;
+
+  if FGraphRenderTimer = nil then
+  begin
+    FGraphRenderTimer := TTimer.Create(Self);
+    FGraphRenderTimer.Enabled := False;
+    FGraphRenderTimer.Interval := 1;
+    FGraphRenderTimer.OnTimer := GraphRenderTimerTimer;
+  end;
+
   FGraphRenderQueued := True;
-  TThread.ForceQueue(
-    nil,
-    procedure
-    begin
-      FGraphRenderQueued := False;
-      if csDestroying in ComponentState then
-        Exit;
-      RenderGraphViews;
-    end
-  );
+  FGraphRenderTimer.Enabled := True;
+end;
+
+procedure TFrameMainTable.GraphRenderTimerTimer(Sender: TObject);
+begin
+  if FGraphRenderTimer <> nil then
+    FGraphRenderTimer.Enabled := False;
+  FGraphRenderQueued := False;
+  if FDestroying or (csDestroying in ComponentState) then
+    Exit;
+  RenderGraphViews;
 end;
 
 procedure TFrameMainTable.RenderConfiguredGraph(AView: TGraphPanelView);

@@ -1208,7 +1208,7 @@ begin
   FStabilitySettings.MinSampleCount := 10;
   FStabilitySettings.MinWindowDurationSec := 10.0;
   FStabilitySettings.SampleSize := 20;
-  FStabilitySettings.MinimumSampleIntervalSec := 0;
+  FStabilitySettings.MinimumSampleIntervalSec := 0.8;
   FStabilitySettings.MaxSampleAgeSec := 20.0;
   FStabilitySettings.MaxVariation := 0.0;
   FStabilitySettings.MaxStdDeviation := 0.0;
