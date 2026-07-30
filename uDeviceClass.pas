@@ -1518,9 +1518,12 @@ begin
     end;
 
   FCalibrCoefTable.Clear;
-  if ASource.FCalibrCoefTable <> nil then
-    for Table in ASource.FCalibrCoefTable do
+  { Калибровочные таблицы нужны рабочей копии прибора в редакторе, но
+    переносятся только при полном копировании с сохранением UUID. }
+  if FullAssign and (ASource.CalibrCoefTables <> nil) then
+    for Table in ASource.CalibrCoefTables do
       if Table <> nil then
+        { Clone создаёт независимые глубокие копии таблицы и всех её элементов. }
         FCalibrCoefTable.Add(Table.Clone);
 
   { ============================= }
