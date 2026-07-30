@@ -1,4 +1,4 @@
-object FormMeterValues: TFormMeterValues
+﻿object FormMeterValues: TFormMeterValues
   Left = 0
   Top = 0
   Caption = #1053#1072#1089#1090#1088#1086#1081#1082#1080' '#1084#1077#1090#1088#1086#1083#1086#1075#1080#1095#1077#1089#1082#1080#1093' '#1074#1077#1083#1080#1095#1080#1085
@@ -5193,20 +5193,26 @@ object FormMeterValues: TFormMeterValues
                 TabOrder = 2
               end
             end
-            object Chart1: TChart
-              Foot.Font.StyleExt = {00040000000200000004000000}
-              Legend.Title.Font.StyleExt = {00070000000000000004000000}
-              SubFoot.Font.StyleExt = {00040000000200000004000000}
-              Title.Text.Strings = (
-                'TChart')
-              Zoom.Brush.Kind = None
-              Zoom.Pen.Fill.Color = claSilver
+            object Chart1: TSimpleChart
               Align = Client
-              TabOrder = 1
               Size.Width = 880.000000000000000000
               Size.Height = 278.000000000000000000
               Size.PlatformDefault = False
-              ColorPaletteIndex = 13
+              XMax = 100.000000000000000000
+              YMax = 100.000000000000000000
+              LineColor = claBlue
+              LineThickness = 2.000000000000000000
+              ShowMarkers = True
+              MarkerRadius = 3.000000000000000000
+              GridColor = xFFCCCCCC
+              AxisColor = claBlack
+              BackgroundColor = claWhite
+              MarginLeft = 40.000000000000000000
+              MarginRight = 20.000000000000000000
+              MarginTop = 40.000000000000000000
+              MarginBottom = 40.000000000000000000
+              XTitleOffset = 5.000000000000000000
+              YTitleOffset = 30.000000000000000000
             end
           end
         end

@@ -15,10 +15,7 @@ uses
   FMX.ScrollBox,
   FMX.StdCtrls,
   FMX.Types,
-  FMXTee.Chart,
-  FMXTee.Engine,
-  FMXTee.Procs,
-  FMXTee.Series,
+  FMX.SimpleChart,
   System.Classes,
   System.DateUtils,
   System.Generics.Collections,
@@ -55,14 +52,13 @@ type
     LayoutGraph: TLayout;
     Layout3: TLayout;
     Layout4: TLayout;
-    ChartCoefs: TChart;
+    ChartCoefs: TSimpleChart;
     ComboBox1: TComboBox;
     LabelCoefTable: TLabel;
     ComboBoxCoefTable: TComboBox;
     StringColumnCoefNum: TStringColumn;
     SpeedButtonCoefGetPoints:
     TSpeedButton;
-    Series1: TFastLineSeries;
     ComboBoxUnitsCoefs: TComboBox;
     ToolBar2: TToolBar;
     LabelCoefType: TLabel;
@@ -100,9 +96,6 @@ type
 
     FCurrentSpillages : TObjectList<TPointSpillage>;
 
-    FSeriesInitError: TLineSeries;
-    FSeriesCalcError: TLineSeries;
-    FSeriesMarkers: TPointSeries;
     FUpdatingUI: Boolean;
 
     function GetCurrentItem(ARow: Integer): TCalibrCoefItem;
@@ -117,7 +110,6 @@ type
     procedure RecalculateCurrentTable;
     procedure SetCurrentSpillages(ASpillages: TObjectList<TPointSpillage>);
 
-    procedure EnsureChartSeries;
     procedure FillCoefTypes;
     procedure FillCoefTables;
     procedure FillUnits;
@@ -167,7 +159,6 @@ begin
   SpeedButtonCoefsRefresh.OnClick := SpeedButtonCoefsRefreshClick;
   SpeedButtonCoefGetPoints.OnClick := SpeedButtonCoefGetPointsClick;
 
-  EnsureChartSeries;
   FillCoefTypes;
 end;
 
@@ -551,35 +542,6 @@ begin
   GridCoefs.Repaint;
 end;
 
-procedure TFrameCalibrCoefs.EnsureChartSeries;
-begin
-  if FSeriesInitError = nil then
-  begin
-    FSeriesInitError := TLineSeries.Create(ChartCoefs);
-    FSeriesInitError.Title := 'Погрешность исх, %';
-    FSeriesInitError.ParentChart := ChartCoefs;
-  end;
-
-  if FSeriesCalcError = nil then
-  begin
-    FSeriesCalcError := TLineSeries.Create(ChartCoefs);
-    FSeriesCalcError.Title := 'Погрешность расч, %';
-    FSeriesCalcError.ParentChart := ChartCoefs;
-  end;
-
-   if FSeriesMarkers = nil then
-  begin
-    FSeriesMarkers := TPointSeries.Create(Self);
-    FSeriesMarkers.ParentChart := ChartCoefs;
-    FSeriesMarkers.Title := 'Точки';
-
-    FSeriesMarkers.Pointer.Visible := True;
-    FSeriesMarkers.Pointer.Style := psCircle;
-    FSeriesMarkers.Pointer.HorizSize := 6;
-    FSeriesMarkers.Pointer.VertSize := 6;
-  end;
-end;
-
 function TFrameCalibrCoefs.InitErrorPercent(AItem: TCalibrCoefItem): Double;
 begin
   if (AItem = nil) or SameValue(AItem.Value, 0, 1E-12) then
@@ -647,16 +609,14 @@ end;
 procedure TFrameCalibrCoefs.UpdateChart;
 var
   Item: TCalibrCoefItem;
-  I : integer;
   X: Double;
   MinX, MaxX: Double;
   MinY, MaxY: Double;
   InitErr, CalcErr: Double;
   DX, DY: Double;
-  FirstX, LastX: Double;
-  FirstInitErr, LastInitErr: Double;
-  FirstCalcErr, LastCalcErr: Double;
   HasFirst: Boolean;
+  InitErrorSeries: TChartSeries;
+  CalcErrorSeries: TChartSeries;
 
 
 
@@ -723,30 +683,27 @@ begin
   end;
 
 begin
-  EnsureChartSeries;
-
-  FSeriesInitError.Clear;
-  FSeriesCalcError.Clear;
-  FSeriesMarkers.Clear;
-
-  FSeriesInitError.Pointer.Visible := True;
-  FSeriesCalcError.Pointer.Visible := True;
-
-  ChartCoefs.Legend.Visible := True;
-  ChartCoefs.BottomAxis.Title.Visible := True;
-  ChartCoefs.LeftAxis.Title.Visible := True;
-
-ChartCoefs.BottomAxis.Title.Caption := BuildAxisTitle(FValueCorrection, 'Q');
-  ChartCoefs.LeftAxis.Title.Caption := 'Погрешность, %';
+  ChartCoefs.BeginUpdate;
+  ChartCoefs.ClearAllSeries;
+  ChartCoefs.XTitle := BuildAxisTitle(FValueCorrection, 'Q');
+  ChartCoefs.YTitle := 'Погрешность, %';
 
   if (FCurrentTable = nil) or (FCurrentTable.Items = nil) or (FCurrentTable.Items.Count = 0) then
   begin
-    ChartCoefs.BottomAxis.Automatic := True;
-   // ChartCoefs.BottomAxis.SetMinMax(0, 1);
-    ChartCoefs.LeftAxis.Automatic := True;
-   /// ChartCoefs.LeftAxis.SetMinMax(-1, 1);
+    ChartCoefs.AutoRangeX := True;
+    ChartCoefs.AutoRangeY := True;
+    ChartCoefs.EndUpdate;
     Exit;
   end;
+
+  InitErrorSeries := ChartCoefs.AddSeries('Погрешность исх, %');
+  InitErrorSeries.Color := $FFA6B9DB;
+  InitErrorSeries.Thickness := 4.5;
+  InitErrorSeries.ShowMarkers := True;
+  CalcErrorSeries := ChartCoefs.AddSeries('Погрешность расч, %');
+  CalcErrorSeries.Color := $FF2E86C1;
+  CalcErrorSeries.Thickness := 2.5;
+  CalcErrorSeries.ShowMarkers := True;
 
   MinX :=  1.0E300;
   MaxX := -1.0E300;
@@ -754,13 +711,9 @@ ChartCoefs.BottomAxis.Title.Caption := BuildAxisTitle(FValueCorrection, 'Q');
   MaxY := -1.0E300;
   HasFirst := False;
 
-  I := 0;
-
-
   for Item in FCurrentTable.Items do
   begin
-   // Inc(I);
-    if (Item = nil){ or (I=1) }then
+    if Item = nil then
       Continue;
 
 
@@ -769,10 +722,8 @@ ChartCoefs.BottomAxis.Title.Caption := BuildAxisTitle(FValueCorrection, 'Q');
     InitErr := InitErrorPercent(Item);
     CalcErr := CalcErrorPercent(Item);
 
-    FSeriesInitError.AddXY(X, InitErr);
-
-
-    FSeriesCalcError.AddXY(X, CalcErr);
+    InitErrorSeries.AddPoint(X, InitErr);
+    CalcErrorSeries.AddPoint(X, CalcErr);
 
 
     UpdateBounds(X, InitErr);
@@ -781,20 +732,14 @@ ChartCoefs.BottomAxis.Title.Caption := BuildAxisTitle(FValueCorrection, 'Q');
 
 
     if not HasFirst then
-    begin
-      FirstX := X;
-      FirstInitErr := InitErr;
-      FirstCalcErr := CalcErr;
       HasFirst := True;
-    end;
-
-    LastX := X;
-    LastInitErr := InitErr;
-    LastCalcErr := CalcErr;
   end;
 
   if not HasFirst then
+  begin
+    ChartCoefs.EndUpdate;
     Exit;
+  end;
 
   DX := (MaxX - MinX) * 0.1;
   if DX <= 0 then
@@ -804,16 +749,14 @@ ChartCoefs.BottomAxis.Title.Caption := BuildAxisTitle(FValueCorrection, 'Q');
   if DY <= 0 then
     DY := 1;
 
-  { хвосты }
- // FSeriesInitError.AddXY(MaxX + DX * 2, LastInitErr);
- // FSeriesCalcError.AddXY(MaxX + DX * 2, LastCalcErr);
-
   { показываем видимую область чуть уже, чем все данные серии }
-  ChartCoefs.BottomAxis.Automatic := False;
-  ChartCoefs.BottomAxis.SetMinMax(MinX - DX, MaxX + DX);
-
-  ChartCoefs.LeftAxis.Automatic := False;
-  ChartCoefs.LeftAxis.SetMinMax(MinY- DY/10, MaxY + DY);
+  ChartCoefs.AutoRangeX := False;
+  ChartCoefs.XMin := MinX - DX;
+  ChartCoefs.XMax := MaxX + DX;
+  ChartCoefs.AutoRangeY := False;
+  ChartCoefs.YMin := MinY - DY / 10;
+  ChartCoefs.YMax := MaxY + DY;
+  ChartCoefs.EndUpdate;
 end;
 
 procedure TFrameCalibrCoefs.SetCurrentTable(ATable: TCalibrCoefTable);

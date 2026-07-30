@@ -17,9 +17,7 @@ uses
   FMX.StdCtrls,
   FMX.TabControl,
   FMX.Types,
-  FMXTee.Chart,
-  FMXTee.Engine,
-  FMXTee.Procs,
+  FMX.SimpleChart,
   System.Classes,
   System.Generics.Collections,
   System.Rtti,
@@ -80,7 +78,7 @@ type
     StringColumn16: TStringColumn;
     StringColumn17: TStringColumn;
     StringColumn18: TStringColumn;
-    Chart1: TChart;
+    Chart1: TSimpleChart;
     CheckBoxIsToSave: TCheckBox;
     EditHash: TEdit;
     TabItem4: TTabItem;
