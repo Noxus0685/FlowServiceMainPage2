@@ -14,6 +14,9 @@ def read(name: str) -> str:
     return (ROOT / name).read_text(encoding="utf-8-sig")
 
 
+SIMPLE_CHART = read("Components/FP/FMX.SimpleChart.pas")
+
+
 def test_active_forms_no_longer_reference_teechart():
     for unit_name in ACTIVE_FORMS:
         pas = read(f"{unit_name}.pas")
@@ -46,3 +49,12 @@ def test_calibration_chart_uses_simple_chart_series_api():
     assert "TFastLineSeries" not in source
     assert "TLineSeries" not in source
     assert "TPointSeries" not in source
+
+
+def test_simple_chart_is_registered_for_runtime_fmx_streaming():
+    assert "initialization" in SIMPLE_CHART
+    registrations = (
+        "RegisterFmxClasses([TSimpleChart]);",
+        "RegisterClass(TSimpleChart);",
+    )
+    assert sum(registration in SIMPLE_CHART for registration in registrations) == 1
