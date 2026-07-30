@@ -1613,17 +1613,14 @@ function TFormDeviceEditor.GetCalibrCoefTableCaption(
   ATable: TCalibrCoefTable): string;
 var
   TypeCaption: string;
+  TableType: TCalibrCoefTableType;
 begin
   if ATable = nil then
     Exit('');
 
-  if not (ATable.&Type in [Ord(cctReference), Ord(cctMeterValueCoef),
-    Ord(cctMeterValueFlowRate), Ord(cctMeterValueQuantity),
-    Ord(cctMeterValueDensity), Ord(cctDeviceCoefCorrection),
-    Ord(cctDeviceFlowRateCorrection), Ord(cctDeviceQuantityCorrection),
-    Ord(cctDeviceDensityCorrection)]) then
+  if not TryCalibrCoefTableType(ATable.&Type, TableType) then
     TypeCaption := 'Неизвестный тип: ' + IntToStr(ATable.&Type)
-  else case TCalibrCoefTableType(ATable.&Type) of
+  else case TableType of
     cctReference: TypeCaption := 'Справочная таблица';
     cctMeterValueCoef: TypeCaption := 'Коэффициент прибора';
     cctMeterValueFlowRate: TypeCaption := 'Расход';

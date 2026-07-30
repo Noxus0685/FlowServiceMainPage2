@@ -4646,7 +4646,6 @@ begin
       // Correction tables of type cctMeterValueCoef belong to the active
       // coefficient value, not to ValueFlow.  Open the settings form on the
       // exact runtime TMeterValue which was populated from the device table.
-      WorkTable.DeviceChannels[Row].FlowMeter.RefreshCorrectionTables;
       MV := WorkTable.DeviceChannels[Row].FlowMeter.ValueCoef;
       if MV = nil then
         MV := WorkTable.DeviceChannels[Row].FlowMeter.ValueFlow;

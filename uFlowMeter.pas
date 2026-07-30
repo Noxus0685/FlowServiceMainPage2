@@ -603,7 +603,11 @@ begin
   FlowMax := FDevice.Qmax;
   FlowMin := FDevice.Qmin;
   MeterFlowCategory := ResolveStdCategoryFromDevice;
-  UpdateByDevice;
+  // During Init the device is attached before its runtime TMeterValue objects
+  // exist.  Defer correction binding to InitAllValues in that case, otherwise
+  // the same table produces several misleading errors for one load operation.
+  if (ValueMassCoef <> nil) and (ValueVolumeCoef <> nil) then
+    UpdateByDevice;
 end;
 
 procedure TFlowMeter.AddDataPoint(const APoint: TPointSpillage);
@@ -1806,15 +1810,14 @@ var
   Item: TCalibrCoefItem;
   CoefItem: TCoef;
   TableType: TCalibrCoefTableType;
+  EnumName: string;
   TargetValue: TMeterValue;
   TargetField: string;
 begin
   if ATable = nil then
     Exit;
 
-  if not (ATable.&Type in [Ord(cctMeterValueCoef),
-    Ord(cctMeterValueFlowRate), Ord(cctMeterValueQuantity),
-    Ord(cctMeterValueDensity)]) then
+  if not TryCalibrCoefTableType(ATable.&Type, TableType) then
   begin
     if ProtocolManager <> nil then
       ProtocolManager.AddMessage(pcError, psEngine,
@@ -1841,14 +1844,13 @@ begin
           [DeviceUUID, ATable.DeviceUUID, ATable.UUID]));
     Exit;
   end;
-  TableType := TCalibrCoefTableType(ATable.&Type);
-
   if (not ATable.Active) or
      (ATable.Items = nil) then
     Exit;
 
   TargetValue := nil;
   TargetField := '';
+  EnumName := CalibrCoefTableTypeName(TableType);
   case TableType of
     cctMeterValueCoef:
       if (ValueCoef <> nil) and (ValueCoef.DependenceType = INDEPENDENT) then
@@ -1872,6 +1874,23 @@ begin
         TargetField := 'ValueDensity';
       end;
   end;
+
+  if TargetField = '' then
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcError, psEngine,
+        'DeviceCorrectionTableBindingError', 'Ошибка привязки таблицы коррекции',
+        Format('Reason=UnknownTableType; DeviceUUID=%s; TableUUID=%s; RawTableType=%d; EnumName=%s',
+          [DeviceUUID, ATable.UUID, ATable.&Type, EnumName]));
+    Exit;
+  end;
+
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcInfo, psEngine,
+      'DeviceCorrectionTableTypeResolved', 'Распознан тип таблицы коррекции',
+      Format('DeviceUUID=%s; TableUUID=%s; RawTableType=%d; EnumName=%s; ' +
+        'EnumOrdinal=%d; TargetField=%s', [DeviceUUID, ATable.UUID,
+         ATable.&Type, EnumName, Ord(TableType), TargetField]));
 
   if TargetValue = nil then
   begin
@@ -1904,16 +1923,17 @@ begin
   if ProtocolManager <> nil then
     ProtocolManager.AddMessage(pcInfo, psEngine, 'DeviceCorrectionTableBound',
       'Таблица коррекции привязана к метрологической величине',
-      Format('DeviceUUID=%s; MeterValueHash=%s; MeterValuePtr=%p; TableUUID=%s; ' +
-        'TableType=%d; TargetField=%s; TargetTablePtr=%p; PointCount=%d; SameInstance=True',
-        [DeviceUUID, TargetValue.Hash, Pointer(TargetValue), ATable.UUID,
-         ATable.&Type, TargetField, Pointer(ATable), ATable.Items.Count]));
+      Format('DeviceUUID=%s; MeterValuePtr=%p; TableUUID=%s; RawTableType=%d; ' +
+        'EnumName=%s; TargetField=%s; TargetTablePtr=%p; PointCount=%d; SameInstance=True',
+        [DeviceUUID, Pointer(TargetValue), ATable.UUID, ATable.&Type, EnumName,
+         TargetField, Pointer(ATable), ATable.Items.Count]));
 end;
 
 procedure TFlowMeter.ApplyCalibrCoefsToValues;
 var
   Table: TCalibrCoefTable;
   BoundTypes: TList<Integer>;
+  ResolvedType: TCalibrCoefTableType;
 begin
   if ValueCoef <> nil then
     ValueCoef.Coefs.Clear;
@@ -1943,9 +1963,12 @@ begin
       end;
       ApplyCalibrCoefsToValue(Table);
       if (Table <> nil) and Table.Active and
-         (Table.&Type in [Ord(cctMeterValueCoef), Ord(cctMeterValueFlowRate),
-          Ord(cctMeterValueQuantity), Ord(cctMeterValueDensity)]) then
-        BoundTypes.Add(Table.&Type);
+         TryCalibrCoefTableType(Table.&Type, ResolvedType) then
+        case ResolvedType of
+          cctMeterValueCoef, cctMeterValueFlowRate,
+          cctMeterValueQuantity, cctMeterValueDensity:
+            BoundTypes.Add(Table.&Type);
+        end;
     end;
   finally
     BoundTypes.Free;

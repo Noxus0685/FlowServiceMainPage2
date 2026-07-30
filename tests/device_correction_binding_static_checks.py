@@ -11,10 +11,14 @@ main = (ROOT / "frmMainTable.pas").read_text(encoding="utf-8-sig")
 version = (ROOT / "uAppVersion.pas").read_text(encoding="utf-8-sig")
 
 
-assert "cctMeterValueCoef = 0" in device
-assert "APP_VERSION = '1.0.5'" in version
+assert "cctMeterValueCoef = 1" in device
+assert "TryCalibrCoefTableType" in device
+assert "Ord(Low(TCalibrCoefTableType))" in device
+assert "Ord(High(TCalibrCoefTableType))" in device
+assert "APP_VERSION = '1.0.6'" in version
 assert "RefreshCorrectionTables" in flow
 assert "DeviceCorrectionTableBound" in flow
+assert "DeviceCorrectionTableTypeResolved" in flow
 for field in ("ValueCoef", "ValueFlow", "ValueQuantity", "ValueDensity"):
     assert f"TargetField := '{field}'" in flow
 assert "SameInstance=True" in flow
