@@ -73,7 +73,6 @@ type
     StringColumnValidityDate: TStringColumn;
     StringColumnVerificationMethod: TStringColumn;
     StringColumnAccuracyClass: TStringColumn;
-    StringTemp: TStringColumn;
     EditFindType: TEdit;
     sbFind: TSpeedButton;
     lyt1: TLayout;
@@ -141,7 +140,7 @@ type
     MenuItem8: TMenuItem;
     MenuItem9: TMenuItem;
     MenuItem10: TMenuItem;
-    sbClearDate: TSpeedButton;
+    Action1: TAction;
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -1450,8 +1449,6 @@ begin
   else if ACol = StringColumnAccuracyClass.Index then
     Value := T.AccuracyClass
 
-  else if ACol = StringTemp.Index then
-    Value := T.Temp
 
   else if ACol = StringColumnReestrNumber.Index then
     Value := T.ReestrNumber
