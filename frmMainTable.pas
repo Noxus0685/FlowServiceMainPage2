@@ -1002,6 +1002,8 @@ type
     procedure RestoreInstrumentalLayoutsByFlags(const AFlowRateVisible, APumpVisible,
       AMainVisible, AMesureVisible, AConditionsVisible, AProceduresVisible: Boolean;
       const AOrder: string = '');
+  protected
+    procedure BeforeDestruction; override;
   public
     procedure AttachGraphsTo(AParent: TFmxObject);
     { Public declarations }
@@ -1213,6 +1215,7 @@ begin
   if Root <> nil then
   begin
     Root.PopupMenu := nil;
+    Root.Parent := nil;
     Root.Free;
     Root := nil;
   end;
@@ -1344,9 +1347,58 @@ begin
     end;
 end;
 
-destructor TFrameMainTable.Destroy;
+procedure TFrameMainTable.BeforeDestruction;
 var
   View: TGraphPanelView;
+begin
+  FDestroying := True;
+  FGraphRenderQueued := False;
+
+  if FGraphRenderTimer <> nil then
+  begin
+    FGraphRenderTimer.Enabled := False;
+    FGraphRenderTimer.OnTimer := nil;
+  end;
+
+  if FStabilitySampleTimer <> nil then
+  begin
+    FStabilitySampleTimer.Enabled := False;
+    FStabilitySampleTimer.OnTimer := nil;
+  end;
+
+  if FGraphViews <> nil then
+    for View in FGraphViews do
+    begin
+      if View = nil then
+        Continue;
+
+      if View.Root <> nil then
+      begin
+        View.Root.OnClick := nil;
+        View.Root.PopupMenu := nil;
+        View.Root.Parent := nil;
+      end;
+
+      if View.Header <> nil then
+        View.Header.OnClick := nil;
+
+      if View.TitleLabel <> nil then
+        View.TitleLabel.OnClick := nil;
+
+      if View.Chart <> nil then
+        View.Chart.OnClick := nil;
+
+      if View.LegendHost <> nil then
+        View.LegendHost.OnClick := nil;
+
+      if View.PopupMenu <> nil then
+        View.PopupMenu.OnPopup := nil;
+    end;
+
+  inherited;
+end;
+
+destructor TFrameMainTable.Destroy;
 begin
   FDestroying := True;
   FGraphRenderQueued := False;
@@ -1365,15 +1417,6 @@ begin
   end;
   FreeAndNil(FStabilitySampleTimer);
 
-  DetachGraphViewEvents;
-  if FGraphViews <> nil then
-    for View in FGraphViews do
-      if (View <> nil) and (View.Root <> nil) then
-      begin
-        View.Root.Align := TAlignLayout.None;
-        View.Root.Parent := nil;
-      end;
-
   FreeAndNil(FGraphSplitters);
   FreeAndNil(FGraphLayoutContainers);
   FreeAndNil(FGraphViews);
@@ -1387,7 +1430,7 @@ begin
   FreeAndNil(FFrameWorkTableProperties);
   FreeAndNil(FDeviceClipboard.Snapshot);
   FreeAndNil(FEtalonClipboard.Snapshot);
-  FInstrumentalVisibleOrder.Free;
+  FreeAndNil(FInstrumentalVisibleOrder);
   inherited;
 end;
 
@@ -6459,6 +6502,13 @@ begin
     FGraphSplitters := TObjectList<TSplitter>.Create(True);
   if FGraphLayoutContainers = nil then
     FGraphLayoutContainers := TObjectList<TLayout>.Create(True);
+  if FGraphRenderTimer = nil then
+  begin
+    FGraphRenderTimer := TTimer.Create(Self);
+    FGraphRenderTimer.Enabled := False;
+    FGraphRenderTimer.Interval := 1;
+    FGraphRenderTimer.OnTimer := GraphRenderTimerTimer;
+  end;
   FInitializingGraphs := True;
   try
     FSelectedGraphIndex := 0;
@@ -7058,23 +7108,28 @@ end;
 
 procedure TFrameMainTable.QueueRenderGraphViews;
 begin
-  if FDestroying or FInitializingGraphs or FGraphRenderQueued then
+  if FDestroying or
+     FInitializingGraphs or
+     FGraphRenderQueued then
     Exit;
 
   if FGraphRenderTimer = nil then
-  begin
-    FGraphRenderTimer := TTimer.Create(Self);
-    FGraphRenderTimer.Enabled := False;
-    FGraphRenderTimer.Interval := 1;
-    FGraphRenderTimer.OnTimer := GraphRenderTimerTimer;
-  end;
+    Exit;
 
   FGraphRenderQueued := True;
+  FGraphRenderTimer.Enabled := False;
   FGraphRenderTimer.Enabled := True;
 end;
 
 procedure TFrameMainTable.GraphRenderTimerTimer(Sender: TObject);
 begin
+  if FDestroying then
+  begin
+    if FGraphRenderTimer <> nil then
+      FGraphRenderTimer.Enabled := False;
+    Exit;
+  end;
+
   if FGraphRenderTimer <> nil then
     FGraphRenderTimer.Enabled := False;
   FGraphRenderQueued := False;
@@ -7135,6 +7190,9 @@ procedure TFrameMainTable.RenderGraphViews;
 var
   I, Count: Integer;
 begin
+  if FDestroying then
+    Exit;
+
   if FRenderingGraphViews then
     Exit;
   if (FGraphViews = nil) or (FGraphsViewConfig = nil) then
