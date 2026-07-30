@@ -91,7 +91,8 @@ type
     procedure TrimStabilityHistory;
     /// <summary>Clears last analysis and runtime confirmation flags without touching settings.</summary>
     procedure ResetStabilityInfo;
-    function AddSampleLocked(const AValue: Double; const ATimeStampMs: Int64): Boolean;
+    function AddStabilitySample(const AValue: Double; const ATimeStampMs: Int64;
+      const ASource: TMeterValueSampleSource): Boolean;
     /// <summary>Adds a physical-value sample with an externally provided monotonic timestamp.</summary>
     procedure AddSample(const AValue: Double; const ATimeStampMs: Int64); overload;
     function FindDimIndex(const AName: string): Integer;
@@ -1281,16 +1282,18 @@ begin
   FVirtualClockEnabled := False;
 end;
 
-function TMeterValue.AddSampleLocked(const AValue: Double;
-  const ATimeStampMs: Int64): Boolean;
+function TMeterValue.AddStabilitySample(const AValue: Double;
+  const ATimeStampMs: Int64;
+  const ASource: TMeterValueSampleSource): Boolean;
 var
   Sample: TMeterValueSample;
   LastTimeStampMs: Int64;
+  MinimumIntervalMs: Int64;
 begin
   Result := False;
 
-  Sample.Value := AValue;
-  Sample.TimeStampMs := ATimeStampMs;
+  if IsNan(AValue) or IsInfinite(AValue) then
+    Exit;
 
   if FSamples.Count > 0 then
   begin
@@ -1311,10 +1314,53 @@ procedure TMeterValue.AddSample(const AValue: Double; const ATimeStampMs: Int64)
 begin
   FSampleLock.Enter;
   try
-    AddSampleLocked(AValue, ATimeStampMs);
+    if ASource = mssAutomatic then
+    begin
+      if not FStabilitySettings.Enabled then
+        Exit;
+
+      MinimumIntervalMs := Round(Max(0.0,
+        FStabilitySettings.MinimumSampleIntervalSec) * 1000.0);
+      if (MinimumIntervalMs > 0) and
+         (FLastAutomaticStabilitySampleMs > 0) and
+         (ATimeStampMs >= FLastAutomaticStabilitySampleMs) and
+         (ATimeStampMs - FLastAutomaticStabilitySampleMs < MinimumIntervalMs) then
+        Exit;
+    end;
+
+    Sample.Value := AValue;
+    Sample.TimeStampMs := ATimeStampMs;
+
+    if FSamples.Count > 0 then
+    begin
+      LastTimeStampMs := FSamples[FSamples.Count - 1].TimeStampMs;
+      if Sample.TimeStampMs < LastTimeStampMs then
+        Exit;
+      if Sample.TimeStampMs = LastTimeStampMs then
+      begin
+        if ASource = mssAutomatic then
+          Exit;
+        Inc(Sample.TimeStampMs);
+      end;
+    end;
+
+    if FActiveStabilityStartMs <= 0 then
+      FActiveStabilityStartMs := Sample.TimeStampMs;
+    FSamples.Add(Sample);
+    TrimStabilityHistory;
+
+    if ASource = mssAutomatic then
+      FLastAutomaticStabilitySampleMs := ATimeStampMs;
+
+    Result := True;
   finally
     FSampleLock.Leave;
   end;
+end;
+
+procedure TMeterValue.AddSample(const AValue: Double; const ATimeStampMs: Int64);
+begin
+  AddStabilitySample(AValue, ATimeStampMs, mssManual);
 end;
 
 procedure TMeterValue.AddCurrentStabilitySample;
@@ -1322,23 +1368,7 @@ var
   CurrentTimeMs: Int64;
   MinimumIntervalMs: Int64;
 begin
-  FSampleLock.Enter;
-  try
-    if not FStabilitySettings.Enabled then
-      Exit;
-    CurrentTimeMs := GetMonotonicTimeMs;
-    MinimumIntervalMs := Round(Max(0.0,
-      FStabilitySettings.MinimumSampleIntervalSec) * 1000.0);
-    if (MinimumIntervalMs > 0) and
-       (FLastAutomaticStabilitySampleMs > 0) and
-       (CurrentTimeMs >= FLastAutomaticStabilitySampleMs) and
-       (CurrentTimeMs - FLastAutomaticStabilitySampleMs < MinimumIntervalMs) then
-      Exit;
-    if AddSampleLocked(Value, CurrentTimeMs) then
-      FLastAutomaticStabilitySampleMs := CurrentTimeMs;
-  finally
-    FSampleLock.Leave;
-  end;
+  AddStabilitySample(Value, GetMonotonicTimeMs, mssAutomatic);
 end;
 
 procedure TMeterValue.ClearSamplesHistory;
@@ -1386,18 +1416,22 @@ begin
       if FSamples[I].TimeStampMs = ATimeStampMs then
       begin
         FSamples[I] := Sample;
-                ResetStabilityInfo;
+        ResetStabilityInfo;
         Exit(True);
       end;
-
-    I := 0;
-    while (I < FSamples.Count) and (FSamples[I].TimeStampMs < ATimeStampMs) do
-      Inc(I);
-    FSamples.Insert(I, Sample);
-    ResetStabilityInfo;
-    Result := True;
   finally
     FSampleLock.Leave;
+  end;
+
+  Result := AddStabilitySample(AValue, ATimeStampMs, mssManual);
+  if Result then
+  begin
+    FSampleLock.Enter;
+    try
+      ResetStabilityInfo;
+    finally
+      FSampleLock.Leave;
+    end;
   end;
 end;
 

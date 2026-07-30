@@ -26,33 +26,54 @@ def test_automatic_sampling_is_atomic_monotonic_and_separate_from_manual_samplin
     automatic = body("AddCurrentStabilitySample")
     manual = body("AddSample")
     assert "FLastAutomaticStabilitySampleMs: Int64;" in METER
-    assert re.search(r"function AddSampleLocked\s*\([^)]*\)\s*:\s*Boolean;", METER, re.S)
-    assert "if not FStabilitySettings.Enabled then" in automatic
-    assert "CurrentTimeMs := GetMonotonicTimeMs;" in automatic
-    assert "MinimumIntervalMs := Round(Max(0.0," in automatic
-    assert "if AddSampleLocked(Value, CurrentTimeMs) then" in automatic
-    assert automatic.index("if AddSampleLocked(Value, CurrentTimeMs) then") < automatic.index("FLastAutomaticStabilitySampleMs := CurrentTimeMs;")
+    assert "TMeterValueSampleSource = (" in BASE
+    assert "mssAutomatic" in BASE and "mssManual" in BASE
+    assert "AddSampleLocked" not in METER
+    assert re.search(r"function AddStabilitySample\s*\([^)]*\)\s*:\s*Boolean;", METER, re.S)
+    assert "AddStabilitySample(Value, GetMonotonicTimeMs, mssAutomatic);" in automatic
+    assert "FSampleLock" not in automatic
+    assert "AddStabilitySample(AValue, ATimeStampMs, mssManual);" in manual
+    assert "FSampleLock" not in manual
     assert "SampleCountBefore" not in METER
     assert "FSamples.Count > SampleCountBefore" not in METER
-    assert "AddSampleLocked(AValue, ATimeStampMs);" in manual
-    assert "MinimumSampleIntervalSec" not in manual
-    assert "FLastAutomaticStabilitySampleMs" not in manual
 
 
-def test_locked_addition_explicitly_reports_success_even_after_history_trim():
+def test_unified_addition_handles_source_interval_duplicates_and_history_trim():
     match = re.search(
-        r"function TMeterValue\.AddSampleLocked\b.*?\nbegin\n(.*?)\nend;",
+        r"function TMeterValue\.AddStabilitySample\b(.*?)\nprocedure TMeterValue\.AddSample",
         METER,
         re.S,
     )
     assert match
-    locked = match.group(1)
-    assert "Result := False;" in locked
-    assert "if Sample.TimeStampMs < LastTimeStampMs then\n      Exit;" in locked
-    add_index = locked.index("FSamples.Add(Sample);")
-    trim_index = locked.index("TrimStabilityHistory;")
-    success_index = locked.index("Result := True;")
+    unified = match.group(1)
+    assert "Result := False;" in unified
+    assert "if IsNan(AValue) or IsInfinite(AValue) then" in unified
+    assert "FSampleLock.Enter;" in unified and "FSampleLock.Leave;" in unified
+    assert "if not FStabilitySettings.Enabled then" in unified
+    assert "MinimumIntervalMs := Round(Max(0.0," in unified
+    assert "if Sample.TimeStampMs < LastTimeStampMs then\n        Exit;" in unified
+    duplicate = re.search(
+        r"if Sample\.TimeStampMs = LastTimeStampMs then\s*begin\s*"
+        r"if ASource = mssAutomatic then\s*Exit;\s*Inc\(Sample\.TimeStampMs\);",
+        unified,
+        re.S,
+    )
+    assert duplicate
+    assert "FLastAutomaticStabilitySampleMs := ATimeStampMs;" in unified
+    add_index = unified.index("FSamples.Add(Sample);")
+    trim_index = unified.index("TrimStabilityHistory;")
+    success_index = unified.index("Result := True;")
     assert add_index < trim_index < success_index
+
+
+def test_special_manual_entry_uses_unified_method_for_new_samples():
+    match = re.search(
+        r"function TMeterValue\.AddStabilitySampleManual\b(.*?)\nfunction TMeterValue\.UpdateStabilitySampleValue",
+        METER,
+        re.S,
+    )
+    assert match
+    assert "Result := AddStabilitySample(AValue, ATimeStampMs, mssManual);" in match.group(1)
 
 
 def test_full_history_clears_reset_automatic_timestamp_but_analysis_reset_does_not():
