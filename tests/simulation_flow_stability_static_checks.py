@@ -13,6 +13,8 @@ assert 'SimulationFlowSample' in work_table
 assert 'DIAGNOSTIC_INTERVAL_MS = 2000' in work_table
 assert 'TMeterValue.GetMonotonicTimeMs' in work_table
 assert 'SimulationTargetValue.ApplyGeneratedValue' in work_table
+assert 'BoolToStr(SameObject, True)' not in work_table
+assert "IfThen(SameObject, 'True', 'False')" in work_table
 assert 'function TMeterValue.ApplyGeneratedValue' in meter_value
 assert 'SetValue(AValue);' in meter_value
 assert 'AddStabilitySample(Value, ASampleTimeMs, mssAutomatic)' in meter_value

@@ -7433,9 +7433,9 @@ begin
       Format('GeneratedValue=%.6f AppliedValue=%.6f SampleTimeMs=%d WorkTableFlowValuePtr=%s SimulationTargetValuePtr=%s SameObject=%s SampleCount=%d FirstSampleMs=%d LastSampleMs=%d CurrentStage=%s StabilityDataStartMs=%d FreshAfterStageStart=%s',
         [AGeneratedValue, SimulationTargetValue.GetDoubleValue, SampleTimeMs,
          PointerText(WorkTableFlowValue), PointerText(SimulationTargetValue),
-         BoolToStr(SameObject, True), Length(Samples), FirstSampleMs, LastSampleMs,
+         IfThen(SameObject, 'True', 'False'), Length(Samples), FirstSampleMs, LastSampleMs,
          CurrentStage, StabilityDataStartMs,
-         BoolToStr((LastSampleMs > StabilityDataStartMs), True)]));
+         IfThen(LastSampleMs > StabilityDataStartMs, 'True', 'False')]));
 end;
 
 function GetChannelDeviceNameForLog(const AChannel: TChannel): string;
