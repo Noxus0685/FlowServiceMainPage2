@@ -27,7 +27,10 @@ uses
   System.Variants,
   frmMeterValueEditFrame,
   uMeterValue,
-  uDebugLog;
+  uDebugLog,
+  uDeviceClass,
+  uFlowMeter,
+  uProtocols;
 
 type
   TFormMeterValues = class(TForm)
@@ -159,6 +162,12 @@ type
     procedure RefreshLayoutCoefs;
     procedure ApplyFilter;
     procedure UpdateGridDevices;
+    function FindOwnerFlowMeter: TFlowMeter;
+    function FindTableForValue(AFlowMeter: TFlowMeter; AValue: TMeterValue;
+      out ASourceField: string): TCalibrCoefTable;
+    procedure LogCorrectionTabOpened;
+    procedure LogCorrectionGridFilled(const AGridName: string;
+      AVisibleRowCount: Integer);
   public
     MeterValue: TMeterValue;
     procedure UpdateLayoutCommonSettings;
@@ -277,6 +286,8 @@ begin
     UpdateStringGridCoefs;
     UpdateLayoutCoefs;
     UpdateLayoutValuesList;
+    if TabControlMeterValueSettings.TabIndex = 1 then
+      LogCorrectionTabOpened;
   end;
 end;
 
@@ -362,6 +373,7 @@ begin
 
   StringGridCoefsData.Tag := 1;
   StringGridCoefsData.Row := Index;
+  LogCorrectionGridFilled('Данные для расчёта', StringGridCoefsData.RowCount);
 end;
 
 procedure TFormMeterValues.UpdateStringGridCoefs;
@@ -388,6 +400,7 @@ begin
   finally
     StringGridCoefs.EndUpdate;
   end;
+  LogCorrectionGridFilled('Коэффициенты диапазонов', StringGridCoefs.RowCount);
 end;
 
 procedure TFormMeterValues.AddRowButtonClick(Sender: TObject);
@@ -498,12 +511,119 @@ begin
       end;
     1:
       begin
+        LogCorrectionTabOpened;
         UpdateStringGridCoefsData;
         UpdateStringGridCoefs;
       end;
     2: UpdateStringGridDimensions;
     4: EnsureMeterValueEditFrame;
   end;
+end;
+
+function TFormMeterValues.FindOwnerFlowMeter: TFlowMeter;
+var
+  FlowMeter: TFlowMeter;
+begin
+  Result := nil;
+  if (MeterValue = nil) or (TFlowMeter.FlowMeters = nil) then
+    Exit;
+  for FlowMeter in TFlowMeter.FlowMeters do
+    if (FlowMeter <> nil) and
+       ((FlowMeter.ValueCoef = MeterValue) or (FlowMeter.ValueFlow = MeterValue) or
+        (FlowMeter.ValueQuantity = MeterValue) or
+        (FlowMeter.ValueDensity = MeterValue)) then
+      Exit(FlowMeter);
+end;
+
+function TFormMeterValues.FindTableForValue(AFlowMeter: TFlowMeter;
+  AValue: TMeterValue; out ASourceField: string): TCalibrCoefTable;
+var
+  Table: TCalibrCoefTable;
+  RequiredType: TCalibrCoefTableType;
+begin
+  Result := nil;
+  ASourceField := '';
+  if (AFlowMeter = nil) or (AFlowMeter.Device = nil) or (AValue = nil) then
+    Exit;
+  if AFlowMeter.ValueCoef = AValue then
+  begin ASourceField := 'ValueCoef'; RequiredType := cctMeterValueCoef; end
+  else if AFlowMeter.ValueFlow = AValue then
+  begin ASourceField := 'ValueFlow'; RequiredType := cctMeterValueFlowRate; end
+  else if AFlowMeter.ValueQuantity = AValue then
+  begin ASourceField := 'ValueQuantity'; RequiredType := cctMeterValueQuantity; end
+  else if AFlowMeter.ValueDensity = AValue then
+  begin ASourceField := 'ValueDensity'; RequiredType := cctMeterValueDensity; end
+  else
+    Exit;
+  for Table in AFlowMeter.Device.CalibrCoefTables do
+    if (Table <> nil) and Table.Active and
+       (Table.&Type = Ord(RequiredType)) then
+      Exit(Table);
+end;
+
+procedure TFormMeterValues.LogCorrectionTabOpened;
+var
+  FlowMeter: TFlowMeter;
+  TableCoef, TableFlow, TableQuantity, TableDensity: TCalibrCoefTable;
+  FieldName: string;
+  function TableUUID(ATable: TCalibrCoefTable): string;
+  begin if ATable <> nil then Result := ATable.UUID else Result := ''; end;
+  function PointCount(ATable: TCalibrCoefTable): Integer;
+  begin if (ATable <> nil) and (ATable.Items <> nil) then Result := ATable.Items.Count else Result := 0; end;
+begin
+  if (ProtocolManager = nil) or (MeterValue = nil) then Exit;
+  FlowMeter := FindOwnerFlowMeter;
+  if FlowMeter <> nil then
+  begin
+    FlowMeter.RefreshCorrectionTables;
+    TableCoef := FindTableForValue(FlowMeter, FlowMeter.ValueCoef, FieldName);
+    TableFlow := FindTableForValue(FlowMeter, FlowMeter.ValueFlow, FieldName);
+    TableQuantity := FindTableForValue(FlowMeter, FlowMeter.ValueQuantity, FieldName);
+    TableDensity := FindTableForValue(FlowMeter, FlowMeter.ValueDensity, FieldName);
+    ProtocolManager.AddMessage(pcInfo, psForm, 'MeterValueCorrectionTabOpened',
+      'Открыта вкладка коррекции метрологической величины',
+      Format('MeterValueHash=%s; MeterValuePtr=%p; DeviceUUID=%s; ' +
+        'ValueCoefPtr=%p; ValueCoefUUID=%s; ValueCoefPointCount=%d; ' +
+        'ValueFlowPtr=%p; ValueFlowUUID=%s; ValueFlowPointCount=%d; ' +
+        'ValueQuantityPtr=%p; ValueQuantityUUID=%s; ValueQuantityPointCount=%d; ' +
+        'ValueDensityPtr=%p; ValueDensityUUID=%s; ValueDensityPointCount=%d',
+        [MeterValue.Hash, Pointer(MeterValue), FlowMeter.DeviceUUID,
+         Pointer(FlowMeter.ValueCoef), TableUUID(TableCoef), PointCount(TableCoef),
+         Pointer(FlowMeter.ValueFlow), TableUUID(TableFlow), PointCount(TableFlow),
+         Pointer(FlowMeter.ValueQuantity), TableUUID(TableQuantity), PointCount(TableQuantity),
+         Pointer(FlowMeter.ValueDensity), TableUUID(TableDensity), PointCount(TableDensity)]));
+  end
+  else
+    ProtocolManager.AddMessage(pcError, psForm, 'DeviceCorrectionTableBindingError',
+      'Не удалось определить владельца метрологической величины',
+      Format('Reason=MeterValueNotFound; MeterValueHash=%s; MeterValuePtr=%p',
+        [MeterValue.Hash, Pointer(MeterValue)]));
+end;
+
+procedure TFormMeterValues.LogCorrectionGridFilled(const AGridName: string;
+  AVisibleRowCount: Integer);
+var
+  FlowMeter: TFlowMeter;
+  Table: TCalibrCoefTable;
+  SourceField, FilterReason, TableUUID: string;
+  PointCount: Integer;
+begin
+  if (ProtocolManager = nil) or (MeterValue = nil) then Exit;
+  FlowMeter := FindOwnerFlowMeter;
+  Table := FindTableForValue(FlowMeter, MeterValue, SourceField);
+  if FlowMeter = nil then FilterReason := 'SourceNil'
+  else if Table = nil then FilterReason := 'TableTypeMismatch'
+  else if Table.Items.Count = 0 then FilterReason := 'NoPoints'
+  else FilterReason := 'None';
+  if Table <> nil then
+  begin TableUUID := Table.UUID; PointCount := Table.Items.Count; end
+  else begin TableUUID := ''; PointCount := 0; end;
+  ProtocolManager.AddMessage(pcInfo, psForm, 'MeterValueCorrectionGridFilled',
+    'Заполнен грид коррекции метрологической величины',
+    Format('GridName=%s; SourceField=%s; SourceTablePtr=%p; SourceTableUUID=%s; ' +
+      'SourcePointCount=%d; VisibleRowCount=%d; FilterReason=%s',
+      [AGridName, SourceField, Pointer(Table), TableUUID, PointCount,
+       AVisibleRowCount, FilterReason]));
 end;
 
 procedure TFormMeterValues.CheckBoxIsToSaveChange(Sender: TObject);

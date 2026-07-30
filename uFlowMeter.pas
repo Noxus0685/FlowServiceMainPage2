@@ -403,6 +403,7 @@ public
   procedure CreateDevice;
 
   procedure SetValues;
+  procedure RefreshCorrectionTables;
 
   procedure InitValues;
   procedure ApplyMeasurementModel;
@@ -419,7 +420,8 @@ uses
   uRepositories,
   uWorkTable,
   uMKSDebug,
-  uDebugLog;
+  uDebugLog,
+  uProtocols;
 
 { TFlowMeter }
 
@@ -601,7 +603,11 @@ begin
   FlowMax := FDevice.Qmax;
   FlowMin := FDevice.Qmin;
   MeterFlowCategory := ResolveStdCategoryFromDevice;
-  UpdateByDevice;
+  // During Init the device is attached before its runtime TMeterValue objects
+  // exist.  Defer correction binding to InitAllValues in that case, otherwise
+  // the same table produces several misleading errors for one load operation.
+  if (ValueMassCoef <> nil) and (ValueVolumeCoef <> nil) then
+    UpdateByDevice;
 end;
 
 procedure TFlowMeter.AddDataPoint(const APoint: TPointSpillage);
@@ -1803,33 +1809,105 @@ procedure TFlowMeter.ApplyCalibrCoefsToValue(ATable: TCalibrCoefTable);
 var
   Item: TCalibrCoefItem;
   CoefItem: TCoef;
-  TableType: Integer;
+  TableType: TCalibrCoefTableType;
+  EnumName: string;
   TargetValue: TMeterValue;
+  TargetField: string;
 begin
   if ATable = nil then
     Exit;
 
-  TableType := ATable.&Type;
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcInfo, psEngine,
+      'DeviceCorrectionTableTypeRaw', 'Получен тип таблицы коррекции',
+      Format('DeviceUUID=%s; TableUUID=%s; RawTableType=%d; EnumLow=%d; ' +
+        'EnumHigh=%d; EnumTypeName=TCalibrCoefTableType; SourceMethod=TFlowMeter.ApplyCalibrCoefsToValue',
+        [DeviceUUID, ATable.UUID, ATable.&Type,
+         Ord(Low(TCalibrCoefTableType)), Ord(High(TCalibrCoefTableType))]));
 
+  if not TryCalibrCoefTableType(ATable.&Type, TableType) then
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcError, psEngine,
+        'DeviceCorrectionTableBindingError', 'Ошибка привязки таблицы коррекции',
+        Format('Reason=UnknownTableType; DeviceUUID=%s; TableUUID=%s; TableType=%d',
+          [DeviceUUID, ATable.UUID, ATable.&Type]));
+    Exit;
+  end;
+  if Trim(ATable.UUID) = '' then
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcError, psEngine,
+        'DeviceCorrectionTableBindingError', 'Ошибка привязки таблицы коррекции',
+        Format('Reason=TableUUIDMismatch; DeviceUUID=%s; TableType=%d',
+          [DeviceUUID, ATable.&Type]));
+    Exit;
+  end;
+  if not SameText(Trim(ATable.DeviceUUID), Trim(DeviceUUID)) then
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcError, psEngine,
+        'DeviceCorrectionTableBindingError', 'Ошибка привязки таблицы коррекции',
+        Format('Reason=OwnerMismatch; DeviceUUID=%s; TableDeviceUUID=%s; TableUUID=%s',
+          [DeviceUUID, ATable.DeviceUUID, ATable.UUID]));
+    Exit;
+  end;
   if (not ATable.Active) or
      (ATable.Items = nil) then
     Exit;
 
   TargetValue := nil;
+  TargetField := '';
+  EnumName := CalibrCoefTableTypeName(TableType);
   case TableType of
-    Ord(cctMeterValueCoef):
-      if (ValueCoef <> nil) and (ValueCoef.DependenceType = INDEPENDENT) then
+    cctMeterValueCoef:
+      begin
         TargetValue := ValueCoef;
-    Ord(cctMeterValueFlowRate):
-      TargetValue := ValueFlow;
-    Ord(cctMeterValueQuantity):
-      TargetValue := ValueQuantity;
-    Ord(cctMeterValueDensity):
-      TargetValue := ValueDensity;
+        TargetField := 'ValueCoef';
+      end;
+    cctMeterValueFlowRate:
+      begin
+        TargetValue := ValueFlow;
+        TargetField := 'ValueFlow';
+      end;
+    cctMeterValueQuantity:
+      begin
+        TargetValue := ValueQuantity;
+        TargetField := 'ValueQuantity';
+      end;
+    cctMeterValueDensity:
+      begin
+        TargetValue := ValueDensity;
+        TargetField := 'ValueDensity';
+      end;
   end;
 
-  if TargetValue = nil then
+  if TargetField = '' then
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcError, psEngine,
+        'DeviceCorrectionTableBindingError', 'Ошибка привязки таблицы коррекции',
+        Format('Reason=UnknownTableType; DeviceUUID=%s; TableUUID=%s; RawTableType=%d; EnumName=%s',
+          [DeviceUUID, ATable.UUID, ATable.&Type, EnumName]));
     Exit;
+  end;
+
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcInfo, psEngine,
+      'DeviceCorrectionTableTypeResolved', 'Распознан тип таблицы коррекции',
+      Format('DeviceUUID=%s; TableUUID=%s; RawTableType=%d; ResolvedTypeName=%s; ' +
+        'TargetField=%s', [DeviceUUID, ATable.UUID,
+         ATable.&Type, EnumName, TargetField]));
+
+  if TargetValue = nil then
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcError, psEngine,
+        'DeviceCorrectionTableBindingError', 'Ошибка привязки таблицы коррекции',
+        Format('Reason=MeterValueNotFound; DeviceUUID=%s; TableUUID=%s; TableType=%d; TargetField=%s',
+          [DeviceUUID, ATable.UUID, ATable.&Type, TargetField]));
+    Exit;
+  end;
 
   for Item in ATable.Items do
   begin
@@ -1845,14 +1923,24 @@ begin
     CoefItem.Q2 := Item.QTo;
     CoefItem.K := Item.K;
     CoefItem.b := Item.b;
-    CoefItem.InUse := True;
+    CoefItem.InUse := Item.Enable;
     TargetValue.Coefs.Add(CoefItem);
   end;
+
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcInfo, psEngine, 'DeviceCorrectionTableBound',
+      'Таблица коррекции привязана к метрологической величине',
+      Format('DeviceUUID=%s; MeterValuePtr=%p; TableUUID=%s; RawTableType=%d; ' +
+        'ResolvedTypeName=%s; TargetField=%s; TargetTablePtr=%p; PointCount=%d; SameInstance=True',
+        [DeviceUUID, Pointer(TargetValue), ATable.UUID, ATable.&Type, EnumName,
+         TargetField, Pointer(ATable), ATable.Items.Count]));
 end;
 
 procedure TFlowMeter.ApplyCalibrCoefsToValues;
 var
   Table: TCalibrCoefTable;
+  BoundTypes: TList<Integer>;
+  ResolvedType: TCalibrCoefTableType;
 begin
   if ValueCoef <> nil then
     ValueCoef.Coefs.Clear;
@@ -1867,8 +1955,36 @@ begin
      (Device.CalibrCoefTables = nil) then
     Exit;
 
-  for Table in Device.CalibrCoefTables do
-    ApplyCalibrCoefsToValue(Table);
+  BoundTypes := TList<Integer>.Create;
+  try
+    for Table in Device.CalibrCoefTables do
+    begin
+      if (Table <> nil) and Table.Active and BoundTypes.Contains(Table.&Type) then
+      begin
+        if ProtocolManager <> nil then
+          ProtocolManager.AddMessage(pcError, psEngine,
+            'DeviceCorrectionTableBindingError', 'Ошибка привязки таблицы коррекции',
+            Format('Reason=DuplicateBinding; DeviceUUID=%s; TableUUID=%s; TableType=%d',
+              [DeviceUUID, Table.UUID, Table.&Type]));
+        Continue;
+      end;
+      ApplyCalibrCoefsToValue(Table);
+      if (Table <> nil) and Table.Active and
+         TryCalibrCoefTableType(Table.&Type, ResolvedType) then
+        case ResolvedType of
+          cctMeterValueCoef, cctMeterValueFlowRate,
+          cctMeterValueQuantity, cctMeterValueDensity:
+            BoundTypes.Add(Table.&Type);
+        end;
+    end;
+  finally
+    BoundTypes.Free;
+  end;
+end;
+
+procedure TFlowMeter.RefreshCorrectionTables;
+begin
+  ApplyCalibrCoefsToValues;
 end;
 
 procedure TFlowMeter.UpdateByDevice;

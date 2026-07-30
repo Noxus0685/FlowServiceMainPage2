@@ -4614,7 +4614,9 @@ begin
         if not UpdateSpillages(ADevice) then
           raise Exception.Create('Ошибка сохранения результатов пролива');
 
-      if (ADevice.CalibrCoefTables <> nil) and (ADevice.CalibrCoefTables.Count > 0) then
+      // Also call for an empty collection: UpdateCalibrCoef removes persisted
+      // rows, which makes deleting the last table durable.
+      if ADevice.CalibrCoefTables <> nil then
         if not UpdateCalibrCoef(ADevice) then
           raise Exception.Create('Ошибка сохранения таблицы калибровочных коэффициентов');
 
