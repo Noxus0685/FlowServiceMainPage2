@@ -19,17 +19,25 @@ uses
 type
 
   TCalibrCoefTableType = (
-    cctReference = 0,                 // справочная таблица (в расчётах TMeterValue не применяется)
-    cctMeterValueCoef = 1,            // поправка коэффициента пересчёта TMeterValue.Coef
+    cctMeterValueCoef = 0,            // поправка коэффициента пересчёта TMeterValue.Coef
     cctMeterValueFlowRate = 2,        // поправка TMeterValue.FlowRate
     cctMeterValueQuantity = 3,        // поправка TMeterValue.Quantity
     cctMeterValueDensity = 4,         // поправка TMeterValue.Density
+    cctReference = 10,                // справочная таблица (в расчётах TMeterValue не применяется)
     cctDeviceCoefCorrection = 11,     // поправка коэффициента преобразования (для записи в прибор)
     cctDeviceFlowRateCorrection = 12, // поправка расхода (для записи в прибор)
     cctDeviceQuantityCorrection = 13, // поправка количества (для записи в прибор)
     cctDeviceDensityCorrection = 14   // поправка плотности (для записи в прибор)
   );
 
+function TryCalibrCoefTableType(const ARawType: Integer;
+  out ATableType: TCalibrCoefTableType): Boolean;
+function CalibrCoefTableTypeName(const ATableType: TCalibrCoefTableType): string;
+function TryResolveCalibrCoefTableTarget(const ARawType: Integer;
+  out ATableType: TCalibrCoefTableType; out AResolvedTypeName,
+  ATargetField: string): Boolean;
+
+type
   TPointSpillage = class;
 
   TSessionSpillage = class(TTypeEntity)
@@ -197,6 +205,10 @@ type
     RequiredStabilizationSec: Double;  // Runtime: максимальный неотрицательный Pause исходных точек
     Participants: TArray<TMeasurementPointParticipant>;
     SourcePointCount: Integer;
+    CommonMinQ: Double;          // Runtime: common admissible flow interval of all participants
+    CommonMaxQ: Double;
+    MinEtalonDeltaQ: Double;     // Runtime: strictest absolute etalon tolerance in the group
+    EtalonRangeValid: Boolean;   // Runtime: false when the source etalon error is invalid
 
     {====================================================================}
     { ПОВТОРЫ И СЕРИИ }
@@ -419,6 +431,8 @@ type
     function Clone: TCalibrCoefTable;
     function FindItemByQ(Q: Double): TCalibrCoefItem;
     function ApplyByQ(Q, X: Double): Double;
+    function TableType: TCalibrCoefTableType;
+    procedure SetTableType(const AType: TCalibrCoefTableType);
   end;
 
   TDevice = class(TTypeEntity)
@@ -625,6 +639,67 @@ uses
   uAppServices,
   uRepositories,
   uMKSDebug;
+
+function TryCalibrCoefTableType(const ARawType: Integer;
+  out ATableType: TCalibrCoefTableType): Boolean;
+begin
+  Result := (ARawType >= Ord(Low(TCalibrCoefTableType))) and
+    (ARawType <= Ord(High(TCalibrCoefTableType)));
+  if not Result then Exit;
+  // Do not cast an Integer into a sparse enum.  Resolve exclusively through
+  // the ordinals of the canonical declaration above, so persisted value 1 is
+  // unambiguously cctMeterValueCoef on every compiler/range-check setting.
+  case ARawType of
+    Ord(cctReference): ATableType := cctReference;
+    Ord(cctMeterValueCoef): ATableType := cctMeterValueCoef;
+    Ord(cctMeterValueFlowRate): ATableType := cctMeterValueFlowRate;
+    Ord(cctMeterValueQuantity): ATableType := cctMeterValueQuantity;
+    Ord(cctMeterValueDensity): ATableType := cctMeterValueDensity;
+    Ord(cctDeviceCoefCorrection): ATableType := cctDeviceCoefCorrection;
+    Ord(cctDeviceFlowRateCorrection): ATableType := cctDeviceFlowRateCorrection;
+    Ord(cctDeviceQuantityCorrection): ATableType := cctDeviceQuantityCorrection;
+    Ord(cctDeviceDensityCorrection): ATableType := cctDeviceDensityCorrection;
+  else
+    Result := False;
+  end;
+end;
+
+function CalibrCoefTableTypeName(
+  const ATableType: TCalibrCoefTableType): string;
+begin
+  case ATableType of
+    cctReference: Result := 'cctReference';
+    cctMeterValueCoef: Result := 'cctMeterValueCoef';
+    cctMeterValueFlowRate: Result := 'cctMeterValueFlowRate';
+    cctMeterValueQuantity: Result := 'cctMeterValueQuantity';
+    cctMeterValueDensity: Result := 'cctMeterValueDensity';
+    cctDeviceCoefCorrection: Result := 'cctDeviceCoefCorrection';
+    cctDeviceFlowRateCorrection: Result := 'cctDeviceFlowRateCorrection';
+    cctDeviceQuantityCorrection: Result := 'cctDeviceQuantityCorrection';
+    cctDeviceDensityCorrection: Result := 'cctDeviceDensityCorrection';
+  else Result := 'Unknown';
+  end;
+end;
+
+function TryResolveCalibrCoefTableTarget(const ARawType: Integer;
+  out ATableType: TCalibrCoefTableType; out AResolvedTypeName,
+  ATargetField: string): Boolean;
+begin
+  AResolvedTypeName := '';
+  ATargetField := '';
+  Result := TryCalibrCoefTableType(ARawType, ATableType);
+  if not Result then Exit;
+  AResolvedTypeName := CalibrCoefTableTypeName(ATableType);
+  case ATableType of
+    cctReference: ATargetField := 'Device.CalibrCoefTables[cctReference]';
+    cctMeterValueCoef: ATargetField := 'ValueCoef';
+    cctMeterValueFlowRate: ATargetField := 'ValueFlow';
+    cctMeterValueQuantity: ATargetField := 'ValueQuantity';
+    cctMeterValueDensity: ATargetField := 'ValueDensity';
+  else
+    Result := False;
+  end;
+end;
 
 class function TDevicePoint.GetPointSpillageTypeText(const AType: EPointSpillageType): string;
 begin
@@ -1194,6 +1269,10 @@ begin
   FlowRate := 0.0;
   Q := 0.0;
   FlowAccuracy := '';
+  CommonMinQ := 0.0;
+  CommonMaxQ := 0.0;
+  MinEtalonDeltaQ := 0.0;
+  EtalonRangeValid := False;
 
   { Условия измерения }
   Pressure := 0.0;
@@ -1585,9 +1664,21 @@ end;
 constructor TCalibrCoefTable.Create;
 begin
   inherited Create;
-  &Type := 0;
+  // A newly created device table is a coefficient correction table.  Assign
+  // the persisted value here, before any points can be appended to Items.
+  SetTableType(cctMeterValueCoef);
   Active := False;
   Items := TObjectList<TCalibrCoefItem>.Create(True);
+end;
+
+function TCalibrCoefTable.TableType: TCalibrCoefTableType;
+begin
+  Result := TCalibrCoefTableType(&Type);
+end;
+
+procedure TCalibrCoefTable.SetTableType(const AType: TCalibrCoefTableType);
+begin
+  &Type := Ord(AType);
 end;
 
 destructor TCalibrCoefTable.Destroy;
@@ -3166,14 +3257,5 @@ begin
 end;
 
 end.
-
-
-
-
-
-
-
-
-
 
 
