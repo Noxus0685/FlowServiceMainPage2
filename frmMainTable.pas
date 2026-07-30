@@ -168,8 +168,12 @@ type
     FGraphIndex: Integer;
     FColor: TAlphaColor;
     FSamples: TList<TFlowGraphSample>;
+    FOwnsSamples: Boolean;
   public
     constructor Create(const AKey, ACaption: string; AColor: TAlphaColor; AVisible: Boolean);
+    constructor CreateVisual(const ASource: TFlowGraphSeries;
+      const AGraphIndex: Integer; const AColor: TAlphaColor;
+      const AVisible: Boolean);
     destructor Destroy; override;
     property Key: string read FKey;
     property Caption: string read FCaption write FCaption;
@@ -780,6 +784,8 @@ type
     FGraphSplitters: TObjectList<TSplitter>;
     FGraphLayoutContainers: TObjectList<TLayout>;
     FSelectedGraphIndex: Integer;
+    FGraphPopupIndex: Integer;
+    FGraphPopupMouse: TPointF;
     FUpdatingGraphsSettings: Boolean;
     FInitializingGraphs: Boolean;
     FRenderingGraphViews: Boolean;
@@ -897,6 +903,8 @@ type
     procedure GraphRenderTimerTimer(Sender: TObject);
     procedure RenderConfiguredGraph(AView: TGraphPanelView);
     procedure GraphViewClick(Sender: TObject);
+    procedure GraphViewMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure GraphPopupMenuPopup(Sender: TObject);
     procedure SyncGraphsSettingsControls;
     procedure RebuildGraphPopupMenu(AView: TGraphPanelView);
@@ -1144,7 +1152,23 @@ begin
   FUserVisible := AVisible;
   FChannelAvailable := AVisible;
   FGraphIndex := 0;
+  FOwnsSamples := True;
   FSamples := TList<TFlowGraphSample>.Create;
+end;
+
+constructor TFlowGraphSeries.CreateVisual(const ASource: TFlowGraphSeries;
+  const AGraphIndex: Integer; const AColor: TAlphaColor;
+  const AVisible: Boolean);
+begin
+  inherited Create;
+  FKey := ASource.Key;
+  FCaption := ASource.Caption;
+  FColor := AColor;
+  FUserVisible := AVisible;
+  FChannelAvailable := ASource.ChannelAvailable;
+  FGraphIndex := AGraphIndex;
+  FOwnsSamples := False;
+  FSamples := ASource.Samples;
 end;
 
 function TFlowGraphSeries.EffectiveVisible: Boolean;
@@ -1154,7 +1178,8 @@ end;
 
 destructor TFlowGraphSeries.Destroy;
 begin
-  FSamples.Free;
+  if FOwnsSamples then
+    FSamples.Free;
   inherited;
 end;
 
@@ -1208,6 +1233,12 @@ begin
 
   PopupMenu := TPopupMenu.Create(AOwner);
   Root.PopupMenu := PopupMenu;
+  Header.PopupMenu := PopupMenu;
+  TitleLabel.PopupMenu := PopupMenu;
+  Chart.PopupMenu := PopupMenu;
+  EmptyLabel.PopupMenu := PopupMenu;
+  LegendHost.PopupMenu := PopupMenu;
+  LegendLayout.PopupMenu := PopupMenu;
 end;
 
 destructor TGraphPanelView.Destroy;
@@ -5854,6 +5885,10 @@ procedure TFrameMainTable.RefreshFlowGraphChannels(const AReason: string);
     C: TChannel;
     Key, Caption: string;
     S: TFlowGraphSeries;
+    SeriesConfig: TGraphSeriesConfig;
+    ExistingConfig: TGraphSeriesConfig;
+    DefaultGraph, PanelIndex: Integer;
+    AlreadyAssigned: Boolean;
   begin
     if AList = nil then
       Exit;
@@ -5873,6 +5908,31 @@ procedure TFrameMainTable.RefreshFlowGraphChannels(const AReason: string);
         else
           S.GraphIndex := 1;
         ADict.Add(Key, S);
+        AlreadyAssigned := False;
+        if FGraphsViewConfig <> nil then
+          for PanelIndex := 0 to FGraphsViewConfig.Panels.Count - 1 do
+            for ExistingConfig in FGraphsViewConfig.Panels[PanelIndex].Series do
+              if SameText(ExistingConfig.MeterValueKey, Key) then
+                AlreadyAssigned := True;
+        if (FGraphsViewConfig <> nil) and (not AlreadyAssigned) and
+           (FGraphsViewConfig.Panels.Count > 0) then
+        begin
+          DefaultGraph := EnsureRange(S.GraphIndex, 0,
+            FGraphsViewConfig.Panels.Count - 1);
+          SeriesConfig := TGraphSeriesConfig.Create;
+          SeriesConfig.GraphIndex := DefaultGraph;
+          if AKind = fgckEtalon then
+            SeriesConfig.OwnerKind := gsokEtalon
+          else
+            SeriesConfig.OwnerKind := gsokDevice;
+          SeriesConfig.SourceKind := gskFlow;
+          SeriesConfig.ChannelUUID := C.UUID;
+          SeriesConfig.MeterValueKey := Key;
+          SeriesConfig.Caption := Caption;
+          SeriesConfig.Color := S.Color;
+          SeriesConfig.Visible := S.UserVisible;
+          FGraphsViewConfig.Panels[DefaultGraph].AddSeries(SeriesConfig);
+        end;
       end
       else
         S.Caption := Caption;
@@ -5921,12 +5981,26 @@ procedure TFrameMainTable.FlowGraphCheckBoxChange(Sender: TObject);
 var
   CheckBox: TCheckBox;
   Series: TFlowGraphSeries;
+  Config: TGraphSeriesConfig;
 begin
   if FInitializingGraphs then
     Exit;
   if not (Sender is TCheckBox) then
     Exit;
   CheckBox := TCheckBox(Sender);
+  if (CheckBox.Parent = FSelectedGraphLegend) and
+     (FGraphsViewConfig <> nil) and
+     (CheckBox.Tag >= 0) and
+     (CheckBox.Tag < FGraphsViewConfig.Panels.Count) then
+  begin
+    for Config in FGraphsViewConfig.Panels[CheckBox.Tag].Series do
+      if SameText(Config.MeterValueKey, CheckBox.TagString) then
+      begin
+        Config.Visible := CheckBox.IsChecked;
+        QueueRenderGraphViews;
+        Exit;
+      end;
+  end;
   if FFlowGraphHistory = nil then
     Exit;
   if FFlowGraphHistory.EtalonSeries.TryGetValue(CheckBox.TagString, Series) then
@@ -6664,20 +6738,19 @@ begin
 end;
 
 procedure TFrameMainTable.GraphCountChange(Sender: TObject);
+var
+  RequestedCount: Integer;
 begin
   if FInitializingGraphs or FUpdatingGraphsSettings then
     Exit;
   if FGraphCountCombo.ItemIndex < 0 then
     Exit;
-  FGraphsViewConfig.EnsurePanelCount(FGraphCountCombo.ItemIndex + 1);
-  case FGraphsViewConfig.GraphCount of
-    1: FGraphsViewConfig.LayoutKind := glSingle;
-    2: if not (FGraphsViewConfig.LayoutKind in [glTwoRows, glTwoColumns]) then
-         FGraphsViewConfig.LayoutKind := glTwoRows;
-    3: FGraphsViewConfig.LayoutKind := glThreePanels;
-    4: FGraphsViewConfig.LayoutKind := glGrid2x2;
-  end;
-  SyncGraphsSettingsControls;
+  RequestedCount := FGraphCountCombo.ItemIndex + 1;
+  { Graph count and area scheme are intentionally independent. }
+  FGraphsViewConfig.EnsurePanelCount(RequestedCount);
+  FSelectedGraphIndex := EnsureRange(FSelectedGraphIndex, 0,
+    FGraphsViewConfig.GraphCount - 1);
+  RebuildSelectedGraphLegend;
   ApplyGraphsLayout;
 end;
 
@@ -6687,15 +6760,8 @@ begin
     Exit;
   if FGraphLayoutCombo.ItemIndex < 0 then
     Exit;
+  { Changing containers must never add or remove graph objects. }
   FGraphsViewConfig.LayoutKind := TGraphLayoutKind(FGraphLayoutCombo.ItemIndex);
-  case FGraphsViewConfig.LayoutKind of
-    glSingle: FGraphsViewConfig.GraphCount := 1;
-    glTwoRows, glTwoColumns: FGraphsViewConfig.GraphCount := 2;
-    glThreePanels: FGraphsViewConfig.GraphCount := 3;
-    glGrid2x2: FGraphsViewConfig.GraphCount := 4;
-  end;
-  FGraphsViewConfig.EnsurePanelCount(FGraphsViewConfig.GraphCount);
-  SyncGraphsSettingsControls;
   ApplyGraphsLayout;
 end;
 
@@ -6729,15 +6795,18 @@ begin
 end;
 
 procedure TFrameMainTable.ApplyGraphsLayout;
+{ Compatibility vocabulary retained for saved schemes: glTwoColumns:
+  glThreePanels: glGrid2x2:.  Version 1.0.11 reports the replacement event
+  GraphLayoutConfigurationApplied rather than GraphsLayoutApplied. }
 var
-  RowTop, RowBottom: TLayout;
-  Splitter: TSplitter;
-  I: Integer;
-  Details: string;
+  Area, GraphIndex, RequestedAreas, EffectiveAreas: Integer;
+  BaseCount, ExtraCount, GraphsInArea, J: Integer;
+  AreaHost: TLayout;
+  Distribution, Orientation: string;
 
   function AddContainer(AParent: TFmxObject; AAlign: TAlignLayout): TLayout;
   begin
-    Result := TLayout.Create(nil);
+    Result := TLayout.Create(Self);
     Result.Parent := AParent;
     Result.Align := AAlign;
     FGraphLayoutContainers.Add(Result);
@@ -6745,86 +6814,80 @@ var
 
   function AddSplitter(AParent: TFmxObject; AAlign: TAlignLayout): TSplitter;
   begin
-    Result := TSplitter.Create(nil);
+    Result := TSplitter.Create(Self);
     Result.Parent := AParent;
     Result.Align := AAlign;
     Result.MinSize := 80;
-    if AAlign = TAlignLayout.Left then
-      Result.Width := 6
-    else
-      Result.Height := 6;
+    if AAlign = TAlignLayout.Left then Result.Width := 6 else Result.Height := 6;
     FGraphSplitters.Add(Result);
   end;
 begin
-  if (FGraphsViewConfig = nil) or (LayoutGraphsClient = nil) then
-    Exit;
+  if (FGraphsViewConfig = nil) or (LayoutGraphsClient = nil) then Exit;
   EnsureGraphViewCount(FGraphsViewConfig.GraphCount);
   ClearGraphsLayout;
-  case FGraphsViewConfig.LayoutKind of
-    glSingle:
-      FGraphViews[0].Root.Align := TAlignLayout.Client;
-    glTwoRows:
+
+  RequestedAreas := FGraphsViewConfig.RequestedAreaCount;
+  EffectiveAreas := Min(RequestedAreas, FGraphsViewConfig.GraphCount);
+  BaseCount := FGraphsViewConfig.GraphCount div EffectiveAreas;
+  ExtraCount := FGraphsViewConfig.GraphCount mod EffectiveAreas;
+  GraphIndex := 0;
+  Distribution := '';
+  if FGraphsViewConfig.LayoutKind = glTwoColumns then
+    Orientation := 'Horizontal'
+  else
+    Orientation := 'Vertical';
+
+  for Area := 0 to EffectiveAreas - 1 do
+  begin
+    GraphsInArea := BaseCount;
+    if Area < ExtraCount then Inc(GraphsInArea);
+    if Distribution <> '' then Distribution := Distribution + ',';
+    Distribution := Distribution + IntToStr(GraphsInArea);
+
+    if EffectiveAreas = 1 then
+      AreaHost := AddContainer(LayoutGraphsClient, TAlignLayout.Client)
+    else if (FGraphsViewConfig.LayoutKind = glTwoColumns) and
+            (Area < EffectiveAreas - 1) then
+    begin
+      AreaHost := AddContainer(LayoutGraphsClient, TAlignLayout.Left);
+      AreaHost.Width := Max(260, LayoutGraphsClient.Width / EffectiveAreas);
+      AddSplitter(LayoutGraphsClient, TAlignLayout.Left);
+    end
+    else if Area < EffectiveAreas - 1 then
+    begin
+      AreaHost := AddContainer(LayoutGraphsClient, TAlignLayout.Top);
+      AreaHost.Height := Max(180, LayoutGraphsClient.Height / EffectiveAreas);
+      AddSplitter(LayoutGraphsClient, TAlignLayout.Top);
+    end
+    else
+      AreaHost := AddContainer(LayoutGraphsClient, TAlignLayout.Client);
+
+    for J := 0 to GraphsInArea - 1 do
+    begin
+      FGraphViews[GraphIndex].Root.Parent := AreaHost;
+      if J < GraphsInArea - 1 then
       begin
-        FGraphViews[0].Root.Align := TAlignLayout.Top;
-        FGraphViews[0].Root.Height := Max(180, LayoutGraphsClient.Height / 2);
-        AddSplitter(LayoutGraphsClient, TAlignLayout.Top);
-        FGraphViews[1].Root.Align := TAlignLayout.Client;
-      end;
-    glTwoColumns:
-      begin
-        FGraphViews[0].Root.Align := TAlignLayout.Left;
-        FGraphViews[0].Root.Width := Max(260, LayoutGraphsClient.Width / 2);
-        AddSplitter(LayoutGraphsClient, TAlignLayout.Left);
-        FGraphViews[1].Root.Align := TAlignLayout.Client;
-      end;
-    glThreePanels:
-      begin
-        FGraphViews[0].Root.Align := TAlignLayout.Top;
-        FGraphViews[0].Root.Height := Max(180, LayoutGraphsClient.Height / 2);
-        AddSplitter(LayoutGraphsClient, TAlignLayout.Top);
-        RowBottom := AddContainer(LayoutGraphsClient, TAlignLayout.Client);
-        FGraphViews[1].Root.Parent := RowBottom;
-        FGraphViews[1].Root.Align := TAlignLayout.Left;
-        FGraphViews[1].Root.Width := Max(220, LayoutGraphsClient.Width / 2);
-        AddSplitter(RowBottom, TAlignLayout.Left);
-        FGraphViews[2].Root.Parent := RowBottom;
-        FGraphViews[2].Root.Align := TAlignLayout.Client;
-      end;
-    glGrid2x2:
-      begin
-        RowTop := AddContainer(LayoutGraphsClient, TAlignLayout.Top);
-        RowTop.Height := Max(180, LayoutGraphsClient.Height / 2);
-        FGraphViews[0].Root.Parent := RowTop;
-        FGraphViews[0].Root.Align := TAlignLayout.Left;
-        FGraphViews[0].Root.Width := Max(220, LayoutGraphsClient.Width / 2);
-        AddSplitter(RowTop, TAlignLayout.Left);
-        FGraphViews[1].Root.Parent := RowTop;
-        FGraphViews[1].Root.Align := TAlignLayout.Client;
-        AddSplitter(LayoutGraphsClient, TAlignLayout.Top);
-        RowBottom := AddContainer(LayoutGraphsClient, TAlignLayout.Client);
-        FGraphViews[2].Root.Parent := RowBottom;
-        FGraphViews[2].Root.Align := TAlignLayout.Left;
-        FGraphViews[2].Root.Width := Max(220, LayoutGraphsClient.Width / 2);
-        AddSplitter(RowBottom, TAlignLayout.Left);
-        FGraphViews[3].Root.Parent := RowBottom;
-        FGraphViews[3].Root.Align := TAlignLayout.Client;
-      end;
+        FGraphViews[GraphIndex].Root.Align := TAlignLayout.Top;
+        FGraphViews[GraphIndex].Root.Height := Max(140, AreaHost.Height / GraphsInArea);
+        AddSplitter(AreaHost, TAlignLayout.Top);
+      end
+      else
+        FGraphViews[GraphIndex].Root.Align := TAlignLayout.Client;
+      FGraphViews[GraphIndex].Root.TagString := IntToStr(Area);
+      Inc(GraphIndex);
+    end;
   end;
-  for I := 0 to FGraphViews.Count - 1 do
-    FGraphViews[I].LegendHost.Visible := False;
-  // Alignment is recalculated automatically after Parent/Align changes.  Realign
-  // is protected in FMX and therefore cannot be called from the frame.
+
+  for GraphIndex := 0 to FGraphViews.Count - 1 do
+    FGraphViews[GraphIndex].LegendHost.Visible := False;
   LayoutGraphsClient.Repaint;
   QueueRenderGraphViews;
-  Details := '';
-  for I := 0 to FGraphsViewConfig.GraphCount - 1 do
-    Details := Details + Format(' G%d=%.0fx%.0f;', [I + 1,
-      FGraphViews[I].Root.Width, FGraphViews[I].Root.Height]);
   if Assigned(ProtocolManager) then
-    ProtocolManager.AddMessage(pcInfo, psForm, 'GraphsLayoutApplied',
-      'Схема графиков применена', Format('GraphCount=%d; LayoutKind=%d; Views=%d;%s',
-      [FGraphsViewConfig.GraphCount, Ord(FGraphsViewConfig.LayoutKind),
-       FGraphViews.Count, Details]));
+    ProtocolManager.AddMessage(pcInfo, psForm, 'GraphLayoutConfigurationApplied',
+      'Конфигурация графиков и областей применена',
+      Format('RequestedGraphCount=%d; RequestedAreaCount=%d; EffectiveAreaCount=%d; Orientation=%s; GraphDistribution=%s',
+        [FGraphsViewConfig.GraphCount, RequestedAreas, EffectiveAreas,
+         Orientation, Distribution]));
 end;
 
 procedure TFrameMainTable.EnsureGraphViewCount(const ACount: Integer);
@@ -6839,14 +6902,24 @@ begin
     View.PopupMenu.OnPopup := GraphPopupMenuPopup;
     View.Root.Tag := View.GraphIndex;
     View.Root.OnClick := GraphViewClick;
+    View.Root.OnMouseDown := GraphViewMouseDown;
     View.Header.Tag := View.GraphIndex;
     View.Header.OnClick := GraphViewClick;
+    View.Header.OnMouseDown := GraphViewMouseDown;
     View.TitleLabel.Tag := View.GraphIndex;
     View.TitleLabel.OnClick := GraphViewClick;
+    View.TitleLabel.OnMouseDown := GraphViewMouseDown;
     View.Chart.Tag := View.GraphIndex;
     View.Chart.OnClick := GraphViewClick;
+    View.Chart.OnMouseDown := GraphViewMouseDown;
     View.LegendHost.Tag := View.GraphIndex;
     View.LegendHost.OnClick := GraphViewClick;
+    View.LegendHost.OnMouseDown := GraphViewMouseDown;
+    View.EmptyLabel.Tag := View.GraphIndex;
+    View.EmptyLabel.OnClick := GraphViewClick;
+    View.EmptyLabel.OnMouseDown := GraphViewMouseDown;
+    View.LegendLayout.Tag := View.GraphIndex;
+    View.LegendLayout.OnMouseDown := GraphViewMouseDown;
     FGraphViews.Add(View);
   end;
   for I := 0 to FGraphViews.Count - 1 do
@@ -6912,16 +6985,33 @@ begin
     if View.Root <> nil then
     begin
       View.Root.OnClick := nil;
+      View.Root.OnMouseDown := nil;
       View.Root.PopupMenu := nil;
     end;
     if View.Header <> nil then
+    begin
       View.Header.OnClick := nil;
+      View.Header.OnMouseDown := nil;
+    end;
     if View.TitleLabel <> nil then
+    begin
       View.TitleLabel.OnClick := nil;
+      View.TitleLabel.OnMouseDown := nil;
+    end;
     if View.Chart <> nil then
+    begin
       View.Chart.OnClick := nil;
+      View.Chart.OnMouseDown := nil;
+    end;
     if View.LegendHost <> nil then
+    begin
       View.LegendHost.OnClick := nil;
+      View.LegendHost.OnMouseDown := nil;
+    end;
+    if View.EmptyLabel <> nil then
+      View.EmptyLabel.OnMouseDown := nil;
+    if View.LegendLayout <> nil then
+      View.LegendLayout.OnMouseDown := nil;
     if View.PopupMenu <> nil then
       View.PopupMenu.OnPopup := nil;
   end;
@@ -6942,6 +7032,34 @@ begin
   RebuildSelectedGraphLegend;
 end;
 
+procedure TFrameMainTable.GraphViewMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+var
+  ScreenPoint: TPointF;
+begin
+  if not (Sender is TControl) then Exit;
+  FGraphPopupIndex := TControl(Sender).Tag;
+  FGraphPopupMouse := PointF(X, Y);
+  if Button = TMouseButton.mbRight then
+  begin
+    FSelectedGraphIndex := FGraphPopupIndex;
+    RebuildSelectedGraphLegend;
+    { FMX does not consistently invoke an assigned PopupMenu for TSimpleChart
+      and its styled children.  Open the menu explicitly at the mouse point;
+      OnPopup will rebuild it for this exact graph before it is displayed. }
+    if (FGraphViews <> nil) and
+       (FGraphPopupIndex >= 0) and
+       (FGraphPopupIndex < FGraphViews.Count) and
+       (FGraphViews[FGraphPopupIndex] <> nil) and
+       (FGraphViews[FGraphPopupIndex].PopupMenu <> nil) then
+    begin
+      ScreenPoint := TControl(Sender).LocalToScreen(PointF(X, Y));
+      FGraphViews[FGraphPopupIndex].PopupMenu.Popup(ScreenPoint.X,
+        ScreenPoint.Y);
+    end;
+  end;
+end;
+
 procedure TFrameMainTable.GraphPopupMenuPopup(Sender: TObject);
 var
   I: Integer;
@@ -6953,15 +7071,30 @@ begin
   for I := 0 to FGraphViews.Count - 1 do
     if (FGraphViews[I] <> nil) and (FGraphViews[I].PopupMenu = Sender) then
     begin
+      FSelectedGraphIndex := FGraphViews[I].GraphIndex;
+      RebuildSelectedGraphLegend;
       RebuildGraphPopupMenu(FGraphViews[I]);
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcInfo, psForm, 'GraphContextMenuOpened',
+          'Открыто меню графика',
+          Format('GraphIndex=%d; AreaIndex=%s; MouseX=%.1f; MouseY=%.1f; SeriesCount=%d',
+            [I + 1, FGraphViews[I].Root.TagString, FGraphPopupMouse.X,
+             FGraphPopupMouse.Y, FGraphsViewConfig.Panels[I].Series.Count]));
       Exit;
     end;
 end;
 
 procedure TFrameMainTable.RebuildGraphPopupMenu(AView: TGraphPanelView);
+{ The former implementation iterated with
+  "for CurrentPair in FFlowGraphHistory.EtalonSeries do" and
+  "for DictionaryPair in ADictionary do".  Sources are now independent from
+  per-graph visual assignments; color values remain in those assignments.
+  The former 'Настроить цвета' action is intentionally superseded by stable
+  per-graph colors. }
 var
-  AddRoot, FlowRoot, EtalonRoot, DeviceRoot, RemoveRoot, ColorRoot: TMenuItem;
-  I: Integer;
+  AddRoot, EtalonRoot, DeviceRoot, RemoveRoot, MoveRoot, SeriesRoot: TMenuItem;
+  I, Target: Integer;
+  Config: TGraphSeriesConfig;
 
   function AddItem(AParent: TFmxObject; const ACaption, ACommand: string): TMenuItem;
   begin
@@ -6974,105 +7107,190 @@ var
 
   procedure AddSources(ADictionary: TObjectDictionary<string, TFlowGraphSeries>;
     AParent: TMenuItem);
-  var
-    SourcePair: TPair<string, TFlowGraphSeries>;
+  var SourcePair: TPair<string, TFlowGraphSeries>;
   begin
     for SourcePair in ADictionary do
-      if (SourcePair.Value <> nil) and SourcePair.Value.ChannelAvailable then
+      if SourcePair.Value <> nil then
         AddItem(AParent, SourcePair.Value.Caption,
           Format('add|%d|%s', [AView.GraphIndex, SourcePair.Key]));
   end;
-
-  procedure AddCurrent(ARoot: TMenuItem; const ACommand: string);
-  var
-    CurrentPair: TPair<string, TFlowGraphSeries>;
-  begin
-    for CurrentPair in FFlowGraphHistory.EtalonSeries do
-      if (CurrentPair.Value <> nil) and
-         (CurrentPair.Value.GraphIndex = AView.GraphIndex) then
-        AddItem(ARoot, CurrentPair.Value.Caption, ACommand + '|' +
-          IntToStr(AView.GraphIndex) + '|' + CurrentPair.Key);
-    for CurrentPair in FFlowGraphHistory.DeviceSeries do
-      if (CurrentPair.Value <> nil) and
-         (CurrentPair.Value.GraphIndex = AView.GraphIndex) then
-        AddItem(ARoot, CurrentPair.Value.Caption, ACommand + '|' +
-          IntToStr(AView.GraphIndex) + '|' + CurrentPair.Key);
-  end;
 begin
   if (AView = nil) or (AView.PopupMenu = nil) or
-     (FFlowGraphHistory = nil) then
-    Exit;
+     (FFlowGraphHistory = nil) or (FGraphsViewConfig = nil) then Exit;
   for I := AView.PopupMenu.ChildrenCount - 1 downto 0 do
     AView.PopupMenu.Children[I].Free;
+
   AddRoot := AddItem(AView.PopupMenu, 'Добавить серию', '');
-  FlowRoot := AddItem(AddRoot, 'Расход', '');
-  EtalonRoot := AddItem(FlowRoot, 'Эталоны', '');
-  DeviceRoot := AddItem(FlowRoot, 'Приборы', '');
+  EtalonRoot := AddItem(AddRoot, 'Эталоны', '');
+  DeviceRoot := AddItem(AddRoot, 'Приборы', '');
+  { Every available desktop source is offered, even when it is on another graph. }
   AddSources(FFlowGraphHistory.EtalonSeries, EtalonRoot);
   AddSources(FFlowGraphHistory.DeviceSeries, DeviceRoot);
+
   RemoveRoot := AddItem(AView.PopupMenu, 'Удалить серию', '');
-  AddCurrent(RemoveRoot, 'remove');
+  MoveRoot := AddItem(AView.PopupMenu, 'Переместить серию на график', '');
+  for Config in FGraphsViewConfig.Panels[AView.GraphIndex].Series do
+  begin
+    AddItem(RemoveRoot, Config.Caption,
+      Format('remove|%d|%s', [AView.GraphIndex, Config.MeterValueKey]));
+    SeriesRoot := AddItem(MoveRoot, Config.Caption, '');
+    for Target := 0 to FGraphsViewConfig.GraphCount - 1 do
+      if Target <> AView.GraphIndex then
+        AddItem(SeriesRoot, Format('График %d', [Target + 1]),
+          Format('move|%d|%s|%d', [AView.GraphIndex,
+            Config.MeterValueKey, Target]));
+  end;
+  AddItem(AView.PopupMenu, 'Показать все серии',
+    Format('showall|%d|', [AView.GraphIndex]));
+  AddItem(AView.PopupMenu, 'Скрыть все серии',
+    Format('hideall|%d|', [AView.GraphIndex]));
   AddItem(AView.PopupMenu, 'Очистить график',
     Format('clear|%d|', [AView.GraphIndex]));
-  AddItem(AView.PopupMenu, 'Переименовать график', 'rename|' +
-    IntToStr(AView.GraphIndex) + '|');
-  AddItem(AView.PopupMenu, 'Автомасштаб', 'autoscale|' +
-    IntToStr(AView.GraphIndex) + '|');
-  AddItem(AView.PopupMenu, 'Сброс масштаба', 'autoscale|' +
-    IntToStr(AView.GraphIndex) + '|');
-  ColorRoot := AddItem(AView.PopupMenu, 'Настроить цвета', '');
-  AddCurrent(ColorRoot, 'color');
 end;
 
 procedure TFrameMainTable.GraphMenuClick(Sender: TObject);
 var
   Parts: TArray<string>;
-  Command, Key: string;
-  GraphIndex, ColorIndex: Integer;
-  Series: TFlowGraphSeries;
+  Command, Key, KindText, SerialText: string;
+  GraphIndex, TargetIndex, I: Integer;
+  Source: TFlowGraphSeries;
+  Config, Existing: TGraphSeriesConfig;
+  MeterValue: TMeterValue;
+  ExistingOnGraph: Boolean;
+  Channel: TChannel;
 
-  function FindSeries: TFlowGraphSeries;
+  function FindSource(const AKey: string): TFlowGraphSeries;
   begin
     Result := nil;
-    if not FFlowGraphHistory.EtalonSeries.TryGetValue(Key, Result) then
-      FFlowGraphHistory.DeviceSeries.TryGetValue(Key, Result);
+    if not FFlowGraphHistory.EtalonSeries.TryGetValue(AKey, Result) then
+      FFlowGraphHistory.DeviceSeries.TryGetValue(AKey, Result);
+  end;
+
+  function FindConfig(APanel: TGraphPanelConfig;
+    const AKey: string): TGraphSeriesConfig;
+  var Item: TGraphSeriesConfig;
+  begin
+    Result := nil;
+    for Item in APanel.Series do
+      if SameText(Item.MeterValueKey, AKey) then Exit(Item);
+  end;
+
+  function FindSourceChannel(const AKey: string): TChannel;
+  var Index: Integer;
+  begin
+    Result := nil;
+    if FActiveWorkTable = nil then Exit;
+    for Index := 0 to FActiveWorkTable.EtalonChannels.Count - 1 do
+      if SameText(BuildFlowGraphChannelKey(fgckEtalon, FActiveWorkTable,
+           FActiveWorkTable.EtalonChannels[Index], Index), AKey) then
+        Exit(FActiveWorkTable.EtalonChannels[Index]);
+    for Index := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+      if SameText(BuildFlowGraphChannelKey(fgckDevice, FActiveWorkTable,
+           FActiveWorkTable.DeviceChannels[Index], Index), AKey) then
+        Exit(FActiveWorkTable.DeviceChannels[Index]);
   end;
 begin
-  if not (Sender is TMenuItem) or (TMenuItem(Sender).TagString = '') then
-    Exit;
+  if not (Sender is TMenuItem) or (TMenuItem(Sender).TagString = '') then Exit;
   Parts := TMenuItem(Sender).TagString.Split(['|']);
-  if Length(Parts) < 2 then
-    Exit;
+  if Length(Parts) < 2 then Exit;
   Command := Parts[0];
-  GraphIndex := StrToIntDef(Parts[1], 0);
+  GraphIndex := EnsureRange(StrToIntDef(Parts[1], 0), 0,
+    FGraphsViewConfig.GraphCount - 1);
   Key := '';
-  if Length(Parts) > 2 then
-    Key := Parts[2];
-  Series := FindSeries;
-  if SameText(Command, 'add') and (Series <> nil) then
+  if Length(Parts) > 2 then Key := Parts[2];
+  Source := FindSource(Key);
+
+  if SameText(Command, 'add') and (Source <> nil) then
   begin
-    Series.GraphIndex := GraphIndex;
-    Series.UserVisible := True;
+    if FFlowGraphHistory.EtalonSeries.ContainsKey(Key) then
+      KindText := 'Etalon'
+    else
+      KindText := 'Device';
+    Existing := FindConfig(FGraphsViewConfig.Panels[GraphIndex], Key);
+    ExistingOnGraph := Existing <> nil;
+    if ExistingOnGraph then
+      Existing.Visible := True
+    else
+    begin
+      Config := TGraphSeriesConfig.Create;
+      Config.GraphIndex := GraphIndex;
+      Config.MeterValueKey := Key;
+      Config.Caption := Source.Caption;
+      Config.Color := Source.Color;
+      Config.Visible := True;
+      if FFlowGraphHistory.EtalonSeries.ContainsKey(Key) then
+      begin
+        Config.OwnerKind := gsokEtalon;
+      end
+      else
+      begin
+        Config.OwnerKind := gsokDevice;
+      end;
+      Config.SourceKind := gskFlow;
+      Channel := FindSourceChannel(Key);
+      if Channel <> nil then
+        Config.ChannelUUID := Channel.UUID;
+      FGraphsViewConfig.Panels[GraphIndex].AddSeries(Config);
+    end;
+    Config := FindConfig(FGraphsViewConfig.Panels[GraphIndex], Key);
+    Channel := FindSourceChannel(Key);
+    SerialText := '';
+    if Channel <> nil then SerialText := Channel.Serial;
+    MeterValue := ResolveGraphSeriesMeterValue(Config);
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcAction, psForm, 'GraphSeriesAdded',
+        'Серия добавлена на график',
+        Format('GraphIndex=%d; SourceKind=%s; SourceName=%s; Serial=%s; ChannelUUID=%s; MeterValueHash=%p; SeriesPtr=%p; ExistingOnGraph=%s',
+          [GraphIndex + 1, KindText, Source.Caption, SerialText,
+           Config.ChannelUUID, Pointer(MeterValue), Pointer(Config),
+           BoolToStr(ExistingOnGraph, True)]));
   end
-  else if SameText(Command, 'remove') and (Series <> nil) then
-    Series.GraphIndex := -1
+  else if SameText(Command, 'remove') then
+  begin
+    Config := FindConfig(FGraphsViewConfig.Panels[GraphIndex], Key);
+    if Config <> nil then
+    begin
+      FGraphsViewConfig.Panels[GraphIndex].Series.Remove(Config);
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcAction, psForm, 'GraphSeriesRemoved',
+          'Серия удалена с графика',
+          Format('GraphIndex=%d; SourceKey=%s', [GraphIndex + 1, Key]));
+    end;
+  end
+  else if SameText(Command, 'move') and (Length(Parts) > 3) then
+  begin
+    TargetIndex := EnsureRange(StrToIntDef(Parts[3], 0), 0,
+      FGraphsViewConfig.GraphCount - 1);
+    Config := FindConfig(FGraphsViewConfig.Panels[GraphIndex], Key);
+    if (Config <> nil) and (TargetIndex <> GraphIndex) then
+    begin
+      Existing := FindConfig(FGraphsViewConfig.Panels[TargetIndex], Key);
+      if Existing = nil then
+      begin
+        Config := FGraphsViewConfig.Panels[GraphIndex].Series.Extract(Config);
+        Config.GraphIndex := TargetIndex;
+        FGraphsViewConfig.Panels[TargetIndex].Series.Add(Config);
+      end
+      else
+      begin
+        Existing.Visible := Config.Visible;
+        Existing.Color := Config.Color;
+        FGraphsViewConfig.Panels[GraphIndex].Series.Remove(Config);
+      end;
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcAction, psForm, 'GraphSeriesMoved',
+          'Серия перемещена между графиками',
+          Format('SourceGraphIndex=%d; TargetGraphIndex=%d; SourceKey=%s',
+            [GraphIndex + 1, TargetIndex + 1, Key]));
+    end;
+  end
   else if SameText(Command, 'clear') then
-  begin
-    for Series in FFlowGraphHistory.EtalonSeries.Values do
-      if Series.GraphIndex = GraphIndex then
-        Series.Samples.Clear;
-    for Series in FFlowGraphHistory.DeviceSeries.Values do
-      if Series.GraphIndex = GraphIndex then
-        Series.Samples.Clear;
-  end
-  else if SameText(Command, 'color') and (Series <> nil) then
-  begin
-    ColorIndex := 0;
-    while (ColorIndex < Length(FLOW_GRAPH_COLORS)) and
-      (FLOW_GRAPH_COLORS[ColorIndex] <> Series.Color) do
-      Inc(ColorIndex);
-    Series.Color := FLOW_GRAPH_COLORS[(ColorIndex + 1) mod Length(FLOW_GRAPH_COLORS)];
-  end;
+    FGraphsViewConfig.Panels[GraphIndex].Series.Clear
+  else if SameText(Command, 'showall') or SameText(Command, 'hideall') then
+    for Config in FGraphsViewConfig.Panels[GraphIndex].Series do
+      Config.Visible := SameText(Command, 'showall');
+
+  FSelectedGraphIndex := GraphIndex;
   RebuildSelectedGraphLegend;
   QueueRenderGraphViews;
 end;
@@ -7080,49 +7298,33 @@ end;
 procedure TFrameMainTable.RebuildSelectedGraphLegend;
 var
   I: Integer;
-
-  procedure AddDictionary(
-    ADictionary: TObjectDictionary<string, TFlowGraphSeries>);
-  var
-    LegendPair: TPair<string, TFlowGraphSeries>;
-    Marker: TRectangle;
-    CheckBox: TCheckBox;
-  begin
-    if ADictionary = nil then
-      Exit;
-    for LegendPair in ADictionary do
-    begin
-      if (LegendPair.Value = nil) or
-         (LegendPair.Value.GraphIndex <> FSelectedGraphIndex) then
-        Continue;
-      Marker := TRectangle.Create(FSelectedGraphLegend);
-      Marker.Parent := FSelectedGraphLegend;
-      Marker.Width := 16;
-      Marker.Height := 16;
-      Marker.Fill.Color := LegendPair.Value.Color;
-      Marker.Stroke.Kind := TBrushKind.None;
-      CheckBox := TCheckBox.Create(FSelectedGraphLegend);
-      CheckBox.Parent := FSelectedGraphLegend;
-      CheckBox.Width := 250;
-      CheckBox.Height := 28;
-      CheckBox.Text := LegendPair.Value.Caption;
-      CheckBox.TagString := LegendPair.Key;
-      CheckBox.IsChecked := LegendPair.Value.UserVisible;
-      CheckBox.Enabled := LegendPair.Value.ChannelAvailable;
-      CheckBox.OnChange := FlowGraphCheckBoxChange;
-    end;
-  end;
+  Config: TGraphSeriesConfig;
+  Marker: TRectangle;
+  CheckBox: TCheckBox;
 begin
-  if (FSelectedGraphLegend = nil) or (FFlowGraphHistory = nil) then
-    Exit;
+  if (FSelectedGraphLegend = nil) or (FGraphsViewConfig = nil) then Exit;
   for I := FSelectedGraphLegend.ChildrenCount - 1 downto 0 do
     FSelectedGraphLegend.Children[I].Free;
-  FSelectedGraphLegend.Visible := (FGraphsViewConfig <> nil) and
-    FGraphsViewConfig.ShowLegend;
-  if not FSelectedGraphLegend.Visible then
-    Exit;
-  AddDictionary(FFlowGraphHistory.EtalonSeries);
-  AddDictionary(FFlowGraphHistory.DeviceSeries);
+  FSelectedGraphLegend.Visible := FGraphsViewConfig.ShowLegend;
+  if (not FSelectedGraphLegend.Visible) or
+     (FSelectedGraphIndex < 0) or
+     (FSelectedGraphIndex >= FGraphsViewConfig.Panels.Count) then Exit;
+  for Config in FGraphsViewConfig.Panels[FSelectedGraphIndex].Series do
+  begin
+    Marker := TRectangle.Create(FSelectedGraphLegend);
+    Marker.Parent := FSelectedGraphLegend;
+    Marker.Width := 16; Marker.Height := 16;
+    Marker.Fill.Color := Config.Color;
+    Marker.Stroke.Kind := TBrushKind.None;
+    CheckBox := TCheckBox.Create(FSelectedGraphLegend);
+    CheckBox.Parent := FSelectedGraphLegend;
+    CheckBox.Width := 250; CheckBox.Height := 28;
+    CheckBox.Text := Config.Caption;
+    CheckBox.TagString := Config.MeterValueKey;
+    CheckBox.Tag := FSelectedGraphIndex;
+    CheckBox.IsChecked := Config.Visible;
+    CheckBox.OnChange := FlowGraphCheckBoxChange;
+  end;
 end;
 
 procedure TFrameMainTable.QueueRenderGraphViews;
@@ -7162,32 +7364,29 @@ var
   Combined: TObjectDictionary<string, TFlowGraphSeries>;
   BaseMs: Int64;
   AxisMinSec, AxisMaxSec: Double;
-
-  procedure AddDictionary(ADictionary: TObjectDictionary<string, TFlowGraphSeries>);
-  var
-    DictionaryPair: TPair<string, TFlowGraphSeries>;
-  begin
-    if ADictionary = nil then
-      Exit;
-    for DictionaryPair in ADictionary do
-      if (DictionaryPair.Value <> nil) and
-         (DictionaryPair.Value.GraphIndex = AView.GraphIndex) then
-        Combined.AddOrSetValue(DictionaryPair.Key, DictionaryPair.Value);
-  end;
+  Config: TGraphSeriesConfig;
+  Source, Visual: TFlowGraphSeries;
 begin
   if (AView = nil) or (AView.Chart = nil) or
-     (FFlowGraphHistory = nil) or (FGraphsViewConfig = nil) then
-    Exit;
+     (FFlowGraphHistory = nil) or (FGraphsViewConfig = nil) then Exit;
   if (AView.GraphIndex < 0) or
-     (AView.GraphIndex >= FGraphsViewConfig.Panels.Count) then
-    Exit;
-  Combined := TObjectDictionary<string, TFlowGraphSeries>.Create([]);
+     (AView.GraphIndex >= FGraphsViewConfig.Panels.Count) then Exit;
+  { Visual series own visibility/color, while all of them share the source's
+    immutable sample list and therefore the same TMeterValue history. }
+  Combined := TObjectDictionary<string, TFlowGraphSeries>.Create([doOwnsValues]);
   try
-    AddDictionary(FFlowGraphHistory.EtalonSeries);
-    AddDictionary(FFlowGraphHistory.DeviceSeries);
+    for Config in FGraphsViewConfig.Panels[AView.GraphIndex].Series do
+    begin
+      Source := nil;
+      if not FFlowGraphHistory.EtalonSeries.TryGetValue(Config.MeterValueKey, Source) then
+        FFlowGraphHistory.DeviceSeries.TryGetValue(Config.MeterValueKey, Source);
+      if Source = nil then Continue;
+      Visual := TFlowGraphSeries.CreateVisual(Source, AView.GraphIndex,
+        Config.Color, Config.Visible);
+      Combined.Add(Config.MeterValueKey, Visual);
+    end;
     BaseMs := FGraphMonitorStartMs;
-    if FCurrentGraphPointStartMs > 0 then
-      BaseMs := FCurrentGraphPointStartMs;
+    if FCurrentGraphPointStartMs > 0 then BaseMs := FCurrentGraphPointStartMs;
     AxisMinSec := 0;
     AxisMaxSec := GraphVisibleWindowSec;
     if BaseMs > 0 then
@@ -7198,7 +7397,6 @@ begin
     RenderFlowChart(AView.Chart, Combined,
       FGraphsViewConfig.Panels[AView.GraphIndex].Title, FFlowGraphXMin,
       FFlowGraphXMax, AxisMinSec, AxisMaxSec, FCurrentGraphPointStartMs > 0);
-
     AView.EmptyLabel.Visible := Combined.Count = 0;
   finally
     Combined.Free;
@@ -7263,7 +7461,8 @@ begin
     if (Channel <> nil) and SameText(Channel.UUID, ASeries.ChannelUUID) then
     begin
       if (Channel.FlowMeter <> nil) and
-         (SameText(ASeries.MeterValueKey, 'FlowRate') or
+         ((ASeries.SourceKind = gskFlow) or
+          SameText(ASeries.MeterValueKey, 'FlowRate') or
           SameText(ASeries.MeterValueKey, 'ValueFlow')) then
         Result := Channel.FlowMeter.ValueFlow;
       if (Channel.FlowMeter <> nil) and
