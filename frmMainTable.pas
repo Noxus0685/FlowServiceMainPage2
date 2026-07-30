@@ -1165,39 +1165,39 @@ constructor TGraphPanelView.Create(AOwner: TComponent; AParent: TFmxObject;
 begin
   inherited Create;
   GraphIndex := AGraphIndex;
-  Root := TLayout.Create(nil);
+  Root := TLayout.Create(AOwner);
   Root.Parent := AParent;
   Root.Align := TAlignLayout.None;
   Root.Padding.Rect := RectF(4, 4, 4, 4);
 
-  Header := TLayout.Create(Root);
+  Header := TLayout.Create(AOwner);
   Header.Parent := Root;
   Header.Align := TAlignLayout.Top;
   Header.Height := 32;
-  TitleLabel := TLabel.Create(Root);
+  TitleLabel := TLabel.Create(AOwner);
   TitleLabel.Parent := Header;
   TitleLabel.Align := TAlignLayout.Client;
   TitleLabel.Text := Format('График %d', [GraphIndex + 1]);
   TitleLabel.TextSettings.Font.Style := [TFontStyle.fsBold];
 
-  LegendHost := TLayout.Create(Root);
+  LegendHost := TLayout.Create(AOwner);
   LegendHost.Parent := Root;
   LegendHost.Align := TAlignLayout.Bottom;
   LegendHost.Height := 0;
   LegendHost.Visible := False;
-  LegendLayout := TFlowLayout.Create(Root);
+  LegendLayout := TFlowLayout.Create(AOwner);
   LegendLayout.Parent := LegendHost;
   LegendLayout.Align := TAlignLayout.Client;
   LegendLayout.FlowDirection := TFlowDirection.LeftToRight;
 
-  Chart := TSimpleChart.Create(Root);
+  Chart := TSimpleChart.Create(AOwner);
   Chart.Parent := Root;
   Chart.Align := TAlignLayout.Client;
   Chart.BackgroundColor := TAlphaColors.White;
   Chart.XTitle := 'Время, с';
   Chart.YTitle := 'Значение';
 
-  EmptyLabel := TLabel.Create(Root);
+  EmptyLabel := TLabel.Create(AOwner);
   EmptyLabel.Parent := Root;
   EmptyLabel.Align := TAlignLayout.Center;
   EmptyLabel.Width := 310;
@@ -1206,27 +1206,20 @@ begin
     'Добавьте серию через правую кнопку мыши.';
   EmptyLabel.TextSettings.HorzAlign := TTextAlign.Center;
 
-  PopupMenu := TPopupMenu.Create(Root);
+  PopupMenu := TPopupMenu.Create(AOwner);
   Root.PopupMenu := PopupMenu;
 end;
 
 destructor TGraphPanelView.Destroy;
 begin
-  if Root <> nil then
-  begin
-    Root.PopupMenu := nil;
-    Root.Parent := nil;
-    Root.Free;
-    Root := nil;
-  end;
-
-  PopupMenu := nil;
+  Root := nil;
   Header := nil;
   TitleLabel := nil;
   Chart := nil;
   EmptyLabel := nil;
   LegendHost := nil;
   LegendLayout := nil;
+  PopupMenu := nil;
   inherited;
 end;
 
@@ -1348,10 +1341,6 @@ begin
 end;
 
 procedure TFrameMainTable.BeforeDestruction;
-var
-  GraphView: TGraphPanelView;
-  Splitter: TSplitter;
-  Container: TLayout;
 begin
   FDestroying := True;
   FGraphRenderQueued := False;
@@ -1368,44 +1357,11 @@ begin
     FStabilitySampleTimer.OnTimer := nil;
   end;
 
-  if FGraphViews <> nil then
-    for GraphView in FGraphViews do
-    begin
-      if GraphView = nil then
-        Continue;
-
-      if GraphView.Root <> nil then
-      begin
-        GraphView.Root.OnClick := nil;
-        GraphView.Root.PopupMenu := nil;
-        GraphView.Root.Parent := nil;
-      end;
-
-      if GraphView.Header <> nil then
-        GraphView.Header.OnClick := nil;
-
-      if GraphView.TitleLabel <> nil then
-        GraphView.TitleLabel.OnClick := nil;
-
-      if GraphView.Chart <> nil then
-        GraphView.Chart.OnClick := nil;
-
-      if GraphView.LegendHost <> nil then
-        GraphView.LegendHost.OnClick := nil;
-
-      if GraphView.PopupMenu <> nil then
-        GraphView.PopupMenu.OnPopup := nil;
-    end;
-
   if FGraphSplitters <> nil then
-    for Splitter in FGraphSplitters do
-      if Splitter <> nil then
-        Splitter.Parent := nil;
+    FGraphSplitters.Clear;
 
   if FGraphLayoutContainers <> nil then
-    for Container in FGraphLayoutContainers do
-      if Container <> nil then
-        Container.Parent := nil;
+    FGraphLayoutContainers.Clear;
 
   inherited;
 end;
@@ -1420,14 +1376,12 @@ begin
     FGraphRenderTimer.Enabled := False;
     FGraphRenderTimer.OnTimer := nil;
   end;
-  FreeAndNil(FGraphRenderTimer);
 
   if FStabilitySampleTimer <> nil then
   begin
     FStabilitySampleTimer.Enabled := False;
     FStabilitySampleTimer.OnTimer := nil;
   end;
-  FreeAndNil(FStabilitySampleTimer);
 
   FreeAndNil(FGraphSplitters);
   FreeAndNil(FGraphLayoutContainers);
@@ -6511,9 +6465,9 @@ begin
   if FGraphViews = nil then
     FGraphViews := TObjectList<TGraphPanelView>.Create(True);
   if FGraphSplitters = nil then
-    FGraphSplitters := TObjectList<TSplitter>.Create(True);
+    FGraphSplitters := TObjectList<TSplitter>.Create(False);
   if FGraphLayoutContainers = nil then
-    FGraphLayoutContainers := TObjectList<TLayout>.Create(True);
+    FGraphLayoutContainers := TObjectList<TLayout>.Create(False);
   if FGraphRenderTimer = nil then
   begin
     FGraphRenderTimer := TTimer.Create(Self);
@@ -6877,6 +6831,7 @@ end;
 
 procedure TFrameMainTable.ClearGraphsLayout;
 var
+  I: Integer;
   GraphView: TGraphPanelView;
   Splitter: TSplitter;
   Container: TLayout;
@@ -6892,22 +6847,30 @@ begin
       end;
 
   if FGraphSplitters <> nil then
-  begin
-    for Splitter in FGraphSplitters do
-      if Splitter <> nil then
-        Splitter.Parent := nil;
+    for I := FGraphSplitters.Count - 1 downto 0 do
+    begin
+      Splitter := FGraphSplitters[I];
+      FGraphSplitters.Delete(I);
 
-    FGraphSplitters.Clear;
-  end;
+      if Splitter <> nil then
+      begin
+        Splitter.Parent := nil;
+        Splitter.Free;
+      end;
+    end;
 
   if FGraphLayoutContainers <> nil then
-  begin
-    for Container in FGraphLayoutContainers do
-      if Container <> nil then
-        Container.Parent := nil;
+    for I := FGraphLayoutContainers.Count - 1 downto 0 do
+    begin
+      Container := FGraphLayoutContainers[I];
+      FGraphLayoutContainers.Delete(I);
 
-    FGraphLayoutContainers.Clear;
-  end;
+      if Container <> nil then
+      begin
+        Container.Parent := nil;
+        Container.Free;
+      end;
+    end;
 end;
 
 procedure TFrameMainTable.DetachGraphViewEvents;

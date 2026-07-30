@@ -138,7 +138,7 @@ def test_popup_menu_is_built_on_popup():
     assert "PopupMenu.OnPopup := GraphPopupMenuPopup" in FRAME
 
 
-def test_graph_views_are_detached_before_fmx_destruction_starts():
+def test_before_destruction_does_not_dereference_fmx_controls():
     declaration = "procedure BeforeDestruction; override;"
     before_destruction = extract_routine_body(
         FRAME, "procedure TFrameMainTable.BeforeDestruction"
@@ -148,34 +148,33 @@ def test_graph_views_are_detached_before_fmx_destruction_starts():
     )
 
     assert declaration in FRAME
-    assert "GraphView.Root.Parent := nil;" in before_destruction
-    assert "GraphView.Root.Align" not in before_destruction
-    assert "GraphView.Root.Parent" not in frame_destroy
-    assert "GraphView.Root.Align" not in frame_destroy
-    assert "for View " not in frame_destroy
-    assert "View." not in frame_destroy
+    assert "FGraphSplitters.Clear;" in before_destruction
+    assert "FGraphLayoutContainers.Clear;" in before_destruction
+    for visual_property in (".Parent", ".Align", ".Width", ".Height"):
+        assert visual_property not in before_destruction
+        assert visual_property not in frame_destroy
+    assert "ClearGraphsLayout" not in before_destruction
     assert "DetachGraphViewEvents" not in frame_destroy
 
 
-def test_graph_view_owns_exactly_one_ownerless_root():
+def test_graph_view_controls_are_owned_by_the_frame():
     constructor = extract_routine_body(FRAME, "constructor TGraphPanelView.Create")
     view_destroy = extract_routine_body(FRAME, "destructor TGraphPanelView.Destroy")
 
-    assert "Root := TLayout.Create(nil);" in constructor
+    assert "Root := TLayout.Create(AOwner);" in constructor
     for child_creation in (
-        "Header := TLayout.Create(Root);",
-        "TitleLabel := TLabel.Create(Root);",
-        "Chart := TSimpleChart.Create(Root);",
-        "EmptyLabel := TLabel.Create(Root);",
-        "LegendHost := TLayout.Create(Root);",
-        "LegendLayout := TFlowLayout.Create(Root);",
-        "PopupMenu := TPopupMenu.Create(Root);",
+        "Header := TLayout.Create(AOwner);",
+        "TitleLabel := TLabel.Create(AOwner);",
+        "Chart := TSimpleChart.Create(AOwner);",
+        "EmptyLabel := TLabel.Create(AOwner);",
+        "LegendHost := TLayout.Create(AOwner);",
+        "LegendLayout := TFlowLayout.Create(AOwner);",
+        "PopupMenu := TPopupMenu.Create(AOwner);",
     ):
         assert child_creation in constructor
-    assert "Root.Parent := nil;" in view_destroy
-    assert view_destroy.count(".Free;") == 1
-    assert "Root.Free;" in view_destroy
-    assert "Root.Align" not in view_destroy
+    assert "Root.Free;" not in view_destroy
+    assert "PopupMenu.Free;" not in view_destroy
+    assert ".Parent" not in view_destroy
 
 
 def test_graph_render_callbacks_stop_during_destruction():
@@ -201,13 +200,13 @@ def test_temporary_graph_layout_controls_have_one_owner():
         FRAME, "procedure TFrameMainTable.ApplyGraphsLayout"
     )
 
-    assert "Result := TSplitter.Create(nil);" in apply_layout
-    assert "Result := TLayout.Create(nil);" in apply_layout
-    assert "TSplitter.Create(Self)" not in apply_layout
-    assert "TLayout.Create(Self)" not in apply_layout
-    assert "FGraphSplitters := TObjectList<TSplitter>.Create(True);" in FRAME
+    assert "Result := TSplitter.Create(Self);" in apply_layout
+    assert "Result := TLayout.Create(Self);" in apply_layout
+    assert "TSplitter.Create(nil)" not in apply_layout
+    assert "TLayout.Create(nil)" not in apply_layout
+    assert "FGraphSplitters := TObjectList<TSplitter>.Create(False);" in FRAME
     assert (
-        "FGraphLayoutContainers := TObjectList<TLayout>.Create(True);" in FRAME
+        "FGraphLayoutContainers := TObjectList<TLayout>.Create(False);" in FRAME
     )
 
 
@@ -222,16 +221,17 @@ def test_temporary_layout_controls_are_detached_before_freeing():
         FRAME, "destructor TFrameMainTable.Destroy"
     )
 
-    assert clear_layout.index("GraphView.Root.Parent := LayoutGraphsClient;") < (
-        clear_layout.index("FGraphSplitters.Clear;")
-    )
-    assert clear_layout.index("Splitter.Parent := nil;") < (
-        clear_layout.index("FGraphSplitters.Clear;")
-    )
-    assert clear_layout.index("Container.Parent := nil;") < (
-        clear_layout.index("FGraphLayoutContainers.Clear;")
-    )
-    assert "Splitter.Parent := nil;" in before_destruction
-    assert "Container.Parent := nil;" in before_destruction
-    for visual_property in (".Parent", ".Align", ".Width", ".Height"):
-        assert visual_property not in frame_destroy
+    reparent = clear_layout.index("GraphView.Root.Parent := LayoutGraphsClient;")
+    delete_splitter = clear_layout.index("FGraphSplitters.Delete(I);")
+    delete_container = clear_layout.index("FGraphLayoutContainers.Delete(I);")
+    assert reparent < delete_splitter < delete_container
+    assert "for I := FGraphSplitters.Count - 1 downto 0 do" in clear_layout
+    assert "for I := FGraphLayoutContainers.Count - 1 downto 0 do" in clear_layout
+    assert "Splitter.Parent := nil;" in clear_layout
+    assert "Splitter.Free;" in clear_layout
+    assert "Container.Parent := nil;" in clear_layout
+    assert "Container.Free;" in clear_layout
+    assert "for Splitter" not in frame_destroy
+    assert "for Container" not in frame_destroy
+    assert "ClearGraphsLayout" not in before_destruction
+    assert "ClearGraphsLayout" not in frame_destroy
