@@ -345,6 +345,7 @@ type
      FTabControlMain: TTabControl;
      FTabItemDevice: TTabItem;
      FTabItemCoefs: TTabItem;
+     FComboCoefTable: TComboBox;
      FGridCoefs: TGrid;
      FButtonCoefAdd: TButton;
      FButtonCoefDelete: TButton;
@@ -399,7 +400,10 @@ type
      procedure CreateGridPointsHeaderMenu;
 
      procedure InitCoefsTab;
-     procedure EnsureCalibrCoefTable;
+     procedure UpdateCoefTablesCombo;
+     function GetCalibrCoefTableCaption(ATable: TCalibrCoefTable): string;
+     function GetSelectedCalibrCoefTable: TCalibrCoefTable;
+     procedure ComboCoefTableChange(Sender: TObject);
      procedure UpdateCoefsGrid;
      function GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;
      procedure GridCoefsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
@@ -1493,17 +1497,6 @@ begin
   end;
 end;
 
-procedure TFormDeviceEditor.EnsureCalibrCoefTable;
-begin
-  if FDevice = nil then
-    Exit;
-
-  if FDevice.CalibrCoefTable = nil then
-    FDevice.CalibrCoefTable := TCalibrCoefTable.Create;
-
-  FDevice.CalibrCoefTable.DeviceID := FDevice.ID;
-end;
-
 procedure TFormDeviceEditor.InitCoefsTab;
 
   function NewCol(const AHeader: string; const AWidth: Single): TStringColumn;
@@ -1515,6 +1508,7 @@ procedure TFormDeviceEditor.InitCoefsTab;
   end;
 var
   LTop: TLayout;
+  LButtons: TLayout;
 begin
   if FCoefsTabInitialized then
     Exit;
@@ -1548,26 +1542,38 @@ begin
   LTop.Padding.Top := 6;
   LTop.Padding.Bottom := 6;
 
-  FButtonCoefAdd := TButton.Create(LTop);
-  FButtonCoefAdd.Parent := LTop;
+  // ComboBox selects one table from CalibrCoefTables; using CalibrCoefTable alone
+  // would always show only the first table in the collection.
+  LButtons := TLayout.Create(LTop);
+  LButtons.Parent := LTop;
+  LButtons.Align := TAlignLayout.Right;
+  LButtons.Width := 380;
+
+  FButtonCoefAdd := TButton.Create(LButtons);
+  FButtonCoefAdd.Parent := LButtons;
   FButtonCoefAdd.Align := TAlignLayout.Left;
   FButtonCoefAdd.Width := 120;
   FButtonCoefAdd.Text := 'Добавить';
   FButtonCoefAdd.OnClick := ButtonCoefAddClick;
 
-  FButtonCoefDelete := TButton.Create(LTop);
-  FButtonCoefDelete.Parent := LTop;
+  FButtonCoefDelete := TButton.Create(LButtons);
+  FButtonCoefDelete.Parent := LButtons;
   FButtonCoefDelete.Align := TAlignLayout.Left;
   FButtonCoefDelete.Width := 120;
   FButtonCoefDelete.Text := 'Удалить';
   FButtonCoefDelete.OnClick := ButtonCoefDeleteClick;
 
-  FButtonCoefClear := TButton.Create(LTop);
-  FButtonCoefClear.Parent := LTop;
+  FButtonCoefClear := TButton.Create(LButtons);
+  FButtonCoefClear.Parent := LButtons;
   FButtonCoefClear.Align := TAlignLayout.Left;
   FButtonCoefClear.Width := 140;
   FButtonCoefClear.Text := 'Очистить';
   FButtonCoefClear.OnClick := ButtonCoefClearClick;
+
+  FComboCoefTable := TComboBox.Create(LTop);
+  FComboCoefTable.Parent := LTop;
+  FComboCoefTable.Align := TAlignLayout.Client;
+  FComboCoefTable.OnChange := ComboCoefTableChange;
 
   FGridCoefs := TGrid.Create(FTabItemCoefs);
   FGridCoefs.Parent := FTabItemCoefs;
@@ -1589,6 +1595,95 @@ begin
   FCoefsTabInitialized := True;
 end;
 
+function TFormDeviceEditor.GetCalibrCoefTableCaption(
+  ATable: TCalibrCoefTable): string;
+var
+  TypeCaption: string;
+begin
+  if ATable = nil then
+    Exit('');
+
+  case ATable.&Type of
+    Ord(cctMeterValueCoef): TypeCaption := 'Коэффициент прибора';
+    Ord(cctMeterValueFlowRate): TypeCaption := 'Расход';
+    Ord(cctMeterValueQuantity): TypeCaption := 'Количество';
+    Ord(cctMeterValueDensity): TypeCaption := 'Плотность';
+  else
+    TypeCaption := 'Неизвестный тип: ' + IntToStr(ATable.&Type);
+  end;
+
+  Result := TypeCaption;
+  if Trim(ATable.Name) <> '' then
+    Result := Result + ' — ' + ATable.Name;
+  if ATable.Active then
+    Result := Result + ' [активная]';
+  Result := Result + ', точек: ' + IntToStr(ATable.Items.Count);
+end;
+
+function TFormDeviceEditor.GetSelectedCalibrCoefTable: TCalibrCoefTable;
+var
+  Index: Integer;
+begin
+  Result := nil;
+  if (FDevice = nil) or (FComboCoefTable = nil) or
+     (FDevice.CalibrCoefTables = nil) then
+    Exit;
+
+  Index := FComboCoefTable.ItemIndex;
+  if (Index < 0) or (Index >= FDevice.CalibrCoefTables.Count) then
+    Exit;
+
+  Result := FDevice.CalibrCoefTables[Index];
+end;
+
+procedure TFormDeviceEditor.UpdateCoefTablesCombo;
+var
+  I, SelectedIndex: Integer;
+  SelectedTable, Table: TCalibrCoefTable;
+begin
+  if FComboCoefTable = nil then
+    Exit;
+
+  SelectedTable := GetSelectedCalibrCoefTable;
+  SelectedIndex := -1;
+  FComboCoefTable.BeginUpdate;
+  try
+    FComboCoefTable.Items.Clear;
+    if (FDevice <> nil) and (FDevice.CalibrCoefTables <> nil) then
+      for I := 0 to FDevice.CalibrCoefTables.Count - 1 do
+      begin
+        Table := FDevice.CalibrCoefTables[I];
+        FComboCoefTable.Items.Add(GetCalibrCoefTableCaption(Table));
+        if Table = SelectedTable then
+          SelectedIndex := I;
+      end;
+
+    if (SelectedIndex < 0) and (FDevice <> nil) and
+       (FDevice.CalibrCoefTables <> nil) then
+      for I := 0 to FDevice.CalibrCoefTables.Count - 1 do
+      begin
+        Table := FDevice.CalibrCoefTables[I];
+        if Table.Active and (Table.Items.Count > 0) then
+        begin
+          SelectedIndex := I;
+          Break;
+        end;
+      end;
+
+    if (SelectedIndex < 0) and (FComboCoefTable.Items.Count > 0) then
+      SelectedIndex := 0;
+    FComboCoefTable.ItemIndex := SelectedIndex;
+  finally
+    FComboCoefTable.EndUpdate;
+  end;
+end;
+
+procedure TFormDeviceEditor.ComboCoefTableChange(Sender: TObject);
+begin
+  // Switching the viewed table does not change device data.
+  UpdateCoefsGrid;
+end;
+
 procedure TFormDeviceEditor.GridCoefsKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
 begin
@@ -1601,33 +1696,40 @@ begin
 end;
 
 procedure TFormDeviceEditor.UpdateCoefsGrid;
+var
+  Table: TCalibrCoefTable;
 begin
   if FGridCoefs = nil then
     Exit;
 
-  EnsureCalibrCoefTable;
+  Table := GetSelectedCalibrCoefTable;
 
   FGridCoefs.BeginUpdate;
   try
-    FGridCoefs.RowCount := FDevice.CalibrCoefTable.Items.Count;
+    if Table <> nil then
+      FGridCoefs.RowCount := Table.Items.Count
+    else
+      FGridCoefs.RowCount := 0;
   finally
     FGridCoefs.EndUpdate;
   end;
 end;
 
 function TFormDeviceEditor.GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;
+var
+  Table: TCalibrCoefTable;
 begin
   Result := nil;
 
   if (FDevice = nil) or (ARow < 0) then
     Exit;
 
-  EnsureCalibrCoefTable;
-
-  if ARow >= FDevice.CalibrCoefTable.Items.Count then
+  // Every grid operation is restricted to the table selected in the ComboBox.
+  Table := GetSelectedCalibrCoefTable;
+  if (Table = nil) or (ARow >= Table.Items.Count) then
     Exit;
 
-  Result := FDevice.CalibrCoefTable.Items[ARow];
+  Result := Table.Items[ARow];
 end;
 
 procedure TFormDeviceEditor.GridCoefsGetValue(Sender: TObject; const ACol,
@@ -1678,19 +1780,24 @@ end;
 procedure TFormDeviceEditor.ButtonCoefAddClick(Sender: TObject);
 var
   Item: TCalibrCoefItem;
+  Table: TCalibrCoefTable;
 begin
-  EnsureCalibrCoefTable;
+  Table := GetSelectedCalibrCoefTable;
+  if Table = nil then
+    Exit;
 
   Item := TCalibrCoefItem.Create;
-  Item.OrderNo := FDevice.CalibrCoefTable.Items.Count + 1;
+  Item.TableID := Table.ID;
+  Item.OrderNo := Table.Items.Count + 1;
   Item.Name := 'Коэф. ' + IntToStr(Item.OrderNo);
   Item.Value := 1;
   Item.Arg := 0;
   Item.K := 1;
   Item.b := 0;
 
-  FDevice.CalibrCoefTable.Items.Add(Item);
+  Table.Items.Add(Item);
 
+  UpdateCoefTablesCombo;
   UpdateCoefsGrid;
   if FGridCoefs.RowCount > 0 then
     FGridCoefs.Selected := FGridCoefs.RowCount - 1;
@@ -1701,29 +1808,38 @@ end;
 procedure TFormDeviceEditor.ButtonCoefDeleteClick(Sender: TObject);
 var
   Row: Integer;
+  Table: TCalibrCoefTable;
 begin
   if (FDevice = nil) or (FGridCoefs = nil) then
     Exit;
 
-  EnsureCalibrCoefTable;
-
-  Row := FGridCoefs.Row;
-  if (Row < 0) or (Row >= FDevice.CalibrCoefTable.Items.Count) then
+  Table := GetSelectedCalibrCoefTable;
+  if Table = nil then
     Exit;
 
-  FDevice.CalibrCoefTable.Items.Delete(Row);
+  Row := FGridCoefs.Row;
+  if (Row < 0) or (Row >= Table.Items.Count) then
+    Exit;
+
+  Table.Items.Delete(Row);
+  UpdateCoefTablesCombo;
   UpdateCoefsGrid;
   SetModified;
 end;
 
 procedure TFormDeviceEditor.ButtonCoefClearClick(Sender: TObject);
+var
+  Table: TCalibrCoefTable;
 begin
   if FDevice = nil then
     Exit;
 
-  EnsureCalibrCoefTable;
-  FDevice.CalibrCoefTable.Items.Clear;
+  Table := GetSelectedCalibrCoefTable;
+  if Table = nil then
+    Exit;
+  Table.Items.Clear;
 
+  UpdateCoefTablesCombo;
   UpdateCoefsGrid;
   SetModified;
 end;
@@ -1970,6 +2086,7 @@ begin
     end;
 
     UpdateUIFromDevice;
+    UpdateCoefTablesCombo;
     UpdateCoefsGrid;
 
   finally
