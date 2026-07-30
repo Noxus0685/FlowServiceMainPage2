@@ -7872,6 +7872,20 @@ begin
     AWorkTable.SimulationLastFlowOutcomeMs := MonotonicNowMs;
   end;
 
+  MonotonicNowMs := TMeterValue.GetMonotonicTimeMs;
+  if (AWorkTable.SimulationLastNoiseMs > 0) and
+     (AWorkTable.SimulationLastNoiseMs > AWorkTable.SimulationLastFlowOutcomeMs) and
+     (MonotonicNowMs - AWorkTable.SimulationLastNoiseMs >= 2000) then
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcError, psWorkTable,
+        'SimulationFlowSampleNotCalled', 'Simulation flow integration watchdog',
+        Format('Version=%s; LastSimulationNoiseMs=%d; LastFlowOutcomeMs=%d',
+          [APP_VERSION, AWorkTable.SimulationLastNoiseMs,
+           AWorkTable.SimulationLastFlowOutcomeMs]));
+    AWorkTable.SimulationLastFlowOutcomeMs := MonotonicNowMs;
+  end;
+
   CurrentTimeMs := GetCurrentTimeMs;
   if AWorkTable.SimulationLastUpdateTimeMs > 0 then
     DeltaTimeSec := EnsureRange((CurrentTimeMs - AWorkTable.SimulationLastUpdateTimeMs) / 1000.0,
