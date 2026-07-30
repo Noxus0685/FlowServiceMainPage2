@@ -150,6 +150,12 @@ type
     Value: Double;
   end;
 
+  /// <summary>Identifies whether a stability sample was recorded automatically or manually.</summary>
+  TMeterValueSampleSource = (
+    mssAutomatic,
+    mssManual
+  );
+
 
   /// <summary>Per-source-sample diagnostic flags calculated by stability analysis.</summary>
   TMeterValueSampleAnalysis = record
@@ -219,6 +225,13 @@ type
     MinWindowDurationSec: Double;
     /// <summary>Maximum number of latest samples kept in working history and shown from TMeterValue history.</summary>
     SampleSize: Integer;
+    /// <summary>
+    /// Минимальный интервал в секундах между автоматически записанными
+    /// пробами стабильности.
+    /// Более частые обновления Value не создают новые записи в FSamples.
+    /// Значение 0 отключает прореживание.
+    /// </summary>
+    MinimumSampleIntervalSec: Double;
     /// <summary>Maximum allowed age in seconds for the latest eligible sample.</summary>
     MaxSampleAgeSec: Double;
     /// <summary>Maximum allowed max-min spread in physical units.</summary>
