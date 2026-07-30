@@ -162,7 +162,8 @@ type
     procedure RefreshLayoutCoefs;
     procedure ApplyFilter;
     procedure UpdateGridDevices;
-    function FindOwnerFlowMeter: TFlowMeter;
+    function FindOwnerFlowMeter: TFlowMeter; overload;
+    function FindOwnerFlowMeter(out ACandidateCount: Integer): TFlowMeter; overload;
     function FindTableForValue(AFlowMeter: TFlowMeter; AValue: TMeterValue;
       out ASourceField: string): TCalibrCoefTable;
     function FindTableByType(AFlowMeter: TFlowMeter;
@@ -584,17 +585,54 @@ end;
 
 function TFormMeterValues.FindOwnerFlowMeter: TFlowMeter;
 var
+  CandidateCount: Integer;
+begin
+  Result := FindOwnerFlowMeter(CandidateCount);
+end;
+
+function TFormMeterValues.FindOwnerFlowMeter(
+  out ACandidateCount: Integer): TFlowMeter;
+var
   FlowMeter: TFlowMeter;
+  Candidate, OwnerCandidate: TFlowMeter;
+  OwnerCandidateCount: Integer;
+  IsCandidate, OwnerMatches: Boolean;
 begin
   Result := nil;
+  Candidate := nil;
+  OwnerCandidate := nil;
+  ACandidateCount := 0;
+  OwnerCandidateCount := 0;
   if (MeterValue = nil) or (TFlowMeter.FlowMeters = nil) then
     Exit;
   for FlowMeter in TFlowMeter.FlowMeters do
-    if (FlowMeter <> nil) and
-       ((FlowMeter.ValueCoef = MeterValue) or (FlowMeter.ValueFlow = MeterValue) or
+    if FlowMeter <> nil then
+    begin
+      IsCandidate := (FlowMeter.ValueCoef = MeterValue) or
+        (FlowMeter.ValueFlow = MeterValue) or
         (FlowMeter.ValueQuantity = MeterValue) or
-        (FlowMeter.ValueDensity = MeterValue)) then
-      Exit(FlowMeter);
+        (FlowMeter.ValueDensity = MeterValue) or
+        ((FlowMeter.ValueCoef <> nil) and
+         SameText(FlowMeter.ValueCoef.Hash, MeterValue.Hash));
+      if not IsCandidate then Continue;
+      Inc(ACandidateCount);
+      Candidate := FlowMeter;
+      OwnerMatches := (Trim(MeterValue.HashOwner) <> '') and
+        (SameText(MeterValue.HashOwner, FlowMeter.DeviceUUID) or
+         SameText(MeterValue.HashOwner, FlowMeter.UUID));
+      if not OwnerMatches and (Trim(MeterValue.NameOwner) <> '') then
+        OwnerMatches := SameText(MeterValue.NameOwner, FlowMeter.Name) or
+          SameText(MeterValue.NameOwner, FlowMeter.SerialNumber);
+      if OwnerMatches then
+      begin
+        Inc(OwnerCandidateCount);
+        OwnerCandidate := FlowMeter;
+      end;
+    end;
+  if OwnerCandidateCount = 1 then
+    Result := OwnerCandidate
+  else if (OwnerCandidateCount = 0) and (ACandidateCount = 1) then
+    Result := Candidate;
 end;
 
 function TFormMeterValues.FindTableForValue(AFlowMeter: TFlowMeter;
@@ -639,17 +677,19 @@ begin
   begin
     FlowMeter.RefreshCorrectionTables;
     TableCoef := FindTableForValue(FlowMeter, FlowMeter.ValueCoef, FieldName);
+    if TableCoef = nil then
+      TableCoef := FindTableByType(FlowMeter, cctReference);
     TableFlow := FindTableForValue(FlowMeter, FlowMeter.ValueFlow, FieldName);
     TableQuantity := FindTableForValue(FlowMeter, FlowMeter.ValueQuantity, FieldName);
     TableDensity := FindTableForValue(FlowMeter, FlowMeter.ValueDensity, FieldName);
     ProtocolManager.AddMessage(pcInfo, psForm, 'MeterValueCorrectionTabOpened',
       'Открыта вкладка коррекции метрологической величины',
-      Format('MeterValueHash=%s; MeterValuePtr=%p; DeviceUUID=%s; ' +
+      Format('MeterValueHash=%s; MeterValueName=%s; MeterValuePtr=%p; DeviceUUID=%s; ' +
         'ValueCoefPtr=%p; ValueCoefUUID=%s; ValueCoefPointCount=%d; ' +
         'ValueFlowPtr=%p; ValueFlowUUID=%s; ValueFlowPointCount=%d; ' +
         'ValueQuantityPtr=%p; ValueQuantityUUID=%s; ValueQuantityPointCount=%d; ' +
         'ValueDensityPtr=%p; ValueDensityUUID=%s; ValueDensityPointCount=%d',
-        [MeterValue.Hash, Pointer(MeterValue), FlowMeter.DeviceUUID,
+        [MeterValue.Hash, MeterValue.GetStrFullName, Pointer(MeterValue), FlowMeter.DeviceUUID,
          Pointer(FlowMeter.ValueCoef), TableUUID(TableCoef), PointCount(TableCoef),
          Pointer(FlowMeter.ValueFlow), TableUUID(TableFlow), PointCount(TableFlow),
          Pointer(FlowMeter.ValueQuantity), TableUUID(TableQuantity), PointCount(TableQuantity),
@@ -680,7 +720,8 @@ begin
   else
     Table := FindTableForValue(FlowMeter, MeterValue, SourceField);
   if FlowMeter = nil then FilterReason := 'SourceNil'
-  else if Table = nil then FilterReason := 'TableTypeMismatch'
+  else if (Table = nil) and (SourceField = '') then FilterReason := 'TableTypeMismatch'
+  else if Table = nil then FilterReason := 'NoPoints'
   else if Table.Items.Count = 0 then FilterReason := 'NoPoints'
   else FilterReason := 'None';
   if Table <> nil then
@@ -688,9 +729,9 @@ begin
   else begin TableUUID := ''; PointCount := 0; end;
   ProtocolManager.AddMessage(pcInfo, psForm, 'MeterValueCorrectionGridFilled',
     'Заполнен грид коррекции метрологической величины',
-    Format('GridName=%s; SourceField=%s; SourceTablePtr=%p; SourceTableUUID=%s; ' +
+    Format('MeterValueHash=%s; GridName=%s; SourceField=%s; SourceTablePtr=%p; SourceTableUUID=%s; ' +
       'SourcePointCount=%d; VisibleRowCount=%d; FilterReason=%s',
-      [AGridName, SourceField, Pointer(Table), TableUUID, PointCount,
+      [MeterValue.Hash, AGridName, SourceField, Pointer(Table), TableUUID, PointCount,
        AVisibleRowCount, FilterReason]));
 end;
 
@@ -937,12 +978,43 @@ begin
 end;
 
 procedure TFormMeterValues.StringGridValuesListSelChanged(Sender: TObject);
+var
+  Owner: TFlowMeter;
+  CandidateCount: Integer;
+  DeviceUUID, RateHash, OwnerSerial: string;
 begin
   if StringGridValuesList.Tag = 0 then
   begin
     if (FFilteredValues <> nil) and (StringGridValuesList.Row >= 0) and
        (StringGridValuesList.Row < FFilteredValues.Count) then
       MeterValue := FFilteredValues[StringGridValuesList.Row];
+  end;
+
+  if (MeterValue <> nil) and (ProtocolManager <> nil) then
+  begin
+    Owner := FindOwnerFlowMeter(CandidateCount);
+    DeviceUUID := '';
+    OwnerSerial := '';
+    if Owner <> nil then
+    begin
+      DeviceUUID := Owner.DeviceUUID;
+      OwnerSerial := Owner.SerialNumber;
+    end;
+    RateHash := '';
+    if MeterValue.ValueRate <> nil then RateHash := MeterValue.ValueRate.Hash;
+    ProtocolManager.AddMessage(pcInfo, psForm, 'MeterValueSelected',
+      'Выбрана метрологическая величина',
+      Format('DeviceUUID=%s; MeterValueHash=%s; MeterValueName=%s; ' +
+        'MeterValueValue=%s; RateHash=%s; OwnerChannelUUID=%s; OwnerSerial=%s',
+        [DeviceUUID, MeterValue.Hash, MeterValue.GetStrFullName,
+         MeterValue.GetStrValue, RateHash, MeterValue.HashOwner, OwnerSerial]));
+    if (Owner = nil) and (CandidateCount > 1) then
+      ProtocolManager.AddMessage(pcError, psForm,
+        'DeviceCorrectionTableBindingError',
+        'Неоднозначный владелец выбранной метрологической величины',
+        Format('Reason=AmbiguousTargetMeterValue; MeterValueHash=%s; ' +
+          'HashOwner=%s; CandidateCount=%d',
+          [MeterValue.Hash, MeterValue.HashOwner, CandidateCount]));
   end;
 
   UpdateLayoutValues;

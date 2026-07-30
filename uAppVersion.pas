@@ -3,7 +3,7 @@
 interface
 
 const
-  APP_VERSION = '1.0.8';
+  APP_VERSION = '1.0.9';
 
 implementation
 

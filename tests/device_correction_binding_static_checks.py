@@ -15,7 +15,7 @@ assert "cctMeterValueCoef = 1" in device
 assert "TryCalibrCoefTableType" in device
 assert "Ord(Low(TCalibrCoefTableType))" in device
 assert "Ord(High(TCalibrCoefTableType))" in device
-assert "APP_VERSION = '1.0.8'" in version
+assert "APP_VERSION = '1.0.9'" in version
 assert "RefreshCorrectionTables" in flow
 assert "DeviceCorrectionTableBound" in flow
 assert "DeviceCorrectionTableTypeResolved" in flow
@@ -31,6 +31,9 @@ for field in ("ValueCoef", "ValueFlow", "ValueQuantity", "ValueDensity"):
 assert "SameInstance=True" in flow
 assert "MeterValueCorrectionTabOpened" in form
 assert "MeterValueCorrectionGridFilled" in form
+assert "MeterValueSelected" in form
+assert "DeviceCorrectionTableTargetResolved" in flow
+assert "AmbiguousTargetMeterValue" in form
 assert "FlowMeter.ValueCoef" in main
 assert "resolved by TableType" not in (ROOT / "fuDeviceEdit.pas").read_text(
     encoding="utf-8-sig"

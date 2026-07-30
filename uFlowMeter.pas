@@ -1915,6 +1915,15 @@ begin
     Exit;
   end;
 
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcInfo, psEngine,
+      'DeviceCorrectionTableTargetResolved',
+      'Определена целевая метрологическая величина таблицы коррекции',
+      Format('DeviceUUID=%s; TableUUID=%s; RawTableType=%d; ' +
+        'TargetMeterValueHash=%s; TargetMeterValueName=%s; TargetField=%s',
+        [DeviceUUID, ATable.UUID, ATable.&Type, TargetValue.Hash,
+         TargetValue.GetStrFullName, TargetField]));
+
   if not IsReferenceTable then
     for Item in ATable.Items do
     begin
@@ -1937,10 +1946,10 @@ begin
   if ProtocolManager <> nil then
     ProtocolManager.AddMessage(pcInfo, psEngine, 'DeviceCorrectionTableBound',
       'Таблица коррекции привязана к метрологической величине',
-      Format('DeviceUUID=%s; MeterValuePtr=%p; TableUUID=%s; RawTableType=%d; ' +
-        'ResolvedTypeName=%s; TargetField=%s; TargetTablePtr=%p; PointCount=%d; SameInstance=True',
-        [DeviceUUID, Pointer(TargetValue), ATable.UUID, ATable.&Type, EnumName,
-         TargetField, Pointer(ATable), ATable.Items.Count]));
+      Format('DeviceUUID=%s; TableUUID=%s; TargetMeterValueHash=%s; ' +
+        'TargetField=%s; TablePtr=%p; TargetTablePtr=%p; PointCount=%d; SameInstance=True',
+        [DeviceUUID, ATable.UUID, TargetValue.Hash, TargetField,
+         Pointer(ATable), Pointer(ATable), ATable.Items.Count]));
 end;
 
 procedure TFlowMeter.ApplyCalibrCoefsToValues;
