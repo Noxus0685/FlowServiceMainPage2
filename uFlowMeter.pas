@@ -786,7 +786,6 @@ begin
   begin
     FDevice.OutputType := AValue;
     FDevice.State := osModified;
-    ApplyMeasurementModel;
   end;
 
   FOutputType := AValue;
@@ -1192,8 +1191,11 @@ var
   FoundDevice: TDevice;
   FoundRepo: TDeviceRepository;
   SrcDevice: TDevice;
+  ValuesAlreadyInitialized: Boolean;
 begin
   FoundDevice := nil;
+  ValuesAlreadyInitialized := (ValueMassCoef <> nil) and
+    (ValueVolumeCoef <> nil);
   Self.DeviceUUID := UUID;
 
   if AppServices.DataManager <> nil then
@@ -1211,6 +1213,7 @@ begin
   MeterFlowCategory := ResolveStdCategoryFromDevice;
 
  // if Assigned(Self.Device) then
+  if not ValuesAlreadyInitialized then
     InitAllValues;
 end;
 
@@ -1219,8 +1222,11 @@ var
   FoundDevice: TDevice;
   FoundRepo: TDeviceRepository;
   SrcDevice: TDevice;
+  ValuesAlreadyInitialized: Boolean;
 begin
   FoundDevice := nil;
+  ValuesAlreadyInitialized := (ValueMassCoef <> nil) and
+    (ValueVolumeCoef <> nil);
   if AppServices.DataManager <> nil then
   begin
 
@@ -1236,6 +1242,7 @@ begin
   MeterFlowCategory := ResolveStdCategoryFromDevice;
 
  // if Assigned(Self.Device) then
+  if not ValuesAlreadyInitialized then
     InitAllValues;
 end;
 
@@ -1813,6 +1820,7 @@ var
   EnumName: string;
   TargetValue: TMeterValue;
   TargetField: string;
+  IsReferenceTable: Boolean;
 begin
   if ATable = nil then
     Exit;
@@ -1858,38 +1866,36 @@ begin
 
   TargetValue := nil;
   TargetField := '';
-  EnumName := CalibrCoefTableTypeName(TableType);
-  case TableType of
-    cctMeterValueCoef:
-      begin
-        TargetValue := ValueCoef;
-        TargetField := 'ValueCoef';
-      end;
-    cctMeterValueFlowRate:
-      begin
-        TargetValue := ValueFlow;
-        TargetField := 'ValueFlow';
-      end;
-    cctMeterValueQuantity:
-      begin
-        TargetValue := ValueQuantity;
-        TargetField := 'ValueQuantity';
-      end;
-    cctMeterValueDensity:
-      begin
-        TargetValue := ValueDensity;
-        TargetField := 'ValueDensity';
-      end;
-  end;
-
-  if TargetField = '' then
+  EnumName := '';
+  IsReferenceTable := False;
+  if not TryResolveCalibrCoefTableTarget(ATable.&Type, TableType, EnumName,
+    TargetField) then
   begin
     if ProtocolManager <> nil then
       ProtocolManager.AddMessage(pcError, psEngine,
         'DeviceCorrectionTableBindingError', 'Ошибка привязки таблицы коррекции',
-        Format('Reason=UnknownTableType; DeviceUUID=%s; TableUUID=%s; RawTableType=%d; EnumName=%s',
-          [DeviceUUID, ATable.UUID, ATable.&Type, EnumName]));
+        Format('Reason=UnsupportedTableType; DeviceUUID=%s; TableUUID=%s; RawTableType=%d; ResolvedTypeName=%s',
+          [DeviceUUID, ATable.UUID, ATable.&Type,
+           CalibrCoefTableTypeName(TableType)]));
     Exit;
+  end;
+  case TableType of
+    cctReference:
+      begin
+        // Reference/input data remains the same device-table instance and is
+        // read directly by the upper correction grid.  ValueCoef identifies
+        // the runtime owner without mixing reference rows into its Coefs list.
+        TargetValue := ValueCoef;
+        IsReferenceTable := True;
+      end;
+    cctMeterValueCoef:
+      TargetValue := ValueCoef;
+    cctMeterValueFlowRate:
+      TargetValue := ValueFlow;
+    cctMeterValueQuantity:
+      TargetValue := ValueQuantity;
+    cctMeterValueDensity:
+      TargetValue := ValueDensity;
   end;
 
   if ProtocolManager <> nil then
@@ -1909,23 +1915,24 @@ begin
     Exit;
   end;
 
-  for Item in ATable.Items do
-  begin
-    if Item = nil then
-      Continue;
+  if not IsReferenceTable then
+    for Item in ATable.Items do
+    begin
+      if Item = nil then
+        Continue;
 
-    CoefItem.Name := Item.Name;
-    CoefItem.Index := Item.OrderNo;
-    CoefItem.Hash := Item.UUID;
-    CoefItem.Value := Item.Value;
-    CoefItem.Arg := Item.Arg;
-    CoefItem.Q1 := Item.QFrom;
-    CoefItem.Q2 := Item.QTo;
-    CoefItem.K := Item.K;
-    CoefItem.b := Item.b;
-    CoefItem.InUse := Item.Enable;
-    TargetValue.Coefs.Add(CoefItem);
-  end;
+      CoefItem.Name := Item.Name;
+      CoefItem.Index := Item.OrderNo;
+      CoefItem.Hash := Item.UUID;
+      CoefItem.Value := Item.Value;
+      CoefItem.Arg := Item.Arg;
+      CoefItem.Q1 := Item.QFrom;
+      CoefItem.Q2 := Item.QTo;
+      CoefItem.K := Item.K;
+      CoefItem.b := Item.b;
+      CoefItem.InUse := Item.Enable;
+      TargetValue.Coefs.Add(CoefItem);
+    end;
 
   if ProtocolManager <> nil then
     ProtocolManager.AddMessage(pcInfo, psEngine, 'DeviceCorrectionTableBound',
@@ -1939,8 +1946,9 @@ end;
 procedure TFlowMeter.ApplyCalibrCoefsToValues;
 var
   Table: TCalibrCoefTable;
-  BoundTypes: TList<Integer>;
+  ProcessedBindings: TList<string>;
   ResolvedType: TCalibrCoefTableType;
+  ResolvedTypeName, TargetField, BindingKey: string;
 begin
   if ValueCoef <> nil then
     ValueCoef.Coefs.Clear;
@@ -1955,11 +1963,16 @@ begin
      (Device.CalibrCoefTables = nil) then
     Exit;
 
-  BoundTypes := TList<Integer>.Create;
+  ProcessedBindings := TList<string>.Create;
   try
     for Table in Device.CalibrCoefTables do
     begin
-      if (Table <> nil) and Table.Active and BoundTypes.Contains(Table.&Type) then
+      BindingKey := '';
+      if (Table <> nil) and Table.Active and
+         TryResolveCalibrCoefTableTarget(Table.&Type, ResolvedType,
+           ResolvedTypeName, TargetField) then
+        BindingKey := DeviceUUID + '|' + Table.UUID + '|' + TargetField;
+      if (BindingKey <> '') and ProcessedBindings.Contains(BindingKey) then
       begin
         if ProtocolManager <> nil then
           ProtocolManager.AddMessage(pcError, psEngine,
@@ -1969,16 +1982,11 @@ begin
         Continue;
       end;
       ApplyCalibrCoefsToValue(Table);
-      if (Table <> nil) and Table.Active and
-         TryCalibrCoefTableType(Table.&Type, ResolvedType) then
-        case ResolvedType of
-          cctMeterValueCoef, cctMeterValueFlowRate,
-          cctMeterValueQuantity, cctMeterValueDensity:
-            BoundTypes.Add(Table.&Type);
-        end;
+      if BindingKey <> '' then
+        ProcessedBindings.Add(BindingKey);
     end;
   finally
-    BoundTypes.Free;
+    ProcessedBindings.Free;
   end;
 end;
 

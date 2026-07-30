@@ -15,15 +15,19 @@ assert "cctMeterValueCoef = 1" in device
 assert "TryCalibrCoefTableType" in device
 assert "Ord(Low(TCalibrCoefTableType))" in device
 assert "Ord(High(TCalibrCoefTableType))" in device
-assert "APP_VERSION = '1.0.7'" in version
+assert "APP_VERSION = '1.0.8'" in version
 assert "RefreshCorrectionTables" in flow
 assert "DeviceCorrectionTableBound" in flow
 assert "DeviceCorrectionTableTypeResolved" in flow
 assert "DeviceCorrectionTableTypeRaw" in flow
 assert "TCalibrCoefTableType(ARawType)" not in device
 assert "(ValueCoef.DependenceType = INDEPENDENT)" not in flow
+assert "TryResolveCalibrCoefTableTarget" in device
+assert "cctReference: ATargetField := 'Device.CalibrCoefTables[cctReference]'" in device
+assert "ProcessedBindings" in flow
+assert "FindTableByType(FlowMeter, cctReference)" in form
 for field in ("ValueCoef", "ValueFlow", "ValueQuantity", "ValueDensity"):
-    assert f"TargetField := '{field}'" in flow
+    assert f"ATargetField := '{field}'" in device
 assert "SameInstance=True" in flow
 assert "MeterValueCorrectionTabOpened" in form
 assert "MeterValueCorrectionGridFilled" in form

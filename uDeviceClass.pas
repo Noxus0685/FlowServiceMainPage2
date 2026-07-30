@@ -33,6 +33,9 @@ type
 function TryCalibrCoefTableType(const ARawType: Integer;
   out ATableType: TCalibrCoefTableType): Boolean;
 function CalibrCoefTableTypeName(const ATableType: TCalibrCoefTableType): string;
+function TryResolveCalibrCoefTableTarget(const ARawType: Integer;
+  out ATableType: TCalibrCoefTableType; out AResolvedTypeName,
+  ATargetField: string): Boolean;
 
 type
   TPointSpillage = class;
@@ -675,6 +678,26 @@ begin
     cctDeviceQuantityCorrection: Result := 'cctDeviceQuantityCorrection';
     cctDeviceDensityCorrection: Result := 'cctDeviceDensityCorrection';
   else Result := 'Unknown';
+  end;
+end;
+
+function TryResolveCalibrCoefTableTarget(const ARawType: Integer;
+  out ATableType: TCalibrCoefTableType; out AResolvedTypeName,
+  ATargetField: string): Boolean;
+begin
+  AResolvedTypeName := '';
+  ATargetField := '';
+  Result := TryCalibrCoefTableType(ARawType, ATableType);
+  if not Result then Exit;
+  AResolvedTypeName := CalibrCoefTableTypeName(ATableType);
+  case ATableType of
+    cctReference: ATargetField := 'Device.CalibrCoefTables[cctReference]';
+    cctMeterValueCoef: ATargetField := 'ValueCoef';
+    cctMeterValueFlowRate: ATargetField := 'ValueFlow';
+    cctMeterValueQuantity: ATargetField := 'ValueQuantity';
+    cctMeterValueDensity: ATargetField := 'ValueDensity';
+  else
+    Result := False;
   end;
 end;
 
@@ -3234,6 +3257,5 @@ begin
 end;
 
 end.
-
 
 

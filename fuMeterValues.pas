@@ -165,6 +165,8 @@ type
     function FindOwnerFlowMeter: TFlowMeter;
     function FindTableForValue(AFlowMeter: TFlowMeter; AValue: TMeterValue;
       out ASourceField: string): TCalibrCoefTable;
+    function FindTableByType(AFlowMeter: TFlowMeter;
+      const AType: TCalibrCoefTableType): TCalibrCoefTable;
     procedure LogCorrectionTabOpened;
     procedure LogCorrectionGridFilled(const AGridName: string;
       AVisibleRowCount: Integer);
@@ -335,6 +337,9 @@ procedure TFormMeterValues.UpdateStringGridCoefsData;
 var
   I, Index: Integer;
   Dbl: Double;
+  FlowMeter: TFlowMeter;
+  ReferenceTable: TCalibrCoefTable;
+  ReferenceItem: TCalibrCoefItem;
 begin
   Index := -1;
   StringGridCoefsData.Tag := 1;
@@ -345,7 +350,26 @@ begin
 
     StringGridCoefsData.RowCount := 0;
 
-    if MeterValue.Coefs.Count > 0 then
+    FlowMeter := FindOwnerFlowMeter;
+    ReferenceTable := FindTableByType(FlowMeter, cctReference);
+    if (ReferenceTable <> nil) and (ReferenceTable.Items <> nil) then
+    begin
+      StringGridCoefsData.RowCount := ReferenceTable.Items.Count;
+      for I := 0 to ReferenceTable.Items.Count - 1 do
+      begin
+        ReferenceItem := ReferenceTable.Items[I];
+        StringGridCoefsData.Cells[0, I] := BoolToStr(ReferenceItem.Enable, True);
+        StringGridCoefsData.Cells[1, I] := ReferenceItem.Name;
+        StringGridCoefsData.Cells[2, I] := MeterValue.GetStringNum(ReferenceItem.Value);
+        StringGridCoefsData.Cells[3, I] := MeterValue.GetStringNum(ReferenceItem.Arg);
+        StringGridCoefsData.Cells[4, I] := RelativeErrorStr(ReferenceItem.Value, ReferenceItem.Arg);
+        Dbl := AbsoluteError(ReferenceItem.Value, ReferenceItem.Arg);
+        StringGridCoefsData.Cells[5, I] := MeterValue.GetStringNum(Dbl);
+        StringGridCoefsData.Cells[6, I] := '';
+        StringGridCoefsData.Cells[7, I] := ReferenceItem.UUID;
+      end;
+    end
+    else if (FlowMeter = nil) and (MeterValue.Coefs.Count > 0) then
     begin
       StringGridCoefsData.RowCount := MeterValue.Coefs.Count;
       for I := 0 to MeterValue.Coefs.Count - 1 do
@@ -374,6 +398,19 @@ begin
   StringGridCoefsData.Tag := 1;
   StringGridCoefsData.Row := Index;
   LogCorrectionGridFilled('Данные для расчёта', StringGridCoefsData.RowCount);
+end;
+
+function TFormMeterValues.FindTableByType(AFlowMeter: TFlowMeter;
+  const AType: TCalibrCoefTableType): TCalibrCoefTable;
+var
+  Table: TCalibrCoefTable;
+begin
+  Result := nil;
+  if (AFlowMeter = nil) or (AFlowMeter.Device = nil) or
+     (AFlowMeter.Device.CalibrCoefTables = nil) then Exit;
+  for Table in AFlowMeter.Device.CalibrCoefTables do
+    if (Table <> nil) and Table.Active and
+       (Table.&Type = Ord(AType)) then Exit(Table);
 end;
 
 procedure TFormMeterValues.UpdateStringGridCoefs;
@@ -418,7 +455,26 @@ var
   Hash: string;
   Cell: string;
   C: TCoef;
+  ReferenceTable: TCalibrCoefTable;
+  ReferenceItem: TCalibrCoefItem;
 begin
+  ReferenceTable := FindTableByType(FindOwnerFlowMeter, cctReference);
+  if (ReferenceTable <> nil) and (ARow >= 0) and
+     (ARow < ReferenceTable.Items.Count) then
+  begin
+    ReferenceItem := ReferenceTable.Items[ARow];
+    Cell := StringGridCoefsData.Cells[ACol, ARow];
+    case ACol of
+      0: ReferenceItem.Enable := SameText(Cell, 'True');
+      1: ReferenceItem.Name := Cell;
+      2: ReferenceItem.Value := MeterValue.GetDoubleNum(Cell);
+      3: ReferenceItem.Arg := MeterValue.GetDoubleNum(Cell);
+      7: if not Cell.IsEmpty then ReferenceItem.UUID := Cell;
+    end;
+    UpdateStringGridCoefsData;
+    Exit;
+  end;
+
   if (ARow < 0) or (ARow >= MeterValue.Coefs.Count) then
     Exit;
 
@@ -464,8 +520,14 @@ begin
 end;
 
 procedure TFormMeterValues.DeleteRowButtonClick(Sender: TObject);
+var
+  ReferenceTable: TCalibrCoefTable;
 begin
-  if (StringGridCoefsData.Row <> -1) and
+  ReferenceTable := FindTableByType(FindOwnerFlowMeter, cctReference);
+  if (ReferenceTable <> nil) and (StringGridCoefsData.Row >= 0) and
+     (StringGridCoefsData.Row < ReferenceTable.Items.Count) then
+    ReferenceTable.Items.Delete(StringGridCoefsData.Row)
+  else if (StringGridCoefsData.Row <> -1) and
      (StringGridCoefsData.Row < MeterValue.Coefs.Count) then
     MeterValue.Coefs.Delete(StringGridCoefsData.Row);
 
@@ -610,7 +672,13 @@ var
 begin
   if (ProtocolManager = nil) or (MeterValue = nil) then Exit;
   FlowMeter := FindOwnerFlowMeter;
-  Table := FindTableForValue(FlowMeter, MeterValue, SourceField);
+  if SameText(AGridName, 'Данные для расчёта') then
+  begin
+    Table := FindTableByType(FlowMeter, cctReference);
+    SourceField := 'Device.CalibrCoefTables[cctReference]';
+  end
+  else
+    Table := FindTableForValue(FlowMeter, MeterValue, SourceField);
   if FlowMeter = nil then FilterReason := 'SourceNil'
   else if Table = nil then FilterReason := 'TableTypeMismatch'
   else if Table.Items.Count = 0 then FilterReason := 'NoPoints'
