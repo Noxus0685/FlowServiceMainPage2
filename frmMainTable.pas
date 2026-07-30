@@ -1376,14 +1376,12 @@ begin
     FGraphRenderTimer.Enabled := False;
     FGraphRenderTimer.OnTimer := nil;
   end;
-  FreeAndNil(FGraphRenderTimer);
 
   if FStabilitySampleTimer <> nil then
   begin
     FStabilitySampleTimer.Enabled := False;
     FStabilitySampleTimer.OnTimer := nil;
   end;
-  FreeAndNil(FStabilitySampleTimer);
 
   FreeAndNil(FGraphSplitters);
   FreeAndNil(FGraphLayoutContainers);
@@ -6715,7 +6713,7 @@ var
 
   function AddContainer(AParent: TFmxObject; AAlign: TAlignLayout): TLayout;
   begin
-    Result := TLayout.Create(Self);
+    Result := TLayout.Create(nil);
     Result.Parent := AParent;
     Result.Align := AAlign;
     FGraphLayoutContainers.Add(Result);
@@ -6723,7 +6721,7 @@ var
 
   function AddSplitter(AParent: TFmxObject; AAlign: TAlignLayout): TSplitter;
   begin
-    Result := TSplitter.Create(Self);
+    Result := TSplitter.Create(nil);
     Result.Parent := AParent;
     Result.Align := AAlign;
     Result.MinSize := 80;
