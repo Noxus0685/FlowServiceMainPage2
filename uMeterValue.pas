@@ -618,7 +618,7 @@ begin
     ValueIdentity := Hash;
 
   ProtocolManager.AddMessage(
-    pcInfo,
+    pcProc,
     psParameters,
     'TMeterValue.SetValue',
     ValueIdentity,
