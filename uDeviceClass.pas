@@ -423,6 +423,8 @@ type
     function Clone: TCalibrCoefTable;
     function FindItemByQ(Q: Double): TCalibrCoefItem;
     function ApplyByQ(Q, X: Double): Double;
+    function TableType: TCalibrCoefTableType;
+    procedure SetTableType(const AType: TCalibrCoefTableType);
   end;
 
   TDevice = class(TTypeEntity)
@@ -1593,9 +1595,21 @@ end;
 constructor TCalibrCoefTable.Create;
 begin
   inherited Create;
-  &Type := 0;
+  // A newly created device table is a coefficient correction table.  Assign
+  // the persisted value here, before any points can be appended to Items.
+  SetTableType(cctMeterValueCoef);
   Active := False;
   Items := TObjectList<TCalibrCoefItem>.Create(True);
+end;
+
+function TCalibrCoefTable.TableType: TCalibrCoefTableType;
+begin
+  Result := TCalibrCoefTableType(&Type);
+end;
+
+procedure TCalibrCoefTable.SetTableType(const AType: TCalibrCoefTableType);
+begin
+  &Type := Ord(AType);
 end;
 
 destructor TCalibrCoefTable.Destroy;
@@ -3174,7 +3188,6 @@ begin
 end;
 
 end.
-
 
 
 

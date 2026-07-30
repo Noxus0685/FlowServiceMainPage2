@@ -1803,13 +1803,17 @@ procedure TFlowMeter.ApplyCalibrCoefsToValue(ATable: TCalibrCoefTable);
 var
   Item: TCalibrCoefItem;
   CoefItem: TCoef;
-  TableType: Integer;
+  TableType: TCalibrCoefTableType;
   TargetValue: TMeterValue;
 begin
   if ATable = nil then
     Exit;
 
-  TableType := ATable.&Type;
+  if not (ATable.&Type in [Ord(cctMeterValueCoef),
+    Ord(cctMeterValueFlowRate), Ord(cctMeterValueQuantity),
+    Ord(cctMeterValueDensity)]) then
+    Exit;
+  TableType := TCalibrCoefTableType(ATable.&Type);
 
   if (not ATable.Active) or
      (ATable.Items = nil) then
@@ -1817,14 +1821,14 @@ begin
 
   TargetValue := nil;
   case TableType of
-    Ord(cctMeterValueCoef):
+    cctMeterValueCoef:
       if (ValueCoef <> nil) and (ValueCoef.DependenceType = INDEPENDENT) then
         TargetValue := ValueCoef;
-    Ord(cctMeterValueFlowRate):
+    cctMeterValueFlowRate:
       TargetValue := ValueFlow;
-    Ord(cctMeterValueQuantity):
+    cctMeterValueQuantity:
       TargetValue := ValueQuantity;
-    Ord(cctMeterValueDensity):
+    cctMeterValueDensity:
       TargetValue := ValueDensity;
   end;
 
