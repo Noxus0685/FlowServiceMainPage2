@@ -91,7 +91,7 @@ type
     procedure TrimStabilityHistory;
     /// <summary>Clears last analysis and runtime confirmation flags without touching settings.</summary>
     procedure ResetStabilityInfo;
-    procedure AddSampleLocked(const AValue: Double; const ATimeStampMs: Int64);
+    function AddSampleLocked(const AValue: Double; const ATimeStampMs: Int64): Boolean;
     /// <summary>Adds a physical-value sample with an externally provided monotonic timestamp.</summary>
     procedure AddSample(const AValue: Double; const ATimeStampMs: Int64); overload;
     function FindDimIndex(const AName: string): Integer;
@@ -1281,11 +1281,14 @@ begin
   FVirtualClockEnabled := False;
 end;
 
-procedure TMeterValue.AddSampleLocked(const AValue: Double; const ATimeStampMs: Int64);
+function TMeterValue.AddSampleLocked(const AValue: Double;
+  const ATimeStampMs: Int64): Boolean;
 var
   Sample: TMeterValueSample;
   LastTimeStampMs: Int64;
 begin
+  Result := False;
+
   Sample.Value := AValue;
   Sample.TimeStampMs := ATimeStampMs;
 
@@ -1301,6 +1304,7 @@ begin
     FActiveStabilityStartMs := Sample.TimeStampMs;
   FSamples.Add(Sample);
   TrimStabilityHistory;
+  Result := True;
 end;
 
 procedure TMeterValue.AddSample(const AValue: Double; const ATimeStampMs: Int64);
@@ -1317,7 +1321,6 @@ procedure TMeterValue.AddCurrentStabilitySample;
 var
   CurrentTimeMs: Int64;
   MinimumIntervalMs: Int64;
-  SampleCountBefore: Integer;
 begin
   FSampleLock.Enter;
   try
@@ -1331,9 +1334,7 @@ begin
        (CurrentTimeMs >= FLastAutomaticStabilitySampleMs) and
        (CurrentTimeMs - FLastAutomaticStabilitySampleMs < MinimumIntervalMs) then
       Exit;
-    SampleCountBefore := FSamples.Count;
-    AddSampleLocked(Value, CurrentTimeMs);
-    if FSamples.Count > SampleCountBefore then
+    if AddSampleLocked(Value, CurrentTimeMs) then
       FLastAutomaticStabilitySampleMs := CurrentTimeMs;
   finally
     FSampleLock.Leave;

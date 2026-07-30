@@ -26,15 +26,33 @@ def test_automatic_sampling_is_atomic_monotonic_and_separate_from_manual_samplin
     automatic = body("AddCurrentStabilitySample")
     manual = body("AddSample")
     assert "FLastAutomaticStabilitySampleMs: Int64;" in METER
-    assert "procedure AddSampleLocked" in METER
+    assert re.search(r"function AddSampleLocked\s*\([^)]*\)\s*:\s*Boolean;", METER, re.S)
     assert "if not FStabilitySettings.Enabled then" in automatic
     assert "CurrentTimeMs := GetMonotonicTimeMs;" in automatic
     assert "MinimumIntervalMs := Round(Max(0.0," in automatic
-    assert "AddSampleLocked(Value, CurrentTimeMs);" in automatic
-    assert automatic.index("AddSampleLocked(Value, CurrentTimeMs);") < automatic.index("FLastAutomaticStabilitySampleMs := CurrentTimeMs;")
+    assert "if AddSampleLocked(Value, CurrentTimeMs) then" in automatic
+    assert automatic.index("if AddSampleLocked(Value, CurrentTimeMs) then") < automatic.index("FLastAutomaticStabilitySampleMs := CurrentTimeMs;")
+    assert "SampleCountBefore" not in METER
+    assert "FSamples.Count > SampleCountBefore" not in METER
     assert "AddSampleLocked(AValue, ATimeStampMs);" in manual
     assert "MinimumSampleIntervalSec" not in manual
     assert "FLastAutomaticStabilitySampleMs" not in manual
+
+
+def test_locked_addition_explicitly_reports_success_even_after_history_trim():
+    match = re.search(
+        r"function TMeterValue\.AddSampleLocked\b.*?\nbegin\n(.*?)\nend;",
+        METER,
+        re.S,
+    )
+    assert match
+    locked = match.group(1)
+    assert "Result := False;" in locked
+    assert "if Sample.TimeStampMs < LastTimeStampMs then\n      Exit;" in locked
+    add_index = locked.index("FSamples.Add(Sample);")
+    trim_index = locked.index("TrimStabilityHistory;")
+    success_index = locked.index("Result := True;")
+    assert add_index < trim_index < success_index
 
 
 def test_full_history_clears_reset_automatic_timestamp_but_analysis_reset_does_not():
