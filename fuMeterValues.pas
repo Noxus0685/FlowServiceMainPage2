@@ -404,14 +404,19 @@ end;
 function TFormMeterValues.FindTableByType(AFlowMeter: TFlowMeter;
   const AType: TCalibrCoefTableType): TCalibrCoefTable;
 var
-  Table: TCalibrCoefTable;
+  Table, FallbackTable: TCalibrCoefTable;
 begin
   Result := nil;
+  FallbackTable := nil;
   if (AFlowMeter = nil) or (AFlowMeter.Device = nil) or
      (AFlowMeter.Device.CalibrCoefTables = nil) then Exit;
   for Table in AFlowMeter.Device.CalibrCoefTables do
-    if (Table <> nil) and Table.Active and
-       (Table.&Type = Ord(AType)) then Exit(Table);
+    if (Table <> nil) and (Table.&Type = Ord(AType)) then
+    begin
+      if Table.Active then Exit(Table);
+      if FallbackTable = nil then FallbackTable := Table;
+    end;
+  Result := FallbackTable;
 end;
 
 procedure TFormMeterValues.UpdateStringGridCoefs;
@@ -640,8 +645,10 @@ function TFormMeterValues.FindTableForValue(AFlowMeter: TFlowMeter;
 var
   Table: TCalibrCoefTable;
   RequiredType: TCalibrCoefTableType;
+  FallbackTable: TCalibrCoefTable;
 begin
   Result := nil;
+  FallbackTable := nil;
   ASourceField := '';
   if (AFlowMeter = nil) or (AFlowMeter.Device = nil) or (AValue = nil) then
     Exit;
@@ -656,9 +663,12 @@ begin
   else
     Exit;
   for Table in AFlowMeter.Device.CalibrCoefTables do
-    if (Table <> nil) and Table.Active and
-       (Table.&Type = Ord(RequiredType)) then
-      Exit(Table);
+    if (Table <> nil) and (Table.&Type = Ord(RequiredType)) then
+    begin
+      if Table.Active then Exit(Table);
+      if FallbackTable = nil then FallbackTable := Table;
+    end;
+  Result := FallbackTable;
 end;
 
 procedure TFormMeterValues.LogCorrectionTabOpened;
@@ -685,12 +695,12 @@ begin
     ProtocolManager.AddMessage(pcInfo, psForm, 'MeterValueCorrectionTabOpened',
       'Открыта вкладка коррекции метрологической величины',
       Format('MeterValueHash=%s; MeterValueName=%s; MeterValuePtr=%p; DeviceUUID=%s; ' +
-        'ValueCoefPtr=%p; ValueCoefUUID=%s; ValueCoefPointCount=%d; ' +
+        'CorrectionTablePtr=%p; CorrectionTableUUID=%s; CorrectionTablePointCount=%d; ' +
         'ValueFlowPtr=%p; ValueFlowUUID=%s; ValueFlowPointCount=%d; ' +
         'ValueQuantityPtr=%p; ValueQuantityUUID=%s; ValueQuantityPointCount=%d; ' +
         'ValueDensityPtr=%p; ValueDensityUUID=%s; ValueDensityPointCount=%d',
         [MeterValue.Hash, MeterValue.GetStrFullName, Pointer(MeterValue), FlowMeter.DeviceUUID,
-         Pointer(FlowMeter.ValueCoef), TableUUID(TableCoef), PointCount(TableCoef),
+         Pointer(TableCoef), TableUUID(TableCoef), PointCount(TableCoef),
          Pointer(FlowMeter.ValueFlow), TableUUID(TableFlow), PointCount(TableFlow),
          Pointer(FlowMeter.ValueQuantity), TableUUID(TableQuantity), PointCount(TableQuantity),
          Pointer(FlowMeter.ValueDensity), TableUUID(TableDensity), PointCount(TableDensity)]));

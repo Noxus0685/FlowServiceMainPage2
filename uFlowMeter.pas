@@ -1860,8 +1860,7 @@ begin
           [DeviceUUID, ATable.DeviceUUID, ATable.UUID]));
     Exit;
   end;
-  if (not ATable.Active) or
-     (ATable.Items = nil) then
+  if ATable.Items = nil then
     Exit;
 
   TargetValue := nil;
@@ -1920,9 +1919,10 @@ begin
       'DeviceCorrectionTableTargetResolved',
       'Определена целевая метрологическая величина таблицы коррекции',
       Format('DeviceUUID=%s; TableUUID=%s; RawTableType=%d; ' +
-        'TargetMeterValueHash=%s; TargetMeterValueName=%s; TargetField=%s',
+        'TargetMeterValueHash=%s; TargetMeterValueName=%s; TargetMeterValuePtr=%p; ' +
+        'TargetTableField=%s; ResolutionMethod=FlowMeterFieldAndDeviceUUID',
         [DeviceUUID, ATable.UUID, ATable.&Type, TargetValue.Hash,
-         TargetValue.GetStrFullName, TargetField]));
+         TargetValue.GetStrFullName, Pointer(TargetValue), TargetField]));
 
   if not IsReferenceTable then
     for Item in ATable.Items do
@@ -1947,8 +1947,9 @@ begin
     ProtocolManager.AddMessage(pcInfo, psEngine, 'DeviceCorrectionTableBound',
       'Таблица коррекции привязана к метрологической величине',
       Format('DeviceUUID=%s; TableUUID=%s; TargetMeterValueHash=%s; ' +
-        'TargetField=%s; TablePtr=%p; TargetTablePtr=%p; PointCount=%d; SameInstance=True',
-        [DeviceUUID, ATable.UUID, TargetValue.Hash, TargetField,
+        'TargetMeterValuePtr=%p; TargetTableField=%s; LoadedTablePtr=%p; ' +
+        'AssignedTablePtr=%p; PointCount=%d; SameInstance=True',
+        [DeviceUUID, ATable.UUID, TargetValue.Hash, Pointer(TargetValue), TargetField,
          Pointer(ATable), Pointer(ATable), ATable.Items.Count]));
 end;
 
@@ -1977,19 +1978,12 @@ begin
     for Table in Device.CalibrCoefTables do
     begin
       BindingKey := '';
-      if (Table <> nil) and Table.Active and
-         TryResolveCalibrCoefTableTarget(Table.&Type, ResolvedType,
+      if Table <> nil then
+        if TryResolveCalibrCoefTableTarget(Table.&Type, ResolvedType,
            ResolvedTypeName, TargetField) then
-        BindingKey := DeviceUUID + '|' + Table.UUID + '|' + TargetField;
+          BindingKey := DeviceUUID + '|' + TargetField;
       if (BindingKey <> '') and ProcessedBindings.Contains(BindingKey) then
-      begin
-        if ProtocolManager <> nil then
-          ProtocolManager.AddMessage(pcError, psEngine,
-            'DeviceCorrectionTableBindingError', 'Ошибка привязки таблицы коррекции',
-            Format('Reason=DuplicateBinding; DeviceUUID=%s; TableUUID=%s; TableType=%d',
-              [DeviceUUID, Table.UUID, Table.&Type]));
         Continue;
-      end;
       ApplyCalibrCoefsToValue(Table);
       if BindingKey <> '' then
         ProcessedBindings.Add(BindingKey);
