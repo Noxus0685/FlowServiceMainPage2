@@ -1,5 +1,5 @@
-﻿object FrameMeterValueEdit: TFrameMeterValueEdit
-  Size.Width = 909.000000000000000000
+object FrameMeterValueEdit: TFrameMeterValueEdit
+  Size.Width = 908.000000000000000000
   Size.Height = 620.000000000000000000
   Size.PlatformDefault = False
   object TabControlMain: TTabControl
@@ -11,17 +11,17 @@
     TabPosition = PlatformDefault
     Sizes = (
       908s
-      615s
+      594s
       908s
-      615s)
+      594s)
     object TabItemMainParameters: TTabItem
       CustomIcon = <
         item
         end>
       TextSettings.Trimming = None
       IsSelected = False
-      Size.Width = 1.000000000000000000
-      Size.Height = 5.000000000000000000
+      Size.Width = 141.000000000000000000
+      Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = ''
       TabOrder = 0
@@ -35,8 +35,8 @@
         end>
       TextSettings.Trimming = None
       IsSelected = True
-      Size.Width = 1.000000000000000000
-      Size.Height = 5.000000000000000000
+      Size.Width = 154.000000000000000000
+      Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = ''
       TabOrder = 0
@@ -50,7 +50,7 @@
         Margins.Right = 8.000000000000000000
         Margins.Bottom = 8.000000000000000000
         Position.X = 8.000000000000000000
-        Position.Y = 459.000000000000000000
+        Position.Y = 438.000000000000000000
         Size.Width = 892.000000000000000000
         Size.Height = 148.000000000000000000
         Size.PlatformDefault = False
@@ -201,8 +201,8 @@
           Size.Height = 56.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
-          Viewport.Width = 892.000000000000000000
-          Viewport.Height = 56.000000000000000000
+          Viewport.Width = 888.000000000000000000
+          Viewport.Height = 52.000000000000000000
         end
       end
       object TabControlStability: TTabControl
@@ -212,28 +212,28 @@
         Margins.Right = 8.000000000000000000
         Margins.Bottom = 4.000000000000000000
         Size.Width = 892.000000000000000000
-        Size.Height = 443.000000000000000000
+        Size.Height = 422.000000000000000000
         Size.PlatformDefault = False
         TabIndex = 0
         TabOrder = 1
         TabPosition = PlatformDefault
         Sizes = (
           892s
-          438s
+          396s
           892s
-          438s
+          396s
           892s
-          438s
+          396s
           892s
-          438s)
+          396s)
         object TabItemStabilityData: TTabItem
           CustomIcon = <
             item
             end>
           TextSettings.Trimming = None
           IsSelected = True
-          Size.Width = 1.000000000000000000
-          Size.Height = 5.000000000000000000
+          Size.Width = 63.000000000000000000
+          Size.Height = 26.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = ''
           TabOrder = 0
@@ -243,14 +243,14 @@
           object LayoutDataRoot: TLayout
             Align = Client
             Size.Width = 892.000000000000000000
-            Size.Height = 438.000000000000000000
+            Size.Height = 396.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
             object GroupSamplesGrid: TGroupBox
               Align = Client
               Margins.Right = 8.000000000000000000
               Size.Width = 484.000000000000000000
-              Size.Height = 438.000000000000000000
+              Size.Height = 396.000000000000000000
               Size.PlatformDefault = False
               Text = #1058#1072#1073#1083#1080#1094#1072' '#1090#1077#1089#1090#1086#1074#1099#1093' '#1079#1085#1072#1095#1077#1085#1080#1081
               object GridSamples: TGrid
@@ -262,12 +262,12 @@
                 Margins.Right = 4.000000000000000000
                 Margins.Bottom = 4.000000000000000000
                 Size.Width = 476.000000000000000000
-                Size.Height = 430.000000000000000000
+                Size.Height = 388.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 0
                 Options = [ColumnResize, ColLines, RowLines, AlwaysShowSelection, Tabs, Header, AutoDisplacement]
-                Viewport.Width = 476.000000000000000000
-                Viewport.Height = 430.000000000000000000
+                Viewport.Width = 456.000000000000000000
+                Viewport.Height = 347.000000000000000000
                 object StringColumnSampleNumber: TStringColumn
                   Header = #8470
                   HeaderSettings.TextSettings.WordWrap = False
@@ -314,7 +314,7 @@
               Align = Right
               Position.X = 492.000000000000000000
               Size.Width = 400.000000000000000000
-              Size.Height = 438.000000000000000000
+              Size.Height = 396.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 1
               Viewport.Width = 384.000000000000000000
@@ -402,12 +402,12 @@
                 object EditScenarioPointCount: TEdit
                   Touch.InteractiveGestures = [LongTap, DoubleTap]
                   TabOrder = 3
+                  Text = '10'
                   Position.X = 12.000000000000000000
                   Position.Y = 130.000000000000000000
                   Size.Width = 120.000000000000000000
                   Size.Height = 24.000000000000000000
                   Size.PlatformDefault = False
-                  Text = '10'
                 end
               end
               object GroupSamplesActions: TGroupBox
@@ -463,7 +463,7 @@
               object GroupSampleEditor: TGroupBox
                 Align = Top
                 Margins.Top = 8.000000000000000000
-                Position.Y = 364.000000000000000000
+                Position.Y = 418.000000000000000000
                 Size.Width = 384.000000000000000000
                 Size.Height = 132.000000000000000000
                 Size.PlatformDefault = False
@@ -524,7 +524,7 @@
               object GroupSamplesGenerator: TGroupBox
                 Align = Top
                 Margins.Top = 8.000000000000000000
-                Position.Y = 504.000000000000000000
+                Position.Y = 558.000000000000000000
                 Size.Width = 384.000000000000000000
                 Size.Height = 300.000000000000000000
                 Size.PlatformDefault = False
@@ -679,8 +679,8 @@
             end>
           TextSettings.Trimming = None
           IsSelected = False
-          Size.Width = 1.000000000000000000
-          Size.Height = 5.000000000000000000
+          Size.Width = 79.000000000000000000
+          Size.Height = 26.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = ''
           TabOrder = 0
@@ -690,7 +690,7 @@
           object SettingsScrollBox: TVertScrollBox
             Align = Client
             Size.Width = 892.000000000000000000
-            Size.Height = 438.000000000000000000
+            Size.Height = 396.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
             Viewport.Width = 704.000000000000000000
@@ -735,7 +735,7 @@
                 Size.Width = 240.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
-                Text = 'Размер массива, шт.'
+                Text = #1056#1072#1079#1084#1077#1088' '#1084#1072#1089#1089#1080#1074#1072', '#1096#1090'.'
               end
               object EditSampleSize: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
@@ -752,7 +752,7 @@
                 Size.Width = 240.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
-                Text = 'Минимальная длительность окна, с'
+                Text = #1052#1080#1085#1080#1084#1072#1083#1100#1085#1072#1103' '#1076#1083#1080#1090#1077#1083#1100#1085#1086#1089#1090#1100' '#1086#1082#1085#1072', '#1089
               end
               object EditMinWindowDurationSec: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
@@ -1147,8 +1147,8 @@
             end>
           TextSettings.Trimming = None
           IsSelected = False
-          Size.Width = 1.000000000000000000
-          Size.Height = 5.000000000000000000
+          Size.Width = 73.000000000000000000
+          Size.Height = 26.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = ''
           TabOrder = 0
@@ -1158,7 +1158,7 @@
           object ResultScrollBox: TVertScrollBox
             Align = Client
             Size.Width = 892.000000000000000000
-            Size.Height = 438.000000000000000000
+            Size.Height = 396.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
             Viewport.Width = 704.000000000000000000
@@ -1177,7 +1177,7 @@
                 Size.Width = 250.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
-                Text = 'Размер массива'
+                Text = #1056#1072#1079#1084#1077#1088' '#1084#1072#1089#1089#1080#1074#1072
               end
               object EditResultSampleCount: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
@@ -1199,7 +1199,7 @@
               end
               object EditResultConfiguredWindowSampleCount: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
-                TabOrder = 18
+                TabOrder = 15
                 ReadOnly = True
                 Position.X = 580.000000000000000000
                 Position.Y = 30.000000000000000000
@@ -1267,11 +1267,11 @@
                 Size.Width = 165.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
-                Text = 'Минимальная длительность окна, с'
+                Text = #1052#1080#1085#1080#1084#1072#1083#1100#1085#1072#1103' '#1076#1083#1080#1090#1077#1083#1100#1085#1086#1089#1090#1100' '#1086#1082#1085#1072', '#1089
               end
               object EditResultRequiredWindowDuration: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
-                TabOrder = 19
+                TabOrder = 16
                 ReadOnly = True
                 Position.X = 580.000000000000000000
                 Position.Y = 150.000000000000000000
@@ -1285,7 +1285,7 @@
                 Size.Width = 250.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
-                Text = 'Прошло с начала окна, с'
+                Text = #1055#1088#1086#1096#1083#1086' '#1089' '#1085#1072#1095#1072#1083#1072' '#1086#1082#1085#1072', '#1089
               end
               object EditResultElapsedWindowSec: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
@@ -1307,7 +1307,7 @@
               end
               object EditResultActualSampleSpan: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
-                TabOrder = 21
+                TabOrder = 19
                 ReadOnly = True
                 Position.X = 580.000000000000000000
                 Position.Y = 210.000000000000000000
@@ -1325,7 +1325,7 @@
               end
               object EditResultCurrentValue: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
-                TabOrder = 6
+                TabOrder = 5
                 ReadOnly = True
                 Position.X = 280.000000000000000000
                 Position.Y = 210.000000000000000000
@@ -1343,7 +1343,7 @@
               end
               object EditResultMeanValue: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
-                TabOrder = 7
+                TabOrder = 6
                 ReadOnly = True
                 Position.X = 280.000000000000000000
                 Position.Y = 240.000000000000000000
@@ -1361,7 +1361,7 @@
               end
               object EditResultMinValue: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
-                TabOrder = 8
+                TabOrder = 7
                 ReadOnly = True
                 Position.X = 280.000000000000000000
                 Position.Y = 270.000000000000000000
@@ -1379,7 +1379,7 @@
               end
               object EditResultMaxValue: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
-                TabOrder = 9
+                TabOrder = 8
                 ReadOnly = True
                 Position.X = 280.000000000000000000
                 Position.Y = 300.000000000000000000
@@ -1397,7 +1397,7 @@
               end
               object EditResultVariation: TEdit
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
-                TabOrder = 10
+                TabOrder = 9
                 ReadOnly = True
                 Position.X = 280.000000000000000000
                 Position.Y = 330.000000000000000000
@@ -1581,8 +1581,8 @@
             end>
           TextSettings.Trimming = None
           IsSelected = False
-          Size.Width = 1.000000000000000000
-          Size.Height = 5.000000000000000000
+          Size.Width = 60.000000000000000000
+          Size.Height = 26.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = ''
           TabOrder = 0

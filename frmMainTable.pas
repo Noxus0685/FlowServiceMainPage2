@@ -5387,7 +5387,7 @@ begin
 
   WorkTable.RecalculateAllMeterValues;
 
-
+     { TODO -oAndrey -cNote : Что-то странное }
    WorkTable.FluidTemp.Value.value:=  WorkTable.ValueTemperture.GetDoubleValue;
    WorkTable.FluidPress.Value.value:= WorkTable.ValuePressure.GetDoubleValue;
    // WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue

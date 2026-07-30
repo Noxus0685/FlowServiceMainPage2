@@ -2640,7 +2640,7 @@ end;
 { Assigns value, applies range limits, and updates history/mean buffers. }
 procedure TMeterValue.SetValue;
 var
-  ValueLocal: Double;
+  ValueLocal, tmp, rte: Double;
   Q: Single;
   MeterValue: TMeterValue;
   I: Integer;
@@ -2759,12 +2759,22 @@ begin
       begin
         Q := ValueCorrection.Value * CoefCorrection;   //Приведение поправочного аргумента к нужной размерности
         if Coefs.Count > 0 then
-          ValueLocal := ValueLocal * Rate(Q);
+        begin
+          tmp := ValueLocal;
+          rte :=  Rate(Q);
+          ValueLocal := tmp * rte;
+
+          if ValueLocal<900 then      //TEST TEST TEST
+          begin
+               rte :=  Rate(Q);
+          end;
+        end;
       end
       else if Coefs.Count > 0 then
+        begin
         ValueLocal := ValueLocal * Rate(ValueLocal);
 
-
+        end;
       SetValue(ValueLocal);
     end;
 
