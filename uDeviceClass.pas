@@ -30,6 +30,11 @@ type
     cctDeviceDensityCorrection = 14   // поправка плотности (для записи в прибор)
   );
 
+function TryCalibrCoefTableType(const ARawType: Integer;
+  out ATableType: TCalibrCoefTableType): Boolean;
+function CalibrCoefTableTypeName(const ATableType: TCalibrCoefTableType): string;
+
+type
   TPointSpillage = class;
 
   TSessionSpillage = class(TTypeEntity)
@@ -423,6 +428,8 @@ type
     function Clone: TCalibrCoefTable;
     function FindItemByQ(Q: Double): TCalibrCoefItem;
     function ApplyByQ(Q, X: Double): Double;
+    function TableType: TCalibrCoefTableType;
+    procedure SetTableType(const AType: TCalibrCoefTableType);
   end;
 
   TDevice = class(TTypeEntity)
@@ -629,6 +636,39 @@ uses
   uAppServices,
   uRepositories,
   uMKSDebug;
+
+function TryCalibrCoefTableType(const ARawType: Integer;
+  out ATableType: TCalibrCoefTableType): Boolean;
+begin
+  Result := (ARawType >= Ord(Low(TCalibrCoefTableType))) and
+    (ARawType <= Ord(High(TCalibrCoefTableType)));
+  if not Result then Exit;
+  ATableType := TCalibrCoefTableType(ARawType);
+  case ATableType of
+    cctReference, cctMeterValueCoef, cctMeterValueFlowRate,
+    cctMeterValueQuantity, cctMeterValueDensity,
+    cctDeviceCoefCorrection, cctDeviceFlowRateCorrection,
+    cctDeviceQuantityCorrection, cctDeviceDensityCorrection: Result := True;
+  else Result := False;
+  end;
+end;
+
+function CalibrCoefTableTypeName(
+  const ATableType: TCalibrCoefTableType): string;
+begin
+  case ATableType of
+    cctReference: Result := 'cctReference';
+    cctMeterValueCoef: Result := 'cctMeterValueCoef';
+    cctMeterValueFlowRate: Result := 'cctMeterValueFlowRate';
+    cctMeterValueQuantity: Result := 'cctMeterValueQuantity';
+    cctMeterValueDensity: Result := 'cctMeterValueDensity';
+    cctDeviceCoefCorrection: Result := 'cctDeviceCoefCorrection';
+    cctDeviceFlowRateCorrection: Result := 'cctDeviceFlowRateCorrection';
+    cctDeviceQuantityCorrection: Result := 'cctDeviceQuantityCorrection';
+    cctDeviceDensityCorrection: Result := 'cctDeviceDensityCorrection';
+  else Result := 'Unknown';
+  end;
+end;
 
 class function TDevicePoint.GetPointSpillageTypeText(const AType: EPointSpillageType): string;
 begin
@@ -1593,9 +1633,21 @@ end;
 constructor TCalibrCoefTable.Create;
 begin
   inherited Create;
-  &Type := 0;
+  // A newly created device table is a coefficient correction table.  Assign
+  // the persisted value here, before any points can be appended to Items.
+  SetTableType(cctMeterValueCoef);
   Active := False;
   Items := TObjectList<TCalibrCoefItem>.Create(True);
+end;
+
+function TCalibrCoefTable.TableType: TCalibrCoefTableType;
+begin
+  Result := TCalibrCoefTableType(&Type);
+end;
+
+procedure TCalibrCoefTable.SetTableType(const AType: TCalibrCoefTableType);
+begin
+  &Type := Ord(AType);
 end;
 
 destructor TCalibrCoefTable.Destroy;
@@ -3174,11 +3226,6 @@ begin
 end;
 
 end.
-
-
-
-
-
 
 
 
