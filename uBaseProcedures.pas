@@ -60,6 +60,13 @@ uses
 
 type
 
+  /// <summary>Решение пользователя о сохранении одиночного ручного измерения.</summary>
+  TSaveConfirmationResult = (
+    scrNone,      // решение ещё не получено
+    scrAccepted,  // сохранение подтверждено
+    scrRejected   // пользователь отказался от сохранения
+  );
+
 
 
    IHasID = interface

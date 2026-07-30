@@ -255,6 +255,9 @@ type
       STABILITY_STDDEV_ERROR_FACTOR = 0.15;
       STABILITY_TREND_ERROR_FACTOR = 0.25;
       STABILITY_FORECAST_HORIZON_SEC = 5.0;
+      DEFAULT_SAMPLE_INTERVAL_MS = 100.0;
+      STABILITY_SAMPLE_SIZE_RESERVE_FACTOR = 1.25;
+      HISTORY_RESERVE_SEC = 5.0;
 
   private
 
@@ -274,9 +277,18 @@ type
     FManualTimeSet: Integer;
 
     FCurrentStage: EMeasurementState;
+    // Решение о сохранении действует только для текущего входа в msSave.
+    FSaveConfirmationResult: TSaveConfirmationResult;
 
     FWaitStartedTick: UInt64;
     FLastStableProtocolTick: UInt64;
+
+    FLastConfiguredStabilityValue: TMeterValue;
+    FLastPreviousSampleSize: Integer;
+    FLastRequiredSampleSize: Integer;
+    FLastSampleCountInBuffer: Integer;
+    FLastEstimatedSampleIntervalMs: Double;
+    FLastBufferExpanded: Boolean;
 
 
     FCurrentRepeat: Integer;
@@ -330,6 +342,8 @@ type
     FLastFreshDataLogMs: Int64;
     FLastPointDecisionLogMs: Int64;
     FLastPointSetupReadyProtocolMs: Int64;
+    FPressureNotControlledLogged: Boolean;
+    FTemperatureNotControlledLogged: Boolean;
     FLastTemperatureReady: Boolean;
     FLastPressureReady: Boolean;
     FLastWaitPointSetupLogState: EStateWorkTable;
@@ -421,7 +435,10 @@ type
     function CalcStableTimeoutSec: Integer;
     procedure ResetPointSetupState;
     procedure StartNewStabilityAttempt;
-    /// <summary>Изменяет только три порога стабильности по Q и Error точки.</summary>
+    /// <summary>
+    /// Настраивает три порога по Q/Error и при необходимости
+    /// расширяет историю для минимального временного окна.
+    /// </summary>
     procedure ConfigureStabilityByPoint(AValue: TMeterValue; APoint: TDevicePoint);
     /// <summary>
     /// Настраивает целевой диапазон по FlowAccuracy и независимо включает
@@ -482,6 +499,12 @@ type
     procedure Process;
     procedure ProcessStage;
     procedure SaveMeasurementResults;
+    /// <summary>Проверяет необходимость решения пользователя перед сохранением.</summary>
+    function RequiresSaveConfirmation: Boolean;
+    /// <summary>Фиксирует подтверждение пользователя без сохранения данных.</summary>
+    procedure AcceptMeasurementResults;
+    /// <summary>Фиксирует отказ пользователя без изменения этапа.</summary>
+    procedure RejectMeasurementResults;
     function BuildDiagnosticSnapshot(const ASwitchAutoText: string): string;
     function DrainDiagnosticEvents: TArray<string>;
 
@@ -496,6 +519,8 @@ type
     property PreparedPointsMode: EMeasurementRunMode read FPreparedPointsMode;
 
     property Stage: EMeasurementState read FCurrentStage;
+    property SaveConfirmationResult: TSaveConfirmationResult
+      read FSaveConfirmationResult;
 
     property Mode: EMeasurementRunMode read FMode write FMode;
     property CurrentPointIndex: Integer read FCurrentPointIndex write FCurrentPointIndex;
@@ -564,6 +589,10 @@ procedure TMeasurementRun.ConfigureStabilityByPoint(AValue: TMeterValue;
 var
   Settings: TMeterValueStabilitySettings;
   ErrorAbsolute: Double;
+  Samples: TArray<TMeterValueSample>;
+  DeltaMs, TotalDeltaMs: Int64;
+  PositiveIntervalCount, I, RequiredSampleCount: Integer;
+  AverageSampleIntervalMs: Double;
 begin
   if (AValue = nil) or (APoint = nil) then
     Exit;
@@ -574,6 +603,40 @@ begin
   Settings.MaxStdDeviation := ErrorAbsolute * STABILITY_STDDEV_ERROR_FACTOR;
   Settings.MaxTrendRate := ErrorAbsolute * STABILITY_TREND_ERROR_FACTOR /
     STABILITY_FORECAST_HORIZON_SEC;
+
+  Samples := AValue.GetStabilitySamples;
+  TotalDeltaMs := 0;
+  PositiveIntervalCount := 0;
+  for I := 1 to High(Samples) do
+  begin
+    DeltaMs := Samples[I].TimeStampMs - Samples[I - 1].TimeStampMs;
+    if DeltaMs > 0 then
+    begin
+      Inc(TotalDeltaMs, DeltaMs);
+      Inc(PositiveIntervalCount);
+    end;
+  end;
+  if PositiveIntervalCount > 0 then
+    AverageSampleIntervalMs := TotalDeltaMs / PositiveIntervalCount
+  else
+    AverageSampleIntervalMs := DEFAULT_SAMPLE_INTERVAL_MS;
+
+  RequiredSampleCount := Ceil(Settings.MinWindowDurationSec * 1000.0 /
+    AverageSampleIntervalMs);
+  RequiredSampleCount := Ceil(RequiredSampleCount *
+    STABILITY_SAMPLE_SIZE_RESERVE_FACTOR);
+  RequiredSampleCount := Max(RequiredSampleCount, Settings.MinSampleCount + 5);
+
+  FLastConfiguredStabilityValue := AValue;
+  FLastPreviousSampleSize := Settings.SampleSize;
+  FLastRequiredSampleSize := RequiredSampleCount;
+  FLastSampleCountInBuffer := Length(Samples);
+  FLastEstimatedSampleIntervalMs := AverageSampleIntervalMs;
+  FLastBufferExpanded := RequiredSampleCount > Settings.SampleSize;
+
+  Settings.SampleSize := Max(Settings.SampleSize, RequiredSampleCount);
+  Settings.MaxSampleAgeSec := Max(Settings.MaxSampleAgeSec,
+    Settings.MinWindowDurationSec + HISTORY_RESERVE_SEC);
   AValue.StabilitySettings := Settings;
 end;
 
@@ -610,7 +673,7 @@ procedure TMeasurementRun.LogPointSetupValueConfigured(const AName: string;
 var
   S: TMeterValueStabilitySettings;
   LowerLimit, UpperLimit: Double;
-  RangeText: string;
+  RangeText, BufferText: string;
 begin
   if AValue = nil then
     Exit;
@@ -623,13 +686,21 @@ begin
   end
   else
     RangeText := '; RangeChecksEnabled=False';
+  if FLastConfiguredStabilityValue = AValue then
+    BufferText := Format('; PreviousSampleSize=%d; ConfiguredSampleSize=%d; SampleCountInBuffer=%d; EstimatedSampleIntervalMs=%.3f; EstimatedSampleRateHz=%.3f; RequiredSampleSize=%d; MinWindowDurationSec=%.3f; MaxSampleAgeSec=%.3f; BufferExpanded=%s',
+      [FLastPreviousSampleSize, S.SampleSize, FLastSampleCountInBuffer,
+       FLastEstimatedSampleIntervalMs, 1000.0 / FLastEstimatedSampleIntervalMs,
+       FLastRequiredSampleSize, S.MinWindowDurationSec, S.MaxSampleAgeSec,
+       BoolToStr(FLastBufferExpanded, True)])
+  else
+    BufferText := '';
   ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitPointSetup',
     'Применены настройки стабилизации',
-    Format('PointSetupValueConfigured: Name=%s; Target=%.6f; MaxVariation=%.9f; MaxStdDeviation=%.9f; MaxTrendRate=%.9f; MinSampleCount=%d; MinWindowDurationSec=%.3f; MaxOutlierRatio=%.9f; CheckCurrentRange=%s; CheckMeanRange=%s%s',
+    Format('PointSetupValueConfigured: Name=%s; Target=%.6f; MaxVariation=%.9f; MaxStdDeviation=%.9f; MaxTrendRate=%.9f; MinSampleCount=%d; MaxOutlierRatio=%.9f; CheckCurrentRange=%s; CheckMeanRange=%s%s%s',
       [AName, S.TargetValue, S.MaxVariation, S.MaxStdDeviation, S.MaxTrendRate,
-       S.MinSampleCount, S.MinWindowDurationSec, S.MaxOutlierFraction,
+       S.MinSampleCount, S.MaxOutlierFraction,
        BoolToStr(S.RequireCurrentValueInRange, True),
-       BoolToStr(S.RequireMeanValueInRange, True), RangeText]));
+       BoolToStr(S.RequireMeanValueInRange, True), RangeText, BufferText]));
 end;
 
 function TMeasurementRun.BuildPointSetupSignalLog(const AName, ASource,
@@ -874,6 +945,8 @@ begin
   FManualTimeSet := 60;
 
   FCurrentStage := msNone;
+  // До первого этапа msSave решение о сохранении отсутствует.
+  FSaveConfirmationResult := scrNone;
   FForceNextPoint := -1;
   FMaxAttemptCount := 3;
   FAttempt := 0;
@@ -915,6 +988,8 @@ begin
   FLastFreshDataLogMs := 0;
   FLastPointDecisionLogMs := 0;
   FLastPointSetupReadyProtocolMs := -1;
+  FPressureNotControlledLogged := False;
+  FTemperatureNotControlledLogged := False;
   FLastTemperatureReady := True;
   FLastPressureReady := True;
   FLastWaitPointSetupLogState := swtNONE;
@@ -1392,6 +1467,10 @@ var
   Point: TDevicePoint;
   CurrentMs: Int64;
 begin
+  // Эти сообщения описывают текущую точку, поэтому для новой точки их можно
+  // опубликовать снова, но не следует повторять при каждом опросе готовности.
+  FPressureNotControlledLogged := False;
+  FTemperatureNotControlledLogged := False;
   SetCurrentPointStatus(mptsSetupPoint);
   if FWorkTable = nil then
     Exit;
@@ -1417,10 +1496,7 @@ begin
          (Channel.FlowMeter.ValueFlow <> nil) then
         Channel.FlowMeter.ValueFlow.ResetStabilityRuntimeState;
     end;
-  AddDiagnosticEvent(Format(
-    'PointSetupWaitStarted: PointIndex=%d; PointUUID=%s; TargetFlowLS=%.6f; SelectedEtalonUUID=%s; WorkTableState=%s; Attempt=%d; CommandSent=%s',
-    [FSetupPointIndex, FSetupPointUUID, FSetupTargetFlowLS, GetSelectedEtalonUUID,
-     TWorkTable.WorkTableStateToString(FWorkTable.State), FAttempt, BoolToStr(FPointSetupCommandSent, True)]));
+
   if Point <> nil then
   begin
     ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitPointSetup',
@@ -1433,6 +1509,7 @@ begin
     FLastPointDecisionLogMs := 0;
     FLastPointSetupReadyProtocolMs := -1;
   end;
+
   if FWorkTable.State <> swtMONITOR then
     FWorkTable.StartMonitor;
 end;
@@ -1476,6 +1553,8 @@ begin
   FWaitStableStartedMs := TMeterValue.GetMonotonicTimeMs;
   if FStabilityDataStartMs <= 0 then
     FStabilityDataStartMs := FWaitStableStartedMs;
+
+   FWorkTable.DeviceChannels[0].FlowMeter.ValueFlow.ProtocolValueChanges := True;
 
   SetLength(FDeviceStability, 0);
   if (FWorkTable <> nil) and (FWorkTable.DeviceChannels <> nil) then
@@ -1642,69 +1721,18 @@ begin
 end;
 
 procedure TMeasurementRun.EnterSave;
-var
-  Point: TDevicePoint;
-  RepeatsTarget: Integer;
-  IsLastRepeat: Boolean;
-  SavedRepeat: Integer;
 begin
   FNextStageAfterSave := msDone;
   SetCurrentPointStatus(mptsSave);
 
+  // Каждое новое измерение начинает этап сохранения без решения пользователя.
+  FSaveConfirmationResult := scrNone;
+  ProtocolManager.AddMessage(pcInfo, psMeasurement, 'EnterSave',
+    'Вход в этап сохранения: решение пользователя сброшено',
+    MeasurementStateToString(FCurrentStage));
+
   FLastMeasureCompletedEventSent := True;
   FireEvent(meMeasureCompleted);
-
-  Point := GetCurrentPoint;
-
-  SaveMeasurementResults;
-  FLastSaveDoneEventSent := True;
-  FireEvent(meSaveDone);
-
-  if IsStopRequested then
-  begin
-    MarkInterruptedPointIfNeeded;
-    ProtocolManager.AddMessage(pcInfo, psMeasurement, 'EnterSave',
-      'После Stop продолжение серии запрещено',
-      Format('Stage=%s; Reason=%s', [MeasurementStateToString(FCurrentStage),
-        MeasurementStopReasonToString(GetStopReason)]));
-    FNextStageAfterSave := msDone;
-    Exit;
-  end;
-
-  RepeatsTarget := 1;
-  if (FMode <> mrmManual) and (Point <> nil) then
-    RepeatsTarget := Max(Point.Repeats, 1);
-  Inc(FCurrentRepeat);
-  IsLastRepeat := FCurrentRepeat >= RepeatsTarget;
-  SavedRepeat := FCurrentRepeat;
-
-  if IsLastRepeat then
-  begin
-    if Point <> nil then
-    begin
-      FLastProcessedPointIndex := FCurrentPointIndex;
-      FLastProcessedPointName := Point.Name;
-      SetCurrentPointStatus(mptsSaved);
-    end;
-    FCurrentRepeat := 0;
-    FLastPointDoneEventSent := True;
-    AddDiagnosticEvent('mePointDone');
-    FireEvent(mePointDone);
-    if FMode = mrmManual then
-      FNextStageAfterSave := msDone
-    else if FindNextEnabledPointIndex(FCurrentPointIndex + 1) < 0 then
-      FNextStageAfterSave := msDone
-    else
-      FNextStageAfterSave := msSelectPoint;
-  end
-  else
-    FNextStageAfterSave := msWaitMeasureStart;
-
-  AddDiagnosticEvent(Format(
-    'RepeatTransition: PointName=%s; CurrentRepeat=%d; RepeatsTarget=%d; IsLastRepeat=%s; NextStage=%s; StabilizationSkipped=%s',
-    [IfThen(Point <> nil, Point.Name, '<none>'), SavedRepeat, RepeatsTarget,
-     BoolToStr(IsLastRepeat, True), MeasurementStateToString(FNextStageAfterSave),
-     BoolToStr(FNextStageAfterSave = msWaitMeasureStart, True)]));
 end;
 
 procedure TMeasurementRun.EnterDone;
@@ -1744,7 +1772,7 @@ begin
   ResetPointSetupState;
   if FWorkTable <> nil then
   begin
-    FWorkTable.ResetCurrentPoint;
+   // FWorkTable.ResetCurrentPoint;
     if (FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.ValueSet <> nil) then
       FWorkTable.FlowRate.ValueSet.Value := 0;
     FWorkTable.TimeResult := 0;
@@ -2006,7 +2034,7 @@ begin
      BoolToStr(PressureReady, True), BoolToStr(ConditionsReady, True),
      BoolToStr(Result, True), Reason]);
   PublishProtocol := (FLastPointSetupReadyProtocolMs < 0) or
-    (CurrentMs - FLastPointSetupReadyProtocolMs >= 1000);
+    (CurrentMs - FLastPointSetupReadyProtocolMs >= 2000);
   if PublishProtocol then
   begin
     ProtocolManager.AddMessage(pcProc, psMeasurement, 'IsPointSetupReady',
@@ -2117,9 +2145,16 @@ begin
   else begin
     LogText := 'PointSetupCondition: Name=FluidTemp; Enabled=False; Skipped=True; Reason=Parameter is not configured';
     AddDiagnosticEvent(LogText);
-    if PublishProtocol then ProtocolManager.AddMessage(pcProc, psMeasurement,
-      'IsConditionsStable', 'Температура не контролируется', LogText);
+    if not FTemperatureNotControlledLogged then
+    begin
+      ProtocolManager.AddMessage(pcProc, psMeasurement, 'IsPointSetupReady',
+        'Температура не контролируется',
+        'Контроль температуры для текущей точки отключён');
+      FTemperatureNotControlledLogged := True;
+    end;
   end;
+  if (FWorkTable.FluidTemp <> nil) and (Point.Temp > 0) then
+    FTemperatureNotControlledLogged := False;
   FLastTemperatureReady := TemperatureStable;
 
   PressureStable := True;
@@ -2140,10 +2175,20 @@ begin
   else begin
     LogText := 'PointSetupCondition: Name=FluidPress; Enabled=False; Skipped=True; Reason=Parameter is not configured';
     AddDiagnosticEvent(LogText);
-    if PublishProtocol then ProtocolManager.AddMessage(pcProc, psMeasurement,
-      'IsConditionsStable', 'Давление не контролируется', LogText);
+    if not FPressureNotControlledLogged then
+    begin
+      ProtocolManager.AddMessage(pcProc, psMeasurement, 'IsPointSetupReady',
+        'Давление не контролируется',
+        'Контроль давления для текущей точки отключён');
+      FPressureNotControlledLogged := True;
+    end;
   end;
+  if (FWorkTable.FluidPress <> nil) and (Point.Pressure > 0) then
+    FPressureNotControlledLogged := False;
   FLastPressureReady := PressureStable;
+
+  if PublishProtocol then
+    FLastPointDecisionLogMs := TMeterValue.GetMonotonicTimeMs;
 
   Result := TemperatureStable and PressureStable;
   if Result then
@@ -4721,6 +4766,8 @@ begin
   FLastWaitPointSetupLogMs := 0;
   FLastWaitPointSetupLogState := swtNONE;
   FLastPointSetupReadyProtocolMs := -1;
+  FPressureNotControlledLogged := False;
+  FTemperatureNotControlledLogged := False;
 end;
 
 procedure TMeasurementRun.StartNewStabilityAttempt;
@@ -5453,9 +5500,134 @@ begin
 end;
 
 procedure TMeasurementRun.ProcessSave;
+var
+  Point: TDevicePoint;
+  RepeatsTarget: Integer;
+  IsLastRepeat: Boolean;
+  SavedRepeat: Integer;
+  ResultsSaved: Boolean;
 begin
-  if FNextStageAfterSave <> msNone then
+  // Одиночное ручное измерение остаётся в msSave до решения пользователя.
+  if RequiresSaveConfirmation then
+    case FSaveConfirmationResult of
+      scrNone:
+        begin
+          if (FWorkTable <> nil) and
+             (FWorkTable.State <> swtSaveConfirmation) then
+          begin
+            FWorkTable.State := swtSaveConfirmation;
+            ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessSave',
+              'Стол ожидает подтверждения сохранения результата',
+              MeasurementStateToString(FCurrentStage));
+          end;
+          Exit;
+        end;
+      scrAccepted:
+        ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessSave',
+          'Сохранение результата после подтверждения пользователя', '');
+      scrRejected:
+        ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessSave',
+          'Сохранение результата пропущено после отказа пользователя', '');
+    end
+  else
+    ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessSave',
+      'Автоматическое сохранение результата без подтверждения', '');
+
+  ResultsSaved := not RequiresSaveConfirmation or
+    (FSaveConfirmationResult = scrAccepted);
+  if ResultsSaved then
+  begin
+    SaveMeasurementResults;
+    FLastSaveDoneEventSent := True;
+    FireEvent(meSaveDone);
+  end;
+
+  Point := GetCurrentPoint;
+  if IsStopRequested then
+  begin
+    MarkInterruptedPointIfNeeded;
+    ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessSave',
+      'После Stop продолжение серии запрещено',
+      Format('Stage=%s; Reason=%s', [MeasurementStateToString(FCurrentStage),
+        MeasurementStopReasonToString(GetStopReason)]));
+    FNextStageAfterSave := msDone;
     SetStage(FNextStageAfterSave);
+    Exit;
+  end;
+
+  RepeatsTarget := 1;
+  if Point <> nil then
+    RepeatsTarget := Max(Point.Repeats, 1);
+  Inc(FCurrentRepeat);
+  IsLastRepeat := FCurrentRepeat >= RepeatsTarget;
+  SavedRepeat := FCurrentRepeat;
+
+  if IsLastRepeat then
+  begin
+    if Point <> nil then
+    begin
+      FLastProcessedPointIndex := FCurrentPointIndex;
+      FLastProcessedPointName := Point.Name;
+      // Отказ завершает обработку точки, но не помечает её как сохранённую.
+      if ResultsSaved then
+        SetCurrentPointStatus(mptsSaved);
+    end;
+    FCurrentRepeat := 0;
+    FLastPointDoneEventSent := True;
+    AddDiagnosticEvent('mePointDone');
+    FireEvent(mePointDone);
+    if FMode = mrmManual then
+      FNextStageAfterSave := msDone
+    else if FindNextEnabledPointIndex(FCurrentPointIndex + 1) < 0 then
+      FNextStageAfterSave := msDone
+    else
+      FNextStageAfterSave := msSelectPoint;
+  end
+  else
+    FNextStageAfterSave := msWaitMeasureStart;
+
+  AddDiagnosticEvent(Format(
+    'RepeatTransition: PointName=%s; CurrentRepeat=%d; RepeatsTarget=%d; IsLastRepeat=%s; NextStage=%s; StabilizationSkipped=%s',
+    [IfThen(Point <> nil, Point.Name, '<none>'), SavedRepeat, RepeatsTarget,
+     BoolToStr(IsLastRepeat, True), MeasurementStateToString(FNextStageAfterSave),
+     BoolToStr(FNextStageAfterSave = msWaitMeasureStart, True)]));
+  SetStage(FNextStageAfterSave);
+end;
+
+function TMeasurementRun.RequiresSaveConfirmation: Boolean;
+var
+  Point: TDevicePoint;
+  RepeatsTarget: Integer;
+begin
+  Point := GetCurrentPoint;
+  RepeatsTarget := 1;
+  if Point <> nil then
+    RepeatsTarget := Max(Point.Repeats, 1);
+
+  // Подтверждение требуется только для одного повтора в ручном режиме.
+  Result := (FMode = mrmManual) and (RepeatsTarget = 1);
+end;
+
+procedure TMeasurementRun.AcceptMeasurementResults;
+begin
+  // Метод фиксирует решение; сохранение выполнит следующий ProcessSave.
+  if (FCurrentStage <> msSave) or not RequiresSaveConfirmation or
+     (FSaveConfirmationResult <> scrNone) then
+    Exit;
+  FSaveConfirmationResult := scrAccepted;
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'AcceptResults',
+    'Пользователь подтвердил сохранение результата измерения', '');
+end;
+
+procedure TMeasurementRun.RejectMeasurementResults;
+begin
+  // Метод фиксирует решение; завершение обработки выполнит ProcessSave.
+  if (FCurrentStage <> msSave) or not RequiresSaveConfirmation or
+     (FSaveConfirmationResult <> scrNone) then
+    Exit;
+  FSaveConfirmationResult := scrRejected;
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'RejectResults',
+    'Пользователь отказался от сохранения результата измерения', '');
 end;
 
 procedure TMeasurementRun.ProcessDone;
