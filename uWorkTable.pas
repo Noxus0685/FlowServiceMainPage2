@@ -496,6 +496,10 @@ type
     FEnvironmentSimulationBaseInitialized: Boolean;
     FSimulationLastUpdateTimeMs: Double;
     FSimulationLastFlowSampleLogMs: Int64;
+    FSimulationLastFlowRejectLogMs: Int64;
+    FSimulationLastFlowRejectReason: string;
+    FSimulationLastNoiseMs: Int64;
+    FSimulationLastFlowOutcomeMs: Int64;
     FSimulationLastFlowUnitsLogTarget: Double;
     FSimulationTargetFlowBase: Double;
     FDeviceSimulationFlowRate: Double;
@@ -817,6 +821,10 @@ type
     property EnvironmentSimulationBaseInitialized: Boolean read FEnvironmentSimulationBaseInitialized;
     property SimulationLastUpdateTimeMs: Double read FSimulationLastUpdateTimeMs write FSimulationLastUpdateTimeMs;
     property SimulationLastFlowSampleLogMs: Int64 read FSimulationLastFlowSampleLogMs write FSimulationLastFlowSampleLogMs;
+    property SimulationLastFlowRejectLogMs: Int64 read FSimulationLastFlowRejectLogMs write FSimulationLastFlowRejectLogMs;
+    property SimulationLastFlowRejectReason: string read FSimulationLastFlowRejectReason write FSimulationLastFlowRejectReason;
+    property SimulationLastNoiseMs: Int64 read FSimulationLastNoiseMs write FSimulationLastNoiseMs;
+    property SimulationLastFlowOutcomeMs: Int64 read FSimulationLastFlowOutcomeMs write FSimulationLastFlowOutcomeMs;
     property SimulationLastFlowUnitsLogTarget: Double read FSimulationLastFlowUnitsLogTarget write FSimulationLastFlowUnitsLogTarget;
     property SimulationTargetFlowBase: Double read FSimulationTargetFlowBase write FSimulationTargetFlowBase;
     property DeviceSimulationFlowRate: Double read FDeviceSimulationFlowRate write FDeviceSimulationFlowRate;
@@ -931,6 +939,7 @@ uses
   FmxHelper,
   frmMainTable,
   uMeasurementRun,
+  uAppVersion,
   uMKSDebug;
 
 const
@@ -2092,6 +2101,10 @@ begin
   FLimitVolumeSet := 0;
   FSimulationLastUpdateTimeMs := 0;
   FSimulationLastFlowSampleLogMs := 0;
+  FSimulationLastFlowRejectLogMs := 0;
+  FSimulationLastFlowRejectReason := '';
+  FSimulationLastNoiseMs := 0;
+  FSimulationLastFlowOutcomeMs := 0;
   FSimulationLastFlowUnitsLogTarget := 0;
   FSimulationTargetFlowBase := 0;
   FDeviceSimulationFlowRate := 0;
@@ -7200,7 +7213,8 @@ begin
   end;
 end;
 
-procedure ApplySimpleSimulationNoise(const AChannel: TChannel; const AChannelKind: string;
+procedure ApplySimpleSimulationNoise(const AWorkTable: TWorkTable;
+  const AChannel: TChannel; const AChannelKind: string;
   const AChannelIndex: Integer; const ACurrentTimeMs, ANoisePercent: Double;
   const ADeviceReady: Boolean);
 var
@@ -7229,6 +7243,8 @@ begin
       (ACurrentTimeMs - AChannel.SimulationLastProgressLogMs >= 1000.0)) then
   begin
     AChannel.SimulationLastProgressLogMs := ACurrentTimeMs;
+    if AWorkTable <> nil then
+      AWorkTable.SimulationLastNoiseMs := TMeterValue.GetMonotonicTimeMs;
     ProtocolManager.AddMessage(pcState, psWorkTable, 'SimulationNoise',
       'Simple channel simulation noise',
       Format('ChannelKind=%s ChannelIndex=%d DeviceReady=%s TargetImpSec=%.6f BeforeImpSec=%.6f RandomStep=%.6f AllowedDelta=%.6f AfterImpSec=%.6f',
@@ -7294,36 +7310,32 @@ begin
       ATargetImpSecValues[I], ACurrentTimeMs,
       Format('Reason=WorkTableTargetChanged TargetSource=WorkTableSetFlow TargetFlowBaseLS=%.6f OldTargetFlowBaseLS=%.6f PointUUID= DeviceReady=%s',
         [ATargetFlow, AOldTargetFlow, IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
-    ApplySimpleSimulationNoise(Channel, 'Etalon', AWorkTable.EtalonChannels.IndexOf(Channel),
+    ApplySimpleSimulationNoise(AWorkTable, Channel, 'Etalon', AWorkTable.EtalonChannels.IndexOf(Channel),
       ACurrentTimeMs, 1.0, AWorkTable.DeviceReady);
     UpdateChannelCurSec(Channel, 0.03);
   end;
 end;
 
-function CalculateActualEtalonFlow(const AWorkTable: TWorkTable): Double;
+function CalculateActualEtalonFlow(const AWorkTable: TWorkTable;
+  out ASourceChannelCount: Integer): Double;
 var
-  I, ActiveEtalonIndex: Integer;
-  GroupKey: Integer;
+  I: Integer;
   ChannelCoef: Double;
 begin
   Result := 0;
-  GroupKey := 0;
-  ActiveEtalonIndex := -1;
+  ASourceChannelCount := 0;
+  if AWorkTable = nil then
+    Exit;
+
   for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
     if IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I]) then
     begin
-      GroupKey := AWorkTable.EtalonChannels[I].Group;
-      ActiveEtalonIndex := I;
-      Break;
-    end;
-
-  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
-    if IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I]) and
-       (AWorkTable.EtalonChannels[I].Group = GroupKey) then
-    begin
       ChannelCoef := GetChannelFlowCoef(AWorkTable.EtalonChannels[I]);
       if ChannelCoef > 0 then
+      begin
         Result := Result + AWorkTable.EtalonChannels[I].ImpSec / ChannelCoef;
+        Inc(ASourceChannelCount);
+      end;
     end;
 end;
 
@@ -7337,50 +7349,68 @@ begin
 end;
 
 procedure ApplySimulatedTableFlowValue(const AWorkTable: TWorkTable;
-  const AGeneratedValue: Double);
+  const AGeneratedValue: Double; const ASourceChannelCount: Integer);
 const
   DIAGNOSTIC_INTERVAL_MS = 2000;
 var
-  SimulationTargetValue: TMeterValue;
-  WorkTableFlowValue: TMeterValue;
-  Samples: TArray<TMeterValueSample>;
+  TargetValue: TMeterValue;
+  CurrentTargetValue: TMeterValue;
+  SamplesBefore: TArray<TMeterValueSample>;
+  SamplesAfter: TArray<TMeterValueSample>;
   SampleTimeMs: Int64;
   FirstSampleMs: Int64;
   LastSampleMs: Int64;
   StabilityDataStartMs: Int64;
   CurrentMs: Int64;
   CurrentStage: string;
-  SameObject: Boolean;
+  FlowRatePtr: TObject;
   Applied: Boolean;
+  SampleDelta: Integer;
+  UnitName: string;
+  PreviousLastSampleMs: Int64;
 
   function PointerText(const AObject: TObject): string;
   begin
     Result := '0x' + IntToHex(NativeUInt(Pointer(AObject)), SizeOf(Pointer) * 2);
   end;
 
-begin
-  if (AWorkTable = nil) or (not AWorkTable.IsSimulationMode) then
-    Exit;
-
-  WorkTableFlowValue := nil;
-  if AWorkTable.FlowRate <> nil then
-    WorkTableFlowValue := AWorkTable.FlowRate.Value;
-  { Resolve the target on every simulation tick.  This deliberately avoids a
-    cached reference surviving Reset/Clear/StartMonitor. }
-  SimulationTargetValue := WorkTableFlowValue;
-  SameObject := (SimulationTargetValue <> nil) and
-    (SimulationTargetValue = WorkTableFlowValue);
-
-  if not SameObject then
+  procedure Reject(const AReason: string);
+  var
+    ShouldLog: Boolean;
   begin
-    if ProtocolManager <> nil then
+    CurrentMs := TMeterValue.GetMonotonicTimeMs;
+    ShouldLog := (AWorkTable = nil) or
+      (AWorkTable.SimulationLastFlowRejectLogMs = 0) or
+      (AWorkTable.SimulationLastFlowRejectReason <> AReason) or
+      (CurrentMs - AWorkTable.SimulationLastFlowRejectLogMs >= DIAGNOSTIC_INTERVAL_MS);
+    if AWorkTable <> nil then
+    begin
+      AWorkTable.SimulationLastFlowOutcomeMs := CurrentMs;
+      if ShouldLog then
+      begin
+        AWorkTable.SimulationLastFlowRejectLogMs := CurrentMs;
+        AWorkTable.SimulationLastFlowRejectReason := AReason;
+      end;
+    end;
+    if ShouldLog and (ProtocolManager <> nil) then
       ProtocolManager.AddMessage(pcError, psWorkTable,
-        'SimulationFlowTargetMismatch', 'Simulation flow target mismatch',
-        Format('SimulationTargetValuePtr=%s WorkTableFlowValuePtr=%s SameObject=False',
-          [PointerText(SimulationTargetValue), PointerText(WorkTableFlowValue)]));
+        'SimulationFlowApplyRejected', 'Simulation flow apply rejected',
+        Format('Version=%s; Reason=%s; GeneratedValue=%.6f; SampleTimeMs=%d',
+          [APP_VERSION, AReason, AGeneratedValue, SampleTimeMs]));
+  end;
+
+begin
+  SampleTimeMs := 0;
+  if AWorkTable = nil then
+  begin
+    Reject('WorkTableNil');
     Exit;
   end;
 
+  FlowRatePtr := AWorkTable.FlowRate;
+  TargetValue := nil;
+  if AWorkTable.FlowRate <> nil then
+    TargetValue := AWorkTable.FlowRate.Value;
   StabilityDataStartMs := 0;
   CurrentStage := 'none';
   if AWorkTable.MeasurementRun <> nil then
@@ -7390,51 +7420,122 @@ begin
       TMeasurementRun(AWorkTable.MeasurementRun).Stage);
   end;
 
-  SampleTimeMs := TMeterValue.GetMonotonicTimeMs;
-  if (StabilityDataStartMs > 0) and (SampleTimeMs <= StabilityDataStartMs) then
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcState, psWorkTable, 'SimulationFlowApplyEnter',
+      'Simulation flow apply entered',
+      Format('Version=%s; IsSimulationMode=%s; WorkTablePtr=%s; FlowRatePtr=%s; FlowValuePtr=%s; EnabledEtalonCount=%d; CurrentStage=%s; StabilityDataStartMs=%d',
+        [APP_VERSION, IfThen(AWorkTable.IsSimulationMode, 'True', 'False'),
+         PointerText(AWorkTable), PointerText(FlowRatePtr), PointerText(TargetValue),
+         ASourceChannelCount, CurrentStage, StabilityDataStartMs]));
+
+  if not AWorkTable.IsSimulationMode then
   begin
-    if ProtocolManager <> nil then
-      ProtocolManager.AddMessage(pcError, psWorkTable,
-        'SimulationFlowSampleRejected', 'Simulation flow sample rejected',
-        Format('Reason=TimestampNotAfterStabilityStart Value=%.6f SampleTimeMs=%d StabilityDataStartMs=%d',
-          [AGeneratedValue, SampleTimeMs, StabilityDataStartMs]));
+    Reject('SimulationModeFalse');
+    Exit;
+  end;
+  if AWorkTable.FlowRate = nil then
+  begin
+    Reject('FlowRateNil');
+    Exit;
+  end;
+  if TargetValue = nil then
+  begin
+    Reject('FlowValueNil');
+    Exit;
+  end;
+  if ASourceChannelCount = 0 then
+  begin
+    Reject('NoEnabledEtalons');
+    Exit;
+  end;
+  if IsNan(AGeneratedValue) or IsInfinite(AGeneratedValue) then
+  begin
+    Reject('CalculatedValueInvalid');
     Exit;
   end;
 
-  Applied := SimulationTargetValue.ApplyGeneratedValue(AGeneratedValue,
-    SampleTimeMs);
+  UnitName := TargetValue.GetDimName;
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcState, psWorkTable, 'SimulationFlowCalculated',
+      'Simulation table flow calculated',
+      Format('Version=%s; GeneratedTableFlow=%.6f; EtalonSum=%.6f; Unit=%s; SourceChannelCount=%d',
+        [APP_VERSION, AGeneratedValue, AGeneratedValue, UnitName,
+         ASourceChannelCount]));
+
+  SampleTimeMs := TMeterValue.GetMonotonicTimeMs;
+  if (StabilityDataStartMs > 0) and (SampleTimeMs <= StabilityDataStartMs) then
+  begin
+    Reject('SampleTimestampNotFresh');
+    Exit;
+  end;
+
+  SamplesBefore := TargetValue.GetStabilitySamples;
+  PreviousLastSampleMs := 0;
+  if Length(SamplesBefore) > 0 then
+    PreviousLastSampleMs := SamplesBefore[High(SamplesBefore)].TimeStampMs;
+  if AWorkTable.FlowRate.Value <> TargetValue then
+  begin
+    Reject('TargetObjectMismatch');
+    Exit;
+  end;
+  Applied := TargetValue.ApplyGeneratedValue(AGeneratedValue, SampleTimeMs);
+  CurrentTargetValue := AWorkTable.FlowRate.Value;
+  if CurrentTargetValue <> TargetValue then
+  begin
+    Reject('TargetObjectChanged');
+    Exit;
+  end;
   if not Applied then
   begin
-    if ProtocolManager <> nil then
-      ProtocolManager.AddMessage(pcError, psWorkTable,
-        'SimulationFlowSampleRejected', 'Simulation flow sample rejected',
-        Format('Reason=StabilityBufferRejected Value=%.6f SampleTimeMs=%d',
-          [AGeneratedValue, SampleTimeMs]));
+    Reject('SampleNotAdded');
+    Exit;
+  end;
+
+  SamplesAfter := CurrentTargetValue.GetStabilitySamples;
+  SampleDelta := Length(SamplesAfter) - Length(SamplesBefore);
+  { A full fixed-size history drops its oldest item while appending one new
+    sample, so its length is unchanged although exactly one sample was added. }
+  if (SampleDelta = 0) and (Length(SamplesAfter) > 0) and
+     (SamplesAfter[High(SamplesAfter)].TimeStampMs > PreviousLastSampleMs) then
+    SampleDelta := 1;
+  if SampleDelta = 0 then
+  begin
+    Reject('SampleNotAdded');
+    Exit;
+  end;
+  if SampleDelta > 1 then
+  begin
+    Reject('DuplicateSamplesAdded');
+    Exit;
+  end;
+
+  FirstSampleMs := SamplesAfter[0].TimeStampMs;
+  LastSampleMs := SamplesAfter[High(SamplesAfter)].TimeStampMs;
+  if (LastSampleMs < SampleTimeMs) then
+  begin
+    Reject('SetValueFailed');
+    Exit;
+  end;
+  if (StabilityDataStartMs > 0) and (LastSampleMs <= StabilityDataStartMs) then
+  begin
+    Reject('SampleTimestampNotFresh');
     Exit;
   end;
 
   CurrentMs := TMeterValue.GetMonotonicTimeMs;
+  AWorkTable.SimulationLastFlowOutcomeMs := CurrentMs;
   if (AWorkTable.SimulationLastFlowSampleLogMs > 0) and
      (CurrentMs - AWorkTable.SimulationLastFlowSampleLogMs < DIAGNOSTIC_INTERVAL_MS) then
     Exit;
   AWorkTable.SimulationLastFlowSampleLogMs := CurrentMs;
 
-  Samples := SimulationTargetValue.GetStabilitySamples;
-  FirstSampleMs := 0;
-  LastSampleMs := 0;
-  if Length(Samples) > 0 then
-  begin
-    FirstSampleMs := Samples[0].TimeStampMs;
-    LastSampleMs := Samples[High(Samples)].TimeStampMs;
-  end;
   if ProtocolManager <> nil then
     ProtocolManager.AddMessage(pcState, psWorkTable, 'SimulationFlowSample',
       'Simulation flow sample applied',
-      Format('GeneratedValue=%.6f AppliedValue=%.6f SampleTimeMs=%d WorkTableFlowValuePtr=%s SimulationTargetValuePtr=%s SameObject=%s SampleCount=%d FirstSampleMs=%d LastSampleMs=%d CurrentStage=%s StabilityDataStartMs=%d FreshAfterStageStart=%s',
-        [AGeneratedValue, SimulationTargetValue.GetDoubleValue, SampleTimeMs,
-         PointerText(WorkTableFlowValue), PointerText(SimulationTargetValue),
-         IfThen(SameObject, 'True', 'False'), Length(Samples), FirstSampleMs, LastSampleMs,
-         CurrentStage, StabilityDataStartMs,
+      Format('Version=%s; GeneratedValue=%.6f; AppliedValue=%.6f; SampleTimeMs=%d; WorkTableFlowValuePtr=%s; SampleCount=%d; FirstSampleMs=%d; LastSampleMs=%d; CurrentStage=%s; StabilityDataStartMs=%d; FreshAfterStageStart=%s; SameObject=True',
+        [APP_VERSION, AGeneratedValue, CurrentTargetValue.GetDoubleValue,
+         SampleTimeMs, PointerText(CurrentTargetValue), Length(SamplesAfter),
+         FirstSampleMs, LastSampleMs, CurrentStage, StabilityDataStartMs,
          IfThen(LastSampleMs > StabilityDataStartMs, 'True', 'False')]));
 end;
 
@@ -7569,7 +7670,7 @@ begin
         TargetImpSec, ACurrentTimeMs,
         Format('Reason=WorkTableTargetChanged TargetSource=WorkTableSetFlow TargetFlowBaseLS=%.6f OldTargetFlowBaseLS=%.6f PointUUID= DeviceReady=%s',
           [TargetDeviceFlow, AOldTargetFlow, IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
-      ApplySimpleSimulationNoise(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
+      ApplySimpleSimulationNoise(AWorkTable, Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
         ACurrentTimeMs, 1.0, AWorkTable.DeviceReady);
       UpdateChannelCurSec(Channel, 0.3);
     end;
@@ -7661,9 +7762,36 @@ var
   OldTargetFlow: Double;
   EnabledEtalonChannels: TObjectList<TChannel>;
   EtalonTargetImpSecValues: TArray<Double>;
+  GeneratedTableFlow: Double;
+  SourceChannelCount: Integer;
+  MonotonicNowMs: Int64;
 begin
-  if (AWorkTable = nil) or (AWorkTable.FlowRate = nil) or (not AWorkTable.FlowRate.IsRunning) then
+  if AWorkTable = nil then
+  begin
+    ApplySimulatedTableFlowValue(nil, 0, 0);
     Exit;
+  end;
+  if AWorkTable.FlowRate = nil then
+  begin
+    ApplySimulatedTableFlowValue(AWorkTable, 0, 0);
+    Exit;
+  end;
+  if not AWorkTable.FlowRate.IsRunning then
+    Exit;
+
+  MonotonicNowMs := TMeterValue.GetMonotonicTimeMs;
+  if (AWorkTable.SimulationLastNoiseMs > 0) and
+     (AWorkTable.SimulationLastNoiseMs > AWorkTable.SimulationLastFlowOutcomeMs) and
+     (MonotonicNowMs - AWorkTable.SimulationLastNoiseMs >= 2000) then
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcError, psWorkTable,
+        'SimulationFlowSampleNotCalled', 'Simulation flow integration watchdog',
+        Format('Version=%s; LastSimulationNoiseMs=%d; LastFlowOutcomeMs=%d',
+          [APP_VERSION, AWorkTable.SimulationLastNoiseMs,
+           AWorkTable.SimulationLastFlowOutcomeMs]));
+    AWorkTable.SimulationLastFlowOutcomeMs := MonotonicNowMs;
+  end;
 
   CurrentTimeMs := GetCurrentTimeMs;
   if AWorkTable.SimulationLastUpdateTimeMs > 0 then
@@ -7692,8 +7820,9 @@ begin
   end;
 
   UpdateDeviceChannelSignals(AWorkTable, TargetFlow, OldTargetFlow, CurrentTimeMs);
-  if AWorkTable.IsSimulationMode then
-    ApplySimulatedTableFlowValue(AWorkTable, CalculateActualEtalonFlow(AWorkTable));
+  GeneratedTableFlow := CalculateActualEtalonFlow(AWorkTable, SourceChannelCount);
+  ApplySimulatedTableFlowValue(AWorkTable, GeneratedTableFlow,
+    SourceChannelCount);
   AWorkTable.SimulationTargetFlowBase := TargetFlow;
   AccumulateSimulationChannelImpResult(AWorkTable.EtalonChannels, DeltaTimeSec);
   AccumulateSimulationChannelImpResult(AWorkTable.DeviceChannels, DeltaTimeSec);
