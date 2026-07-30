@@ -20,6 +20,7 @@ uses
   System.SysUtils,
   System.UITypes,
   uProtocols,
+  uAppVersion,
   uWorkTable;
 
 type
@@ -115,6 +116,10 @@ begin
     end;
 
   ProtocolManager.Subscribe(FListener);
+  ProtocolManager.AddMessage(pcInfo, psEngine, 'ApplicationVersion',
+    'Версия программы',
+    Format('Version=%s; Executable=%s; BuildDate=; GitCommit=; SimulationMode=False',
+      [APP_VERSION, ExpandFileName(ParamStr(0))]));
 end;
 
 
@@ -253,6 +258,8 @@ var
 begin
   Lines := TStringList.Create;
   try
+    Lines.Add(Format('ApplicationVersion | Версия программы | Version=%s; Executable=%s; BuildDate=; GitCommit=; SimulationMode=False',
+      [APP_VERSION, ExpandFileName(ParamStr(0))]));
     for I := 0 to ListBoxProtocol.Count - 1 do
       if ListBoxProtocol.ItemByIndex(I) is TListBoxItem then
       begin
