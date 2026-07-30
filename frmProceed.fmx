@@ -221,8 +221,8 @@ object FrameProceed: TFrameProceed
           Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = GridResultsSelChanged
           OnGetValue = GridResultsGetValue
-          Viewport.Width = 941.000000000000000000
-          Viewport.Height = 568.000000000000000000
+          Viewport.Width = 961.000000000000000000
+          Viewport.Height = 609.000000000000000000
           object StringColumnResultName: TStringColumn
             Header = #1048#1084#1103
             HeaderSettings.TextSettings.Trimming = Character
@@ -417,21 +417,22 @@ object FrameProceed: TFrameProceed
                 Text = #1057#1077#1089#1089#1080#1103
                 TabOrder = 0
               end
-              object Chart1: TChart
-                Position.X = 27.000000000000000000
-                Position.Y = 204.000000000000000000
-                Foot.Font.StyleExt = {00040000000200000004000000}
-                Legend.Title.Font.StyleExt = {00070000000000000004000000}
-                SubFoot.Font.StyleExt = {00040000000200000004000000}
-                Title.Text.Strings = (
-                  'TChart')
-                Zoom.Brush.Kind = None
-                Zoom.Pen.Fill.Color = claSilver
-                TabOrder = 2
-                Size.Width = 273.000000000000000000
-                Size.Height = 209.000000000000000000
-                Size.PlatformDefault = False
-                ColorPaletteIndex = 13
+              object Chart1: TSimpleChart
+                XMax = 100.000000000000000000
+                YMax = 100.000000000000000000
+                LineColor = claBlue
+                LineThickness = 2.000000000000000000
+                ShowMarkers = True
+                MarkerRadius = 3.000000000000000000
+                GridColor = xFFCCCCCC
+                AxisColor = claBlack
+                BackgroundColor = claWhite
+                MarginLeft = 40.000000000000000000
+                MarginRight = 20.000000000000000000
+                MarginTop = 40.000000000000000000
+                MarginBottom = 40.000000000000000000
+                XTitleOffset = 5.000000000000000000
+                YTitleOffset = 30.000000000000000000
               end
               object LabelSessionActive: TLabel
                 Position.X = 16.000000000000000000
@@ -465,8 +466,8 @@ object FrameProceed: TFrameProceed
               Size.PlatformDefault = False
               TabOrder = 0
               Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
-              Viewport.Width = 277.000000000000000000
-              Viewport.Height = 194.000000000000000000
+              Viewport.Width = 297.000000000000000000
+              Viewport.Height = 219.000000000000000000
               object StringColumnCoefTableName: TStringColumn
                 HeaderSettings.TextSettings.WordWrap = False
               end
@@ -543,7 +544,6 @@ object FrameProceed: TFrameProceed
         object ButtonSessionDeleteDataPoint: TButton
           Align = Left
           Hint = #1059#1076#1072#1083#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
-          ShowHint = True
           Position.X = 49.000000000000000000
           Size.Width = 40.000000000000000000
           Size.Height = 32.000000000000000000
@@ -552,13 +552,14 @@ object FrameProceed: TFrameProceed
           TabOrder = 3
           Text = #1059#1076#1072#1083#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
           TextSettings.Trimming = None
+          ParentShowHint = False
+          ShowHint = True
           OnClick = ButtonSessionDeleteDataPointClick
         end
         object ButtonSessionNew: TButton
           Action = ActionSessionNew
           Align = Left
           Hint = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
-          ShowHint = True
           ImageIndex = -1
           Position.X = 89.000000000000000000
           Size.Width = 39.000000000000000000
@@ -568,11 +569,12 @@ object FrameProceed: TFrameProceed
           TabOrder = 2
           Text = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
           TextSettings.Trimming = None
+          ParentShowHint = False
+          ShowHint = True
         end
         object ButtonSessionClearPoints: TButton
           Align = Left
           Hint = #1054#1095#1080#1089#1090#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
-          ShowHint = True
           Position.X = 5.000000000000000000
           Size.Width = 44.000000000000000000
           Size.Height = 32.000000000000000000
@@ -581,11 +583,12 @@ object FrameProceed: TFrameProceed
           TabOrder = 0
           Text = #1054#1095#1080#1089#1090#1080#1090#1100
           TextSettings.Trimming = None
+          ParentShowHint = False
+          ShowHint = True
           OnClick = ButtonSessionClearPointsClick
         end
         object ButtonSessionClose: TButton
           Action = ActionSessionClose
-          ShowHint = True
           Align = Left
           ImageIndex = -1
           Position.X = 128.000000000000000000
@@ -595,12 +598,13 @@ object FrameProceed: TFrameProceed
           StyleLookup = 'organizetoolbutton'
           TabOrder = 1
           TextSettings.Trimming = None
+          ParentShowHint = False
+          ShowHint = True
         end
         object ButtonSessionSynchTable: TButton
           Action = ActionSessionSynchTable
           Align = Left
           Hint = #1057#1080#1085#1093#1088#1086#1085#1080#1079#1080#1088#1086#1074#1072#1090#1100' '#1089#1086' '#1089#1090#1086#1083#1086#1084
-          ShowHint = True
           ImageIndex = -1
           Position.X = 175.000000000000000000
           Size.Width = 47.000000000000000000
@@ -609,6 +613,8 @@ object FrameProceed: TFrameProceed
           StyleLookup = 'refreshtoolbutton'
           TabOrder = 4
           TextSettings.Trimming = None
+          ParentShowHint = False
+          ShowHint = True
         end
       end
       object Layout19: TLayout
@@ -705,7 +711,6 @@ object FrameProceed: TFrameProceed
         TabOrder = 37
         object Button3: TButton
           Action = ActionSessionPointDelete
-          ShowHint = True
           Align = Left
           ImageIndex = -1
           Position.X = 49.000000000000000000
@@ -715,12 +720,13 @@ object FrameProceed: TFrameProceed
           StyleLookup = 'trashtoolbutton'
           TabOrder = 3
           TextSettings.Trimming = None
+          ParentShowHint = False
+          ShowHint = True
         end
         object Button4: TButton
           Action = ActionSessionNew
           Align = Left
           Hint = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
-          ShowHint = True
           ImageIndex = -1
           Position.X = 89.000000000000000000
           Size.Width = 39.000000000000000000
@@ -730,12 +736,13 @@ object FrameProceed: TFrameProceed
           TabOrder = 2
           Text = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
           TextSettings.Trimming = None
+          ParentShowHint = False
+          ShowHint = True
         end
         object Button5: TButton
           Action = ActionSessionPointsClear
           Align = Left
           Hint = #1054#1095#1080#1089#1090#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
-          ShowHint = True
           ImageIndex = -1
           Position.X = 5.000000000000000000
           Size.Width = 44.000000000000000000
@@ -745,10 +752,11 @@ object FrameProceed: TFrameProceed
           TabOrder = 0
           Text = #1054#1095#1080#1089#1090#1080#1090#1100
           TextSettings.Trimming = None
+          ParentShowHint = False
+          ShowHint = True
         end
         object Button6: TButton
           Action = ActionSessionClose
-          ShowHint = True
           Align = Left
           ImageIndex = -1
           Position.X = 128.000000000000000000
@@ -758,6 +766,8 @@ object FrameProceed: TFrameProceed
           StyleLookup = 'organizetoolbutton'
           TabOrder = 1
           TextSettings.Trimming = None
+          ParentShowHint = False
+          ShowHint = True
         end
       end
       object Line9: TLine

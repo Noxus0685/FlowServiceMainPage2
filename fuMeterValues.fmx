@@ -4698,8 +4698,8 @@ object FormMeterValues: TFormMeterValues
                   Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
                   OnSelChanged = StringGridCoefsDataSelChanged
                   OnEditingDone = StringGridCoefsDataEditingDone
-                  Viewport.Width = 880.000000000000000000
-                  Viewport.Height = 193.000000000000000000
+                  Viewport.Width = 860.000000000000000000
+                  Viewport.Height = 152.000000000000000000
                   object CheckColumn1: TCheckColumn
                     HeaderSettings.TextSettings.WordWrap = False
                   end
@@ -4876,8 +4876,8 @@ object FormMeterValues: TFormMeterValues
                   TabOrder = 0
                   RowCount = 20
                   Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
-                  Viewport.Width = 880.000000000000000000
-                  Viewport.Height = 193.000000000000000000
+                  Viewport.Width = 860.000000000000000000
+                  Viewport.Height = 152.000000000000000000
                   object CheckColumn2: TCheckColumn
                     HeaderSettings.TextSettings.WordWrap = False
                   end
@@ -5193,20 +5193,23 @@ object FormMeterValues: TFormMeterValues
                 TabOrder = 2
               end
             end
-            object Chart1: TChart
-              Foot.Font.StyleExt = {00040000000200000004000000}
-              Legend.Title.Font.StyleExt = {00070000000000000004000000}
-              SubFoot.Font.StyleExt = {00040000000200000004000000}
-              Title.Text.Strings = (
-                'TChart')
-              Zoom.Brush.Kind = None
-              Zoom.Pen.Fill.Color = claSilver
+            object Chart1: TSimpleChart
               Align = Client
-              TabOrder = 1
-              Size.Width = 880.000000000000000000
-              Size.Height = 278.000000000000000000
-              Size.PlatformDefault = False
-              ColorPaletteIndex = 13
+              XMax = 100.000000000000000000
+              YMax = 100.000000000000000000
+              LineColor = claBlue
+              LineThickness = 2.000000000000000000
+              ShowMarkers = True
+              MarkerRadius = 3.000000000000000000
+              GridColor = xFFCCCCCC
+              AxisColor = claBlack
+              BackgroundColor = claWhite
+              MarginLeft = 40.000000000000000000
+              MarginRight = 20.000000000000000000
+              MarginTop = 40.000000000000000000
+              MarginBottom = 40.000000000000000000
+              XTitleOffset = 5.000000000000000000
+              YTitleOffset = 30.000000000000000000
             end
           end
         end
@@ -5244,8 +5247,8 @@ object FormMeterValues: TFormMeterValues
           RowCount = 20
           Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = StringGridDimensionsSelChanged
-          Viewport.Width = 896.000000000000000000
-          Viewport.Height = 193.000000000000000000
+          Viewport.Width = 876.000000000000000000
+          Viewport.Height = 168.000000000000000000
           object StringColumn8: TStringColumn
             Header = #8470
             HeaderSettings.TextSettings.WordWrap = False
@@ -5556,8 +5559,8 @@ object FormMeterValues: TFormMeterValues
           RowCount = 20
           Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = StringGridValuesListSelChanged
-          Viewport.Width = 896.000000000000000000
-          Viewport.Height = 399.000000000000000000
+          Viewport.Width = 876.000000000000000000
+          Viewport.Height = 358.000000000000000000
           object StringColumnNum: TStringColumn
             Header = #8470
             HeaderSettings.TextSettings.WordWrap = False

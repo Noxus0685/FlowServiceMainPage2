@@ -22,9 +22,7 @@ uses
   FMX.TabControl,
   FMX.TreeView,
   FMX.Types,
-  FMXTee.Chart,
-  FMXTee.Engine,
-  FMXTee.Procs,
+  FMX.SimpleChart,
   frmCalibrCoefs,
   fuDeviceSelect,
   System.Actions,
@@ -130,7 +128,7 @@ type
     LayoutSessionProperties: TLayout;
     LabelCoefs: TLabel;
     LabelSessionDate: TLabel;
-    Chart1: TChart;
+    Chart1: TSimpleChart;
     LabelSessionActive: TLabel;
     TabItemCalculations: TTabItem;
     GridCoefs: TGrid;
