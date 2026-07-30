@@ -19,11 +19,11 @@ uses
 type
 
   TCalibrCoefTableType = (
-    cctReference = 0,                 // справочная таблица (в расчётах TMeterValue не применяется)
-    cctMeterValueCoef = 1,            // поправка коэффициента пересчёта TMeterValue.Coef
+    cctMeterValueCoef = 0,            // поправка коэффициента пересчёта TMeterValue.Coef
     cctMeterValueFlowRate = 2,        // поправка TMeterValue.FlowRate
     cctMeterValueQuantity = 3,        // поправка TMeterValue.Quantity
     cctMeterValueDensity = 4,         // поправка TMeterValue.Density
+    cctReference = 10,                // справочная таблица (в расчётах TMeterValue не применяется)
     cctDeviceCoefCorrection = 11,     // поправка коэффициента преобразования (для записи в прибор)
     cctDeviceFlowRateCorrection = 12, // поправка расхода (для записи в прибор)
     cctDeviceQuantityCorrection = 13, // поправка количества (для записи в прибор)
