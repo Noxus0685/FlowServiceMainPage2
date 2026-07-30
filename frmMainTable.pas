@@ -1349,7 +1349,7 @@ end;
 
 procedure TFrameMainTable.BeforeDestruction;
 var
-  View: TGraphPanelView;
+  GraphView: TGraphPanelView;
   Splitter: TSplitter;
   Container: TLayout;
 begin
@@ -1369,32 +1369,32 @@ begin
   end;
 
   if FGraphViews <> nil then
-    for View in FGraphViews do
+    for GraphView in FGraphViews do
     begin
-      if View = nil then
+      if GraphView = nil then
         Continue;
 
-      if View.Root <> nil then
+      if GraphView.Root <> nil then
       begin
-        View.Root.OnClick := nil;
-        View.Root.PopupMenu := nil;
-        View.Root.Parent := nil;
+        GraphView.Root.OnClick := nil;
+        GraphView.Root.PopupMenu := nil;
+        GraphView.Root.Parent := nil;
       end;
 
-      if View.Header <> nil then
-        View.Header.OnClick := nil;
+      if GraphView.Header <> nil then
+        GraphView.Header.OnClick := nil;
 
-      if View.TitleLabel <> nil then
-        View.TitleLabel.OnClick := nil;
+      if GraphView.TitleLabel <> nil then
+        GraphView.TitleLabel.OnClick := nil;
 
-      if View.Chart <> nil then
-        View.Chart.OnClick := nil;
+      if GraphView.Chart <> nil then
+        GraphView.Chart.OnClick := nil;
 
-      if View.LegendHost <> nil then
-        View.LegendHost.OnClick := nil;
+      if GraphView.LegendHost <> nil then
+        GraphView.LegendHost.OnClick := nil;
 
-      if View.PopupMenu <> nil then
-        View.PopupMenu.OnPopup := nil;
+      if GraphView.PopupMenu <> nil then
+        GraphView.PopupMenu.OnPopup := nil;
     end;
 
   if FGraphSplitters <> nil then
@@ -1406,55 +1406,6 @@ begin
     for Container in FGraphLayoutContainers do
       if Container <> nil then
         Container.Parent := nil;
-
-  inherited;
-end;
-
-destructor TFrameMainTable.Destroy;
-begin
-  FDestroying := True;
-  FGraphRenderQueued := False;
-
-  if FGraphRenderTimer <> nil then
-  begin
-    FGraphRenderTimer.Enabled := False;
-    FGraphRenderTimer.OnTimer := nil;
-  end;
-
-  if FStabilitySampleTimer <> nil then
-  begin
-    FStabilitySampleTimer.Enabled := False;
-    FStabilitySampleTimer.OnTimer := nil;
-  end;
-
-  if FGraphViews <> nil then
-    for View in FGraphViews do
-    begin
-      if View = nil then
-        Continue;
-
-      if View.Root <> nil then
-      begin
-        View.Root.OnClick := nil;
-        View.Root.PopupMenu := nil;
-        View.Root.Parent := nil;
-      end;
-
-      if View.Header <> nil then
-        View.Header.OnClick := nil;
-
-      if View.TitleLabel <> nil then
-        View.TitleLabel.OnClick := nil;
-
-      if View.Chart <> nil then
-        View.Chart.OnClick := nil;
-
-      if View.LegendHost <> nil then
-        View.LegendHost.OnClick := nil;
-
-      if View.PopupMenu <> nil then
-        View.PopupMenu.OnPopup := nil;
-    end;
 
   inherited;
 end;
@@ -6926,18 +6877,18 @@ end;
 
 procedure TFrameMainTable.ClearGraphsLayout;
 var
-  View: TGraphPanelView;
+  GraphView: TGraphPanelView;
   Splitter: TSplitter;
   Container: TLayout;
 begin
   if FGraphViews <> nil then
-    for View in FGraphViews do
-      if (View <> nil) and (View.Root <> nil) then
+    for GraphView in FGraphViews do
+      if (GraphView <> nil) and (GraphView.Root <> nil) then
       begin
-        View.Root.Parent := LayoutGraphsClient;
-        View.Root.Align := TAlignLayout.None;
-        View.Root.Width := 0;
-        View.Root.Height := 0;
+        GraphView.Root.Parent := LayoutGraphsClient;
+        GraphView.Root.Align := TAlignLayout.None;
+        GraphView.Root.Width := 0;
+        GraphView.Root.Height := 0;
       end;
 
   if FGraphSplitters <> nil then

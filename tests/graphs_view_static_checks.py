@@ -148,10 +148,12 @@ def test_graph_views_are_detached_before_fmx_destruction_starts():
     )
 
     assert declaration in FRAME
-    assert "View.Root.Parent := nil;" in before_destruction
-    assert "View.Root.Align" not in before_destruction
-    assert "View.Root.Parent" not in frame_destroy
-    assert "View.Root.Align" not in frame_destroy
+    assert "GraphView.Root.Parent := nil;" in before_destruction
+    assert "GraphView.Root.Align" not in before_destruction
+    assert "GraphView.Root.Parent" not in frame_destroy
+    assert "GraphView.Root.Align" not in frame_destroy
+    assert "for View " not in frame_destroy
+    assert "View." not in frame_destroy
     assert "DetachGraphViewEvents" not in frame_destroy
 
 
@@ -220,7 +222,7 @@ def test_temporary_layout_controls_are_detached_before_freeing():
         FRAME, "destructor TFrameMainTable.Destroy"
     )
 
-    assert clear_layout.index("View.Root.Parent := LayoutGraphsClient;") < (
+    assert clear_layout.index("GraphView.Root.Parent := LayoutGraphsClient;") < (
         clear_layout.index("FGraphSplitters.Clear;")
     )
     assert clear_layout.index("Splitter.Parent := nil;") < (
