@@ -240,6 +240,8 @@ type
     /// <summary>Clears stability samples and runtime confirmation state while preserving all settings.</summary>
     procedure ClearSamplesHistory;
     procedure AddCurrentStabilitySample;
+    /// <summary>Applies one generated reading through SetValue and records that applied value as one automatic stability sample.</summary>
+    function ApplyGeneratedValue(const AValue: Double; out ASampleTimeMs: Int64): Boolean;
     /// <summary>Returns a thread-safe immutable copy of chronological stability samples.</summary>
     function GetSamples: TArray<TMeterValueSample>;
     /// <summary>Returns a thread-safe immutable copy of chronological stability samples for editor preview.</summary>
@@ -1426,6 +1428,33 @@ var
   MinimumIntervalMs: Int64;
 begin
   AddStabilitySample(Value, GetMonotonicTimeMs, mssAutomatic);
+end;
+
+function TMeterValue.ApplyGeneratedValue(const AValue: Double;
+  out ASampleTimeMs: Int64): Boolean;
+var
+  StabilityWasEnabled: Boolean;
+begin
+  { SetValue is the normal value/filter/protocol pipeline, but historically it
+    captures the preceding value before assigning the new one.  A generated
+    reading must produce exactly one sample containing the value just applied. }
+  StabilityWasEnabled := FStabilitySettings.Enabled;
+  FStabilitySettings.Enabled := False;
+  try
+    SetValue(AValue);
+  finally
+    FStabilitySettings.Enabled := StabilityWasEnabled;
+  end;
+
+  ASampleTimeMs := GetMonotonicTimeMs;
+  { The simulation history must also be available while merely monitoring,
+    before the measurement FSM enables its point-specific checks. }
+  FStabilitySettings.Enabled := True;
+  try
+    Result := AddStabilitySample(Value, ASampleTimeMs, mssAutomatic);
+  finally
+    FStabilitySettings.Enabled := StabilityWasEnabled;
+  end;
 end;
 
 procedure TMeterValue.ClearSamplesHistory;
