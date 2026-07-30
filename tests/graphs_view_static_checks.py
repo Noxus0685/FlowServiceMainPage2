@@ -192,3 +192,44 @@ def test_graph_render_callbacks_stop_during_destruction():
     assert "if FGraphRenderTimer = nil then\n    Exit;" in queue
     assert "if FDestroying then\n    Exit;" in render
     assert "(FGraphViews = nil) or (FGraphsViewConfig = nil)" in render
+
+
+def test_temporary_graph_layout_controls_have_one_owner():
+    apply_layout = extract_routine_body(
+        FRAME, "procedure TFrameMainTable.ApplyGraphsLayout"
+    )
+
+    assert "Result := TSplitter.Create(nil);" in apply_layout
+    assert "Result := TLayout.Create(nil);" in apply_layout
+    assert "TSplitter.Create(Self)" not in apply_layout
+    assert "TLayout.Create(Self)" not in apply_layout
+    assert "FGraphSplitters := TObjectList<TSplitter>.Create(True);" in FRAME
+    assert (
+        "FGraphLayoutContainers := TObjectList<TLayout>.Create(True);" in FRAME
+    )
+
+
+def test_temporary_layout_controls_are_detached_before_freeing():
+    clear_layout = extract_routine_body(
+        FRAME, "procedure TFrameMainTable.ClearGraphsLayout"
+    )
+    before_destruction = extract_routine_body(
+        FRAME, "procedure TFrameMainTable.BeforeDestruction"
+    )
+    frame_destroy = extract_routine_body(
+        FRAME, "destructor TFrameMainTable.Destroy"
+    )
+
+    assert clear_layout.index("View.Root.Parent := LayoutGraphsClient;") < (
+        clear_layout.index("FGraphSplitters.Clear;")
+    )
+    assert clear_layout.index("Splitter.Parent := nil;") < (
+        clear_layout.index("FGraphSplitters.Clear;")
+    )
+    assert clear_layout.index("Container.Parent := nil;") < (
+        clear_layout.index("FGraphLayoutContainers.Clear;")
+    )
+    assert "Splitter.Parent := nil;" in before_destruction
+    assert "Container.Parent := nil;" in before_destruction
+    for visual_property in (".Parent", ".Align", ".Width", ".Height"):
+        assert visual_property not in frame_destroy

@@ -1350,6 +1350,67 @@ end;
 procedure TFrameMainTable.BeforeDestruction;
 var
   View: TGraphPanelView;
+  Splitter: TSplitter;
+  Container: TLayout;
+begin
+  FDestroying := True;
+  FGraphRenderQueued := False;
+
+  if FGraphRenderTimer <> nil then
+  begin
+    FGraphRenderTimer.Enabled := False;
+    FGraphRenderTimer.OnTimer := nil;
+  end;
+
+  if FStabilitySampleTimer <> nil then
+  begin
+    FStabilitySampleTimer.Enabled := False;
+    FStabilitySampleTimer.OnTimer := nil;
+  end;
+
+  if FGraphViews <> nil then
+    for View in FGraphViews do
+    begin
+      if View = nil then
+        Continue;
+
+      if View.Root <> nil then
+      begin
+        View.Root.OnClick := nil;
+        View.Root.PopupMenu := nil;
+        View.Root.Parent := nil;
+      end;
+
+      if View.Header <> nil then
+        View.Header.OnClick := nil;
+
+      if View.TitleLabel <> nil then
+        View.TitleLabel.OnClick := nil;
+
+      if View.Chart <> nil then
+        View.Chart.OnClick := nil;
+
+      if View.LegendHost <> nil then
+        View.LegendHost.OnClick := nil;
+
+      if View.PopupMenu <> nil then
+        View.PopupMenu.OnPopup := nil;
+    end;
+
+  if FGraphSplitters <> nil then
+    for Splitter in FGraphSplitters do
+      if Splitter <> nil then
+        Splitter.Parent := nil;
+
+  if FGraphLayoutContainers <> nil then
+    for Container in FGraphLayoutContainers do
+      if Container <> nil then
+        Container.Parent := nil;
+
+  inherited;
+end;
+
+destructor TFrameMainTable.Destroy;
 begin
   FDestroying := True;
   FGraphRenderQueued := False;
@@ -6747,7 +6808,7 @@ var
 
   function AddContainer(AParent: TFmxObject; AAlign: TAlignLayout): TLayout;
   begin
-    Result := TLayout.Create(Self);
+    Result := TLayout.Create(nil);
     Result.Parent := AParent;
     Result.Align := AAlign;
     FGraphLayoutContainers.Add(Result);
@@ -6755,7 +6816,7 @@ var
 
   function AddSplitter(AParent: TFmxObject; AAlign: TAlignLayout): TSplitter;
   begin
-    Result := TSplitter.Create(Self);
+    Result := TSplitter.Create(nil);
     Result.Parent := AParent;
     Result.Align := AAlign;
     Result.MinSize := 80;
@@ -6866,16 +6927,36 @@ end;
 procedure TFrameMainTable.ClearGraphsLayout;
 var
   View: TGraphPanelView;
+  Splitter: TSplitter;
+  Container: TLayout;
 begin
-  for View in FGraphViews do
+  if FGraphViews <> nil then
+    for View in FGraphViews do
+      if (View <> nil) and (View.Root <> nil) then
+      begin
+        View.Root.Parent := LayoutGraphsClient;
+        View.Root.Align := TAlignLayout.None;
+        View.Root.Width := 0;
+        View.Root.Height := 0;
+      end;
+
+  if FGraphSplitters <> nil then
   begin
-    View.Root.Parent := LayoutGraphsClient;
-    View.Root.Align := TAlignLayout.None;
-    View.Root.Width := 0;
-    View.Root.Height := 0;
+    for Splitter in FGraphSplitters do
+      if Splitter <> nil then
+        Splitter.Parent := nil;
+
+    FGraphSplitters.Clear;
   end;
-  FGraphSplitters.Clear;
-  FGraphLayoutContainers.Clear;
+
+  if FGraphLayoutContainers <> nil then
+  begin
+    for Container in FGraphLayoutContainers do
+      if Container <> nil then
+        Container.Parent := nil;
+
+    FGraphLayoutContainers.Clear;
+  end;
 end;
 
 procedure TFrameMainTable.DetachGraphViewEvents;
