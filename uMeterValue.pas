@@ -1302,6 +1302,8 @@ begin
   if IsNan(AValue) or IsInfinite(AValue) then
     Exit;
 
+procedure TMeterValue.AddSample(const AValue: Double; const ATimeStampMs: Int64);
+begin
   FSampleLock.Enter;
   try
     if ASource = mssAutomatic then
@@ -1354,6 +1356,9 @@ begin
 end;
 
 procedure TMeterValue.AddCurrentStabilitySample;
+var
+  CurrentTimeMs: Int64;
+  MinimumIntervalMs: Int64;
 begin
   AddStabilitySample(Value, GetMonotonicTimeMs, mssAutomatic);
 end;
