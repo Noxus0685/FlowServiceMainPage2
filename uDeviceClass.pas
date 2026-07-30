@@ -19,11 +19,11 @@ uses
 type
 
   TCalibrCoefTableType = (
-    cctReference = 0,                 // справочная таблица (в расчётах TMeterValue не применяется)
-    cctMeterValueCoef = 1,            // поправка коэффициента пересчёта TMeterValue.Coef
+    cctMeterValueCoef = 0,            // поправка коэффициента пересчёта TMeterValue.Coef
     cctMeterValueFlowRate = 2,        // поправка TMeterValue.FlowRate
     cctMeterValueQuantity = 3,        // поправка TMeterValue.Quantity
     cctMeterValueDensity = 4,         // поправка TMeterValue.Density
+    cctReference = 10,                // справочная таблица (в расчётах TMeterValue не применяется)
     cctDeviceCoefCorrection = 11,     // поправка коэффициента преобразования (для записи в прибор)
     cctDeviceFlowRateCorrection = 12, // поправка расхода (для записи в прибор)
     cctDeviceQuantityCorrection = 13, // поправка количества (для записи в прибор)
@@ -423,6 +423,8 @@ type
     function Clone: TCalibrCoefTable;
     function FindItemByQ(Q: Double): TCalibrCoefItem;
     function ApplyByQ(Q, X: Double): Double;
+    function TableType: TCalibrCoefTableType;
+    procedure SetTableType(const AType: TCalibrCoefTableType);
   end;
 
   TDevice = class(TTypeEntity)
@@ -1593,9 +1595,21 @@ end;
 constructor TCalibrCoefTable.Create;
 begin
   inherited Create;
-  &Type := 0;
+  // A newly created device table is a coefficient correction table.  Assign
+  // the persisted value here, before any points can be appended to Items.
+  SetTableType(cctMeterValueCoef);
   Active := False;
   Items := TObjectList<TCalibrCoefItem>.Create(True);
+end;
+
+function TCalibrCoefTable.TableType: TCalibrCoefTableType;
+begin
+  Result := TCalibrCoefTableType(&Type);
+end;
+
+procedure TCalibrCoefTable.SetTableType(const AType: TCalibrCoefTableType);
+begin
+  &Type := Ord(AType);
 end;
 
 destructor TCalibrCoefTable.Destroy;
@@ -3174,8 +3188,6 @@ begin
 end;
 
 end.
-
-
 
 
 

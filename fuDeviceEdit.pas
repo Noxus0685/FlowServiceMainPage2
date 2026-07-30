@@ -346,6 +346,9 @@ type
      FTabItemDevice: TTabItem;
      FTabItemCoefs: TTabItem;
      FComboCoefTable: TComboBox;
+     FCorrectionTableCreatedLogged: Boolean;
+     FCorrectionTableLoadedLogged: Boolean;
+     FCorrectionTableSavedLogged: Boolean;
      FGridCoefs: TGrid;
      FButtonCoefAdd: TButton;
      FButtonCoefDelete: TButton;
@@ -403,6 +406,8 @@ type
      procedure UpdateCoefTablesCombo;
      function GetCalibrCoefTableCaption(ATable: TCalibrCoefTable): string;
      function GetSelectedCalibrCoefTable: TCalibrCoefTable;
+     procedure LogCorrectionTable(const AEventName: string;
+       ATable: TCalibrCoefTable; const AExtra: string = '');
      procedure ComboCoefTableChange(Sender: TObject);
      procedure UpdateCoefsGrid;
      function GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;
@@ -1253,6 +1258,15 @@ begin
           WriteDeviceEditActionLog('Сохранён прибор', FDevice);
       end;
 
+      if (FDevice <> nil) and (FDevice.CalibrCoefTables <> nil) and
+         (FDevice.CalibrCoefTables.Count > 0) and
+         not FCorrectionTableSavedLogged then
+      begin
+        LogCorrectionTable('DeviceCorrectionTableSaved',
+          FDevice.CalibrCoefTables[0]);
+        FCorrectionTableSavedLogged := True;
+      end;
+
       if not SameText(FInitialTypeUUID, string(FDevice.DeviceTypeUUID)) then
       begin
         FTypeChangedDuringEdit := True;
@@ -1603,13 +1617,22 @@ begin
   if ATable = nil then
     Exit('');
 
-  case ATable.&Type of
-    Ord(cctMeterValueCoef): TypeCaption := 'Коэффициент прибора';
-    Ord(cctMeterValueFlowRate): TypeCaption := 'Расход';
-    Ord(cctMeterValueQuantity): TypeCaption := 'Количество';
-    Ord(cctMeterValueDensity): TypeCaption := 'Плотность';
-  else
-    TypeCaption := 'Неизвестный тип: ' + IntToStr(ATable.&Type);
+  if not (ATable.&Type in [Ord(cctReference), Ord(cctMeterValueCoef),
+    Ord(cctMeterValueFlowRate), Ord(cctMeterValueQuantity),
+    Ord(cctMeterValueDensity), Ord(cctDeviceCoefCorrection),
+    Ord(cctDeviceFlowRateCorrection), Ord(cctDeviceQuantityCorrection),
+    Ord(cctDeviceDensityCorrection)]) then
+    TypeCaption := 'Неизвестный тип: ' + IntToStr(ATable.&Type)
+  else case TCalibrCoefTableType(ATable.&Type) of
+    cctReference: TypeCaption := 'Справочная таблица';
+    cctMeterValueCoef: TypeCaption := 'Коэффициент прибора';
+    cctMeterValueFlowRate: TypeCaption := 'Расход';
+    cctMeterValueQuantity: TypeCaption := 'Количество';
+    cctMeterValueDensity: TypeCaption := 'Плотность';
+    cctDeviceCoefCorrection: TypeCaption := 'Коррекция коэффициента прибора';
+    cctDeviceFlowRateCorrection: TypeCaption := 'Коррекция расхода прибора';
+    cctDeviceQuantityCorrection: TypeCaption := 'Коррекция количества прибора';
+    cctDeviceDensityCorrection: TypeCaption := 'Коррекция плотности прибора';
   end;
 
   Result := TypeCaption;
@@ -1618,6 +1641,21 @@ begin
   if ATable.Active then
     Result := Result + ' [активная]';
   Result := Result + ', точек: ' + IntToStr(ATable.Items.Count);
+end;
+
+procedure TFormDeviceEditor.LogCorrectionTable(const AEventName: string;
+  ATable: TCalibrCoefTable; const AExtra: string);
+var
+  Details: string;
+begin
+  if (ProtocolManager = nil) or (FDevice = nil) or (ATable = nil) then
+    Exit;
+  Details := Format('DeviceUUID=%s; TableUUID=%s; TableType=%d; PointCount=%d',
+    [FDevice.UUID, ATable.UUID, ATable.&Type, ATable.Items.Count]);
+  if AExtra <> '' then
+    Details := Details + '; ' + AExtra;
+  ProtocolManager.AddMessage(pcInfo, psForm, AEventName,
+    'Таблица коррекции прибора', Details);
 end;
 
 function TFormDeviceEditor.GetSelectedCalibrCoefTable: TCalibrCoefTable;
@@ -1784,7 +1822,24 @@ var
 begin
   Table := GetSelectedCalibrCoefTable;
   if Table = nil then
-    Exit;
+  begin
+    if (FDevice = nil) or (FDevice.CalibrCoefTables = nil) then
+      Exit;
+    Table := TCalibrCoefTable.Create;
+    Table.SetTableType(cctMeterValueCoef);
+    Table.UUID := TGUID.NewGuid.ToString;
+    Table.DeviceID := FDevice.ID;
+    Table.DeviceUUID := FDevice.UUID;
+    Table.Active := True;
+    Table.AppliedAt := Now;
+    FDevice.CalibrCoefTables.Add(Table);
+    UpdateCoefTablesCombo;
+    if not FCorrectionTableCreatedLogged then
+    begin
+      LogCorrectionTable('DeviceCorrectionTableCreated', Table);
+      FCorrectionTableCreatedLogged := True;
+    end;
+  end;
 
   Item := TCalibrCoefItem.Create;
   Item.TableID := Table.ID;
@@ -2038,6 +2093,9 @@ begin
     FSkipPointDeleteConfirm := False;
     FPointSortColumn := -1;
     FPointSortAscending := True;
+    FCorrectionTableCreatedLogged := False;
+    FCorrectionTableLoadedLogged := False;
+    FCorrectionTableSavedLogged := False;
 
     FreeAndNil(FDevice);
     FreeAndNil(FLoadedDeviceSnapshot);
@@ -2088,6 +2146,14 @@ begin
     UpdateUIFromDevice;
     UpdateCoefTablesCombo;
     UpdateCoefsGrid;
+    if (FDevice.CalibrCoefTables <> nil) and
+       (FDevice.CalibrCoefTables.Count > 0) and
+       not FCorrectionTableLoadedLogged then
+    begin
+      LogCorrectionTable('DeviceCorrectionTableLoaded',
+        FDevice.CalibrCoefTables[0]);
+      FCorrectionTableLoadedLogged := True;
+    end;
 
   finally
     FLoading := False;
