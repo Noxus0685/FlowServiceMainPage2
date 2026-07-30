@@ -16,9 +16,20 @@ def body(name: str) -> str:
 
 def test_setting_default_validation_and_ini_roundtrip_are_present():
     assert "MinimumSampleIntervalSec: Double;" in BASE
-    assert "FStabilitySettings.MinimumSampleIntervalSec := 0;" in METER
-    assert "'MinimumSampleIntervalSec', MV.FStabilitySettings.MinimumSampleIntervalSec" in METER
-    assert "'MinimumSampleIntervalSec', AMeterValue.FStabilitySettings.MinimumSampleIntervalSec" in METER
+    assert "FStabilitySettings.MinimumSampleIntervalSec := 0.8;" in METER
+    assert re.search(
+        r"MV\.FStabilitySettings\.MinimumSampleIntervalSec\s*:=\s*Ini\.ReadFloat\(Section,\s*"
+        r"'MinimumSampleIntervalSec',\s*MV\.FStabilitySettings\.MinimumSampleIntervalSec\);",
+        METER,
+    )
+    assert re.search(
+        r"AMeterValue\.FStabilitySettings\.MinimumSampleIntervalSec\s*:=\s*Ini\.ReadFloat\(ASection,\s*"
+        r"'MinimumSampleIntervalSec',\s*AMeterValue\.FStabilitySettings\.MinimumSampleIntervalSec\);",
+        METER,
+    )
+    assert "'MinimumSampleIntervalSec', 0" not in METER
+    assert "По умолчанию 0,8 секунды." in BASE
+    assert "Значение 0 отключает прореживание." in BASE
     assert "Минимальный интервал автоматической записи проб не может быть отрицательным." in METER
 
 
