@@ -1817,6 +1817,14 @@ begin
   if ATable = nil then
     Exit;
 
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcInfo, psEngine,
+      'DeviceCorrectionTableTypeRaw', 'Получен тип таблицы коррекции',
+      Format('DeviceUUID=%s; TableUUID=%s; RawTableType=%d; EnumLow=%d; ' +
+        'EnumHigh=%d; EnumTypeName=TCalibrCoefTableType; SourceMethod=TFlowMeter.ApplyCalibrCoefsToValue',
+        [DeviceUUID, ATable.UUID, ATable.&Type,
+         Ord(Low(TCalibrCoefTableType)), Ord(High(TCalibrCoefTableType))]));
+
   if not TryCalibrCoefTableType(ATable.&Type, TableType) then
   begin
     if ProtocolManager <> nil then
@@ -1853,7 +1861,6 @@ begin
   EnumName := CalibrCoefTableTypeName(TableType);
   case TableType of
     cctMeterValueCoef:
-      if (ValueCoef <> nil) and (ValueCoef.DependenceType = INDEPENDENT) then
       begin
         TargetValue := ValueCoef;
         TargetField := 'ValueCoef';
@@ -1888,17 +1895,17 @@ begin
   if ProtocolManager <> nil then
     ProtocolManager.AddMessage(pcInfo, psEngine,
       'DeviceCorrectionTableTypeResolved', 'Распознан тип таблицы коррекции',
-      Format('DeviceUUID=%s; TableUUID=%s; RawTableType=%d; EnumName=%s; ' +
-        'EnumOrdinal=%d; TargetField=%s', [DeviceUUID, ATable.UUID,
-         ATable.&Type, EnumName, Ord(TableType), TargetField]));
+      Format('DeviceUUID=%s; TableUUID=%s; RawTableType=%d; ResolvedTypeName=%s; ' +
+        'TargetField=%s', [DeviceUUID, ATable.UUID,
+         ATable.&Type, EnumName, TargetField]));
 
   if TargetValue = nil then
   begin
     if ProtocolManager <> nil then
       ProtocolManager.AddMessage(pcError, psEngine,
         'DeviceCorrectionTableBindingError', 'Ошибка привязки таблицы коррекции',
-        Format('Reason=TargetFieldUnavailable; DeviceUUID=%s; TableUUID=%s; TableType=%d',
-          [DeviceUUID, ATable.UUID, ATable.&Type]));
+        Format('Reason=MeterValueNotFound; DeviceUUID=%s; TableUUID=%s; TableType=%d; TargetField=%s',
+          [DeviceUUID, ATable.UUID, ATable.&Type, TargetField]));
     Exit;
   end;
 
@@ -1924,7 +1931,7 @@ begin
     ProtocolManager.AddMessage(pcInfo, psEngine, 'DeviceCorrectionTableBound',
       'Таблица коррекции привязана к метрологической величине',
       Format('DeviceUUID=%s; MeterValuePtr=%p; TableUUID=%s; RawTableType=%d; ' +
-        'EnumName=%s; TargetField=%s; TargetTablePtr=%p; PointCount=%d; SameInstance=True',
+        'ResolvedTypeName=%s; TargetField=%s; TargetTablePtr=%p; PointCount=%d; SameInstance=True',
         [DeviceUUID, Pointer(TargetValue), ATable.UUID, ATable.&Type, EnumName,
          TargetField, Pointer(ATable), ATable.Items.Count]));
 end;

@@ -643,13 +643,21 @@ begin
   Result := (ARawType >= Ord(Low(TCalibrCoefTableType))) and
     (ARawType <= Ord(High(TCalibrCoefTableType)));
   if not Result then Exit;
-  ATableType := TCalibrCoefTableType(ARawType);
-  case ATableType of
-    cctReference, cctMeterValueCoef, cctMeterValueFlowRate,
-    cctMeterValueQuantity, cctMeterValueDensity,
-    cctDeviceCoefCorrection, cctDeviceFlowRateCorrection,
-    cctDeviceQuantityCorrection, cctDeviceDensityCorrection: Result := True;
-  else Result := False;
+  // Do not cast an Integer into a sparse enum.  Resolve exclusively through
+  // the ordinals of the canonical declaration above, so persisted value 1 is
+  // unambiguously cctMeterValueCoef on every compiler/range-check setting.
+  case ARawType of
+    Ord(cctReference): ATableType := cctReference;
+    Ord(cctMeterValueCoef): ATableType := cctMeterValueCoef;
+    Ord(cctMeterValueFlowRate): ATableType := cctMeterValueFlowRate;
+    Ord(cctMeterValueQuantity): ATableType := cctMeterValueQuantity;
+    Ord(cctMeterValueDensity): ATableType := cctMeterValueDensity;
+    Ord(cctDeviceCoefCorrection): ATableType := cctDeviceCoefCorrection;
+    Ord(cctDeviceFlowRateCorrection): ATableType := cctDeviceFlowRateCorrection;
+    Ord(cctDeviceQuantityCorrection): ATableType := cctDeviceQuantityCorrection;
+    Ord(cctDeviceDensityCorrection): ATableType := cctDeviceDensityCorrection;
+  else
+    Result := False;
   end;
 end;
 
@@ -3226,7 +3234,6 @@ begin
 end;
 
 end.
-
 
 
 
