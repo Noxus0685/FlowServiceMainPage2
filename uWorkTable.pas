@@ -495,6 +495,7 @@ type
     FSimulationBasePressAfter: Double;
     FEnvironmentSimulationBaseInitialized: Boolean;
     FSimulationLastUpdateTimeMs: Double;
+    FSimulationLastFlowSampleLogMs: Int64;
     FSimulationLastFlowUnitsLogTarget: Double;
     FSimulationTargetFlowBase: Double;
     FDeviceSimulationFlowRate: Double;
@@ -815,6 +816,7 @@ type
     property SimulationBasePressAfter: Double read FSimulationBasePressAfter;
     property EnvironmentSimulationBaseInitialized: Boolean read FEnvironmentSimulationBaseInitialized;
     property SimulationLastUpdateTimeMs: Double read FSimulationLastUpdateTimeMs write FSimulationLastUpdateTimeMs;
+    property SimulationLastFlowSampleLogMs: Int64 read FSimulationLastFlowSampleLogMs write FSimulationLastFlowSampleLogMs;
     property SimulationLastFlowUnitsLogTarget: Double read FSimulationLastFlowUnitsLogTarget write FSimulationLastFlowUnitsLogTarget;
     property SimulationTargetFlowBase: Double read FSimulationTargetFlowBase write FSimulationTargetFlowBase;
     property DeviceSimulationFlowRate: Double read FDeviceSimulationFlowRate write FDeviceSimulationFlowRate;
@@ -2089,6 +2091,7 @@ begin
   FLimitImpSet := 0;
   FLimitVolumeSet := 0;
   FSimulationLastUpdateTimeMs := 0;
+  FSimulationLastFlowSampleLogMs := 0;
   FSimulationLastFlowUnitsLogTarget := 0;
   FSimulationTargetFlowBase := 0;
   FDeviceSimulationFlowRate := 0;
@@ -7333,6 +7336,108 @@ begin
     Result := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
 end;
 
+procedure ApplySimulatedTableFlowValue(const AWorkTable: TWorkTable;
+  const AGeneratedValue: Double);
+const
+  DIAGNOSTIC_INTERVAL_MS = 2000;
+var
+  SimulationTargetValue: TMeterValue;
+  WorkTableFlowValue: TMeterValue;
+  Samples: TArray<TMeterValueSample>;
+  SampleTimeMs: Int64;
+  FirstSampleMs: Int64;
+  LastSampleMs: Int64;
+  StabilityDataStartMs: Int64;
+  CurrentMs: Int64;
+  CurrentStage: string;
+  SameObject: Boolean;
+  Applied: Boolean;
+
+  function PointerText(const AObject: TObject): string;
+  begin
+    Result := '0x' + IntToHex(NativeUInt(Pointer(AObject)), SizeOf(Pointer) * 2);
+  end;
+
+begin
+  if (AWorkTable = nil) or (not AWorkTable.IsSimulationMode) then
+    Exit;
+
+  WorkTableFlowValue := nil;
+  if AWorkTable.FlowRate <> nil then
+    WorkTableFlowValue := AWorkTable.FlowRate.Value;
+  { Resolve the target on every simulation tick.  This deliberately avoids a
+    cached reference surviving Reset/Clear/StartMonitor. }
+  SimulationTargetValue := WorkTableFlowValue;
+  SameObject := (SimulationTargetValue <> nil) and
+    (SimulationTargetValue = WorkTableFlowValue);
+
+  if not SameObject then
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcError, psWorkTable,
+        'SimulationFlowTargetMismatch', 'Simulation flow target mismatch',
+        Format('SimulationTargetValuePtr=%s WorkTableFlowValuePtr=%s SameObject=False',
+          [PointerText(SimulationTargetValue), PointerText(WorkTableFlowValue)]));
+    Exit;
+  end;
+
+  StabilityDataStartMs := 0;
+  CurrentStage := 'none';
+  if AWorkTable.MeasurementRun <> nil then
+  begin
+    StabilityDataStartMs := TMeasurementRun(AWorkTable.MeasurementRun).StabilityDataStartMs;
+    CurrentStage := TMeasurementRun.MeasurementStateToString(
+      TMeasurementRun(AWorkTable.MeasurementRun).Stage);
+  end;
+
+  SampleTimeMs := TMeterValue.GetMonotonicTimeMs;
+  if (StabilityDataStartMs > 0) and (SampleTimeMs <= StabilityDataStartMs) then
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcError, psWorkTable,
+        'SimulationFlowSampleRejected', 'Simulation flow sample rejected',
+        Format('Reason=TimestampNotAfterStabilityStart Value=%.6f SampleTimeMs=%d StabilityDataStartMs=%d',
+          [AGeneratedValue, SampleTimeMs, StabilityDataStartMs]));
+    Exit;
+  end;
+
+  Applied := SimulationTargetValue.ApplyGeneratedValue(AGeneratedValue,
+    SampleTimeMs);
+  if not Applied then
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcError, psWorkTable,
+        'SimulationFlowSampleRejected', 'Simulation flow sample rejected',
+        Format('Reason=StabilityBufferRejected Value=%.6f SampleTimeMs=%d',
+          [AGeneratedValue, SampleTimeMs]));
+    Exit;
+  end;
+
+  CurrentMs := TMeterValue.GetMonotonicTimeMs;
+  if (AWorkTable.SimulationLastFlowSampleLogMs > 0) and
+     (CurrentMs - AWorkTable.SimulationLastFlowSampleLogMs < DIAGNOSTIC_INTERVAL_MS) then
+    Exit;
+  AWorkTable.SimulationLastFlowSampleLogMs := CurrentMs;
+
+  Samples := SimulationTargetValue.GetStabilitySamples;
+  FirstSampleMs := 0;
+  LastSampleMs := 0;
+  if Length(Samples) > 0 then
+  begin
+    FirstSampleMs := Samples[0].TimeStampMs;
+    LastSampleMs := Samples[High(Samples)].TimeStampMs;
+  end;
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcState, psWorkTable, 'SimulationFlowSample',
+      'Simulation flow sample applied',
+      Format('GeneratedValue=%.6f AppliedValue=%.6f SampleTimeMs=%d WorkTableFlowValuePtr=%s SimulationTargetValuePtr=%s SameObject=%s SampleCount=%d FirstSampleMs=%d LastSampleMs=%d CurrentStage=%s StabilityDataStartMs=%d FreshAfterStageStart=%s',
+        [AGeneratedValue, SimulationTargetValue.GetDoubleValue, SampleTimeMs,
+         PointerText(WorkTableFlowValue), PointerText(SimulationTargetValue),
+         IfThen(SameObject, 'True', 'False'), Length(Samples), FirstSampleMs, LastSampleMs,
+         CurrentStage, StabilityDataStartMs,
+         IfThen(LastSampleMs > StabilityDataStartMs, 'True', 'False')]));
+end;
+
 function GetChannelDeviceNameForLog(const AChannel: TChannel): string;
 begin
   Result := '';
@@ -7587,6 +7692,8 @@ begin
   end;
 
   UpdateDeviceChannelSignals(AWorkTable, TargetFlow, OldTargetFlow, CurrentTimeMs);
+  if AWorkTable.IsSimulationMode then
+    ApplySimulatedTableFlowValue(AWorkTable, CalculateActualEtalonFlow(AWorkTable));
   AWorkTable.SimulationTargetFlowBase := TargetFlow;
   AccumulateSimulationChannelImpResult(AWorkTable.EtalonChannels, DeltaTimeSec);
   AccumulateSimulationChannelImpResult(AWorkTable.DeviceChannels, DeltaTimeSec);
