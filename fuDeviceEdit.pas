@@ -2151,7 +2151,7 @@ begin
        not FCorrectionTableLoadedLogged then
     begin
       LogCorrectionTable('DeviceCorrectionTableLoaded',
-        FDevice.CalibrCoefTables[0], 'TargetField=resolved by TableType');
+        FDevice.CalibrCoefTables[0]);
       FCorrectionTableLoadedLogged := True;
     end;
 

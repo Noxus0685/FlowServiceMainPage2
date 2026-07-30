@@ -4642,7 +4642,15 @@ begin
 
     if (WorkTable.DeviceChannels[Row] <> nil) and
        (WorkTable.DeviceChannels[Row].FlowMeter <> nil) then
-      MV := WorkTable.DeviceChannels[Row].FlowMeter.ValueFlow;
+    begin
+      // Correction tables of type cctMeterValueCoef belong to the active
+      // coefficient value, not to ValueFlow.  Open the settings form on the
+      // exact runtime TMeterValue which was populated from the device table.
+      WorkTable.DeviceChannels[Row].FlowMeter.RefreshCorrectionTables;
+      MV := WorkTable.DeviceChannels[Row].FlowMeter.ValueCoef;
+      if MV = nil then
+        MV := WorkTable.DeviceChannels[Row].FlowMeter.ValueFlow;
+    end;
   end;
 
   if (MV = nil) and (TMeterValue.GetMeterValues <> nil) and
