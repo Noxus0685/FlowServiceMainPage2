@@ -958,7 +958,7 @@ begin
   end;
 end;
 
-
-
+initialization
+  RegisterFmxClasses([TSimpleChart]);
 
 end.
