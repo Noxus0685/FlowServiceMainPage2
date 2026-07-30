@@ -59,6 +59,7 @@ type
     destructor Destroy; override;
     procedure Reset;
     procedure EnsurePanelCount(const ACount: Integer);
+    function RequestedAreaCount: Integer;
     property Panels: TObjectList<TGraphPanelConfig> read FPanels;
   end;
 
@@ -74,7 +75,8 @@ end;
 
 function TGraphSeriesConfig.SourceIdentity: string;
 begin
-  Result := Format('%d|%d|%d|%s|%s', [GraphIndex, Ord(OwnerKind), Ord(SourceKind),
+  { A source may be shown by independent visual series on several graphs. }
+  Result := Format('%d|%d|%s|%s', [Ord(OwnerKind), Ord(SourceKind),
     LowerCase(Trim(ChannelUUID)), LowerCase(Trim(MeterValueKey))]);
 end;
 
@@ -142,13 +144,40 @@ end;
 procedure TGraphsViewConfig.EnsurePanelCount(const ACount: Integer);
 var
   Wanted: Integer;
+  Moving: TGraphSeriesConfig;
 begin
   Wanted := ACount;
   if Wanted < 1 then Wanted := 1;
   if Wanted > 4 then Wanted := 4;
   while FPanels.Count < Wanted do
     FPanels.Add(TGraphPanelConfig.Create(Format('График %d', [FPanels.Count + 1])));
+  while FPanels.Count > Wanted do
+  begin
+    { Preserve assignments when a graph is removed.  ExtractOwn prevents the
+      visual series from being destroyed before it is attached to the last
+      remaining graph. }
+    while FPanels.Last.Series.Count > 0 do
+    begin
+      Moving := FPanels.Last.Series.Extract(FPanels.Last.Series.Last);
+      Moving.GraphIndex := Wanted - 1;
+      if not FPanels[Wanted - 1].AddSeries(Moving) then
+        Moving.Free;
+    end;
+    FPanels.Delete(FPanels.Count - 1);
+  end;
   GraphCount := Wanted;
+end;
+
+function TGraphsViewConfig.RequestedAreaCount: Integer;
+begin
+  case LayoutKind of
+    glSingle: Result := 1;
+    glTwoRows, glTwoColumns: Result := 2;
+    glThreePanels: Result := 3;
+    glGrid2x2: Result := 4;
+  else
+    Result := 1;
+  end;
 end;
 
 procedure TGraphsViewConfig.Reset;
