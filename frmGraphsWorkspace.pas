@@ -51,6 +51,8 @@ type
     DurationSec: Integer;
   end;
 
+  TGraphHistoryLoadMode = (ghlmCurrentSegmentHistory, ghlmAfterLocalReset);
+
   TGraphSeriesRuntime = class
   public
     ChartSeries: TChartSeries;
@@ -60,6 +62,16 @@ type
     LastAcceptedValue: Double;
     LastAcceptedPointKey: string;
     RuntimeResetTimeMs: Int64;
+    HistoryLoaded: Boolean;
+    HistoryLoadMode: TGraphHistoryLoadMode;
+  end;
+
+  TGraphSourceHistory = class
+  public
+    SourceKey: string;
+    Samples: TList<TMeterValueSample>;
+    constructor Create(const ASourceKey: string);
+    destructor Destroy; override;
   end;
 
   TGraphVisualSlot = class
@@ -150,6 +162,7 @@ type
     FToleranceDiagnosticTimes: TDictionary<string, Int64>;
     FLastToleranceSourceInfo: TGraphToleranceSourceInfo;
     FGraphSlots: TObjectList<TGraphVisualSlot>;
+    FSegmentHistory: TObjectDictionary<string, TGraphSourceHistory>;
     FApplyingLayout: Boolean;
     FLastLayoutColumns: Integer;
     FLastLayoutRows: Integer;
@@ -225,6 +238,14 @@ type
     procedure RemoveRuntimeSeries(const AConfig: TGraphSeriesConfig;
       AChart: TSimpleChart);
     procedure RemoveGraphRuntimeSeries(const AGraphIndex: Integer);
+    function SeriesSourceKey(const ASeries: TGraphSeriesConfig): string;
+    procedure CaptureWorkspaceSample(const ASourceKey: string;
+      const ASample: TMeterValueSample);
+    function GetWorkspaceSegmentSamples(const ASourceKey: string): TArray<TMeterValueSample>;
+    procedure ClearWorkspaceSegmentHistory;
+    procedure LoadSeriesCurrentSegmentHistory(const AGraphIndex: Integer;
+      ASeriesConfig: TGraphSeriesConfig; ARuntime: TGraphSeriesRuntime);
+    procedure LoadGraphCurrentSegmentHistory(const AGraphIndex: Integer);
   public
     destructor Destroy; override;
     procedure Initialize(AWorkTable: TWorkTable);
@@ -245,6 +266,19 @@ implementation
 
 {$R *.fmx}
 
+constructor TGraphSourceHistory.Create(const ASourceKey: string);
+begin
+  inherited Create;
+  SourceKey := ASourceKey;
+  Samples := TList<TMeterValueSample>.Create;
+end;
+
+destructor TGraphSourceHistory.Destroy;
+begin
+  Samples.Free;
+  inherited;
+end;
+
 destructor TGraphVisualSlot.Destroy;
 begin
   RootLayout.Free;
@@ -255,6 +289,7 @@ destructor TFrameGraphsWorkspace.Destroy;
 begin
   { Slots own the controls parented to LayoutGraphsHost and must go first. }
   FGraphSlots.Free;
+  FSegmentHistory.Free;
   FToleranceDiagnosticTimes.Free;
   FSeriesRuntime.Free;
   FConfig.Free;
@@ -276,6 +311,7 @@ begin
     FGraphSlots := TObjectList<TGraphVisualSlot>.Create(True);
     FSeriesRuntime := TObjectDictionary<TGraphSeriesConfig,
       TGraphSeriesRuntime>.Create([doOwnsValues]);
+    FSegmentHistory := TObjectDictionary<string, TGraphSourceHistory>.Create([doOwnsValues]);
     FSelectedGraph := 0;
     FContextGraphIndex := 0;
     FLastPointIndex := -1;
@@ -1078,7 +1114,13 @@ begin
       FSeriesRuntime.Add(ASource, TGraphSeriesRuntime.Create);
       FSeriesRuntime[ASource].ChartSeries := Series;
       FSeriesRuntime[ASource].LastSampleIndex := -1;
+      FSeriesRuntime[ASource].LastSampleTimeMs := 0;
       FSeriesRuntime[ASource].WaitingForFirstSample := True;
+      FSeriesRuntime[ASource].RuntimeResetTimeMs := 0;
+      FSeriesRuntime[ASource].HistoryLoadMode := ghlmCurrentSegmentHistory;
+      FSeriesRuntime[ASource].HistoryLoaded := False;
+      LoadSeriesCurrentSegmentHistory(AGraphIndex, ASource,
+        FSeriesRuntime[ASource]);
       Chart.InvalidateChart;
     end;
   end;
@@ -1230,9 +1272,12 @@ begin
   Runtime.ChartSeries.Color := ASeriesConfig.Color;
   Runtime.ChartSeries.Visible := ASeriesConfig.Visible;
   Runtime.LastSampleIndex := -1;
+  Runtime.LastSampleTimeMs := 0;
   Runtime.WaitingForFirstSample := True;
   Runtime.LastAcceptedPointKey := FLastPointKey;
-  Runtime.RuntimeResetTimeMs := TMeterValue.GetMonotonicTimeMs;
+  Runtime.RuntimeResetTimeMs := 0;
+  Runtime.HistoryLoadMode := ghlmCurrentSegmentHistory;
+  Runtime.HistoryLoaded := False;
   FSeriesRuntime.Add(ASeriesConfig, Runtime);
   Result := Runtime.ChartSeries;
 end;
@@ -1247,6 +1292,130 @@ begin
     ASamples := AMeterValue.GetStabilitySamples;
     Result := Length(ASamples) > 0;
   end;
+end;
+
+function TFrameGraphsWorkspace.SeriesSourceKey(
+  const ASeries: TGraphSeriesConfig): string;
+begin
+  Result := Format('%d|%s|%s|%s', [Ord(ASeries.OwnerKind),
+    NormalizeUUID(ASeries.ChannelUUID), LowerCase(Trim(ASeries.MeterValueKey)),
+    FLastPointKey]);
+end;
+
+procedure TFrameGraphsWorkspace.CaptureWorkspaceSample(const ASourceKey: string;
+  const ASample: TMeterValueSample);
+var History: TGraphSourceHistory; I: Integer;
+begin
+  if (FSegmentHistory = nil) or (ASample.TimeStampMs < FSharedSegmentStartMs) or
+     (ASample.TimeStampMs < FRuntimeResetTimeMs) then Exit;
+  if not FSegmentHistory.TryGetValue(ASourceKey, History) then
+  begin
+    History := TGraphSourceHistory.Create(ASourceKey);
+    FSegmentHistory.Add(ASourceKey, History);
+  end;
+  for I := History.Samples.Count - 1 downto Max(0, History.Samples.Count - 8) do
+    if History.Samples[I].TimeStampMs = ASample.TimeStampMs then Exit;
+  History.Samples.Add(ASample);
+end;
+
+function TFrameGraphsWorkspace.GetWorkspaceSegmentSamples(
+  const ASourceKey: string): TArray<TMeterValueSample>;
+var History: TGraphSourceHistory;
+begin
+  SetLength(Result, 0);
+  if (FSegmentHistory <> nil) and FSegmentHistory.TryGetValue(ASourceKey, History) then
+    Result := History.Samples.ToArray;
+end;
+
+procedure TFrameGraphsWorkspace.ClearWorkspaceSegmentHistory;
+begin
+  if FSegmentHistory <> nil then FSegmentHistory.Clear;
+end;
+
+procedure TFrameGraphsWorkspace.LoadSeriesCurrentSegmentHistory(
+  const AGraphIndex: Integer; ASeriesConfig: TGraphSeriesConfig;
+  ARuntime: TGraphSeriesRuntime);
+var Channel: TChannel; MeterValue: TMeterValue; Samples: TArray<TMeterValueSample>;
+  Sample: TMeterValueSample; SourceKey, HistorySource, Reason: string;
+  EffectiveStartMs, FirstTime, LastTime: Int64;
+  I, Added, Skipped: Integer; X, Y, FirstX, LastX: Double;
+begin
+  if (ARuntime = nil) or ARuntime.HistoryLoaded then Exit;
+  if ARuntime.HistoryLoadMode = ghlmAfterLocalReset then
+  begin
+    ARuntime.HistoryLoaded := True;
+    Exit;
+  end;
+  if not ResolveSeriesSource(ASeriesConfig, Channel, MeterValue, Reason) then Exit;
+  SourceKey := SeriesSourceKey(ASeriesConfig);
+  Samples := GetWorkspaceSegmentSamples(SourceKey);
+  HistorySource := 'WorkspaceArchive';
+  if Length(Samples) = 0 then
+  begin
+    Samples := MeterValue.GetStabilitySamples;
+    HistorySource := 'MeterValueBuffer';
+    for Sample in Samples do CaptureWorkspaceSample(SourceKey, Sample);
+    if (Length(Samples) > 0) and Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSegmentHistoryCaptured',
+        'Отсчёты источника сохранены в общем архиве сегмента', Format(
+        'SourceKey=%s; CapturedCount=%d', [SourceKey, Length(Samples)]));
+  end;
+  EffectiveStartMs := Max(FSharedSegmentStartMs, FRuntimeResetTimeMs);
+  Added := 0; Skipped := 0; FirstTime := 0; LastTime := 0; FirstX := 0; LastX := 0;
+  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+    'GraphSeriesHistoryLoadBegin', 'Начата загрузка истории серии', Format(
+    'GraphIndex=%d; ChannelUUID=%s; MeterValueKey=%s; HistoryLoadMode=CurrentSegmentHistory; SegmentStartMs=%d; GlobalResetTimeMs=%d; LocalResetTimeMs=%d; AvailableSampleCount=%d; HistorySource=%s',
+    [AGraphIndex, ASeriesConfig.ChannelUUID, ASeriesConfig.MeterValueKey,
+     FSharedSegmentStartMs, FRuntimeResetTimeMs, ARuntime.RuntimeResetTimeMs,
+     Length(Samples), HistorySource]));
+  if Length(Samples) = 0 then
+  begin
+    ARuntime.HistoryLoaded := True;
+    if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+      'GraphSeriesHistoryLoadSkipped', 'История серии недоступна', Format(
+      'GraphIndex=%d; ChannelUUID=%s; Reason=NoHistory',
+      [AGraphIndex, ASeriesConfig.ChannelUUID]));
+    Exit;
+  end;
+  for I := 0 to High(Samples) do
+  begin
+    Sample := Samples[I];
+    if (Sample.TimeStampMs < EffectiveStartMs) or IsNan(Sample.Value) or
+       IsInfinite(Sample.Value) or (Abs(Sample.Value) >= MaxDouble) then
+    begin Inc(Skipped); Continue end;
+    X := (Sample.TimeStampMs - FSharedSegmentStartMs) / 1000.0;
+    Y := Sample.Value;
+    if SameText(ASeriesConfig.MeterValueKey, 'ValueFlow') or
+       SameText(ASeriesConfig.MeterValueKey, 'FlowRate') then
+      Y := ConvertFlowToDisplayUnits(Y);
+    ARuntime.ChartSeries.AddPoint(X, Y);
+    if (Added = 0) and Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesHistorySampleAdded',
+        'Добавлен первый исторический отсчёт серии', Format(
+        'GraphIndex=%d; ChannelUUID=%s; SampleTimeMs=%d; X=%g; Y=%g',
+        [AGraphIndex, ASeriesConfig.ChannelUUID, Sample.TimeStampMs, X, Y]));
+    if Added = 0 then begin FirstTime := Sample.TimeStampMs; FirstX := X end;
+    LastTime := Sample.TimeStampMs; LastX := X; Inc(Added);
+    ARuntime.LastSampleTimeMs := Sample.TimeStampMs;
+    ARuntime.LastSampleIndex := I;
+  end;
+  ARuntime.HistoryLoaded := True;
+  ARuntime.WaitingForFirstSample := Added = 0;
+  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+    'GraphSeriesHistoryLoadDone', 'Загрузка истории серии завершена', Format(
+    'GraphIndex=%d; ChannelUUID=%s; ReadCount=%d; AddedCount=%d; SkippedCount=%d; FirstSampleTimeMs=%d; LastSampleTimeMs=%d; FirstX=%g; LastX=%g; PointsCount=%d',
+    [AGraphIndex, ASeriesConfig.ChannelUUID, Length(Samples), Added, Skipped,
+     FirstTime, LastTime, FirstX, LastX, ARuntime.ChartSeries.Points.Count]));
+end;
+
+procedure TFrameGraphsWorkspace.LoadGraphCurrentSegmentHistory(
+  const AGraphIndex: Integer);
+var Config: TGraphSeriesConfig; Runtime: TGraphSeriesRuntime;
+begin
+  if (AGraphIndex < 0) or (AGraphIndex >= FConfig.Panels.Count) then Exit;
+  for Config in FConfig.Panels[AGraphIndex].Series do
+    if FSeriesRuntime.TryGetValue(Config, Runtime) then
+      LoadSeriesCurrentSegmentHistory(AGraphIndex, Config, Runtime);
 end;
 
 procedure TFrameGraphsWorkspace.UpdateSeriesPoints(AGraphIndex: Integer;
@@ -1292,6 +1461,7 @@ begin
   for SampleIndex := 0 to High(Samples) do
   begin
     Sample := Samples[SampleIndex];
+    CaptureWorkspaceSample(SeriesSourceKey(ASeriesConfig), Sample);
     BaseY := Sample.Value;
     RejectReason := '';
     if Sample.TimeStampMs < FSharedSegmentStartMs then
@@ -1466,6 +1636,8 @@ begin
       Pair.Value.WaitingForFirstSample := True;
       Pair.Value.LastAcceptedPointKey := APointKey;
       Pair.Value.RuntimeResetTimeMs := AStartMs;
+      Pair.Value.HistoryLoaded := False;
+      Pair.Value.HistoryLoadMode := ghlmCurrentSegmentHistory;
       if Pair.Value.ChartSeries <> nil then
       begin
         Inc(ClearedPoints, Pair.Value.ChartSeries.Points.Count);
@@ -1549,34 +1721,15 @@ begin
 end;
 
 procedure TFrameGraphsWorkspace.RebuildSeriesForCurrentUnits;
-var
-  Pair: TPair<TGraphSeriesConfig, TGraphSeriesRuntime>;
-  Channel: TChannel;
-  MeterValue: TMeterValue;
-  Samples: TArray<TMeterValueSample>;
-  Sample: TMeterValueSample;
+var Pair: TPair<TGraphSeriesConfig, TGraphSeriesRuntime>;
 begin
   for Pair in FSeriesRuntime do
   begin
     Pair.Value.ChartSeries.ClearPoints;
     Pair.Value.LastSampleTimeMs := 0;
     Pair.Value.LastSampleIndex := -1;
-    Channel := ResolveChannel(Pair.Key);
-    MeterValue := ResolveMeterValue(Pair.Key, Channel);
-    if MeterValue = nil then Continue;
-    Samples := MeterValue.GetStabilitySamples;
-    for Sample in Samples do
-      if (Sample.TimeStampMs >= FSharedSegmentStartMs) and
-         (Sample.TimeStampMs >= Max(FRuntimeResetTimeMs, Pair.Value.RuntimeResetTimeMs)) and
-         (Sample.TimeStampMs > Pair.Value.LastSampleTimeMs) then
-      begin
-        Pair.Value.ChartSeries.AddPoint(
-          (Sample.TimeStampMs - FSharedSegmentStartMs) / 1000.0,
-          IfThen(SameText(Pair.Key.MeterValueKey, 'ValueFlow') or
-            SameText(Pair.Key.MeterValueKey, 'FlowRate'),
-            ConvertFlowToDisplayUnits(Sample.Value), Sample.Value));
-        Pair.Value.LastSampleTimeMs := Sample.TimeStampMs;
-      end;
+    Pair.Value.HistoryLoaded := False;
+    LoadSeriesCurrentSegmentHistory(Pair.Key.GraphIndex, Pair.Key, Pair.Value);
   end;
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesRebuiltForUnits',
@@ -1644,6 +1797,7 @@ begin
   else
     Exit;
   end;
+  ClearWorkspaceSegmentHistory;
   ResetSeriesSegment(StartMs, APointKey);
   FLastFallbackSampleMs := 0;
   FSharedTimeInitialized := True;
@@ -2229,7 +2383,9 @@ begin
         Inc(ClearedPointsCount, OldPointsCount);
         Runtime.ChartSeries.ClearPoints;
       end;
-      Runtime.LastSampleTimeMs := 0;
+      Runtime.LastSampleTimeMs := ResetTimeMs;
+      Runtime.HistoryLoadMode := ghlmAfterLocalReset;
+      Runtime.HistoryLoaded := True;
       Runtime.LastSampleIndex := -1;
       Runtime.WaitingForFirstSample := True;
       Runtime.LastAcceptedValue := 0;
@@ -2269,6 +2425,7 @@ var
 begin
   Count := 0; Cleared := 0;
   FRuntimeResetTimeMs := TMeterValue.GetMonotonicTimeMs;
+  ClearWorkspaceSegmentHistory;
   FLastFallbackSampleMs := 0;
   PointKey := CurrentPointKey(PointIndex);
   for Pair in FSeriesRuntime do
@@ -2276,7 +2433,9 @@ begin
     Inc(Count); Inc(Cleared, Pair.Value.ChartSeries.Points.Count);
     Pair.Value.ChartSeries.ClearPoints; Pair.Value.LastSampleTimeMs := 0;
     Pair.Value.LastSampleIndex := -1; Pair.Value.WaitingForFirstSample := True;
-    Pair.Value.RuntimeResetTimeMs := FRuntimeResetTimeMs;
+    Pair.Value.RuntimeResetTimeMs := 0;
+    Pair.Value.HistoryLoadMode := ghlmCurrentSegmentHistory;
+    Pair.Value.HistoryLoaded := False;
     Pair.Value.LastAcceptedPointKey := PointKey;
   end;
   FSharedSegmentStartMs := FRuntimeResetTimeMs;
@@ -2458,6 +2617,12 @@ begin
         Continue;
       end;
       VisualSeries.Visible := Config.Visible;
+      if (Runtime <> nil) and not Runtime.HistoryLoaded then
+      begin
+        SeriesAddedBefore := VisualSeries.Points.Count;
+        LoadSeriesCurrentSegmentHistory(GraphIndex, Config, Runtime);
+        if VisualSeries.Points.Count > SeriesAddedBefore then Changed := True;
+      end;
       if not SamplingActive then
         Continue;
       SeriesAddedBefore := PointsAdded;
