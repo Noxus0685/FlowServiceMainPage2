@@ -1,11 +1,11 @@
-unit frmGraphsWorkspace;
+﻿unit frmGraphsWorkspace;
 
 interface
 
 uses
   System.Classes, System.SysUtils, System.Types, System.Math, System.UITypes,
   System.Generics.Collections,
-  FMX.Controls, FMX.Forms, FMX.Layouts, FMX.Menus, FMX.Objects,
+  FMX.Controls, FMX.Forms, FMX.Layouts, FMX.ListBox, FMX.Menus, FMX.Objects,
   FMX.StdCtrls, FMX.Types, FMX.SimpleChart,
   uBaseProcedures, uClasses, uDeviceClass, uGraphsViewConfig, uMeasurementRun, uMeterValue, uProtocols,
   uWorkTable, uFlowMeter;
@@ -161,6 +161,9 @@ type
     FLastToleranceDiagnosticReason: string;
     FToleranceDiagnosticTimes: TDictionary<string, Int64>;
     FLastToleranceSourceInfo: TGraphToleranceSourceInfo;
+    FLastTolerancePointKey: string;
+    FLastToleranceTarget: Double;
+    FLastToleranceError: Double;
     FGraphSlots: TObjectList<TGraphVisualSlot>;
     FSegmentHistory: TObjectDictionary<string, TGraphSourceHistory>;
     FApplyingLayout: Boolean;
@@ -230,8 +233,13 @@ type
       AErrorPercent: Double; out AReason: string): Boolean;
     function ResolveToleranceSource(out AInfo: TGraphToleranceSourceInfo;
       out AReason: string): Boolean;
-    function ValidateDevicePointsTolerance(const APointIndex: Integer;
-      out AReferencePoint: TDevicePoint; out AReason: string): Boolean;
+    function IsValidTolerancePoint(APoint: TDevicePoint): Boolean;
+    function PointsMatch(ARunPoint, ADevicePoint: TDevicePoint): Boolean;
+    function BuildTolerancePointKey(APoint: TDevicePoint;
+      const APointIndex: Integer): string;
+    function LooksLikeUtf8Mojibake(const AText: string): Boolean;
+    procedure CheckGraphTextEncoding(const AControlName, APropertyName,
+      AText, ASource: string);
     procedure LogToleranceEvent(const AEventName, AReason,
       ADetails: string);
     procedure UpdateIndependentYAxis(const AGraphIndex: Integer);
@@ -326,6 +334,11 @@ begin
   EnsureGraphSlotCount(FConfig.GraphCount);
   SyncControls;
   ApplyDynamicGridLayout;
+  CheckGraphTextEncoding(LabelGraphLayout.Name, 'Text',
+    LabelGraphLayout.Text, 'FMX');
+  CheckGraphTextEncoding(ButtonClearAll.Name, 'Text',
+    ButtonClearAll.Text, 'FMX');
+  CheckGraphTextEncoding(ButtonReset.Name, 'Text', ButtonReset.Text, 'FMX');
   if FirstInitialization then
   begin
     FLastPointKey := CurrentPointKey(PointIndex);
@@ -618,6 +631,7 @@ var Item: TGraphSourceMenuItem;
 begin
   if AParent = nil then raise EArgumentNilException.Create('AParent');
   if AChannel = nil then raise EArgumentNilException.Create('AChannel');
+  CheckGraphTextEncoding(AChannel.Name, 'Caption', AChannel.Name, 'Channel');
   Item := TGraphSourceMenuItem.Create(nil);
   Item.GraphIndex := FContextGraphIndex;
   Item.OwnerKind := AOwnerKind;
@@ -1769,9 +1783,7 @@ begin
   Run := TMeasurementRun(FWorkTable.MeasurementRun);
   Point := Run.CurrentPoint;
   APointIndex := Run.CurrentPointIndex;
-  if Point = nil then Exit;
-  if Trim(Point.UUID) <> '' then Result := Point.UUID
-  else Result := Format('%d|%s|%.12g', [APointIndex, Point.Name, Point.Q]);
+  Result := BuildTolerancePointKey(Point, APointIndex);
 end;
 
 function TFrameGraphsWorkspace.IsPointTransitionStage: Boolean;
@@ -1907,111 +1919,76 @@ begin
     FToleranceDiagnosticTimes.AddOrSetValue(DiagnosticKey, NowMs);
 end;
 
-function TFrameGraphsWorkspace.ValidateDevicePointsTolerance(
-  const APointIndex: Integer; out AReferencePoint: TDevicePoint;
-  out AReason: string): Boolean;
-var
-  Channel: TChannel;
-  Device, ReferenceDevice: TDevice;
-  Point: TDevicePoint;
+function TFrameGraphsWorkspace.IsValidTolerancePoint(
+  APoint: TDevicePoint): Boolean;
+begin
+  Result := (APoint <> nil) and
+    not IsNan(APoint.Q) and not IsInfinite(APoint.Q) and
+    (Abs(APoint.Q) < MaxDouble) and
+    not IsNan(APoint.Error) and not IsInfinite(APoint.Error) and
+    (Abs(APoint.Error) < MaxDouble) and (APoint.Error <> 0);
+end;
+
+function TFrameGraphsWorkspace.PointsMatch(ARunPoint,
+  ADevicePoint: TDevicePoint): Boolean;
 begin
   Result := False;
-  AReferencePoint := nil;
-  ReferenceDevice := nil;
-  AReason := '';
-  if (FWorkTable = nil) or (FWorkTable.DeviceChannels = nil) then
-  begin
-    AReason := 'DeviceChannelsMissing';
+  if (ARunPoint = nil) or (ADevicePoint = nil) then
     Exit;
-  end;
-  if APointIndex < 0 then
-  begin
-    AReason := 'InvalidPointIndex';
-    Exit;
-  end;
-  for Channel in FWorkTable.DeviceChannels do
-  begin
-    if (Channel = nil) or not Channel.Enabled or (Channel.FlowMeter = nil) then
-      Continue;
-    Device := Channel.FlowMeter.Device;
-    if (Device = nil) or (Device.Points = nil) or
-       (APointIndex >= Device.Points.Count) then
-      Continue;
-    Point := Device.Points[APointIndex];
-    if Point = nil then
-      Continue;
-    if AReferencePoint = nil then
-    begin
-      AReferencePoint := Point;
-      ReferenceDevice := Device;
-    end
-    else if not SameValue(Point.Q, AReferencePoint.Q, 1E-9) or
-            not SameValue(Point.Error, AReferencePoint.Error, 1E-9) then
-    begin
-      AReason := 'DevicePointsToleranceMismatch';
-      LogToleranceEvent('GraphToleranceSourceMismatch', AReason, Format(
-        'ReferenceDeviceUUID=%s; ReferencePointUUID=%s; ReferenceQ=%g; ReferenceError=%g; ConflictingDeviceUUID=%s; ConflictingPointUUID=%s; ConflictingQ=%g; ConflictingError=%g',
-        [ReferenceDevice.UUID, AReferencePoint.UUID, AReferencePoint.Q,
-         AReferencePoint.Error, Device.UUID, Point.UUID, Point.Q, Point.Error]));
-      Exit;
-    end;
-  end;
-  if AReferencePoint = nil then
-  begin
-    AReason := 'DevicePointNotFound';
-    Exit;
-  end;
-  Result := True;
+  if (Trim(ARunPoint.UUID) <> '') and
+     SameText(NormalizeUUID(ARunPoint.UUID),
+       NormalizeUUID(ADevicePoint.UUID)) then
+    Exit(True);
+  if SameValue(ARunPoint.Q, ADevicePoint.Q,
+       Max(1E-9, Abs(ARunPoint.Q) * 1E-6)) then
+    Exit(True);
+end;
+
+function TFrameGraphsWorkspace.BuildTolerancePointKey(APoint: TDevicePoint;
+  const APointIndex: Integer): string;
+begin
+  if APoint = nil then
+    Exit('');
+  if Trim(APoint.UUID) <> '' then
+    Result := NormalizeUUID(APoint.UUID)
+  else
+    Result := Format('%d|%.12g|%.12g|%s',
+      [APointIndex, APoint.Q, APoint.Error, APoint.Name]);
+end;
+
+function TFrameGraphsWorkspace.LooksLikeUtf8Mojibake(
+  const AText: string): Boolean;
+begin
+  Result := AText.Contains('Р') and
+    (AText.Contains('С') or AText.Contains('Рџ') or AText.Contains('Р“'));
+end;
+
+procedure TFrameGraphsWorkspace.CheckGraphTextEncoding(const AControlName,
+  APropertyName, AText, ASource: string);
+begin
+  if LooksLikeUtf8Mojibake(AText) then
+    LogToleranceEvent('GraphTextEncodingWarning', 'MojibakeDetected', Format(
+      'ControlName=%s; PropertyName=%s; Text=%s; Source=%s',
+      [AControlName, APropertyName, AText, ASource]));
 end;
 
 function TFrameGraphsWorkspace.ResolveToleranceSource(
   out AInfo: TGraphToleranceSourceInfo; out AReason: string): Boolean;
 var
   Run: TMeasurementRun;
-  RunPoint, Point, ReferencePoint: TDevicePoint;
+  RunPoint, DevicePoint, IndexedPoint: TDevicePoint;
   Channel: TChannel;
-  Device, ReferenceDevice: TDevice;
-  I, RunPointIndex: Integer;
-  MatchKind, FallbackReason: string;
+  Device: TDevice;
+  ResolvedIndex: Integer;
+  IndexMismatch: Boolean;
 
-  function NumberValid(const AValue: Double): Boolean;
-  begin
-    Result := not IsNan(AValue) and not IsInfinite(AValue) and
-      (Abs(AValue) < MaxDouble);
-  end;
-
-  function FindPointInDevice(ADevice: TDevice; out APointIndex: Integer): TDevicePoint;
-  var
-    J: Integer;
-  begin
-    Result := nil;
-    APointIndex := -1;
-    if (ADevice = nil) or (ADevice.Points = nil) or (RunPoint = nil) then
-      Exit;
-    if Trim(RunPoint.UUID) <> '' then
-      for J := 0 to ADevice.Points.Count - 1 do
-        if (ADevice.Points[J] <> nil) and
-           (NormalizeUUID(ADevice.Points[J].UUID) = NormalizeUUID(RunPoint.UUID)) then
-        begin
-          APointIndex := J;
-          Exit(ADevice.Points[J]);
-        end;
-    for J := 0 to ADevice.Points.Count - 1 do
-      if (ADevice.Points[J] <> nil) and SameValue(ADevice.Points[J].Q,
-         RunPoint.Q, 1E-9) and SameText(Trim(ADevice.Points[J].Name),
-         Trim(RunPoint.Name)) then
-      begin
-        APointIndex := J;
-        Exit(ADevice.Points[J]);
-      end;
-  end;
-
-  procedure SetDeviceSource(ADevice: TDevice; APoint: TDevicePoint;
+  procedure SetSource(ADevice: TDevice; APoint: TDevicePoint;
     const APointIndex: Integer; const ASourceKind: string);
   begin
     AInfo.Device := ADevice;
     AInfo.Point := APoint;
-    AInfo.DeviceUUID := ADevice.UUID;
+    if ADevice <> nil then
+      AInfo.DeviceUUID := ADevice.UUID;
     AInfo.PointUUID := APoint.UUID;
     AInfo.PointIndex := APointIndex;
     AInfo.TargetQ := APoint.Q;
@@ -2019,170 +1996,179 @@ var
     AInfo.SourceKind := ASourceKind;
   end;
 
+  function FindByUUID(out ADevice: TDevice;
+    out APointIndex: Integer): TDevicePoint;
+  var
+    J: Integer;
+    LocalChannel: TChannel;
+  begin
+    Result := nil; ADevice := nil; APointIndex := -1;
+    if (RunPoint = nil) or (Trim(RunPoint.UUID) = '') or
+       (FWorkTable.DeviceChannels = nil) then Exit;
+    for LocalChannel in FWorkTable.DeviceChannels do
+      if (LocalChannel <> nil) and LocalChannel.Enabled and
+         (LocalChannel.FlowMeter <> nil) then
+      begin
+        ADevice := LocalChannel.FlowMeter.Device;
+        if (ADevice = nil) or (ADevice.Points = nil) then Continue;
+        for J := 0 to ADevice.Points.Count - 1 do
+          if (ADevice.Points[J] <> nil) and SameText(
+             NormalizeUUID(ADevice.Points[J].UUID), NormalizeUUID(RunPoint.UUID)) then
+          begin APointIndex := J; Exit(ADevice.Points[J]) end;
+      end;
+    ADevice := nil;
+  end;
+
+  function FindByQAndName(out ADevice: TDevice;
+    out APointIndex: Integer): TDevicePoint;
+  var
+    J: Integer;
+    LocalChannel: TChannel;
+  begin
+    Result := nil; ADevice := nil; APointIndex := -1;
+    if (RunPoint = nil) or (FWorkTable.DeviceChannels = nil) then Exit;
+    for LocalChannel in FWorkTable.DeviceChannels do
+      if (LocalChannel <> nil) and LocalChannel.Enabled and
+         (LocalChannel.FlowMeter <> nil) then
+      begin
+        ADevice := LocalChannel.FlowMeter.Device;
+        if (ADevice = nil) or (ADevice.Points = nil) then Continue;
+        for J := 0 to ADevice.Points.Count - 1 do
+          if (ADevice.Points[J] <> nil) and SameValue(ADevice.Points[J].Q,
+             RunPoint.Q, Max(1E-9, Abs(RunPoint.Q) * 1E-6)) and
+             SameText(Trim(ADevice.Points[J].Name), Trim(RunPoint.Name)) then
+          begin APointIndex := J; Exit(ADevice.Points[J]) end;
+      end;
+    ADevice := nil;
+  end;
+
 begin
   Result := False;
   AInfo := Default(TGraphToleranceSourceInfo);
   AInfo.PointIndex := -1;
   AReason := '';
-  if FWorkTable = nil then
-  begin
-    AReason := 'WorkTableMissing';
-    Exit;
-  end;
+  if FWorkTable = nil then begin AReason := 'WorkTableMissing'; Exit end;
   if not (FWorkTable.MeasurementRun is TMeasurementRun) then
-  begin
-    AReason := 'MeasurementRunMissing';
-    Exit;
-  end;
+  begin AReason := 'MeasurementRunMissing'; Exit end;
   Run := TMeasurementRun(FWorkTable.MeasurementRun);
-  RunPointIndex := Run.CurrentPointIndex;
   RunPoint := Run.CurrentPoint;
-
-  if RunPointIndex >= 0 then
+  if RunPoint = nil then
   begin
-    if not ValidateDevicePointsTolerance(RunPointIndex, ReferencePoint,
-       AReason) then
-    begin
-      if AReason = 'DevicePointsToleranceMismatch' then
-        Exit;
-      AReason := '';
-      ReferencePoint := nil;
-    end;
-    ReferenceDevice := nil;
-    if ReferencePoint <> nil then
-      for Channel in FWorkTable.DeviceChannels do
-      if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) and
-         (Channel.FlowMeter.Device <> nil) and
-         (Channel.FlowMeter.Device.Points <> nil) and
-         (RunPointIndex < Channel.FlowMeter.Device.Points.Count) and
-         (Channel.FlowMeter.Device.Points[RunPointIndex] = ReferencePoint) then
-      begin
-        ReferenceDevice := Channel.FlowMeter.Device;
-        Break;
-      end;
-    if ReferenceDevice <> nil then
-    begin
-      SetDeviceSource(ReferenceDevice, ReferencePoint, RunPointIndex,
-        'DevicePointByIndex');
-      Result := True;
-    end;
+    AReason := 'RunPointMissing';
+    LogToleranceEvent('GraphTolerancePointRejected', AReason,
+      Format('Reason=%s; RunPointIndex=%d; Stage=%d',
+        [AReason, Run.CurrentPointIndex, Ord(Run.Stage)]));
+    Exit
   end;
-
-  if not Result and (RunPoint <> nil) and (Trim(RunPoint.UUID) <> '') then
+  if not IsValidTolerancePoint(RunPoint) and
+     ((Run.CurrentPointIndex = -1) or
+      ((RunPoint.Q = 0) and (RunPoint.Error = 0) and
+       SameText(BuildTolerancePointKey(RunPoint, Run.CurrentPointIndex),
+         FLastTolerancePointKey))) then
   begin
-    ReferencePoint := nil;
-    ReferenceDevice := nil;
-    for Channel in FWorkTable.DeviceChannels do
-    begin
-      if (Channel = nil) or not Channel.Enabled or (Channel.FlowMeter = nil) then
-        Continue;
-      Device := Channel.FlowMeter.Device;
-      Point := FindPointInDevice(Device, I);
-      if (Point = nil) or
-         (NormalizeUUID(Point.UUID) <> NormalizeUUID(RunPoint.UUID)) then
-        Continue;
-      if ReferencePoint = nil then
-      begin
-        ReferencePoint := Point;
-        ReferenceDevice := Device;
-        RunPointIndex := I;
-      end
-      else if not SameValue(Point.Q, ReferencePoint.Q, 1E-9) or
-              not SameValue(Point.Error, ReferencePoint.Error, 1E-9) then
-      begin
-        AReason := 'DevicePointsToleranceMismatch';
-        LogToleranceEvent('GraphToleranceSourceMismatch', AReason, Format(
-          'ReferenceDeviceUUID=%s; ReferencePointUUID=%s; ReferenceQ=%g; ReferenceError=%g; ConflictingDeviceUUID=%s; ConflictingPointUUID=%s; ConflictingQ=%g; ConflictingError=%g',
-          [ReferenceDevice.UUID, ReferencePoint.UUID, ReferencePoint.Q,
-           ReferencePoint.Error, Device.UUID, Point.UUID, Point.Q, Point.Error]));
-        Exit;
-      end;
-    end;
-    if ReferencePoint <> nil then
-    begin
-      SetDeviceSource(ReferenceDevice, ReferencePoint, RunPointIndex,
-        'DevicePointByUUID');
-      Result := True;
-    end;
-  end;
-
-  { Q and name are intentionally the final device-point matching fallback. }
-  if not Result and (RunPoint <> nil) then
-  begin
-    MatchKind := 'DevicePointByQAndName';
-    ReferencePoint := nil;
-    ReferenceDevice := nil;
-    for Channel in FWorkTable.DeviceChannels do
-      if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) then
-      begin
-        Device := Channel.FlowMeter.Device;
-        Point := FindPointInDevice(Device, I);
-        if Point = nil then
-          Continue;
-        if ReferencePoint = nil then
-        begin
-          ReferencePoint := Point;
-          ReferenceDevice := Device;
-          RunPointIndex := I;
-        end
-        else if not SameValue(Point.Q, ReferencePoint.Q, 1E-9) or
-                not SameValue(Point.Error, ReferencePoint.Error, 1E-9) then
-        begin
-          AReason := 'DevicePointsToleranceMismatch';
-          LogToleranceEvent('GraphToleranceSourceMismatch', AReason, Format(
-            'ReferenceDeviceUUID=%s; ReferencePointUUID=%s; ReferenceQ=%g; ReferenceError=%g; ConflictingDeviceUUID=%s; ConflictingPointUUID=%s; ConflictingQ=%g; ConflictingError=%g',
-            [ReferenceDevice.UUID, ReferencePoint.UUID, ReferencePoint.Q,
-             ReferencePoint.Error, Device.UUID, Point.UUID, Point.Q, Point.Error]));
-          Exit;
-        end;
-      end;
-    if ReferencePoint <> nil then
-    begin
-      SetDeviceSource(ReferenceDevice, ReferencePoint, RunPointIndex, MatchKind);
-      Result := True;
-    end;
-  end;
-
-  if Result then
-  begin
-    LogToleranceEvent('GraphToleranceSourceResolved', AInfo.SourceKind, Format(
-      'SourceKind=%s; DeviceUUID=%s; PointUUID=%s; PointIndex=%d; Q=%g; Error=%g',
-      [AInfo.SourceKind, AInfo.DeviceUUID, AInfo.PointUUID, AInfo.PointIndex,
-       AInfo.TargetQ, AInfo.ErrorPercent]));
+    AReason := 'PartialPointUpdate';
+    LogToleranceEvent('GraphTolerancePointRejected', AReason, Format(
+      'Reason=%s; RunPointUUID=%s; RunPointIndex=%d; RunPointQ=%g; RunPointError=%g; Stage=%d',
+      [AReason, RunPoint.UUID, Run.CurrentPointIndex, RunPoint.Q,
+       RunPoint.Error, Ord(Run.Stage)]));
     Exit;
   end;
 
-  { A run point is never accepted unless it can be associated with an enabled
-    device.  This is a defensive compatibility path for incomplete device
-    point objects only. }
-  FallbackReason := 'DevicePointValuesUnavailable';
-  if (RunPoint <> nil) and ((Run.CurrentPointIndex >= 0) or
-     (Trim(RunPoint.UUID) <> '')) and NumberValid(RunPoint.Q) and
-     NumberValid(RunPoint.Error) and not SameValue(RunPoint.Error, 0.0, 1E-12) then
+  { The measurement-run point is authoritative.  Device collections can have
+    a different order and are only compatibility fallbacks for invalid data. }
+  if IsValidTolerancePoint(RunPoint) then
+  begin
+    SetSource(nil, RunPoint, Run.CurrentPointIndex, 'RunCurrentPoint');
+    Result := True;
+  end
+  else
+  begin
+    AReason := 'RunPointInvalid';
+    LogToleranceEvent('GraphTolerancePointRejected', AReason, Format(
+      'Reason=%s; RunPointUUID=%s; RunPointIndex=%d; RunPointQ=%g; RunPointError=%g; Stage=%d',
+      [AReason, RunPoint.UUID, Run.CurrentPointIndex, RunPoint.Q,
+       RunPoint.Error, Ord(Run.Stage)]));
+    DevicePoint := FindByUUID(Device, ResolvedIndex);
+    if IsValidTolerancePoint(DevicePoint) then
+    begin SetSource(Device, DevicePoint, ResolvedIndex, 'DevicePointByUUID'); Result := True end
+    else
+    begin
+      if Trim(RunPoint.UUID) <> '' then
+        LogToleranceEvent('GraphTolerancePointRejected',
+          'DevicePointUUIDMismatch', Format(
+          'Reason=DevicePointUUIDMismatch; RunPointUUID=%s; Stage=%d',
+          [RunPoint.UUID, Ord(Run.Stage)]));
+      DevicePoint := FindByQAndName(Device, ResolvedIndex);
+      if IsValidTolerancePoint(DevicePoint) then
+      begin SetSource(Device, DevicePoint, ResolvedIndex, 'DevicePointByQ'); Result := True end;
+      if not Result then
+        LogToleranceEvent('GraphTolerancePointRejected',
+          'DevicePointQMismatch', Format(
+          'Reason=DevicePointQMismatch; RunPointQ=%g; RunPointName=%s; Stage=%d',
+          [RunPoint.Q, RunPoint.Name, Ord(Run.Stage)]));
+    end;
+  end;
+
+  { A same-position device point is diagnostic only when the authoritative run
+    point is valid.  A mismatch is reported and can never replace RunPoint. }
+  if Result and SameText(AInfo.SourceKind, 'RunCurrentPoint') and
+     (Run.CurrentPointIndex >= 0) and (FWorkTable.DeviceChannels <> nil) then
     for Channel in FWorkTable.DeviceChannels do
       if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) then
       begin
         Device := Channel.FlowMeter.Device;
-        Point := FindPointInDevice(Device, I);
-        if Point <> nil then
+        if (Device = nil) or (Device.Points = nil) or
+           (Run.CurrentPointIndex >= Device.Points.Count) then Continue;
+        IndexedPoint := Device.Points[Run.CurrentPointIndex];
+        if (IndexedPoint <> nil) and not PointsMatch(RunPoint, IndexedPoint) then
+          LogToleranceEvent('GraphTolerancePointRejected',
+            'DevicePointIndexMismatch', Format(
+            'Reason=DevicePointIndexMismatch; RunPointUUID=%s; RunPointIndex=%d; RunPointQ=%g; IndexedPointUUID=%s; IndexedPointQ=%g; Stage=%d',
+            [RunPoint.UUID, Run.CurrentPointIndex, RunPoint.Q,
+             IndexedPoint.UUID, IndexedPoint.Q, Ord(Run.Stage)]));
+      end;
+
+  { Index is examined only as a verified final fallback. }
+  IndexMismatch := False;
+  if not Result and (Run.CurrentPointIndex >= 0) and
+     (FWorkTable.DeviceChannels <> nil) then
+    for Channel in FWorkTable.DeviceChannels do
+      if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) then
+      begin
+        Device := Channel.FlowMeter.Device;
+        if (Device = nil) or (Device.Points = nil) or
+           (Run.CurrentPointIndex >= Device.Points.Count) then Continue;
+        IndexedPoint := Device.Points[Run.CurrentPointIndex];
+        if not PointsMatch(RunPoint, IndexedPoint) then
+        begin IndexMismatch := True; Continue end;
+        if IsValidTolerancePoint(IndexedPoint) then
         begin
-          AInfo.Device := Device;
-          AInfo.Point := RunPoint;
-          AInfo.DeviceUUID := Device.UUID;
-          AInfo.PointUUID := RunPoint.UUID;
-          AInfo.PointIndex := I;
-          AInfo.TargetQ := RunPoint.Q;
-          AInfo.ErrorPercent := RunPoint.Error;
-          AInfo.SourceKind := 'RunCurrentPoint';
-          LogToleranceEvent('GraphToleranceSourceFallback', FallbackReason,
-            Format('SourceKind=RunCurrentPoint; RunPointUUID=%s; RunPointIndex=%d; Q=%g; Error=%g; FallbackReason=%s',
-              [RunPoint.UUID, Run.CurrentPointIndex, RunPoint.Q, RunPoint.Error,
-               FallbackReason]));
+          SetSource(Device, IndexedPoint, Run.CurrentPointIndex,
+            'DevicePointByVerifiedIndex');
           Result := True;
-          Exit;
+          Break;
         end;
       end;
-  AReason := 'DevicePointNotFound';
+
+  if not Result then
+  begin
+    if IndexMismatch then AReason := 'DevicePointIndexMismatch'
+    else AReason := 'TolerancePointNotResolved';
+    LogToleranceEvent('GraphTolerancePointRejected', AReason, Format(
+      'Reason=%s; RunPointPtr=%p; RunPointUUID=%s; RunPointIndex=%d; RunPointName=%s; RunPointQ=%g; RunPointError=%g; Stage=%d',
+      [AReason, Pointer(RunPoint), RunPoint.UUID, Run.CurrentPointIndex,
+       RunPoint.Name, RunPoint.Q, RunPoint.Error, Ord(Run.Stage)]));
+    Exit;
+  end;
+
+  LogToleranceEvent('GraphToleranceSourceResolved', AInfo.SourceKind, Format(
+    'SourceKind=%s; RunPointPtr=%p; RunPointUUID=%s; RunPointIndex=%d; RunPointName=%s; RunPointQ=%g; RunPointError=%g; ResolvedPointPtr=%p; ResolvedPointUUID=%s; ResolvedPointIndex=%d; ResolvedPointName=%s; ResolvedQ=%g; ResolvedError=%g; QDifference=%g; ErrorDifference=%g; PointsMatched=%s; Stage=%d',
+    [AInfo.SourceKind, Pointer(RunPoint), RunPoint.UUID, Run.CurrentPointIndex,
+     RunPoint.Name, RunPoint.Q, RunPoint.Error, Pointer(AInfo.Point),
+     AInfo.PointUUID, AInfo.PointIndex, AInfo.Point.Name, AInfo.TargetQ,
+     AInfo.ErrorPercent, AInfo.TargetQ - RunPoint.Q,
+     AInfo.ErrorPercent - RunPoint.Error,
+     BoolToStr(PointsMatch(RunPoint, AInfo.Point), True), Ord(Run.Stage)]));
 end;
 
 function TFrameGraphsWorkspace.ResolvePointTolerance(out ATarget, ALower,
@@ -2243,7 +2229,22 @@ var
   RunPointUUID: string;
   RunPointQ, RunPointError: Double;
   Run: TMeasurementRun;
+  NewPointKey, OldPointKey: string;
 begin
+  BaseTarget := 0; BaseLower := 0; BaseUpper := 0; ErrorPercent := 0;
+  if IsPointTransitionStage then
+  begin
+    for I := 0 to FConfig.GraphCount - 1 do
+    begin
+      EnsureLimitSeries(I);
+      GraphSlotByIndex(I).TargetSeries.Visible := False;
+      GraphSlotByIndex(I).LowerSeries.Visible := False;
+      GraphSlotByIndex(I).UpperSeries.Visible := False;
+    end;
+    LogToleranceEvent('GraphTolerancePointRejected', 'TransitionStage',
+      'Reason=TransitionStage; Stage=msSelectPoint|msSelectEtalon|msSetupPoint');
+    Exit;
+  end;
   Available := ResolvePointTolerance(BaseTarget, BaseLower, BaseUpper,
     ErrorPercent, Reason);
   DisplayTarget := ConvertFlowToDisplayUnits(BaseTarget);
@@ -2265,13 +2266,35 @@ begin
       RunPointError := Run.CurrentPoint.Error;
     end;
   end;
+  NewPointKey := '';
+  if Available then
+    NewPointKey := BuildTolerancePointKey(FLastToleranceSourceInfo.Point,
+      PointIndex);
+  if Available and (NewPointKey = '') then
+  begin
+    Available := False;
+    Reason := 'PartialPointUpdate';
+    LogToleranceEvent('GraphTolerancePointRejected', Reason,
+      Format('Reason=%s; Stage=%d', [Reason, Ord(Run.Stage)]));
+  end;
   NowMs := TMeterValue.GetMonotonicTimeMs;
   if Available then
   begin
+    if not SameText(NewPointKey, FLastTolerancePointKey) then
+    begin
+      OldPointKey := FLastTolerancePointKey;
+      LogToleranceEvent('GraphTolerancePointChanged', NewPointKey, Format(
+        'OldPointKey=%s; NewPointKey=%s; OldTarget=%g; NewTarget=%g; OldError=%g; NewError=%g; Stage=%d',
+        [OldPointKey, NewPointKey, FLastToleranceTarget, BaseTarget,
+         FLastToleranceError, ErrorPercent, Ord(Run.Stage)]));
+      FLastTolerancePointKey := NewPointKey;
+      FLastToleranceTarget := BaseTarget;
+      FLastToleranceError := ErrorPercent;
+    end;
     ToleranceValue := Abs(BaseTarget) * Abs(ErrorPercent) / 100.0;
     LogToleranceEvent('GraphPointToleranceResolved',
       FLastToleranceSourceInfo.SourceKind, Format(
-      'SourceKind=%s; SourceDeviceUUID=%s; SourcePointUUID=%s; SourcePointIndex=%d; RunPointUUID=%s; RunPointIndex=%d; RunPointQ=%g; RunPointError=%g; ResolvedTargetQ=%g; ResolvedErrorPercent=%g; ToleranceValue=%g; Lower=%g; Upper=%g; DisplayUnit=%s; DisplayTarget=%g; DisplayLower=%g; DisplayUpper=%g',
+      'SourceKind=%s; SourceDeviceUUID=%s; SourcePointUUID=%s; SourcePointIndex=%d; RunPointUUID=%s; RunPointIndex=%d; RunPointQ=%g; RunPointError=%g; TargetQ=%g; ErrorPercent=%g; ToleranceValue=%g; Lower=%g; Upper=%g; DisplayUnit=%s; DisplayTarget=%g; DisplayLower=%g; DisplayUpper=%g',
       [FLastToleranceSourceInfo.SourceKind,
        FLastToleranceSourceInfo.DeviceUUID,
        FLastToleranceSourceInfo.PointUUID,

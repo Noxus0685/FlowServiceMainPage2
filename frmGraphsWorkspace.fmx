@@ -1,4 +1,4 @@
-object FrameGraphsWorkspace: TFrameGraphsWorkspace
+﻿object FrameGraphsWorkspace: TFrameGraphsWorkspace
   Size.Width = 1100.000000000000000000
   Size.Height = 700.000000000000000000
   Size.PlatformDefault = False
