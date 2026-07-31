@@ -10,8 +10,8 @@ uses
   uBaseProcedures,
   uClasses,
   uDeviceClass,
-  uMeterValue,
-  uProtocols;
+  uMeterValue
+  ;
 
 const
   XMLVERFLOWMETERS = '5.0';
