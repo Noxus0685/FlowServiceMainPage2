@@ -6559,8 +6559,32 @@ begin
     table only owns/places one frame and supplies the narrow data dependency. }
   if FGraphsWorkspace = nil then
   begin
-    FGraphsWorkspace := TFrameGraphsWorkspace.Create(Self);
-    FGraphsWorkspace.Name := 'FrameGraphsWorkspace';
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcInfo, psForm, 'GraphsWorkspaceCreateBegin',
+        'Начато создание дизайнерской рабочей области графиков',
+        Format('ParentClass=%s', [AParent.ClassName]));
+    try
+      FGraphsWorkspace := TFrameGraphsWorkspace.Create(Self);
+      FGraphsWorkspace.Name := 'FrameGraphsWorkspace';
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcInfo, psForm,
+          'GraphsWorkspaceCreateSuccess',
+          'Дизайнерская рабочая область графиков создана',
+          Format('ClassName=%s; ParentClass=%s; FramePtr=%p',
+            [FGraphsWorkspace.ClassName, AParent.ClassName,
+             Pointer(FGraphsWorkspace)]));
+    except
+      on E: Exception do
+      begin
+        if Assigned(ProtocolManager) then
+          ProtocolManager.AddMessage(pcError, psForm,
+            'GraphsWorkspaceCreateError',
+            'Ошибка создания дизайнерской рабочей области графиков',
+            Format('ExceptionClass=%s; ExceptionMessage=%s',
+              [E.ClassName, E.Message]));
+        raise;
+      end;
+    end;
   end;
   FGraphsWorkspace.Parent := AParent;
   FGraphsWorkspace.Align := TAlignLayout.Client;

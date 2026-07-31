@@ -482,4 +482,9 @@ begin
     TAlphaColors.Blue);
 end;
 
+initialization
+  { Register the streamed frame class before TFrame.Create asks FMX to load
+    the TFrameGraphsWorkspace resource embedded by {$R *.fmx}. }
+  RegisterFmxClasses([TFrameGraphsWorkspace]);
+
 end.
