@@ -1,4 +1,4 @@
-﻿unit frmGraphsWorkspace;
+unit frmGraphsWorkspace;
 
 interface
 
@@ -59,6 +59,26 @@ type
     WaitingForFirstSample: Boolean;
     LastAcceptedValue: Double;
     LastAcceptedPointKey: string;
+    RuntimeResetTimeMs: Int64;
+  end;
+
+  TGraphVisualSlot = class
+  public
+    RootLayout: TLayout;
+    HeaderLayout: TLayout;
+    TitleLabel: TLabel;
+    Chart: TSimpleChart;
+    HitControl: TRectangle;
+    TargetSeries: TChartSeries;
+    LowerSeries: TChartSeries;
+    UpperSeries: TChartSeries;
+    GraphIndex: Integer;
+    destructor Destroy; override;
+  end;
+
+  TGraphColumnMenuItem = class(TMenuItem)
+  public
+    ColumnCount: Integer;
   end;
 
   TFrameGraphsWorkspace = class(TFrame)
@@ -70,30 +90,7 @@ type
     ButtonReset: TButton;
     LayoutWorkspaceBody: TLayout;
     LayoutGraphsHost: TLayout;
-    LayoutArea1: TLayout;
-    LayoutArea2: TLayout;
-    LayoutArea3: TLayout;
-    LayoutArea4: TLayout;
-    LayoutParking: TLayout;
-    SplitterArea1: TSplitter;
-    SplitterArea2: TSplitter;
-    SplitterArea3: TSplitter;
-    LayoutGraphSlot1: TLayout;
-    LabelGraphTitle1: TLabel;
-    ChartGraph1: TSimpleChart;
-    RectangleGraphHit1: TRectangle;
-    LayoutGraphSlot2: TLayout;
-    LabelGraphTitle2: TLabel;
-    ChartGraph2: TSimpleChart;
-    RectangleGraphHit2: TRectangle;
-    LayoutGraphSlot3: TLayout;
-    LabelGraphTitle3: TLabel;
-    ChartGraph3: TSimpleChart;
-    RectangleGraphHit3: TRectangle;
-    LayoutGraphSlot4: TLayout;
-    LabelGraphTitle4: TLabel;
-    ChartGraph4: TSimpleChart;
-    RectangleGraphHit4: TRectangle;
+    ScrollBoxGraphs: TVertScrollBox;
     PopupMenuGraph: TPopupMenu;
     MenuItemEtalons: TMenuItem;
     MenuItemDevices: TMenuItem;
@@ -106,6 +103,8 @@ type
     MenuItemShowToleranceLines: TMenuItem;
     MenuItemAddGraph: TMenuItem;
     MenuItemDeleteGraph: TMenuItem;
+    MenuItemLayout: TMenuItem;
+    MenuItemClearGraphValues: TMenuItem;
     MenuItemClearGraph: TMenuItem;
     procedure GraphLayoutChange(Sender: TObject);
     procedure ClearAllClick(Sender: TObject);
@@ -115,7 +114,9 @@ type
     procedure GraphHitMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
     procedure GraphPopup(Sender: TObject);
+    procedure ClearGraphValuesClick(Sender: TObject);
     procedure ClearGraphClick(Sender: TObject);
+    procedure GraphColumnModeClick(Sender: TObject);
     procedure SeriesColorClick(Sender: TObject);
     procedure GraphDurationClick(Sender: TObject);
     procedure ShowLegendClick(Sender: TObject);
@@ -141,9 +142,6 @@ type
     FRuntimeResetTimeMs: Int64;
     FLastSegmentDecision: string;
     FLastFlowUnitKey: string;
-    FTargetSeries: array[0..3] of TChartSeries;
-    FLowerSeries: array[0..3] of TChartSeries;
-    FUpperSeries: array[0..3] of TChartSeries;
     FLastFallbackSampleMs: Int64;
     FLastUpdateDiagnosticMs: Int64;
     FDefaultSourcesInitialized: Boolean;
@@ -151,13 +149,25 @@ type
     FLastToleranceDiagnosticReason: string;
     FToleranceDiagnosticTimes: TDictionary<string, Int64>;
     FLastToleranceSourceInfo: TGraphToleranceSourceInfo;
+    FGraphSlots: TObjectList<TGraphVisualSlot>;
+    FApplyingLayout: Boolean;
+    FLastLayoutColumns: Integer;
+    FLastLayoutRows: Integer;
+    FLastLayoutGraphCount: Integer;
+    FLastGraphCellWidth: Single;
+    FLastGraphCellHeight: Single;
+    function CreateGraphSlot(const AGraphIndex: Integer): TGraphVisualSlot;
+    procedure DestroyGraphSlot(const AGraphIndex: Integer);
+    procedure EnsureGraphSlotCount(const ACount: Integer);
+    procedure ReindexGraphSlots;
+    function GraphSlotByIndex(const AIndex: Integer): TGraphVisualSlot;
     function ChartByIndex(const AIndex: Integer): TSimpleChart;
-    function SlotByIndex(const AIndex: Integer): TLayout;
-    function AreaByIndex(const AIndex: Integer): TLayout;
+    procedure CalculateDynamicGrid(const AGraphCount: Integer;
+      const AAvailableWidth: Single; out AColumns, ARows: Integer);
+    procedure ApplyDynamicGridLayout;
     procedure SelectGraph(const AIndex: Integer);
     procedure SyncControls;
     procedure ClearChart(const AIndex: Integer; const AClearAssignments: Boolean);
-    procedure PlaceSlot(const ASlot, AArea: Integer; const AAlign: TAlignLayout);
     procedure ClearDynamicMenu(AParent: TMenuItem);
     procedure BuildSourceMenu(out AEtalonCount, ADeviceCount: Integer);
     procedure BuildSeriesColorsMenu;
@@ -166,7 +176,6 @@ type
     function FindSeries(const AGraphIndex: Integer; const AChannelUUID,
       AMeterValueKey: string): TGraphSeriesConfig;
     procedure DeleteSource(const AGraphIndex: Integer; ASeries: TGraphSeriesConfig);
-    procedure NormalizeLayout;
     procedure AddEmptyMenuItem(AParent: TMenuItem; const ACaption: string);
     procedure AddChannelMenuItem(AParent: TMenuItem; AChannel: TChannel;
       const AOwnerKind: TGraphSeriesOwnerKind);
@@ -203,6 +212,7 @@ type
     procedure ApplySharedXAxis;
     procedure EnsureLimitSeries(const AGraphIndex: Integer);
     procedure UpdateToleranceLines;
+    procedure UpdateToleranceLinesForGraph(const AGraphIndex: Integer);
     function ResolvePointTolerance(out ATarget, ALower, AUpper,
       AErrorPercent: Double; out AReason: string): Boolean;
     function ResolveToleranceSource(out AInfo: TGraphToleranceSourceInfo;
@@ -223,6 +233,8 @@ type
     procedure ClearGraph(const AGraphIndex: Integer);
     procedure ClearAllGraphs;
     procedure ResetRuntimeGraphData;
+    procedure ResetGraphRuntimeData(const AGraphIndex: Integer);
+    procedure Resize; override;
     function AddSource(const AGraphIndex: Integer;
       ASource: TGraphSeriesConfig): Boolean;
     procedure EnsureDefaultEnabledSources;
@@ -233,8 +245,16 @@ implementation
 
 {$R *.fmx}
 
+destructor TGraphVisualSlot.Destroy;
+begin
+  RootLayout.Free;
+  inherited;
+end;
+
 destructor TFrameGraphsWorkspace.Destroy;
 begin
+  { Slots own the controls parented to LayoutGraphsHost and must go first. }
+  FGraphSlots.Free;
   FToleranceDiagnosticTimes.Free;
   FSeriesRuntime.Free;
   FConfig.Free;
@@ -247,19 +267,13 @@ var
   PointIndex: Integer;
 begin
   if PopupMenuGraph = nil then
-    raise EInvalidOperation.Create(
-      'PopupMenuGraph не загружен из frmGraphsWorkspace.fmx');
-  if MenuItemEtalons = nil then
-    raise EInvalidOperation.Create(
-      'MenuItemEtalons не загружен из frmGraphsWorkspace.fmx');
-  if MenuItemDevices = nil then
-    raise EInvalidOperation.Create(
-      'MenuItemDevices не загружен из frmGraphsWorkspace.fmx');
+    raise EInvalidOperation.Create('PopupMenuGraph не загружен из frmGraphsWorkspace.fmx');
   FWorkTable := AWorkTable;
   FirstInitialization := FConfig = nil;
   if FConfig = nil then
   begin
     FConfig := TGraphsViewConfig.Create;
+    FGraphSlots := TObjectList<TGraphVisualSlot>.Create(True);
     FSeriesRuntime := TObjectDictionary<TGraphSeriesConfig,
       TGraphSeriesRuntime>.Create([doOwnsValues]);
     FSelectedGraph := 0;
@@ -269,9 +283,13 @@ begin
     FSharedAxisMaxX := 60;
     FRuntimeResetTimeMs := TMeterValue.GetMonotonicTimeMs;
     FToleranceDiagnosticTimes := TDictionary<string, Int64>.Create;
+    FLastLayoutColumns := -1;
+    FLastLayoutRows := -1;
+    FLastLayoutGraphCount := -1;
   end;
+  EnsureGraphSlotCount(FConfig.GraphCount);
   SyncControls;
-  ApplyLayout;
+  ApplyDynamicGridLayout;
   if FirstInitialization then
   begin
     FLastPointKey := CurrentPointKey(PointIndex);
@@ -282,91 +300,196 @@ begin
   EnsureDefaultEnabledSources;
 end;
 
-function TFrameGraphsWorkspace.ChartByIndex(const AIndex: Integer): TSimpleChart;
+function TFrameGraphsWorkspace.CreateGraphSlot(
+  const AGraphIndex: Integer): TGraphVisualSlot;
 begin
-  case AIndex of
-    0: Result := ChartGraph1; 1: Result := ChartGraph2;
-    2: Result := ChartGraph3; 3: Result := ChartGraph4;
-  else Result := nil end;
+  Result := TGraphVisualSlot.Create;
+  Result.GraphIndex := AGraphIndex;
+  Result.RootLayout := TLayout.Create(nil);
+  Result.RootLayout.Parent := LayoutGraphsHost;
+  Result.RootLayout.Align := TAlignLayout.None;
+  Result.RootLayout.ClipChildren := True;
+  Result.RootLayout.Tag := AGraphIndex;
+
+  Result.HeaderLayout := TLayout.Create(Result.RootLayout);
+  Result.HeaderLayout.Parent := Result.RootLayout;
+  Result.HeaderLayout.Align := TAlignLayout.Top;
+  Result.HeaderLayout.Height := 28;
+  Result.TitleLabel := TLabel.Create(Result.HeaderLayout);
+  Result.TitleLabel.Parent := Result.HeaderLayout;
+  Result.TitleLabel.Align := TAlignLayout.Client;
+  Result.TitleLabel.Text := Format('График %d', [AGraphIndex + 1]);
+  Result.TitleLabel.TextSettings.HorzAlign := TTextAlign.Center;
+  Result.TitleLabel.Tag := AGraphIndex;
+  Result.TitleLabel.OnMouseDown := GraphControlMouseDown;
+
+  Result.Chart := TSimpleChart.Create(Result.RootLayout);
+  Result.Chart.Parent := Result.RootLayout;
+  Result.Chart.Align := TAlignLayout.Client;
+  Result.Chart.ClipParent := True;
+  Result.Chart.Tag := AGraphIndex;
+  Result.Chart.Title := Result.TitleLabel.Text;
+  Result.Chart.XTitle := 'Время, с';
+  Result.Chart.YTitle := 'Расход, ' + GetCurrentFlowUnitText;
+  Result.Chart.OnMouseDown := GraphControlMouseDown;
+  { No full-size HitControl: it would consume legend interaction.  The chart
+    receives right clicks directly. }
+  Result.HitControl := nil;
+  FGraphSlots.Add(Result);
+  EnsureLimitSeries(AGraphIndex);
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSlotCreated',
+      'Создан динамический слот графика', Format('GraphIndex=%d; GraphCount=%d',
+      [AGraphIndex, FGraphSlots.Count]));
 end;
 
-function TFrameGraphsWorkspace.SlotByIndex(const AIndex: Integer): TLayout;
+procedure TFrameGraphsWorkspace.DestroyGraphSlot(const AGraphIndex: Integer);
 begin
-  case AIndex of
-    0: Result := LayoutGraphSlot1; 1: Result := LayoutGraphSlot2;
-    2: Result := LayoutGraphSlot3; 3: Result := LayoutGraphSlot4;
-  else Result := nil end;
+  if (FGraphSlots = nil) or (AGraphIndex < 0) or
+     (AGraphIndex >= FGraphSlots.Count) then Exit;
+  FGraphSlots.Delete(AGraphIndex);
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSlotDestroyed',
+      'Удалён динамический слот графика', Format('GraphIndex=%d; GraphCount=%d',
+      [AGraphIndex, FGraphSlots.Count]));
 end;
 
-function TFrameGraphsWorkspace.AreaByIndex(const AIndex: Integer): TLayout;
+procedure TFrameGraphsWorkspace.EnsureGraphSlotCount(const ACount: Integer);
 begin
-  case AIndex of
-    0: Result := LayoutArea1; 1: Result := LayoutArea2;
-    2: Result := LayoutArea3; 3: Result := LayoutArea4;
-  else Result := LayoutArea1 end;
+  if FGraphSlots = nil then Exit;
+  while FGraphSlots.Count < Max(0, ACount) do
+    CreateGraphSlot(FGraphSlots.Count);
+  while FGraphSlots.Count > Max(0, ACount) do
+    DestroyGraphSlot(FGraphSlots.Count - 1);
+  ReindexGraphSlots;
 end;
 
-procedure TFrameGraphsWorkspace.PlaceSlot(const ASlot, AArea: Integer;
-  const AAlign: TAlignLayout);
-var Slot: TLayout;
+procedure TFrameGraphsWorkspace.ReindexGraphSlots;
+var I: Integer; Slot: TGraphVisualSlot;
 begin
-  Slot := SlotByIndex(ASlot);
-  Slot.Parent := AreaByIndex(AArea);
-  Slot.Align := AAlign;
-  Slot.Visible := True;
+  if FGraphSlots = nil then Exit;
+  for I := 0 to FGraphSlots.Count - 1 do
+  begin
+    Slot := FGraphSlots[I];
+    Slot.GraphIndex := I;
+    Slot.RootLayout.Tag := I;
+    Slot.TitleLabel.Tag := I;
+    Slot.Chart.Tag := I;
+    if Slot.HitControl <> nil then Slot.HitControl.Tag := I;
+    Slot.TitleLabel.Text := Format('График %d', [I + 1]);
+    Slot.Chart.Title := Slot.TitleLabel.Text;
+  end;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSlotsReindexed',
+      'Переиндексированы слоты графиков', Format('GraphCount=%d', [FGraphSlots.Count]));
+end;
+
+function TFrameGraphsWorkspace.GraphSlotByIndex(
+  const AIndex: Integer): TGraphVisualSlot;
+begin
+  Result := nil;
+  if (FGraphSlots <> nil) and (AIndex >= 0) and (AIndex < FGraphSlots.Count) then
+    Result := FGraphSlots[AIndex];
+end;
+
+function TFrameGraphsWorkspace.ChartByIndex(
+  const AIndex: Integer): TSimpleChart;
+var Slot: TGraphVisualSlot;
+begin
+  Result := nil;
+  Slot := GraphSlotByIndex(AIndex);
+  if Slot <> nil then Result := Slot.Chart;
+end;
+
+procedure TFrameGraphsWorkspace.CalculateDynamicGrid(const AGraphCount: Integer;
+  const AAvailableWidth: Single; out AColumns, ARows: Integer);
+var MaxColumnsByWidth: Integer; MinimumWidth: Single;
+begin
+  AColumns := 0; ARows := 0;
+  if AGraphCount <= 0 then Exit;
+  MinimumWidth := Max(1, FConfig.MinimumGraphWidth);
+  MaxColumnsByWidth := Max(1, Floor(Max(0, AAvailableWidth) / MinimumWidth));
+  if FConfig.AutoGrid or (FConfig.PreferredColumnCount <= 0) then
+    AColumns := Min(MaxColumnsByWidth, AGraphCount)
+  else
+    AColumns := Min(Min(FConfig.PreferredColumnCount, MaxColumnsByWidth), AGraphCount);
+  AColumns := Max(1, AColumns);
+  ARows := (AGraphCount + AColumns - 1) div AColumns;
+end;
+
+procedure TFrameGraphsWorkspace.ApplyDynamicGridLayout;
+const HorizontalPadding = 8; VerticalPadding = 8;
+  HorizontalSpacing = 8; VerticalSpacing = 8;
+var I, Columns, Rows, ColumnIndex, RowIndex: Integer;
+  AvailableWidth, AvailableHeight, GraphWidth, GraphHeight, ContentHeight: Single;
+  Slot: TGraphVisualSlot; Changed, ScrollRequired: Boolean;
+begin
+  if FApplyingLayout or (FConfig = nil) or (FGraphSlots = nil) then Exit;
+  FApplyingLayout := True;
+  try
+    EnsureGraphSlotCount(FConfig.GraphCount);
+    AvailableWidth := Max(0, ScrollBoxGraphs.Width - HorizontalPadding * 2);
+    AvailableHeight := Max(0, ScrollBoxGraphs.Height - VerticalPadding * 2);
+    CalculateDynamicGrid(FGraphSlots.Count, AvailableWidth, Columns, Rows);
+    if Columns = 0 then Exit;
+    GraphWidth := Max(1, (AvailableWidth - Max(0, Columns - 1) * HorizontalSpacing) / Columns);
+    GraphHeight := Max(FConfig.MinimumGraphHeight,
+      (AvailableHeight - Max(0, Rows - 1) * VerticalSpacing) / Max(1, Rows));
+    ContentHeight := VerticalPadding * 2 + Rows * GraphHeight +
+      Max(0, Rows - 1) * VerticalSpacing;
+    Changed := (Columns <> FLastLayoutColumns) or (Rows <> FLastLayoutRows) or
+      (FGraphSlots.Count <> FLastLayoutGraphCount) or
+      (Abs(GraphWidth - FLastGraphCellWidth) > 1) or
+      (Abs(GraphHeight - FLastGraphCellHeight) > 1);
+    for I := 0 to FGraphSlots.Count - 1 do
+    begin
+      Slot := FGraphSlots[I]; ColumnIndex := I mod Columns; RowIndex := I div Columns;
+      Slot.RootLayout.Position.X := HorizontalPadding + ColumnIndex * (GraphWidth + HorizontalSpacing);
+      Slot.RootLayout.Position.Y := VerticalPadding + RowIndex * (GraphHeight + VerticalSpacing);
+      Slot.RootLayout.Width := GraphWidth; Slot.RootLayout.Height := GraphHeight;
+      Slot.Chart.ShowLegend := FConfig.Panels[I].ShowLegend;
+    end;
+    LayoutGraphsHost.Width := AvailableWidth + HorizontalPadding * 2;
+    LayoutGraphsHost.Height := Max(1, ContentHeight);
+    ScrollRequired := ContentHeight > ScrollBoxGraphs.Height;
+    if Changed and Assigned(ProtocolManager) then
+    begin
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphDynamicLayoutCalculated',
+        'Рассчитана динамическая сетка графиков', Format(
+        'GraphCount=%d; AvailableWidth=%g; AvailableHeight=%g; AutoGrid=%s; PreferredColumnCount=%d; CalculatedColumns=%d; CalculatedRows=%d; GraphWidth=%g; GraphHeight=%g',
+        [FGraphSlots.Count, AvailableWidth, AvailableHeight, BoolToStr(FConfig.AutoGrid, True),
+         FConfig.PreferredColumnCount, Columns, Rows, GraphWidth, GraphHeight]));
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphDynamicLayoutApplied',
+        'Применена динамическая сетка графиков', Format(
+        'GraphCount=%d; Columns=%d; Rows=%d; ContentHeight=%g; ScrollRequired=%s',
+        [FGraphSlots.Count, Columns, Rows, ContentHeight, BoolToStr(ScrollRequired, True)]));
+    end;
+    FLastLayoutColumns := Columns; FLastLayoutRows := Rows;
+    FLastLayoutGraphCount := FGraphSlots.Count;
+    FLastGraphCellWidth := GraphWidth; FLastGraphCellHeight := GraphHeight;
+    ApplySharedXAxis;
+  finally
+    FApplyingLayout := False;
+  end;
 end;
 
 procedure TFrameGraphsWorkspace.ApplyLayout;
-var I: Integer; Slot: TLayout;
 begin
-  if FConfig = nil then Exit;
-  for I := 0 to 3 do
-  begin
-    Slot := SlotByIndex(I);
-    Slot.Parent := LayoutParking;
-    Slot.Visible := False;
-  end;
-  for I := 0 to 3 do AreaByIndex(I).Visible := False;
-  LayoutArea1.Align := TAlignLayout.Client;
-  case FConfig.LayoutKind of
-    glSingle: begin LayoutArea1.Visible := True; PlaceSlot(0, 0, TAlignLayout.Client); end;
-    glTwoRows:
-      begin
-        LayoutArea1.Visible := True; LayoutArea1.Align := TAlignLayout.Top; LayoutArea1.Height := LayoutGraphsHost.Height / 2;
-        LayoutArea2.Visible := True; LayoutArea2.Align := TAlignLayout.Client;
-        PlaceSlot(0, 0, TAlignLayout.Client);
-        if FConfig.GraphCount = 3 then begin PlaceSlot(1, 0, TAlignLayout.Left); LayoutGraphSlot2.Width := LayoutArea1.Width / 2; LayoutGraphSlot1.Align := TAlignLayout.Client; PlaceSlot(2, 1, TAlignLayout.Client); end
-        else PlaceSlot(1, 1, TAlignLayout.Client);
-      end;
-    glTwoColumns:
-      begin
-        LayoutArea1.Visible := True; LayoutArea1.Align := TAlignLayout.Left; LayoutArea1.Width := LayoutGraphsHost.Width / 2;
-        LayoutArea2.Visible := True; LayoutArea2.Align := TAlignLayout.Client;
-        PlaceSlot(0, 0, TAlignLayout.Client);
-        if FConfig.GraphCount = 3 then begin PlaceSlot(1, 0, TAlignLayout.Top); LayoutGraphSlot2.Height := LayoutArea1.Height / 2; LayoutGraphSlot1.Align := TAlignLayout.Client; PlaceSlot(2, 1, TAlignLayout.Client); end
-        else PlaceSlot(1, 1, TAlignLayout.Client);
-      end;
-    glThreePanels:
-      for I := 0 to Min(2, FConfig.GraphCount - 1) do begin AreaByIndex(I).Visible := True; AreaByIndex(I).Align := TAlignLayout.Left; AreaByIndex(I).Width := LayoutGraphsHost.Width / 3; PlaceSlot(I, I, TAlignLayout.Client); end;
-    glGrid2x2:
-      for I := 0 to FConfig.GraphCount - 1 do begin AreaByIndex(I).Visible := True; AreaByIndex(I).Align := TAlignLayout.None; AreaByIndex(I).Position.X := (I mod 2) * LayoutGraphsHost.Width / 2; AreaByIndex(I).Position.Y := (I div 2) * LayoutGraphsHost.Height / 2; AreaByIndex(I).Width := LayoutGraphsHost.Width / 2; AreaByIndex(I).Height := LayoutGraphsHost.Height / 2; PlaceSlot(I, I, TAlignLayout.Client); end;
-  end;
-  for I := 0 to FConfig.GraphCount - 1 do
-  begin
-    if not SlotByIndex(I).Visible then PlaceSlot(I, Min(I, 3), TAlignLayout.Client);
-    ChartByIndex(I).ShowLegend := FConfig.Panels[I].ShowLegend;
-  end;
-  { Align/Parent changes above enqueue FMX alignment automatically.  Realign is
-    protected in the Delphi version used by the application and must not be
-    called from the frame. }
-  ApplySharedXAxis;
+  ApplyDynamicGridLayout;
+end;
+
+procedure TFrameGraphsWorkspace.Resize;
+begin
+  inherited;
+  ApplyDynamicGridLayout;
 end;
 
 procedure TFrameGraphsWorkspace.SyncControls;
 begin
   FUpdatingControls := True;
   try
-    ComboGraphLayout.ItemIndex := Ord(FConfig.LayoutKind);
+    if FConfig.AutoGrid then ComboGraphLayout.ItemIndex := 0
+    else ComboGraphLayout.ItemIndex := EnsureRange(FConfig.PreferredColumnCount, 1, 6);
   finally
     FUpdatingControls := False;
   end;
@@ -377,7 +500,15 @@ end;
 procedure TFrameGraphsWorkspace.GraphLayoutChange(Sender: TObject);
 begin
   if FUpdatingControls or (FConfig = nil) then Exit;
-  FConfig.LayoutKind := TGraphLayoutKind(ComboGraphLayout.ItemIndex); ApplyLayout;
+  if ComboGraphLayout.ItemIndex <= 0 then
+  begin FConfig.AutoGrid := True; FConfig.PreferredColumnCount := 0 end
+  else
+  begin FConfig.AutoGrid := False; FConfig.PreferredColumnCount := ComboGraphLayout.ItemIndex end;
+  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+    'GraphColumnModeChanged', 'Изменён режим колонок графиков', Format(
+    'AutoGrid=%s; PreferredColumnCount=%d', [BoolToStr(FConfig.AutoGrid, True),
+     FConfig.PreferredColumnCount]));
+  ApplyDynamicGridLayout;
 end;
 
 
@@ -627,7 +758,20 @@ const
 var
   I: Integer;
   Item: TGraphDurationMenuItem;
+  LayoutItem: TGraphColumnMenuItem;
 begin
+  ClearDynamicMenu(MenuItemLayout);
+  for I := 0 to 6 do
+  begin
+    LayoutItem := TGraphColumnMenuItem.Create(nil);
+    LayoutItem.ColumnCount := I;
+    if I = 0 then LayoutItem.Text := 'Автоматически'
+    else LayoutItem.Text := Format('%d столбцов', [I]);
+    LayoutItem.IsChecked := (FConfig.AutoGrid and (I = 0)) or
+      ((not FConfig.AutoGrid) and (FConfig.PreferredColumnCount = I));
+    LayoutItem.OnClick := GraphColumnModeClick;
+    MenuItemLayout.AddObject(LayoutItem);
+  end;
   ClearDynamicMenu(MenuItemGraphLength);
   for I := Low(Durations) to High(Durations) do
   begin
@@ -644,8 +788,30 @@ begin
     FConfig.Panels[FContextGraphIndex].ShowTargetLine;
   MenuItemShowToleranceLines.IsChecked :=
     FConfig.Panels[FContextGraphIndex].ShowToleranceLines;
-  MenuItemAddGraph.Enabled := FConfig.GraphCount < 4;
+  MenuItemAddGraph.Enabled := True;
   MenuItemDeleteGraph.Enabled := FConfig.GraphCount > 1;
+end;
+
+procedure TFrameGraphsWorkspace.GraphColumnModeClick(Sender: TObject);
+var Item: TGraphColumnMenuItem;
+begin
+  if not (Sender is TGraphColumnMenuItem) then Exit;
+  Item := TGraphColumnMenuItem(Sender);
+  FConfig.AutoGrid := Item.ColumnCount = 0;
+  FConfig.PreferredColumnCount := Item.ColumnCount;
+  SyncControls;
+  ApplyDynamicGridLayout;
+  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+    'GraphColumnModeChanged', 'Изменён режим колонок графиков', Format(
+    'AutoGrid=%s; PreferredColumnCount=%d', [BoolToStr(FConfig.AutoGrid, True),
+     FConfig.PreferredColumnCount]));
+end;
+
+procedure TFrameGraphsWorkspace.ClearGraphValuesClick(Sender: TObject);
+begin
+  if (FConfig <> nil) and (FContextGraphIndex >= 0) and
+     (FContextGraphIndex < FConfig.GraphCount) then
+    ResetGraphRuntimeData(FContextGraphIndex);
 end;
 
 procedure TFrameGraphsWorkspace.SeriesColorClick(Sender: TObject);
@@ -725,90 +891,32 @@ begin
        BoolToStr(Panel.ShowToleranceLines, True)]));
 end;
 
-procedure TFrameGraphsWorkspace.NormalizeLayout;
-begin
-  if FConfig.GraphCount = 1 then FConfig.LayoutKind := glSingle
-  else if FConfig.GraphCount = 2 then
-  begin
-    if not (FConfig.LayoutKind in [glTwoRows, glTwoColumns]) then
-      FConfig.LayoutKind := glTwoRows;
-  end
-  else if FConfig.GraphCount = 3 then
-  begin
-    if not (FConfig.LayoutKind in [glTwoRows, glTwoColumns, glThreePanels]) then
-      FConfig.LayoutKind := glThreePanels;
-  end
-  else FConfig.LayoutKind := glGrid2x2;
-  SyncControls;
-end;
-
 procedure TFrameGraphsWorkspace.AddGraphClick(Sender: TObject);
 var OldCount: Integer;
 begin
   OldCount := FConfig.GraphCount;
-  if OldCount >= 4 then Exit;
   FConfig.EnsurePanelCount(OldCount + 1);
-  NormalizeLayout; ApplyLayout; SelectGraph(FConfig.GraphCount - 1);
-  RefreshEnabledSources;
+  CreateGraphSlot(OldCount);
+  ApplyDynamicGridLayout; SelectGraph(FConfig.GraphCount - 1);
   if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
     'GraphAdded', 'Добавлен график', Format('GraphIndex=%d; OldGraphCount=%d; NewGraphCount=%d',
     [FSelectedGraph, OldCount, FConfig.GraphCount]));
 end;
 
 procedure TFrameGraphsWorkspace.DeleteGraphClick(Sender: TObject);
-var
-  OldCount, DeletedIndex, I, PointIndex: Integer;
-  S: TGraphSeriesConfig;
-  Runtime: TGraphSeriesRuntime;
-  SavedPoints: TDictionary<TGraphSeriesConfig, TArray<TPointF>>;
-  Points: TArray<TPointF>;
-  Chart: TSimpleChart;
+var OldCount, DeletedIndex, I: Integer; S: TGraphSeriesConfig;
 begin
   OldCount := FConfig.GraphCount;
   if OldCount <= 1 then Exit;
   DeletedIndex := FContextGraphIndex;
-  SavedPoints := TDictionary<TGraphSeriesConfig, TArray<TPointF>>.Create;
-  try
-    { Snapshot the shifted panels' displayed points before their series are
-      rebound to the designer charts on the left. }
-    for I := DeletedIndex + 1 to OldCount - 1 do
-      for S in FConfig.Panels[I].Series do
-        if FSeriesRuntime.TryGetValue(S, Runtime) and
-           (Runtime.ChartSeries <> nil) then
-        begin
-          SetLength(Points, Runtime.ChartSeries.Points.Count);
-          for PointIndex := 0 to Runtime.ChartSeries.Points.Count - 1 do
-            Points[PointIndex] := Runtime.ChartSeries.Points[PointIndex];
-          SavedPoints.Add(S, Points);
-        end;
-    for I := DeletedIndex to OldCount - 1 do RemoveGraphRuntimeSeries(I);
-    FConfig.DeletePanel(DeletedIndex);
-    for I := DeletedIndex to FConfig.GraphCount - 1 do
-    begin
-      Chart := ChartByIndex(I);
-      for S in FConfig.Panels[I].Series do
-      begin
-        SetLength(Points, 0);
-        S.GraphIndex := I;
-        Runtime := TGraphSeriesRuntime.Create;
-        Runtime.ChartSeries := Chart.AddSeries(S.Caption);
-        Runtime.ChartSeries.Color := S.Color;
-        Runtime.LastSampleIndex := -1;
-        Runtime.WaitingForFirstSample := True;
-        if SavedPoints.TryGetValue(S, Points) then
-          for PointIndex := 0 to High(Points) do
-            Runtime.ChartSeries.AddPoint(Points[PointIndex].X, Points[PointIndex].Y);
-        if Length(Points) > 0 then
-          Runtime.LastSampleTimeMs := FSharedSegmentStartMs +
-            Round(Points[High(Points)].X * 1000);
-        FSeriesRuntime.Add(S, Runtime);
-      end;
-      Chart.InvalidateChart;
-    end;
-  finally
-    SavedPoints.Free;
-  end;
-  NormalizeLayout; ApplyLayout;
+  if (DeletedIndex < 0) or (DeletedIndex >= OldCount) then Exit;
+  RemoveGraphRuntimeSeries(DeletedIndex);
+  FConfig.DeletePanel(DeletedIndex);
+  DestroyGraphSlot(DeletedIndex);
+  for I := DeletedIndex to FConfig.GraphCount - 1 do
+    for S in FConfig.Panels[I].Series do S.GraphIndex := I;
+  ReindexGraphSlots;
+  ApplyDynamicGridLayout;
   SelectGraph(Min(DeletedIndex, FConfig.GraphCount - 1));
   if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
     'GraphDeleted', 'Удалён график', Format('GraphIndex=%d; OldGraphCount=%d; NewGraphCount=%d',
@@ -1124,6 +1232,7 @@ begin
   Runtime.LastSampleIndex := -1;
   Runtime.WaitingForFirstSample := True;
   Runtime.LastAcceptedPointKey := FLastPointKey;
+  Runtime.RuntimeResetTimeMs := TMeterValue.GetMonotonicTimeMs;
   FSeriesRuntime.Add(ASeriesConfig, Runtime);
   Result := Runtime.ChartSeries;
 end;
@@ -1153,11 +1262,12 @@ var
   BaseY, DisplayY, X: Double;
   RejectReason, FallbackSkipReason: string;
   FirstRejectedLogged, FirstAcceptedLogged: Boolean;
-  NewestSampleTimeMs: Int64;
+  NewestSampleTimeMs, EffectiveResetTimeMs: Int64;
 begin
   if (ASeriesConfig = nil) or (AChartSeries = nil) or
      not FSeriesRuntime.TryGetValue(ASeriesConfig, Runtime) then
     Exit;
+  EffectiveResetTimeMs := Max(FRuntimeResetTimeMs, Runtime.RuntimeResetTimeMs);
   Added := 0;
   Skipped := 0;
   BufferedAddedCount := 0;
@@ -1186,7 +1296,7 @@ begin
     RejectReason := '';
     if Sample.TimeStampMs < FSharedSegmentStartMs then
       RejectReason := 'SampleBeforeSegment'
-    else if Sample.TimeStampMs < FRuntimeResetTimeMs then
+    else if Sample.TimeStampMs < EffectiveResetTimeMs then
       RejectReason := 'SampleBeforeReset'
     else if (Sample.TimeStampMs < Runtime.LastSampleTimeMs) or
             ((Sample.TimeStampMs = Runtime.LastSampleTimeMs) and
@@ -1276,7 +1386,7 @@ begin
     else if (FSharedSegmentStartMs = 0) or
             (ANowMs < FSharedSegmentStartMs) then
       FallbackSkipReason := 'BeforeSegment'
-    else if ANowMs < FRuntimeResetTimeMs then
+    else if ANowMs < EffectiveResetTimeMs then
       FallbackSkipReason := 'BeforeRuntimeReset'
     else if Runtime.WaitingForFirstSample and
             SameValue(BaseY, 0.0, 1E-12) and
@@ -1355,6 +1465,7 @@ begin
       Pair.Value.LastSampleIndex := -1;
       Pair.Value.WaitingForFirstSample := True;
       Pair.Value.LastAcceptedPointKey := APointKey;
+      Pair.Value.RuntimeResetTimeMs := AStartMs;
       if Pair.Value.ChartSeries <> nil then
       begin
         Inc(ClearedPoints, Pair.Value.ChartSeries.Points.Count);
@@ -1456,6 +1567,7 @@ begin
     Samples := MeterValue.GetStabilitySamples;
     for Sample in Samples do
       if (Sample.TimeStampMs >= FSharedSegmentStartMs) and
+         (Sample.TimeStampMs >= Max(FRuntimeResetTimeMs, Pair.Value.RuntimeResetTimeMs)) and
          (Sample.TimeStampMs > Pair.Value.LastSampleTimeMs) then
       begin
         Pair.Value.ChartSeries.AddPoint(
@@ -1600,20 +1712,21 @@ begin
 end;
 
 procedure TFrameGraphsWorkspace.EnsureLimitSeries(const AGraphIndex: Integer);
-var Chart: TSimpleChart;
+var Slot: TGraphVisualSlot;
 begin
-  Chart := ChartByIndex(AGraphIndex);
-  if FTargetSeries[AGraphIndex] = nil then
+  Slot := GraphSlotByIndex(AGraphIndex);
+  if (Slot = nil) or (Slot.Chart = nil) then Exit;
+  if Slot.TargetSeries = nil then
   begin
-    FTargetSeries[AGraphIndex] := Chart.AddSeries('Целевой расход');
-    FTargetSeries[AGraphIndex].Color := TAlphaColors.Green;
-    FTargetSeries[AGraphIndex].ShowMarkers := False;
-    FLowerSeries[AGraphIndex] := Chart.AddSeries('Нижняя допустимая граница');
-    FLowerSeries[AGraphIndex].Color := TAlphaColors.Red;
-    FLowerSeries[AGraphIndex].ShowMarkers := False;
-    FUpperSeries[AGraphIndex] := Chart.AddSeries('Верхняя допустимая граница');
-    FUpperSeries[AGraphIndex].Color := TAlphaColors.Red;
-    FUpperSeries[AGraphIndex].ShowMarkers := False;
+    Slot.TargetSeries := Slot.Chart.AddSeries('Целевой расход');
+    Slot.TargetSeries.Color := TAlphaColors.Green;
+    Slot.TargetSeries.ShowMarkers := False;
+    Slot.LowerSeries := Slot.Chart.AddSeries('Нижняя допустимая граница');
+    Slot.LowerSeries.Color := TAlphaColors.Red;
+    Slot.LowerSeries.ShowMarkers := False;
+    Slot.UpperSeries := Slot.Chart.AddSeries('Верхняя допустимая граница');
+    Slot.UpperSeries.Color := TAlphaColors.Red;
+    Slot.UpperSeries.ShowMarkers := False;
   end;
 end;
 
@@ -2025,19 +2138,19 @@ begin
   for I := 0 to FConfig.GraphCount - 1 do
   begin
     EnsureLimitSeries(I);
-    FTargetSeries[I].ClearPoints; FLowerSeries[I].ClearPoints;
-    FUpperSeries[I].ClearPoints;
-    FTargetSeries[I].Visible := Available and FConfig.Panels[I].ShowTargetLine;
-    FLowerSeries[I].Visible := Available and FConfig.Panels[I].ShowToleranceLines;
-    FUpperSeries[I].Visible := Available and FConfig.Panels[I].ShowToleranceLines;
+    GraphSlotByIndex(I).TargetSeries.ClearPoints; GraphSlotByIndex(I).LowerSeries.ClearPoints;
+    GraphSlotByIndex(I).UpperSeries.ClearPoints;
+    GraphSlotByIndex(I).TargetSeries.Visible := Available and FConfig.Panels[I].ShowTargetLine;
+    GraphSlotByIndex(I).LowerSeries.Visible := Available and FConfig.Panels[I].ShowToleranceLines;
+    GraphSlotByIndex(I).UpperSeries.Visible := Available and FConfig.Panels[I].ShowToleranceLines;
     if Available then
     begin
-      FTargetSeries[I].AddPoint(FSharedAxisMinX, DisplayTarget);
-      FTargetSeries[I].AddPoint(FSharedAxisMaxX, DisplayTarget);
-      FLowerSeries[I].AddPoint(FSharedAxisMinX, DisplayLower);
-      FLowerSeries[I].AddPoint(FSharedAxisMaxX, DisplayLower);
-      FUpperSeries[I].AddPoint(FSharedAxisMinX, DisplayUpper);
-      FUpperSeries[I].AddPoint(FSharedAxisMaxX, DisplayUpper);
+      GraphSlotByIndex(I).TargetSeries.AddPoint(FSharedAxisMinX, DisplayTarget);
+      GraphSlotByIndex(I).TargetSeries.AddPoint(FSharedAxisMaxX, DisplayTarget);
+      GraphSlotByIndex(I).LowerSeries.AddPoint(FSharedAxisMinX, DisplayLower);
+      GraphSlotByIndex(I).LowerSeries.AddPoint(FSharedAxisMaxX, DisplayLower);
+      GraphSlotByIndex(I).UpperSeries.AddPoint(FSharedAxisMinX, DisplayUpper);
+      GraphSlotByIndex(I).UpperSeries.AddPoint(FSharedAxisMaxX, DisplayUpper);
     end;
     UpdateIndependentYAxis(I);
   end;
@@ -2046,6 +2159,36 @@ begin
       'Обновлены линии допуска графиков', Format(
       'GraphCount=%d; AxisMinX=%g; AxisMaxX=%g',
       [FConfig.GraphCount, FSharedAxisMinX, FSharedAxisMaxX]));
+end;
+
+procedure TFrameGraphsWorkspace.UpdateToleranceLinesForGraph(
+  const AGraphIndex: Integer);
+var Slot: TGraphVisualSlot; Target, Lower, Upper, ErrorPercent: Double;
+  Available: Boolean; Reason: string;
+begin
+  Slot := GraphSlotByIndex(AGraphIndex);
+  if (Slot = nil) or (AGraphIndex < 0) or
+     (AGraphIndex >= FConfig.GraphCount) then Exit;
+  EnsureLimitSeries(AGraphIndex);
+  Available := ResolvePointTolerance(Target, Lower, Upper, ErrorPercent, Reason);
+  Target := ConvertFlowToDisplayUnits(Target);
+  Lower := ConvertFlowToDisplayUnits(Lower);
+  Upper := ConvertFlowToDisplayUnits(Upper);
+  Slot.TargetSeries.ClearPoints;
+  Slot.LowerSeries.ClearPoints;
+  Slot.UpperSeries.ClearPoints;
+  Slot.TargetSeries.Visible := Available and FConfig.Panels[AGraphIndex].ShowTargetLine;
+  Slot.LowerSeries.Visible := Available and FConfig.Panels[AGraphIndex].ShowToleranceLines;
+  Slot.UpperSeries.Visible := Available and FConfig.Panels[AGraphIndex].ShowToleranceLines;
+  if Available then
+  begin
+    Slot.TargetSeries.AddPoint(FSharedAxisMinX, Target);
+    Slot.TargetSeries.AddPoint(FSharedAxisMaxX, Target);
+    Slot.LowerSeries.AddPoint(FSharedAxisMinX, Lower);
+    Slot.LowerSeries.AddPoint(FSharedAxisMaxX, Lower);
+    Slot.UpperSeries.AddPoint(FSharedAxisMinX, Upper);
+    Slot.UpperSeries.AddPoint(FSharedAxisMaxX, Upper);
+  end;
 end;
 
 procedure TFrameGraphsWorkspace.UpdateIndependentYAxis(const AGraphIndex: Integer);
@@ -2066,6 +2209,58 @@ begin
   Chart.AutoRangeY := False; Chart.YMin := Lo - Pad; Chart.YMax := Hi + Pad;
 end;
 
+procedure TFrameGraphsWorkspace.ResetGraphRuntimeData(
+  const AGraphIndex: Integer);
+var Config: TGraphSeriesConfig; Runtime: TGraphSeriesRuntime;
+  Slot: TGraphVisualSlot; ResetTimeMs, LastSampleBefore: Int64;
+  ClearedSeriesCount, ClearedPointsCount, OldPointsCount: Integer;
+begin
+  if (FConfig = nil) or (AGraphIndex < 0) or
+     (AGraphIndex >= FConfig.GraphCount) then Exit;
+  ResetTimeMs := TMeterValue.GetMonotonicTimeMs;
+  ClearedSeriesCount := 0; ClearedPointsCount := 0;
+  for Config in FConfig.Panels[AGraphIndex].Series do
+    if FSeriesRuntime.TryGetValue(Config, Runtime) and (Runtime <> nil) then
+    begin
+      OldPointsCount := 0; LastSampleBefore := Runtime.LastSampleTimeMs;
+      if Runtime.ChartSeries <> nil then
+      begin
+        OldPointsCount := Runtime.ChartSeries.Points.Count;
+        Inc(ClearedPointsCount, OldPointsCount);
+        Runtime.ChartSeries.ClearPoints;
+      end;
+      Runtime.LastSampleTimeMs := 0;
+      Runtime.LastSampleIndex := -1;
+      Runtime.WaitingForFirstSample := True;
+      Runtime.LastAcceptedValue := 0;
+      Runtime.LastAcceptedPointKey := FLastPointKey;
+      Runtime.RuntimeResetTimeMs := ResetTimeMs;
+      Inc(ClearedSeriesCount);
+      if False and Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcProc, psForm, 'GraphRuntimeValuesResetSeries',
+          'Очищены значения серии выбранного графика', Format(
+          'GraphIndex=%d; ChannelUUID=%s; MeterValueKey=%s; OldPointsCount=%d; LastSampleTimeMsBefore=%d; RuntimeResetTimeMs=%d; WaitingForFirstSample=True',
+          [AGraphIndex, Config.ChannelUUID, Config.MeterValueKey, OldPointsCount,
+           LastSampleBefore, ResetTimeMs]));
+      { Per-series details are intentionally kept out of the normal protocol;
+        the summary below is sufficient when diagnostic mode is disabled. }
+    end;
+  Slot := GraphSlotByIndex(AGraphIndex);
+  if Slot <> nil then
+  begin
+    if Slot.TargetSeries <> nil then Slot.TargetSeries.ClearPoints;
+    if Slot.LowerSeries <> nil then Slot.LowerSeries.ClearPoints;
+    if Slot.UpperSeries <> nil then Slot.UpperSeries.ClearPoints;
+  end;
+  UpdateToleranceLinesForGraph(AGraphIndex);
+  UpdateIndependentYAxis(AGraphIndex);
+  if (Slot <> nil) and (Slot.Chart <> nil) then Slot.Chart.InvalidateChart;
+  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+    'GraphRuntimeValuesReset', 'Очищены значения выбранного графика', Format(
+    'Scope=SingleGraph; GraphIndex=%d; ResetTimeMs=%d; SeriesCount=%d; ClearedPointsCount=%d; AssignmentsPreserved=True; SharedSegmentPreserved=True; OtherGraphsAffected=False',
+    [AGraphIndex, ResetTimeMs, ClearedSeriesCount, ClearedPointsCount]));
+end;
+
 procedure TFrameGraphsWorkspace.ResetRuntimeGraphData;
 var
   Pair: TPair<TGraphSeriesConfig, TGraphSeriesRuntime>;
@@ -2081,6 +2276,7 @@ begin
     Inc(Count); Inc(Cleared, Pair.Value.ChartSeries.Points.Count);
     Pair.Value.ChartSeries.ClearPoints; Pair.Value.LastSampleTimeMs := 0;
     Pair.Value.LastSampleIndex := -1; Pair.Value.WaitingForFirstSample := True;
+    Pair.Value.RuntimeResetTimeMs := FRuntimeResetTimeMs;
     Pair.Value.LastAcceptedPointKey := PointKey;
   end;
   FSharedSegmentStartMs := FRuntimeResetTimeMs;
@@ -2091,7 +2287,7 @@ begin
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphRuntimeReset',
       'Сброшены runtime-данные графиков', Format(
-      'GraphCount=%d; SeriesCount=%d; ClearedPointsCount=%d; AssignmentsPreserved=True; VisibleDurationSec=%d',
+      'Scope=AllGraphs; GraphCount=%d; SeriesCount=%d; ClearedPointsCount=%d; AssignmentsPreserved=True; VisibleDurationSec=%d',
       [FConfig.GraphCount, Count, Cleared, FConfig.VisibleDurationSec]));
 end;
 

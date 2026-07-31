@@ -1,4 +1,4 @@
-﻿object FrameGraphsWorkspace: TFrameGraphsWorkspace
+object FrameGraphsWorkspace: TFrameGraphsWorkspace
   Size.Width = 1100.000000000000000000
   Size.Height = 700.000000000000000000
   Size.PlatformDefault = False
@@ -6,27 +6,27 @@
     Align = Client
     Size.Width = 1100.000000000000000000
     Size.Height = 700.000000000000000000
-    Size.PlatformDefault = False
     object PanelGraphSettings: TPanel
       Align = Top
       Size.Width = 1100.000000000000000000
       Size.Height = 52.000000000000000000
-      Size.PlatformDefault = False
       object LabelGraphLayout: TLabel
         Align = Left
-                Size.Width = 120.000000000000000000
+        Size.Width = 120.000000000000000000
         Size.Height = 52.000000000000000000
-        Text = #1057#1093#1077#1084#1072' '#1088#1072#1079#1084#1077#1097#1077#1085#1080#1103
+        Text = 'Компоновка'
       end
       object ComboGraphLayout: TComboBox
         Align = Left
         Items.Strings = (
-          #1054#1076#1085#1072' '#1086#1073#1083#1072#1089#1090#1100
-          #1044#1074#1077' '#1087#1086' '#1075#1086#1088#1080#1079#1086#1085#1090#1072#1083#1080
-          #1044#1074#1077' '#1087#1086' '#1074#1077#1088#1090#1080#1082#1072#1083#1080
-          #1058#1088#1080' '#1086#1073#1083#1072#1089#1090#1080
-          #1057#1077#1090#1082#1072' 2x2')
-        ItemIndex = 1
+          'Автоматически'
+          '1 столбец'
+          '2 столбца'
+          '3 столбца'
+          '4 столбца'
+          '5 столбцов'
+          '6 столбцов')
+        ItemIndex = 0
         Position.X = 120.000000000000000000
         Size.Width = 190.000000000000000000
         Size.Height = 52.000000000000000000
@@ -37,7 +37,7 @@
         Position.X = 930.000000000000000000
         Size.Width = 90.000000000000000000
         Size.Height = 52.000000000000000000
-        Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1074#1089#1077
+        Text = 'Очистить все'
         OnClick = ClearAllClick
       end
       object ButtonReset: TButton
@@ -45,7 +45,7 @@
         Position.X = 1020.000000000000000000
         Size.Width = 80.000000000000000000
         Size.Height = 52.000000000000000000
-        Text = #1057#1073#1088#1086#1089
+        Text = 'Сброс'
         OnClick = ResetClick
       end
     end
@@ -54,195 +54,14 @@
       Position.Y = 52.000000000000000000
       Size.Width = 1100.000000000000000000
       Size.Height = 648.000000000000000000
-      object LayoutGraphsHost: TLayout
+      object ScrollBoxGraphs: TVertScrollBox
         Align = Client
         Size.Width = 1100.000000000000000000
         Size.Height = 648.000000000000000000
-        object LayoutArea1: TLayout
-          ClipChildren = True
+        object LayoutGraphsHost: TLayout
           Align = Top
           Size.Width = 1100.000000000000000000
-          Size.Height = 324.000000000000000000
-        end
-        object SplitterArea1: TSplitter
-          Align = Top
-          Position.Y = 324.000000000000000000
-          Size.Width = 1100.000000000000000000
-          Size.Height = 5.000000000000000000
-        end
-        object LayoutArea2: TLayout
-          ClipChildren = True
-          Align = Client
-          Position.Y = 329.000000000000000000
-          Size.Width = 1100.000000000000000000
-          Size.Height = 319.000000000000000000
-        end
-        object LayoutArea3: TLayout
-          ClipChildren = True
-          Visible = False
-          Size.Width = 400.000000000000000000
-          Size.Height = 300.000000000000000000
-        end
-        object SplitterArea2: TSplitter
-          Visible = False
-          Size.Width = 5.000000000000000000
-          Size.Height = 300.000000000000000000
-        end
-        object LayoutArea4: TLayout
-          ClipChildren = True
-          Visible = False
-          Size.Width = 400.000000000000000000
-          Size.Height = 300.000000000000000000
-        end
-        object SplitterArea3: TSplitter
-          Visible = False
-          Size.Width = 5.000000000000000000
-          Size.Height = 300.000000000000000000
-        end
-        object LayoutParking: TLayout
-          Visible = False
-          Size.Width = 10.000000000000000000
-          Size.Height = 10.000000000000000000
-        end
-        object LayoutGraphSlot1: TLayout
-          ClipChildren = True
-          Tag = 0
-          Align = Client
-          Size.Width = 1100.000000000000000000
-          Size.Height = 324.000000000000000000
-          OnMouseDown = GraphControlMouseDown
-          object LabelGraphTitle1: TLabel
-            Tag = 0
-            Align = Top
-            Size.Width = 1100.000000000000000000
-            Size.Height = 28.000000000000000000
-            Text = #1043#1088#1072#1092#1080#1082' 1'
-            TextSettings.HorzAlign = Center
-            OnMouseDown = GraphControlMouseDown
-          end
-          object ChartGraph1: TSimpleChart
-            Align = Client
-            Position.Y = 28.000000000000000000
-            Size.Width = 1100.000000000000000000
-            Size.Height = 296.000000000000000000
-            Title = #1043#1088#1072#1092#1080#1082' 1'
-            XTitle = #1042#1088#1077#1084#1103
-          end
-          object RectangleGraphHit1: TRectangle
-            Tag = 0
-            Align = Client
-            Cursor = crDefault
-            Fill.Kind = None
-            HitTest = True
-            Opacity = 1.000000000000000000
-            Stroke.Kind = None
-            OnMouseDown = GraphHitMouseDown
-          end
-        end
-        object LayoutGraphSlot2: TLayout
-          ClipChildren = True
-          Tag = 1
-          Align = Client
-          Size.Width = 1100.000000000000000000
-          Size.Height = 319.000000000000000000
-          OnMouseDown = GraphControlMouseDown
-          object LabelGraphTitle2: TLabel
-            Tag = 1
-            Align = Top
-            Size.Width = 1100.000000000000000000
-            Size.Height = 28.000000000000000000
-            Text = #1043#1088#1072#1092#1080#1082' 2'
-            TextSettings.HorzAlign = Center
-            OnMouseDown = GraphControlMouseDown
-          end
-          object ChartGraph2: TSimpleChart
-            Align = Client
-            Position.Y = 28.000000000000000000
-            Size.Width = 1100.000000000000000000
-            Size.Height = 291.000000000000000000
-            Title = #1043#1088#1072#1092#1080#1082' 2'
-            XTitle = #1042#1088#1077#1084#1103
-          end
-          object RectangleGraphHit2: TRectangle
-            Tag = 1
-            Align = Client
-            Cursor = crDefault
-            Fill.Kind = None
-            HitTest = True
-            Opacity = 1.000000000000000000
-            Stroke.Kind = None
-            OnMouseDown = GraphHitMouseDown
-          end
-        end
-        object LayoutGraphSlot3: TLayout
-          ClipChildren = True
-          Tag = 2
-          Visible = False
-          Size.Width = 400.000000000000000000
-          Size.Height = 300.000000000000000000
-          OnMouseDown = GraphControlMouseDown
-          object LabelGraphTitle3: TLabel
-            Tag = 2
-            Align = Top
-            Size.Width = 400.000000000000000000
-            Size.Height = 28.000000000000000000
-            Text = #1043#1088#1072#1092#1080#1082' 3'
-            TextSettings.HorzAlign = Center
-            OnMouseDown = GraphControlMouseDown
-          end
-          object ChartGraph3: TSimpleChart
-            Align = Client
-            Position.Y = 28.000000000000000000
-            Size.Width = 400.000000000000000000
-            Size.Height = 272.000000000000000000
-            Title = #1043#1088#1072#1092#1080#1082' 3'
-            XTitle = #1042#1088#1077#1084#1103
-          end
-          object RectangleGraphHit3: TRectangle
-            Tag = 2
-            Align = Client
-            Cursor = crDefault
-            Fill.Kind = None
-            HitTest = True
-            Opacity = 1.000000000000000000
-            Stroke.Kind = None
-            OnMouseDown = GraphHitMouseDown
-          end
-        end
-        object LayoutGraphSlot4: TLayout
-          ClipChildren = True
-          Tag = 3
-          Visible = False
-          Size.Width = 400.000000000000000000
-          Size.Height = 300.000000000000000000
-          OnMouseDown = GraphControlMouseDown
-          object LabelGraphTitle4: TLabel
-            Tag = 3
-            Align = Top
-            Size.Width = 400.000000000000000000
-            Size.Height = 28.000000000000000000
-            Text = #1043#1088#1072#1092#1080#1082' 4'
-            TextSettings.HorzAlign = Center
-            OnMouseDown = GraphControlMouseDown
-          end
-          object ChartGraph4: TSimpleChart
-            Align = Client
-            Position.Y = 28.000000000000000000
-            Size.Width = 400.000000000000000000
-            Size.Height = 272.000000000000000000
-            Title = #1043#1088#1072#1092#1080#1082' 4'
-            XTitle = #1042#1088#1077#1084#1103
-          end
-          object RectangleGraphHit4: TRectangle
-            Tag = 3
-            Align = Client
-            Cursor = crDefault
-            Fill.Kind = None
-            HitTest = True
-            Opacity = 1.000000000000000000
-            Stroke.Kind = None
-            OnMouseDown = GraphHitMouseDown
-          end
+          Size.Height = 648.000000000000000000
         end
       end
     end
@@ -250,49 +69,53 @@
   object PopupMenuGraph: TPopupMenu
     OnPopup = GraphPopup
     object MenuItemEtalons: TMenuItem
-      Text = #1069#1090#1072#1083#1086#1085#1099
+      Text = 'Эталоны'
     end
     object MenuItemDevices: TMenuItem
-      Text = #1055#1088#1080#1073#1086#1088#1099
+      Text = 'Приборы'
     end
     object MenuItemSettings: TMenuItem
-      Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080
+      Text = 'Настройки'
       object MenuItemSeriesColors: TMenuItem
-        Text = #1062#1074#1077#1090#1072
+        Text = 'Цвета'
       end
       object MenuItemGraphLength: TMenuItem
-        Text = #1044#1083#1080#1085#1072' '#1074#1088#1077#1084#1077#1085#1085#1086#1075#1086' '#1086#1082#1085#1072
+        Text = 'Длина временного окна'
       end
       object MenuItemFlowUnits: TMenuItem
         Enabled = False
-        Text = #1045#1076#1080#1085#1080#1094#1099' '#1088#1072#1089#1093#1086#1076#1072
+        Text = 'Единицы расхода'
       end
       object MenuItemShowLegend: TMenuItem
-        AutoCheck = False
-        Text = #1055#1086#1082#1072#1079#1099#1074#1072#1090#1100' '#1083#1077#1075#1077#1085#1076#1091
+        Text = 'Показывать легенду'
         OnClick = ShowLegendClick
       end
       object MenuItemShowTargetLine: TMenuItem
-        AutoCheck = False
-        Text = #1055#1086#1082#1072#1079#1099#1074#1072#1090#1100' '#1094#1077#1083#1077#1074#1091#1102' '#1083#1080#1085#1080#1102
+        Text = 'Показывать целевую линию'
         OnClick = ToleranceVisibilityClick
       end
       object MenuItemShowToleranceLines: TMenuItem
-        AutoCheck = False
-        Text = #1055#1086#1082#1072#1079#1099#1074#1072#1090#1100' '#1075#1088#1072#1085#1080#1094#1099' '#1076#1086#1087#1091#1089#1082#1072
+        Text = 'Показывать границы допуска'
         OnClick = ToleranceVisibilityClick
+      end
+      object MenuItemLayout: TMenuItem
+        Text = 'Компоновка'
       end
     end
     object MenuItemAddGraph: TMenuItem
-      Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1075#1088#1072#1092#1080#1082
+      Text = 'Добавить график'
       OnClick = AddGraphClick
     end
     object MenuItemDeleteGraph: TMenuItem
-      Text = #1059#1076#1072#1083#1080#1090#1100' '#1075#1088#1072#1092#1080#1082
+      Text = 'Удалить график'
       OnClick = DeleteGraphClick
     end
+    object MenuItemClearGraphValues: TMenuItem
+      Text = 'Очистить значения графика'
+      OnClick = ClearGraphValuesClick
+    end
     object MenuItemClearGraph: TMenuItem
-      Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1075#1088#1072#1092#1080#1082
+      Text = 'Очистить график'
       OnClick = ClearGraphClick
     end
   end
