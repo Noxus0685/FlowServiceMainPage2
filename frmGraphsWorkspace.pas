@@ -135,17 +135,14 @@ type
 
   TFrameGraphsWorkspace = class(TFrame)
     LayoutWorkspaceRoot: TLayout;
-    PanelGraphSettings: TPanel;
-    LabelGraphLayout: TLabel;
-    ComboGraphLayout: TComboBox;
-    ButtonClearAll: TButton;
-    ButtonReset: TButton;
     LayoutWorkspaceBody: TLayout;
     LayoutGraphsHost: TLayout;
     ScrollBoxGraphs: TVertScrollBox;
     PopupMenuGraph: TPopupMenu;
+    MenuItemAddSource: TMenuItem;
     MenuItemEtalons: TMenuItem;
     MenuItemDevices: TMenuItem;
+    MenuItemOther: TMenuItem;
     MenuItemSettings: TMenuItem;
     MenuItemSeriesColors: TMenuItem;
     MenuItemGraphLength: TMenuItem;
@@ -159,9 +156,6 @@ type
     MenuItemLayout: TMenuItem;
     MenuItemClearGraphValues: TMenuItem;
     MenuItemClearGraph: TMenuItem;
-    procedure GraphLayoutChange(Sender: TObject);
-    procedure ClearAllClick(Sender: TObject);
-    procedure ResetClick(Sender: TObject);
     procedure GraphControlMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
     procedure GraphHitMouseDown(Sender: TObject; Button: TMouseButton;
@@ -182,7 +176,6 @@ type
     FConfig: TGraphsViewConfig;
     FSelectedGraph: Integer;
     FContextGraphIndex: Integer;
-    FUpdatingControls: Boolean;
     FSeriesRuntime: TObjectDictionary<TGraphSeriesConfig, TGraphSeriesRuntime>;
     FLastRunActive: Boolean;
     FSharedSegmentStartMs: Int64;
@@ -222,11 +215,14 @@ type
       const AAvailableWidth: Single; out AColumns, ARows: Integer);
     procedure ApplyDynamicGridLayout;
     procedure SelectGraph(const AIndex: Integer);
-    procedure SyncControls;
     procedure ClearChart(const AIndex: Integer; const AClearAssignments: Boolean);
     procedure ClearDynamicMenu(AParent: TMenuItem);
     procedure BuildSourceMenu(out AEtalonCount, ADeviceCount: Integer);
+    procedure AddEnvironmentMenuItem(AParent: TMenuItem;
+      const AKind: TGraphSourceKind; const ACaption, AKey: string);
+    procedure UpdateGraphHeader(const AGraphIndex: Integer);
     procedure BuildSeriesColorsMenu;
+    procedure EnsureGraphLayoutMenu;
     procedure UpdateGraphSettingsMenu;
     function NextSeriesColor(const AGraphIndex: Integer): TAlphaColor;
     function FindSeries(const AGraphIndex: Integer; const AChannelUUID,
@@ -443,6 +439,7 @@ var
 begin
   if PopupMenuGraph = nil then
     raise EInvalidOperation.Create('PopupMenuGraph не загружен из frmGraphsWorkspace.fmx');
+  EnsureGraphLayoutMenu;
   FWorkTable := AWorkTable;
   FirstInitialization := FConfig = nil;
   if FConfig = nil then
@@ -464,13 +461,7 @@ begin
     FLastLayoutGraphCount := -1;
   end;
   EnsureGraphSlotCount(FConfig.GraphCount);
-  SyncControls;
   ApplyDynamicGridLayout;
-  CheckGraphTextEncoding(LabelGraphLayout.Name, 'Text',
-    LabelGraphLayout.Text, 'FMX');
-  CheckGraphTextEncoding(ButtonClearAll.Name, 'Text',
-    ButtonClearAll.Text, 'FMX');
-  CheckGraphTextEncoding(ButtonReset.Name, 'Text', ButtonReset.Text, 'FMX');
   if FirstInitialization then
   begin
     FLastPointKey := CurrentPointKey(PointIndex);
@@ -509,9 +500,9 @@ begin
   Result.Chart.Align := TAlignLayout.Client;
   Result.Chart.ClipParent := True;
   Result.Chart.Tag := AGraphIndex;
-  Result.Chart.Title := Result.TitleLabel.Text;
+  Result.Chart.Title := '';
   Result.Chart.XTitle := 'Время, с';
-  Result.Chart.YTitle := 'Расход, ' + GetCurrentFlowUnitText;
+  Result.Chart.YTitle := '';
   Result.Chart.OnMouseDown := GraphControlMouseDown;
   { No full-size HitControl: it would consume legend interaction.  The chart
     receives right clicks directly. }
@@ -557,8 +548,7 @@ begin
     Slot.TitleLabel.Tag := I;
     Slot.Chart.Tag := I;
     if Slot.HitControl <> nil then Slot.HitControl.Tag := I;
-    Slot.TitleLabel.Text := Format('График %d', [I + 1]);
-    Slot.Chart.Title := Slot.TitleLabel.Text;
+    UpdateGraphHeader(I);
   end;
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphSlotsReindexed',
@@ -665,35 +655,6 @@ begin
   ApplyDynamicGridLayout;
 end;
 
-procedure TFrameGraphsWorkspace.SyncControls;
-begin
-  FUpdatingControls := True;
-  try
-    if FConfig.AutoGrid then ComboGraphLayout.ItemIndex := 0
-    else ComboGraphLayout.ItemIndex := EnsureRange(FConfig.PreferredColumnCount, 1, 6);
-  finally
-    FUpdatingControls := False;
-  end;
-end;
-
-
-
-procedure TFrameGraphsWorkspace.GraphLayoutChange(Sender: TObject);
-begin
-  if FUpdatingControls or (FConfig = nil) then Exit;
-  if ComboGraphLayout.ItemIndex <= 0 then
-  begin FConfig.AutoGrid := True; FConfig.PreferredColumnCount := 0 end
-  else
-  begin FConfig.AutoGrid := False; FConfig.PreferredColumnCount := ComboGraphLayout.ItemIndex end;
-  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
-    'GraphColumnModeChanged', 'Изменён режим колонок графиков', Format(
-    'AutoGrid=%s; PreferredColumnCount=%d', [BoolToStr(FConfig.AutoGrid, True),
-     FConfig.PreferredColumnCount]));
-  ApplyDynamicGridLayout;
-end;
-
-
-
 procedure TFrameGraphsWorkspace.SelectGraph(const AIndex: Integer);
 begin
   if (FConfig = nil) or (AIndex < 0) or (AIndex >= FConfig.GraphCount) then Exit;
@@ -781,12 +742,32 @@ begin
   AParent.AddObject(Item);
 end;
 
+procedure TFrameGraphsWorkspace.AddEnvironmentMenuItem(AParent: TMenuItem;
+  const AKind: TGraphSourceKind; const ACaption, AKey: string);
+var Item: TGraphSourceMenuItem;
+begin
+  Item := TGraphSourceMenuItem.Create(nil);
+  Item.GraphIndex := FContextGraphIndex;
+  Item.OwnerKind := gsokWorkTable;
+  Item.SourceKind := AKind;
+  Item.ChannelUUID := 'WORKTABLE';
+  Item.MeterValueKey := AKey;
+  Item.SourceCaption := ACaption;
+  Item.Text := ACaption;
+  Item.IsChecked := FindSeries(FContextGraphIndex, Item.ChannelUUID, AKey) <> nil;
+  Item.OnClick := SourceMenuItemClick;
+  AParent.AddObject(Item);
+end;
+
 procedure TFrameGraphsWorkspace.BuildSourceMenu(out AEtalonCount,
   ADeviceCount: Integer);
 var Channel: TChannel;
 begin
   AEtalonCount := 0; ADeviceCount := 0;
   ClearDynamicMenu(MenuItemEtalons); ClearDynamicMenu(MenuItemDevices);
+  ClearDynamicMenu(MenuItemOther);
+  AddEnvironmentMenuItem(MenuItemOther, gskTemperature, 'Температура', 'FluidTemp');
+  AddEnvironmentMenuItem(MenuItemOther, gskPressure, 'Давление', 'FluidPress');
   if FWorkTable <> nil then
   begin
     if FWorkTable.EtalonChannels <> nil then
@@ -817,12 +798,15 @@ begin
   Existing := FindSeries(Item.GraphIndex, Item.ChannelUUID, Item.MeterValueKey);
   if Existing <> nil then
   begin
+    if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+      'GraphSourceRemoved', 'Источник удалён из графика',
+      Format('GraphIndex=%d; SourceKind=%s; SourceName=%s',
+        [Item.GraphIndex, IfThen(Existing.SourceKind = gskTemperature, 'Temperature',
+          IfThen(Existing.SourceKind = gskPressure, 'Pressure',
+            IfThen(Existing.OwnerKind = gsokEtalon, 'Etalon', 'Device'))),
+         Existing.Caption]));
     DeleteSource(Item.GraphIndex, Existing);
-    if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceRemoved',
-        'Источник удалён из графика',
-        Format('GraphIndex=%d; ChannelUUID=%s; MeterValueKey=%s',
-          [Item.GraphIndex, Item.ChannelUUID, Item.MeterValueKey]));
+    UpdateToleranceLinesForGraph(Item.GraphIndex);
     Exit;
   end;
   Source := TGraphSeriesConfig.Create;
@@ -837,9 +821,11 @@ begin
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceAdded',
       'Источник добавлен в график',
-      Format('GraphIndex=%d; SourceKind=%d; Serial=%s; ChannelUUID=%s; MeterValueKey=%s; Existing=%s',
-        [Item.GraphIndex, Ord(Item.OwnerKind), Item.Serial, Item.ChannelUUID,
-         Item.MeterValueKey, BoolToStr(not Added, True)]));
+      Format('GraphIndex=%d; SourceKind=%s; SourceName=%s',
+        [Item.GraphIndex, IfThen(Item.SourceKind = gskTemperature, 'Temperature',
+          IfThen(Item.SourceKind = gskPressure, 'Pressure',
+            IfThen(Item.OwnerKind = gsokEtalon, 'Etalon', 'Device'))),
+         Item.SourceCaption]));
 end;
 
 function TFrameGraphsWorkspace.FindSeries(const AGraphIndex: Integer;
@@ -1014,6 +1000,53 @@ begin
   Result := Palette[FConfig.Panels[AGraphIndex].Series.Count mod Length(Palette)];
 end;
 
+procedure TFrameGraphsWorkspace.UpdateGraphHeader(const AGraphIndex: Integer);
+var
+  Config, FirstVisible: TGraphSeriesConfig;
+  HeaderText, Names, DimensionText: string;
+  Slot: TGraphVisualSlot;
+begin
+  if (FConfig = nil) or (AGraphIndex < 0) or
+     (AGraphIndex >= FConfig.Panels.Count) then Exit;
+  Names := '';
+  FirstVisible := nil;
+  for Config in FConfig.Panels[AGraphIndex].Series do
+    if Config.Visible then
+    begin
+      if FirstVisible = nil then FirstVisible := Config;
+      if Names <> '' then Names := Names + ', ';
+      Names := Names + Config.Caption;
+    end;
+  if FirstVisible = nil then
+    HeaderText := Format('График %d', [AGraphIndex + 1])
+  else
+  begin
+    case FirstVisible.SourceKind of
+      gskTemperature: DimensionText := 'Температура, °C';
+      gskPressure: DimensionText := 'Давление, bar';
+    else
+      DimensionText := 'Расход, ' + GetCurrentFlowUnitText;
+    end;
+    { The former Y-axis caption is now part of the one visible graph header. }
+    if (FirstVisible.SourceKind in [gskTemperature, gskPressure]) and
+       SameText(Names, FirstVisible.Caption) then
+      HeaderText := DimensionText
+    else
+      HeaderText := DimensionText + ': ' + Names;
+  end;
+  FConfig.Panels[AGraphIndex].Title := HeaderText;
+  Slot := GraphSlotByIndex(AGraphIndex);
+  if Slot <> nil then
+  begin
+    Slot.TitleLabel.Text := HeaderText;
+    { TSimpleChart has its own title area; keep it empty to avoid a duplicate. }
+    Slot.Chart.Title := '';
+  end;
+  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+    'GraphHeaderUpdated', 'Обновлён заголовок графика',
+    Format('GraphIndex=%d; HeaderText=%s', [AGraphIndex, HeaderText]));
+end;
+
 procedure TFrameGraphsWorkspace.DeleteSource(const AGraphIndex: Integer;
   ASeries: TGraphSeriesConfig);
 var
@@ -1023,6 +1056,7 @@ begin
   Chart := ChartByIndex(AGraphIndex);
   RemoveRuntimeSeries(ASeries, Chart);
   FConfig.Panels[AGraphIndex].Series.Remove(ASeries);
+  UpdateGraphHeader(AGraphIndex);
   if Chart <> nil then Chart.InvalidateChart;
 end;
 
@@ -1069,6 +1103,23 @@ begin
   end;
 end;
 
+procedure TFrameGraphsWorkspace.EnsureGraphLayoutMenu;
+begin
+  { Keep the column selector available even when an older FMX resource without
+    MenuItemLayout is loaded (for example after an incremental application
+    update).  The checked column entries themselves are rebuilt on popup. }
+  if MenuItemLayout <> nil then Exit;
+  if MenuItemSettings = nil then
+    raise EInvalidOperation.Create('MenuItemSettings не загружен из frmGraphsWorkspace.fmx');
+  MenuItemLayout := TMenuItem.Create(Self);
+  MenuItemLayout.Name := 'MenuItemLayout';
+  MenuItemLayout.Text := 'Компоновка';
+  MenuItemSettings.AddObject(MenuItemLayout);
+  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+    'GraphLayoutMenuRestored', 'Восстановлено меню компоновки графиков',
+    'Source=RuntimeFallback; Modes=Auto|1|2|3|4|5|6');
+end;
+
 procedure TFrameGraphsWorkspace.UpdateGraphSettingsMenu;
 const
   Durations: array[0..6] of Integer = (30, 60, 120, 300, 600, 1800, 0);
@@ -1079,6 +1130,7 @@ var
   Item: TGraphDurationMenuItem;
   LayoutItem: TGraphColumnMenuItem;
 begin
+  EnsureGraphLayoutMenu;
   ClearDynamicMenu(MenuItemLayout);
   for I := 0 to 6 do
   begin
@@ -1121,7 +1173,6 @@ begin
   Item := TGraphColumnMenuItem(Sender);
   FConfig.AutoGrid := Item.ColumnCount = 0;
   FConfig.PreferredColumnCount := Item.ColumnCount;
-  SyncControls;
   ApplyDynamicGridLayout;
   if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
     'GraphColumnModeChanged', 'Изменён режим колонок графиков', Format(
@@ -1281,6 +1332,10 @@ begin
     FConfig.Panels[AIndex].Series.Clear;
     FConfig.Panels[AIndex].DefaultAssignmentSuppressed := True;
     RemoveOrphanSeriesRuntime;
+    UpdateGraphHeader(AIndex);
+    if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+      'GraphToleranceHidden', 'Линии допуска скрыты',
+      Format('GraphIndex=%d; Reason=GraphCleared', [AIndex]));
   end;
 end;
 
@@ -1357,14 +1412,23 @@ begin
       if FSeriesRuntime.TryGetValue(Existing, Runtime) and
          (Runtime.ChartSeries <> nil) then
       begin
-        Channel := ResolveChannel(Existing);
-        Runtime.ChartSeries.Visible := Existing.Visible and (Channel <> nil) and
-          Channel.Enabled and (Channel.FlowMeter <> nil) and
-          (Channel.FlowMeter.ValueFlow <> nil);
+        if Existing.OwnerKind = gsokWorkTable then
+          Runtime.ChartSeries.Visible := Existing.Visible and
+            (ResolveMeterValue(Existing, nil) <> nil)
+        else
+        begin
+          Channel := ResolveChannel(Existing);
+          Runtime.ChartSeries.Visible := Existing.Visible and (Channel <> nil) and
+            Channel.Enabled and (Channel.FlowMeter <> nil) and
+            (Channel.FlowMeter.ValueFlow <> nil);
+        end;
       end;
   RemoveOrphanSeriesRuntime;
   for GraphIndex := 0 to FConfig.GraphCount - 1 do
+  begin
     ValidateGraphRuntimeBindings(GraphIndex);
+    UpdateGraphHeader(GraphIndex);
+  end;
   FDefaultSourcesInitialized := (EtalonsEnabled + DevicesEnabled) > 0;
   if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
     'GraphDefaultSourcesRefreshDone', 'Завершена синхронизация источников графиков',
@@ -1383,7 +1447,6 @@ procedure TFrameGraphsWorkspace.ClearGraph(const AGraphIndex: Integer);
 begin ClearChart(AGraphIndex, True); UpdateToleranceLines end;
 procedure TFrameGraphsWorkspace.ClearAllGraphs;
 var I: Integer; begin if FConfig <> nil then begin for I := 0 to FConfig.GraphCount - 1 do ClearChart(I, True); UpdateToleranceLines end end;
-procedure TFrameGraphsWorkspace.ClearAllClick(Sender: TObject); begin ClearAllGraphs end;
 procedure TFrameGraphsWorkspace.ClearGraphClick(Sender: TObject);
 begin
   ClearGraph(FContextGraphIndex);
@@ -1391,7 +1454,6 @@ begin
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphCleared',
       'График очищен', Format('GraphIndex=%d', [FContextGraphIndex]));
 end;
-procedure TFrameGraphsWorkspace.ResetClick(Sender: TObject); begin ResetRuntimeGraphData end;
 
 function TFrameGraphsWorkspace.AddSource(const AGraphIndex: Integer; ASource: TGraphSeriesConfig): Boolean;
 var
@@ -1414,6 +1476,7 @@ begin
       ASource.IdentityKey := BuildGraphSeriesIdentity(AGraphIndex,
         ASource.OwnerKind, ASource.ChannelUUID, ASource.MeterValueKey);
       RecreateSeriesRuntime(AGraphIndex, ASource);
+      UpdateGraphHeader(AGraphIndex);
       Chart.InvalidateChart;
     end;
   end;
@@ -1465,7 +1528,13 @@ begin
        SameText(ASeries.MeterValueKey, 'FlowRate') then
       Result := FWorkTable.ValueFlowRate
     else if SameText(ASeries.MeterValueKey, 'ValueQuantity') then
-      Result := FWorkTable.ValueQuantity;
+      Result := FWorkTable.ValueQuantity
+    else if SameText(ASeries.MeterValueKey, 'FluidTemp') and
+            (FWorkTable.FluidTemp <> nil) then
+      Result := FWorkTable.FluidTemp.Value
+    else if SameText(ASeries.MeterValueKey, 'FluidPress') and
+            (FWorkTable.FluidPress <> nil) then
+      Result := FWorkTable.FluidPress.Value;
     Exit;
   end;
   if (AChannel = nil) or (AChannel.FlowMeter = nil) then
@@ -1509,6 +1578,13 @@ begin
     Exit;
   end;
   WantedUUID := NormalizeUUID(ASeriesConfig.ChannelUUID);
+  if ASeriesConfig.OwnerKind = gsokWorkTable then
+  begin
+    AMeterValue := ResolveMeterValue(ASeriesConfig, nil);
+    if AMeterValue = nil then AReason := 'MeterValueNotFound';
+    Result := AMeterValue <> nil;
+    Exit;
+  end;
   if (ASeriesConfig.OwnerKind = gsokEtalon) and
      (FWorkTable.EtalonChannels <> nil) then
   begin
@@ -1996,7 +2072,7 @@ begin
   for I := 0 to FConfig.GraphCount - 1 do
   begin
     ChartByIndex(I).XTitle := 'Время, с';
-    ChartByIndex(I).YTitle := 'Расход, ' + GetCurrentFlowUnitText;
+    ChartByIndex(I).YTitle := '';
   end;
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphAxisUnitsUpdated',
@@ -2990,82 +3066,57 @@ function TFrameGraphsWorkspace.ResolveGraphTolerance(const AGraphIndex: Integer;
   out ASourceKind, AReason: string): Boolean;
 var
   Run: TMeasurementRun;
-  RunPoint, SourcePoint: TDevicePoint;
-  Channel: TChannel;
-  PointIndex: Integer;
+  RunPoint: TDevicePoint;
+  Config: TGraphSeriesConfig;
+  HasDevice, HasEtalon: Boolean;
   ToleranceValue: Double;
-  GraphKind, ChannelUUID, DeviceUUID, FlowSourceField: string;
-  NormalizedPointFlow: Double;
 begin
-  Result := False; ATargetQ := 0; AErrorPercent := 0;
-  ALowerQ := 0; AUpperQ := 0; ASourceKind := ''; AReason := '';
-  Run := nil; RunPoint := nil; SourcePoint := nil; Channel := nil;
-  PointIndex := -1; ChannelUUID := ''; DeviceUUID := '';
-  NormalizedPointFlow := 0; FlowSourceField := '';
-  if FWorkTable = nil then begin AReason := 'WorkTableMissing'; Exit end;
-  if not (FWorkTable.MeasurementRun is TMeasurementRun) then
-  begin AReason := 'MeasurementRunMissing'; Exit end;
-  Run := TMeasurementRun(FWorkTable.MeasurementRun); RunPoint := Run.CurrentPoint;
-  if RunPoint = nil then begin AReason := 'RunPointMissing'; Exit end;
-  if IsPointTransitionStage then begin AReason := 'TransitionStage'; Exit end;
-  if AGraphIndex = 0 then GraphKind := 'Etalon' else GraphKind := 'Device';
-  LogToleranceEvent('GraphToleranceResolveBegin', Format('%d', [AGraphIndex]),
-    Format('GraphIndex=%d; GraphKind=%s; RunPointUUID=%s; RunPointIndex=%d; RunTargetQ=%g',
-      [AGraphIndex, GraphKind, RunPoint.UUID, Run.CurrentPointIndex, RunPoint.Q]));
-  if AGraphIndex = 0 then
-  begin
-    if not ResolveActiveEtalonTolerance(ATargetQ, AErrorPercent, SourcePoint,
-      Channel, NormalizedPointFlow, FlowSourceField, AReason) then Exit;
-    ASourceKind := 'ActiveEtalonPointByNormalizedQ';
-    PointIndex := Channel.FlowMeter.Device.Points.IndexOf(SourcePoint);
-    ChannelUUID := Channel.UUID; DeviceUUID := Channel.FlowMeter.Device.UUID;
-  end
-  else
-  begin
-    ATargetQ := RunPoint.Q;
-    if IsNan(ATargetQ) or IsInfinite(ATargetQ) or (Abs(ATargetQ) >= MaxDouble) then
-    begin AReason := 'RunTargetQInvalid'; Exit end;
-    SourcePoint := RunPoint;
-    if IsNan(SourcePoint.Error) or IsInfinite(SourcePoint.Error) or
-       (Abs(SourcePoint.Error) >= MaxDouble) then
-    begin AReason := 'DevicePointErrorInvalid'; Exit end;
-    AErrorPercent := Abs(SourcePoint.Error);
-    ASourceKind := 'CurrentDevicePoint'; PointIndex := Run.CurrentPointIndex;
-    NormalizedPointFlow := SourcePoint.Q; FlowSourceField := 'Q';
-  end;
-  LogToleranceEvent('GraphToleranceSourceResolved',
-    Format('%d|%s|%s', [AGraphIndex, ASourceKind, SourcePoint.UUID]), Format(
-    'GraphIndex=%d; GraphKind=%s; SourceKind=%s; ChannelUUID=%s; DeviceUUID=%s; PointUUID=%s; PointIndex=%d; PointName=%s; PointQ=%g; PointError=%g; RunTargetQ=%g; NormalizedPointFlow=%g; FlowSourceField=%s',
-    [AGraphIndex, GraphKind, ASourceKind, ChannelUUID, DeviceUUID,
-     SourcePoint.UUID, PointIndex, SourcePoint.Name, SourcePoint.Q,
-     SourcePoint.Error, ATargetQ, NormalizedPointFlow, FlowSourceField]));
-  ToleranceValue := Abs(ATargetQ) * Abs(AErrorPercent) / 100.0;
-  ALowerQ := ATargetQ - ToleranceValue; AUpperQ := ATargetQ + ToleranceValue;
-  LogToleranceEvent('GraphToleranceCalculated', Format('%d', [AGraphIndex]),
-    Format('GraphIndex=%d; GraphKind=%s; TargetQ=%g; ErrorPercent=%g; LowerQ=%g; UpperQ=%g; DisplayTarget=%g; DisplayLower=%g; DisplayUpper=%g',
-      [AGraphIndex, GraphKind, ATargetQ, AErrorPercent, ALowerQ, AUpperQ,
-       ConvertFlowToDisplayUnits(ATargetQ), ConvertFlowToDisplayUnits(ALowerQ),
-       ConvertFlowToDisplayUnits(AUpperQ)]));
+  Result := False;
+  ATargetQ := 0; AErrorPercent := 0; ALowerQ := 0; AUpperQ := 0;
+  ASourceKind := ''; AReason := '';
+  if (FWorkTable = nil) or not (FWorkTable.MeasurementRun is TMeasurementRun) then
+  begin AReason := 'NoRunPoint'; Exit end;
+  Run := TMeasurementRun(FWorkTable.MeasurementRun);
+  RunPoint := Run.CurrentPoint;
+  if RunPoint = nil then begin AReason := 'NoRunPoint'; Exit end;
+  if IsPointTransitionStage then begin AReason := 'NoRunPoint'; Exit end;
+  HasDevice := False; HasEtalon := False;
+  for Config in FConfig.Panels[AGraphIndex].Series do
+    if Config.Visible and (Config.SourceKind = gskFlow) then
+      case Config.OwnerKind of
+        gsokDevice: HasDevice := True;
+        gsokEtalon: HasEtalon := True;
+      end;
+  if not (HasDevice or HasEtalon) then
+  begin AReason := 'NoVisibleFlowSources'; Exit end;
+  if HasDevice and HasEtalon then ASourceKind := 'Mixed'
+  else if HasEtalon then ASourceKind := 'Etalon'
+  else ASourceKind := 'Device';
+  ATargetQ := RunPoint.Q;
+  AErrorPercent := Abs(RunPoint.Error);
+  if IsNan(ATargetQ) or IsInfinite(ATargetQ) or
+     IsNan(AErrorPercent) or IsInfinite(AErrorPercent) then
+  begin AReason := 'NoRunPoint'; Exit end;
+  ToleranceValue := Abs(ATargetQ) * AErrorPercent / 100;
+  ALowerQ := ATargetQ - ToleranceValue;
+  AUpperQ := ATargetQ + ToleranceValue;
+  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+    'GraphToleranceResolved', 'Рассчитаны линии допуска графика', Format(
+    'GraphIndex=%d; GraphKind=%s; TargetQ=%g; ErrorPercent=%g; LowerQ=%g; UpperQ=%g',
+    [AGraphIndex, ASourceKind, ATargetQ, AErrorPercent, ALowerQ, AUpperQ]));
   Result := True;
 end;
 
 function TFrameGraphsWorkspace.GraphHasVisibleSources(
   const AGraphIndex: Integer): Boolean;
-var
-  Config: TGraphSeriesConfig;
-  Channel: TChannel;
-  ExpectedKind: TGraphSeriesOwnerKind;
+var Config: TGraphSeriesConfig;
 begin
   Result := False;
   if (FConfig = nil) or (AGraphIndex < 0) or
      (AGraphIndex >= FConfig.GraphCount) then Exit;
-  if AGraphIndex = 0 then ExpectedKind := gsokEtalon else ExpectedKind := gsokDevice;
   for Config in FConfig.Panels[AGraphIndex].Series do
-    if Config.Visible and (Config.OwnerKind = ExpectedKind) then
-    begin
-      Channel := ResolveChannel(Config);
-      if (Channel <> nil) and Channel.Enabled then Exit(True);
-    end;
+    if Config.Visible and (Config.SourceKind = gskFlow) and
+       (Config.OwnerKind in [gsokEtalon, gsokDevice]) then Exit(True);
 end;
 
 procedure TFrameGraphsWorkspace.HideGraphToleranceLines(
@@ -3116,12 +3167,20 @@ var
   TargetQ, ErrorPercent, LowerQ, UpperQ: Double;
   SourceKind, Reason: string;
 begin
-  if not GraphHasVisibleSources(AGraphIndex) then begin HideGraphToleranceLines(AGraphIndex); Exit end;
+  if not GraphHasVisibleSources(AGraphIndex) then
+  begin
+    HideGraphToleranceLines(AGraphIndex);
+    if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+      'GraphToleranceHidden', 'Линии допуска скрыты',
+      Format('GraphIndex=%d; Reason=NoVisibleFlowSources', [AGraphIndex]));
+    Exit;
+  end;
   if not ResolveGraphTolerance(AGraphIndex, TargetQ, ErrorPercent, LowerQ,
     UpperQ, SourceKind, Reason) then
   begin
     HideGraphToleranceLines(AGraphIndex);
-    LogToleranceEvent('GraphToleranceSourceUnavailable', Reason,
+    if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+      'GraphToleranceHidden', 'Линии допуска скрыты',
       Format('GraphIndex=%d; Reason=%s', [AGraphIndex, Reason]));
     Exit;
   end;
@@ -3215,7 +3274,7 @@ begin
   UpdateIndependentYAxis(AGraphIndex);
   if (Slot <> nil) and (Slot.Chart <> nil) then Slot.Chart.InvalidateChart;
   if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
-    'GraphRuntimeValuesReset', 'Очищены значения выбранного графика', Format(
+    'GraphValuesCleared', 'Очищены значения выбранного графика', Format(
     'Scope=SingleGraph; GraphIndex=%d; ResetTimeMs=%d; SeriesCount=%d; ClearedPointsCount=%d; AssignmentsPreserved=True; SharedSegmentPreserved=True; OtherGraphsAffected=False',
     [AGraphIndex, ResetTimeMs, ClearedSeriesCount, ClearedPointsCount]));
 end;
@@ -3418,7 +3477,7 @@ begin
           'Источник пользовательской серии разрешён', Format(
           'GraphIndex=%d; ChannelUUID=%s; ChannelAssigned=True; MeterValueAssigned=True; MeterValueClass=%s; SampleBufferAvailable=True',
           [GraphIndex, Config.ChannelUUID, MeterValue.ClassName]));
-      if not Channel.Enabled then
+      if (Channel <> nil) and not Channel.Enabled then
       begin
         VisualSeries.Visible := False;
         Inc(SeriesFailed);
