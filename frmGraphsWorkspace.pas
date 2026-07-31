@@ -222,7 +222,7 @@ end;
 
 constructor TFrameGraphsWorkspace.Create(AOwner: TComponent);
 begin
-  inherited;
+  inherited Create(AOwner);
   FState := TGraphWorkspaceState.Create;
   FContextGraphIndex := 0;
   RefreshFromState;
@@ -409,7 +409,7 @@ begin SelectGraph(FContextGraphIndex);
   RebuildAddSeriesMenu;
   if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcInfo, psForm,
     'GraphContextMenuOpened', 'Открыто меню дизайнерского графика',
-    Format('DesignedSlot=%d', [FContextGraphIndex + 1])); end;
+    Format('GraphIndex=%d', [FContextGraphIndex + 1])); end;
 procedure TFrameGraphsWorkspace.MenuItemAddSeriesClick(Sender: TObject); begin if Assigned(FOnAddSeries) then FOnAddSeries(Self, FContextGraphIndex); end;
 procedure TFrameGraphsWorkspace.MenuItemRemoveSeriesClick(Sender: TObject); begin if Assigned(FOnRemoveSeries) then FOnRemoveSeries(Self, FContextGraphIndex); end;
 procedure TFrameGraphsWorkspace.MenuItemMoveSeriesClick(Sender: TObject); begin if Assigned(FOnMoveSeries) then FOnMoveSeries(Self, FContextGraphIndex); end;

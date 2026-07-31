@@ -6570,9 +6570,8 @@ begin
         ProtocolManager.AddMessage(pcInfo, psForm,
           'GraphsWorkspaceCreateSuccess',
           'Дизайнерская рабочая область графиков создана',
-          Format('ClassName=%s; ParentClass=%s; FramePtr=%p',
-            [FGraphsWorkspace.ClassName, AParent.ClassName,
-             Pointer(FGraphsWorkspace)]));
+          Format('ClassName=%s; FramePtr=%p',
+            [FGraphsWorkspace.ClassName, Pointer(FGraphsWorkspace)]));
     except
       on E: Exception do
       begin
