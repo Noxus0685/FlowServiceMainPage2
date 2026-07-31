@@ -56,6 +56,8 @@ type
     LayoutKind: TGraphLayoutKind;
     ShowLegend: Boolean;
     SettingsPanelVisible: Boolean;
+    { One time window belongs to the workspace, not to an individual panel. }
+    VisibleDurationSec: Integer;
     constructor Create;
     destructor Destroy; override;
     procedure Reset;
@@ -172,6 +174,7 @@ begin
   LayoutKind := glTwoRows;
   ShowLegend := True;
   SettingsPanelVisible := True;
+  VisibleDurationSec := 60;
   FPanels.Clear;
   EnsurePanelCount(GraphCount);
 end;
