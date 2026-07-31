@@ -98,6 +98,10 @@
         Text = 'Показывать границы допуска'
         OnClick = ToleranceVisibilityClick
       end
+      object MenuItemShowToleranceInLegend: TMenuItem
+        Text = 'Показывать служебные линии в легенде'
+        OnClick = ToleranceVisibilityClick
+      end
       object MenuItemLayout: TMenuItem
         Text = 'Компоновка'
       end

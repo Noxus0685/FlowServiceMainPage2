@@ -38,6 +38,7 @@ type
     Title: string;
     ShowTargetLine: Boolean;
     ShowToleranceLines: Boolean;
+    ShowToleranceInLegend: Boolean;
     DefaultAssignmentSuppressed: Boolean;
     ShowLegend: Boolean;
     VisibleDurationSec: Integer;
@@ -93,6 +94,7 @@ begin
   Title := ATitle;
   ShowTargetLine := True;
   ShowToleranceLines := True;
+  ShowToleranceInLegend := True;
   DefaultAssignmentSuppressed := False;
   ShowLegend := True;
   VisibleDurationSec := 0;
