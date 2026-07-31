@@ -80,6 +80,11 @@ type
 
   TGraphSeriesRuntime = class
   public
+    IdentityKey: string;
+    ChannelUUID: string;
+    OwnerKind: TGraphSeriesOwnerKind;
+    MeterValueKey: string;
+    GraphIndex: Integer;
     ChartSeries: TChartSeries;
     LastSampleTimeMs: Int64;
     LastSampleIndex: Integer;
@@ -225,6 +230,17 @@ type
     function NextSeriesColor(const AGraphIndex: Integer): TAlphaColor;
     function FindSeries(const AGraphIndex: Integer; const AChannelUUID,
       AMeterValueKey: string): TGraphSeriesConfig;
+    function FindSeriesByIdentity(const AGraphIndex: Integer;
+      const AOwnerKind: TGraphSeriesOwnerKind; const AChannelUUID,
+      AMeterValueKey: string): TGraphSeriesConfig;
+    function IsRuntimeBoundToSeries(const AGraphIndex: Integer;
+      ASeriesConfig: TGraphSeriesConfig; ARuntime: TGraphSeriesRuntime): Boolean;
+    procedure RecreateSeriesRuntime(const AGraphIndex: Integer;
+      ASeriesConfig: TGraphSeriesConfig);
+    procedure RemoveSeriesCompletely(const AGraphIndex: Integer;
+      ASeriesConfig: TGraphSeriesConfig);
+    procedure ValidateGraphRuntimeBindings(const AGraphIndex: Integer);
+    procedure RemoveOrphanSeriesRuntime;
     procedure DeleteSource(const AGraphIndex: Integer; ASeries: TGraphSeriesConfig);
     procedure AddEmptyMenuItem(AParent: TMenuItem; const ACaption: string);
     procedure AddChannelMenuItem(AParent: TMenuItem; AChannel: TChannel;
@@ -821,6 +837,173 @@ begin
        SameText(S.MeterValueKey, AMeterValueKey) then Exit(S);
 end;
 
+function TFrameGraphsWorkspace.FindSeriesByIdentity(const AGraphIndex: Integer;
+  const AOwnerKind: TGraphSeriesOwnerKind; const AChannelUUID,
+  AMeterValueKey: string): TGraphSeriesConfig;
+var
+  S: TGraphSeriesConfig;
+  Identity: string;
+begin
+  Result := nil;
+  if (FConfig = nil) or (AGraphIndex < 0) or
+     (AGraphIndex >= FConfig.Panels.Count) then Exit;
+  Identity := BuildGraphSeriesIdentity(AGraphIndex, AOwnerKind, AChannelUUID,
+    AMeterValueKey);
+  for S in FConfig.Panels[AGraphIndex].Series do
+  begin
+    S.IdentityKey := BuildGraphSeriesIdentity(AGraphIndex, S.OwnerKind,
+      S.ChannelUUID, S.MeterValueKey);
+    if SameText(S.IdentityKey, Identity) then Exit(S);
+  end;
+end;
+
+function TFrameGraphsWorkspace.IsRuntimeBoundToSeries(
+  const AGraphIndex: Integer; ASeriesConfig: TGraphSeriesConfig;
+  ARuntime: TGraphSeriesRuntime): Boolean;
+var
+  Chart: TSimpleChart;
+  I: Integer;
+  ChartMatch, VisualMatch: Boolean;
+  Reason: string;
+begin
+  Result := False;
+  Reason := 'RuntimeMissing';
+  if (ASeriesConfig = nil) or (ARuntime = nil) then Exit;
+  ASeriesConfig.IdentityKey := BuildGraphSeriesIdentity(AGraphIndex,
+    ASeriesConfig.OwnerKind, ASeriesConfig.ChannelUUID,
+    ASeriesConfig.MeterValueKey);
+  if ARuntime.GraphIndex <> AGraphIndex then Reason := 'GraphIndexMismatch'
+  else if ARuntime.OwnerKind <> ASeriesConfig.OwnerKind then Reason := 'OwnerKindMismatch'
+  else if not SameText(NormalizeUUID(ARuntime.ChannelUUID),
+    NormalizeUUID(ASeriesConfig.ChannelUUID)) then Reason := 'ChannelUUIDMismatch'
+  else if not SameText(Trim(ARuntime.MeterValueKey),
+    Trim(ASeriesConfig.MeterValueKey)) then Reason := 'MeterValueKeyMismatch'
+  else if not SameText(ARuntime.IdentityKey, ASeriesConfig.IdentityKey) then
+    Reason := 'IdentityKeyMismatch'
+  else
+  begin
+    Chart := ChartByIndex(AGraphIndex);
+    ChartMatch := False;
+    if (Chart <> nil) and (ARuntime.ChartSeries <> nil) then
+      for I := 0 to Chart.SeriesCount - 1 do
+        if Chart.Series[I] = ARuntime.ChartSeries then begin ChartMatch := True; Break end;
+    if not ChartMatch then Reason := 'ChartMismatch'
+    else
+    begin
+      VisualMatch := (ARuntime.ToleranceVisual <> nil) and
+        (ARuntime.ToleranceVisual.Chart = Chart) and
+        SameText(NormalizeUUID(ARuntime.ToleranceVisual.ChannelUUID),
+          NormalizeUUID(ARuntime.ChannelUUID)) and
+        SameText(ARuntime.ToleranceVisual.MeterValueKey, ARuntime.MeterValueKey);
+      if not VisualMatch then Reason := 'ToleranceVisualMismatch'
+      else Result := True;
+    end;
+  end;
+  if (not Result) and Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesBindingMismatch',
+      'Привязка runtime серии устарела', Format(
+      'GraphIndex=%d; SeriesCaption=%s; SeriesIdentityKey=%s; RuntimeIdentityKey=%s; SeriesOwnerKind=%d; RuntimeOwnerKind=%d; SeriesChannelUUID=%s; RuntimeChannelUUID=%s; SeriesMeterValueKey=%s; RuntimeMeterValueKey=%s; Reason=%s',
+      [AGraphIndex, ASeriesConfig.Caption, ASeriesConfig.IdentityKey,
+       ARuntime.IdentityKey, Ord(ASeriesConfig.OwnerKind), Ord(ARuntime.OwnerKind),
+       ASeriesConfig.ChannelUUID, ARuntime.ChannelUUID,
+       ASeriesConfig.MeterValueKey, ARuntime.MeterValueKey, Reason]));
+end;
+
+procedure TFrameGraphsWorkspace.RecreateSeriesRuntime(
+  const AGraphIndex: Integer; ASeriesConfig: TGraphSeriesConfig);
+var
+  OldRuntime, Runtime: TGraphSeriesRuntime;
+  Chart: TSimpleChart;
+  OldIdentity, OldUUID: string;
+  OldPoints: Integer;
+begin
+  if ASeriesConfig = nil then Exit;
+  Chart := ChartByIndex(AGraphIndex);
+  if Chart = nil then Exit;
+  OldIdentity := ''; OldUUID := ''; OldPoints := 0;
+  if FSeriesRuntime.TryGetValue(ASeriesConfig, OldRuntime) then
+  begin
+    OldIdentity := OldRuntime.IdentityKey;
+    OldUUID := OldRuntime.ChannelUUID;
+    if OldRuntime.ChartSeries <> nil then OldPoints := OldRuntime.ChartSeries.Points.Count;
+    RemoveRuntimeSeries(ASeriesConfig, Chart);
+  end;
+  ASeriesConfig.GraphIndex := AGraphIndex;
+  ASeriesConfig.IdentityKey := BuildGraphSeriesIdentity(AGraphIndex,
+    ASeriesConfig.OwnerKind, ASeriesConfig.ChannelUUID, ASeriesConfig.MeterValueKey);
+  Runtime := TGraphSeriesRuntime.Create;
+  Runtime.IdentityKey := ASeriesConfig.IdentityKey;
+  Runtime.ChannelUUID := NormalizeUUID(ASeriesConfig.ChannelUUID);
+  Runtime.OwnerKind := ASeriesConfig.OwnerKind;
+  Runtime.MeterValueKey := ASeriesConfig.MeterValueKey;
+  Runtime.GraphIndex := AGraphIndex;
+  Runtime.ChartSeries := Chart.AddSeries(ASeriesConfig.Caption);
+  Runtime.ChartSeries.Color := ASeriesConfig.Color;
+  Runtime.ChartSeries.Visible := ASeriesConfig.Visible;
+  Runtime.LastSampleIndex := -1;
+  Runtime.WaitingForFirstSample := True;
+  Runtime.HistoryLoadMode := ghlmCurrentSegmentHistory;
+  Runtime.HistoryLoaded := False;
+  Runtime.ToleranceResolveState := gtrsNotResolved;
+  Runtime.TolerancePointKey := '';
+  FSeriesRuntime.Add(ASeriesConfig, Runtime);
+  EnsureSeriesToleranceVisual(AGraphIndex, ASeriesConfig, Runtime);
+  HideSeriesToleranceVisual(Runtime);
+  LoadSeriesCurrentSegmentHistory(AGraphIndex, ASeriesConfig, Runtime);
+  if Assigned(ProtocolManager) then
+  begin
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesRuntimeRecreated',
+      'Runtime серии создан заново', Format(
+      'GraphIndex=%d; OldIdentityKey=%s; NewIdentityKey=%s; OldChannelUUID=%s; NewChannelUUID=%s; OldMainSeriesPoints=%d; HistoryReloadRequested=True; ToleranceRebuildRequested=True',
+      [AGraphIndex, OldIdentity, Runtime.IdentityKey, OldUUID,
+       Runtime.ChannelUUID, OldPoints]));
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesBindingValidated',
+      'Привязка runtime серии проверена', Format(
+      'GraphIndex=%d; IdentityKey=%s; OwnerKind=%d; SeriesChannelUUID=%s; RuntimeChannelUUID=%s; MeterValueKey=%s; ChartSeriesAssigned=True; ToleranceVisualAssigned=True; Result=True',
+      [AGraphIndex, Runtime.IdentityKey, Ord(Runtime.OwnerKind),
+       ASeriesConfig.ChannelUUID, Runtime.ChannelUUID, Runtime.MeterValueKey]));
+  end;
+end;
+
+procedure TFrameGraphsWorkspace.RemoveSeriesCompletely(const AGraphIndex: Integer;
+  ASeriesConfig: TGraphSeriesConfig);
+begin
+  if (ASeriesConfig = nil) or (FConfig = nil) then Exit;
+  RemoveRuntimeSeries(ASeriesConfig, ChartByIndex(AGraphIndex));
+  FConfig.Panels[AGraphIndex].Series.Remove(ASeriesConfig);
+end;
+
+procedure TFrameGraphsWorkspace.ValidateGraphRuntimeBindings(const AGraphIndex: Integer);
+var S: TGraphSeriesConfig; R: TGraphSeriesRuntime;
+begin
+  if (FConfig = nil) or (AGraphIndex < 0) or (AGraphIndex >= FConfig.Panels.Count) then Exit;
+  for S in FConfig.Panels[AGraphIndex].Series do
+    if (not FSeriesRuntime.TryGetValue(S, R)) or
+       not IsRuntimeBoundToSeries(AGraphIndex, S, R) then
+      RecreateSeriesRuntime(AGraphIndex, S);
+end;
+
+procedure TFrameGraphsWorkspace.RemoveOrphanSeriesRuntime;
+var Pair: TPair<TGraphSeriesConfig, TGraphSeriesRuntime>;
+  Orphans: TList<TGraphSeriesConfig>; S: TGraphSeriesConfig;
+  I: Integer; Found: Boolean;
+begin
+  if (FSeriesRuntime = nil) or (FConfig = nil) then Exit;
+  Orphans := TList<TGraphSeriesConfig>.Create;
+  try
+    for Pair in FSeriesRuntime do
+    begin
+      Found := False;
+      for I := 0 to FConfig.Panels.Count - 1 do
+        if FConfig.Panels[I].Series.IndexOf(Pair.Key) >= 0 then begin Found := True; Break end;
+      if (not Found) or not SameText(Pair.Value.IdentityKey,
+        BuildGraphSeriesIdentity(Pair.Key.GraphIndex, Pair.Key.OwnerKind,
+          Pair.Key.ChannelUUID, Pair.Key.MeterValueKey)) then Orphans.Add(Pair.Key);
+    end;
+    for S in Orphans do RemoveRuntimeSeries(S, ChartByIndex(S.GraphIndex));
+  finally Orphans.Free end;
+end;
+
 function TFrameGraphsWorkspace.NextSeriesColor(
   const AGraphIndex: Integer): TAlphaColor;
 const
@@ -1082,6 +1265,9 @@ begin
   for I := DeletedIndex to FConfig.GraphCount - 1 do
     for S in FConfig.Panels[I].Series do S.GraphIndex := I;
   ReindexGraphSlots;
+  RemoveOrphanSeriesRuntime;
+  for I := DeletedIndex to FConfig.GraphCount - 1 do
+    ValidateGraphRuntimeBindings(I);
   ApplyDynamicGridLayout;
   SelectGraph(Min(DeletedIndex, FConfig.GraphCount - 1));
   if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
@@ -1112,6 +1298,7 @@ begin
     RemoveGraphRuntimeSeries(AIndex);
     FConfig.Panels[AIndex].Series.Clear;
     FConfig.Panels[AIndex].DefaultAssignmentSuppressed := True;
+    RemoveOrphanSeriesRuntime;
   end;
 end;
 
@@ -1140,7 +1327,8 @@ var
         Format('GraphIndex=%d; ChannelUUID=%s', [GraphIndex, AChannel.UUID]));
       Exit;
     end;
-    Existing := FindSeries(GraphIndex, NormalizeUUID(AChannel.UUID), 'ValueFlow');
+    Existing := FindSeriesByIdentity(GraphIndex, AOwner,
+      NormalizeUUID(AChannel.UUID), 'ValueFlow');
     if Existing <> nil then
     begin
       Inc(ExistingCount);
@@ -1191,7 +1379,11 @@ begin
         Runtime.ChartSeries.Visible := Existing.Visible and (Channel <> nil) and
           Channel.Enabled and (Channel.FlowMeter <> nil) and
           (Channel.FlowMeter.ValueFlow <> nil);
+        if not Runtime.ChartSeries.Visible then HideSeriesToleranceVisual(Runtime);
       end;
+  RemoveOrphanSeriesRuntime;
+  for GraphIndex := 0 to FConfig.GraphCount - 1 do
+    ValidateGraphRuntimeBindings(GraphIndex);
   FDefaultSourcesInitialized := (EtalonsEnabled + DevicesEnabled) > 0;
   if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
     'GraphDefaultSourcesRefreshDone', 'Завершена синхронизация источников графиков',
@@ -1203,6 +1395,7 @@ end;
 procedure TFrameGraphsWorkspace.EnsureDefaultEnabledSources;
 begin
   if not FDefaultSourcesInitialized then RefreshEnabledSources;
+  RemoveOrphanSeriesRuntime;
 end;
 
 procedure TFrameGraphsWorkspace.ClearGraph(const AGraphIndex: Integer);
@@ -1222,7 +1415,6 @@ procedure TFrameGraphsWorkspace.ResetClick(Sender: TObject); begin ResetRuntimeG
 function TFrameGraphsWorkspace.AddSource(const AGraphIndex: Integer; ASource: TGraphSeriesConfig): Boolean;
 var
   Chart: TSimpleChart;
-  Series: TChartSeries;
 begin
   Result := False;
   if (ASource = nil) or (FConfig = nil) or (AGraphIndex < 0) or (AGraphIndex >= FConfig.Panels.Count) then Exit;
@@ -1235,26 +1427,12 @@ begin
     Chart := ChartByIndex(AGraphIndex);
     if Chart <> nil then
     begin
-      Series := Chart.AddSeries(ASource.Caption);
-      Series.Color := ASource.Color;
-      Series.Visible := True;
       if FSeriesRuntime = nil then
         FSeriesRuntime := TObjectDictionary<TGraphSeriesConfig,
           TGraphSeriesRuntime>.Create([doOwnsValues]);
-      FSeriesRuntime.Add(ASource, TGraphSeriesRuntime.Create);
-      FSeriesRuntime[ASource].ChartSeries := Series;
-      FSeriesRuntime[ASource].LastSampleIndex := -1;
-      FSeriesRuntime[ASource].LastSampleTimeMs := 0;
-      FSeriesRuntime[ASource].WaitingForFirstSample := True;
-      FSeriesRuntime[ASource].RuntimeResetTimeMs := 0;
-      FSeriesRuntime[ASource].HistoryLoadMode := ghlmCurrentSegmentHistory;
-      FSeriesRuntime[ASource].HistoryLoaded := False;
-      FSeriesRuntime[ASource].ToleranceResolveState := gtrsPendingPoint;
-      EnsureSeriesToleranceVisual(AGraphIndex, ASource,
-        FSeriesRuntime[ASource]);
-      HideSeriesToleranceVisual(FSeriesRuntime[ASource]);
-      LoadSeriesCurrentSegmentHistory(AGraphIndex, ASource,
-        FSeriesRuntime[ASource]);
+      ASource.IdentityKey := BuildGraphSeriesIdentity(AGraphIndex,
+        ASource.OwnerKind, ASource.ChannelUUID, ASource.MeterValueKey);
+      RecreateSeriesRuntime(AGraphIndex, ASource);
       Chart.InvalidateChart;
     end;
   end;
@@ -1396,24 +1574,11 @@ begin
   if (ASeriesConfig = nil) or (FSeriesRuntime = nil) then
     Exit;
   if FSeriesRuntime.TryGetValue(ASeriesConfig, Runtime) and
-     (Runtime <> nil) and (Runtime.ChartSeries <> nil) then
+     IsRuntimeBoundToSeries(AGraphIndex, ASeriesConfig, Runtime) then
     Exit(Runtime.ChartSeries);
-  Chart := ChartByIndex(AGraphIndex);
-  if Chart = nil then
-    Exit;
-  Runtime := TGraphSeriesRuntime.Create;
-  Runtime.ChartSeries := Chart.AddSeries(ASeriesConfig.Caption);
-  Runtime.ChartSeries.Color := ASeriesConfig.Color;
-  Runtime.ChartSeries.Visible := ASeriesConfig.Visible;
-  Runtime.LastSampleIndex := -1;
-  Runtime.LastSampleTimeMs := 0;
-  Runtime.WaitingForFirstSample := True;
-  Runtime.LastAcceptedPointKey := FLastPointKey;
-  Runtime.RuntimeResetTimeMs := 0;
-  Runtime.HistoryLoadMode := ghlmCurrentSegmentHistory;
-  Runtime.HistoryLoaded := False;
-  FSeriesRuntime.Add(ASeriesConfig, Runtime);
-  Result := Runtime.ChartSeries;
+  RecreateSeriesRuntime(AGraphIndex, ASeriesConfig);
+  if FSeriesRuntime.TryGetValue(ASeriesConfig, Runtime) then
+    Result := Runtime.ChartSeries;
 end;
 
 function TFrameGraphsWorkspace.GetSeriesSamples(AMeterValue: TMeterValue;
@@ -2371,6 +2536,9 @@ begin
   begin AReason := 'RunTargetQInvalid'; Exit end;
   Channel := ResolveChannel(ASeriesConfig);
   if Channel = nil then begin AReason := 'EtalonChannelMissing'; Exit end;
+  if not SameText(NormalizeUUID(Channel.UUID),
+    NormalizeUUID(ASeriesConfig.ChannelUUID)) then
+  begin AReason := 'EtalonChannelIdentityMismatch'; Exit(False) end;
   if (not Channel.Enabled) or (Channel.FlowMeter = nil) then
   begin AReason := 'EtalonDeviceMissing'; Exit end;
   ADevice := Channel.FlowMeter.Device;
@@ -2403,6 +2571,7 @@ var
   EtalonPointCount: Integer;
   ToleranceValue: Double;
   OwnerText: string;
+  ResolvedChannel: TChannel;
 begin
   Result := False;
   AInfo := Default(TGraphSeriesToleranceInfo);
@@ -2418,6 +2587,11 @@ begin
   else begin AReason := 'UnsupportedMeterValue'; Exit end;
   if (ASeriesConfig.SourceKind <> gskFlow) then
   begin AReason := 'UnsupportedMeterValue'; Exit end;
+  ResolvedChannel := ResolveChannel(ASeriesConfig);
+  if ResolvedChannel = nil then begin AReason := 'ChannelMissing'; Exit end;
+  if not SameText(NormalizeUUID(ResolvedChannel.UUID),
+    NormalizeUUID(ASeriesConfig.ChannelUUID)) then
+  begin AReason := 'ResolvedChannelUUIDMismatch'; Exit end;
   if not TryGetValidRunPoint(Run, RunPoint, RunPointKey, AReason) then
   begin
     AReason := 'TolerancePointPending';
@@ -2476,6 +2650,14 @@ begin
     AInfo.SourceKind := 'DevicePointByUUIDOrQ';
   end;
   AInfo.ErrorPercent := Abs(SourcePoint.Error);
+  LogToleranceEvent('GraphEtalonToleranceBindingCheck', AInfo.ChannelUUID,
+    Format('GraphIndex=%d; SeriesChannelUUID=%s; ResolvedChannelUUID=%s; ToleranceChannelUUID=%s; IdentityMatch=%s',
+      [AGraphIndex, ASeriesConfig.ChannelUUID, ResolvedChannel.UUID,
+       AInfo.ChannelUUID, BoolToStr(SameText(NormalizeUUID(AInfo.ChannelUUID),
+       NormalizeUUID(ASeriesConfig.ChannelUUID)), True)]));
+  if not SameText(NormalizeUUID(AInfo.ChannelUUID),
+    NormalizeUUID(ASeriesConfig.ChannelUUID)) then
+  begin AReason := 'ToleranceResultChannelMismatch'; Exit(False) end;
   LogToleranceEvent('GraphSeriesToleranceSourceResolved',
     Format('%d|%s|%s', [AGraphIndex, AInfo.ChannelUUID, AInfo.PointUUID]),
     Format('GraphIndex=%d; OwnerKind=%s; ChannelUUID=%s; DeviceUUID=%s; PointUUID=%s; PointIndex=%d; PointName=%s; PointQ=%g; PointError=%g; SourceKind=%s',
@@ -2578,6 +2760,13 @@ var
   RunPointQ: Double;
 begin
   if (ARuntime = nil) or (FConfig = nil) then Exit;
+  if not IsRuntimeBoundToSeries(AGraphIndex, ASeriesConfig, ARuntime) then
+  begin
+    LogToleranceEvent('GraphSeriesBindingMismatch', 'ToleranceVisualMismatch',
+      Format('GraphIndex=%d; SeriesChannelUUID=%s; RuntimeChannelUUID=%s; Reason=ToleranceVisualMismatch',
+        [AGraphIndex, ASeriesConfig.ChannelUUID, ARuntime.ChannelUUID]));
+    Exit;
+  end;
   PreviousState := ARuntime.ToleranceResolveState;
   PreviousReason := ARuntime.LastToleranceReason;
   PreviousKey := ARuntime.TolerancePointKey;
@@ -2680,8 +2869,8 @@ begin
        [AGraphIndex, OwnerText, Info.ChannelUUID, CurrentPointKey, Info.TargetQ,
         Info.ErrorPercent, Info.DisplayTarget, Info.DisplayLower, Info.DisplayUpper]));
   LogToleranceEvent('GraphSeriesToleranceVisualState', CurrentPointKey, Format(
-    'GraphIndex=%d; ChannelUUID=%s; MainSeriesVisible=%s; ShowTargetLine=%s; ShowToleranceLines=%s; TargetSeriesAssigned=%s; LowerSeriesAssigned=%s; UpperSeriesAssigned=%s; TargetPointsCount=%d; LowerPointsCount=%d; UpperPointsCount=%d; TargetVisible=%s; LowerVisible=%s; UpperVisible=%s',
-    [AGraphIndex, Info.ChannelUUID, BoolToStr(MainSeriesVisible, True),
+    'GraphIndex=%d; SeriesChannelUUID=%s; RuntimeChannelUUID=%s; MainSeriesVisible=%s; ShowTargetLine=%s; ShowToleranceLines=%s; TargetSeriesAssigned=%s; LowerSeriesAssigned=%s; UpperSeriesAssigned=%s; TargetPointsCount=%d; LowerPointsCount=%d; UpperPointsCount=%d; TargetVisible=%s; LowerVisible=%s; UpperVisible=%s',
+    [AGraphIndex, Info.ChannelUUID, ARuntime.ChannelUUID, BoolToStr(MainSeriesVisible, True),
      BoolToStr(Panel.ShowTargetLine, True), BoolToStr(Panel.ShowToleranceLines, True),
      BoolToStr(Visual.TargetSeries <> nil, True), BoolToStr(Visual.LowerSeries <> nil, True),
      BoolToStr(Visual.UpperSeries <> nil, True), Visual.TargetSeries.Points.Count,
@@ -2695,12 +2884,23 @@ procedure TFrameGraphsWorkspace.UpdateToleranceLinesForGraph(
 var
   SeriesConfig: TGraphSeriesConfig;
   Runtime: TGraphSeriesRuntime;
+  Channel: TChannel;
 begin
   if (FConfig = nil) or (AGraphIndex < 0) or
      (AGraphIndex >= FConfig.GraphCount) then Exit;
   for SeriesConfig in FConfig.Panels[AGraphIndex].Series do
-    if FSeriesRuntime.TryGetValue(SeriesConfig, Runtime) then
+  begin
+    Channel := ResolveChannel(SeriesConfig);
+    if (Channel = nil) or not Channel.Enabled or not SeriesConfig.Visible then
+    begin
+      if FSeriesRuntime.TryGetValue(SeriesConfig, Runtime) then
+        HideSeriesToleranceVisual(Runtime);
+      Continue;
+    end;
+    if FSeriesRuntime.TryGetValue(SeriesConfig, Runtime) and
+       IsRuntimeBoundToSeries(AGraphIndex, SeriesConfig, Runtime) then
       UpdateSeriesToleranceLines(AGraphIndex, SeriesConfig, Runtime);
+  end;
   UpdateIndependentYAxis(AGraphIndex);
 end;
 
@@ -2945,6 +3145,16 @@ begin
     for Config in FConfig.Panels[GraphIndex].Series do
     begin
       Inc(SeriesProcessed);
+      if not FSeriesRuntime.TryGetValue(Config, Runtime) then
+      begin
+        RecreateSeriesRuntime(GraphIndex, Config);
+        if not FSeriesRuntime.TryGetValue(Config, Runtime) then Continue;
+      end;
+      if not IsRuntimeBoundToSeries(GraphIndex, Config, Runtime) then
+      begin
+        RecreateSeriesRuntime(GraphIndex, Config);
+        if not FSeriesRuntime.TryGetValue(Config, Runtime) then Continue;
+      end;
       VisualSeries := EnsureVisualSeries(GraphIndex, Config);
       Runtime := nil;
       FSeriesRuntime.TryGetValue(Config, Runtime);

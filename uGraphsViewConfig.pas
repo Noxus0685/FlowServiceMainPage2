@@ -15,9 +15,15 @@ type
     gskVolume, gskCustomMeterValue);
   TGraphSeriesOwnerKind = (gsokEtalon, gsokDevice, gsokWorkTable, gsokSystem);
 
+function BuildGraphSeriesIdentity(const AGraphIndex: Integer;
+  const AOwnerKind: TGraphSeriesOwnerKind; const AChannelUUID,
+  AMeterValueKey: string): string;
+
+type
   { Configuration is deliberately independent of FMX controls and runtime samples. }
   TGraphSeriesConfig = class
   public
+    IdentityKey: string;
     GraphIndex: Integer;
     OwnerKind: TGraphSeriesOwnerKind;
     SourceKind: TGraphSourceKind;
@@ -74,6 +80,22 @@ type
 
 implementation
 
+function NormalizeGraphUUID(const AValue: string): string;
+begin
+  Result := UpperCase(Trim(AValue));
+  if (Length(Result) >= 2) and (Result[1] = '{') and
+     (Result[Length(Result)] = '}') then
+    Result := Copy(Result, 2, Length(Result) - 2);
+end;
+
+function BuildGraphSeriesIdentity(const AGraphIndex: Integer;
+  const AOwnerKind: TGraphSeriesOwnerKind; const AChannelUUID,
+  AMeterValueKey: string): string;
+begin
+  Result := Format('%d|%d|%s|%s', [AGraphIndex, Ord(AOwnerKind),
+    NormalizeGraphUUID(AChannelUUID), LowerCase(Trim(AMeterValueKey))]);
+end;
+
 constructor TGraphSeriesConfig.Create;
 begin
   inherited Create;
@@ -84,8 +106,9 @@ end;
 
 function TGraphSeriesConfig.SourceIdentity: string;
 begin
-  Result := Format('%d|%d|%d|%s|%s', [GraphIndex, Ord(OwnerKind), Ord(SourceKind),
-    LowerCase(Trim(ChannelUUID)), LowerCase(Trim(MeterValueKey))]);
+  IdentityKey := BuildGraphSeriesIdentity(GraphIndex, OwnerKind, ChannelUUID,
+    MeterValueKey);
+  Result := IdentityKey;
 end;
 
 constructor TGraphPanelConfig.Create(const ATitle: string);
