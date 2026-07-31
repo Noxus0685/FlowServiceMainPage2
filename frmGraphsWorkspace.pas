@@ -154,6 +154,17 @@ type
     function ResolveChannel(const ASeries: TGraphSeriesConfig): TChannel;
     function ResolveMeterValue(const ASeries: TGraphSeriesConfig;
       AChannel: TChannel): TMeterValue;
+    function NormalizeUUID(const AValue: string): string;
+    function ResolveSeriesSource(ASeriesConfig: TGraphSeriesConfig;
+      out AChannel: TChannel; out AMeterValue: TMeterValue;
+      out AReason: string): Boolean;
+    function EnsureVisualSeries(AGraphIndex: Integer;
+      ASeriesConfig: TGraphSeriesConfig): TChartSeries;
+    function GetSeriesSamples(AMeterValue: TMeterValue;
+      out ASamples: TArray<TMeterValueSample>): Boolean;
+    procedure UpdateSeriesPoints(AGraphIndex: Integer;
+      ASeriesConfig: TGraphSeriesConfig; AChartSeries: TChartSeries;
+      AMeterValue: TMeterValue; var AAddedCount: Integer);
     function IsSamplingActive: Boolean;
     procedure ResetSeriesSegment(const AStartMs: Int64;
       const APointKey: string);
@@ -835,12 +846,12 @@ begin
   if (ASeries.OwnerKind = gsokEtalon) and
      (FWorkTable.EtalonChannels <> nil) then
     for Channel in FWorkTable.EtalonChannels do
-      if (Channel <> nil) and SameText(Channel.UUID, ASeries.ChannelUUID) then
+      if (Channel <> nil) and NormalizeUUID(Channel.UUID) = NormalizeUUID(ASeries.ChannelUUID) then
         Exit(Channel);
   if (ASeries.OwnerKind = gsokDevice) and
      (FWorkTable.DeviceChannels <> nil) then
     for Channel in FWorkTable.DeviceChannels do
-      if (Channel <> nil) and SameText(Channel.UUID, ASeries.ChannelUUID) then
+      if (Channel <> nil) and NormalizeUUID(Channel.UUID) = NormalizeUUID(ASeries.ChannelUUID) then
         Exit(Channel);
 end;
 
@@ -868,6 +879,215 @@ begin
           SameText(ASeries.MeterValueKey, 'Volume') or
           SameText(ASeries.MeterValueKey, 'Mass') then
     Result := AChannel.FlowMeter.ValueQuantity;
+end;
+
+function TFrameGraphsWorkspace.NormalizeUUID(const AValue: string): string;
+begin
+  Result := LowerCase(Trim(AValue));
+  if (Length(Result) >= 2) and (Result[1] = '{') and
+     (Result[Length(Result)] = '}') then
+    Result := Copy(Result, 2, Length(Result) - 2);
+end;
+
+function TFrameGraphsWorkspace.ResolveSeriesSource(
+  ASeriesConfig: TGraphSeriesConfig; out AChannel: TChannel;
+  out AMeterValue: TMeterValue; out AReason: string): Boolean;
+var
+  Candidate: TChannel;
+  WantedUUID: string;
+begin
+  Result := False;
+  AChannel := nil;
+  AMeterValue := nil;
+  AReason := '';
+  if ASeriesConfig = nil then
+  begin
+    AReason := 'ConfigMissing';
+    Exit;
+  end;
+  if FWorkTable = nil then
+  begin
+    AReason := 'ChannelNotFound';
+    Exit;
+  end;
+  WantedUUID := NormalizeUUID(ASeriesConfig.ChannelUUID);
+  if (ASeriesConfig.OwnerKind = gsokEtalon) and
+     (FWorkTable.EtalonChannels <> nil) then
+    for Candidate in FWorkTable.EtalonChannels do
+      if (Candidate <> nil) and
+         (NormalizeUUID(Candidate.UUID) = WantedUUID) then
+      begin
+        AChannel := Candidate;
+        Break;
+      end
+  else if (ASeriesConfig.OwnerKind = gsokDevice) and
+          (FWorkTable.DeviceChannels <> nil) then
+    for Candidate in FWorkTable.DeviceChannels do
+      if (Candidate <> nil) and
+         (NormalizeUUID(Candidate.UUID) = WantedUUID) then
+      begin
+        AChannel := Candidate;
+        Break;
+      end;
+  if AChannel = nil then
+  begin
+    AReason := 'ChannelNotFound';
+    Exit;
+  end;
+  AMeterValue := ResolveMeterValue(ASeriesConfig, AChannel);
+  if AMeterValue = nil then
+  begin
+    AReason := 'MeterValueNotFound';
+    Exit;
+  end;
+  Result := True;
+end;
+
+function TFrameGraphsWorkspace.EnsureVisualSeries(AGraphIndex: Integer;
+  ASeriesConfig: TGraphSeriesConfig): TChartSeries;
+var
+  Runtime: TGraphSeriesRuntime;
+  Chart: TSimpleChart;
+begin
+  Result := nil;
+  if (ASeriesConfig = nil) or (FSeriesRuntime = nil) then
+    Exit;
+  if FSeriesRuntime.TryGetValue(ASeriesConfig, Runtime) and
+     (Runtime <> nil) and (Runtime.ChartSeries <> nil) then
+    Exit(Runtime.ChartSeries);
+  Chart := ChartByIndex(AGraphIndex);
+  if Chart = nil then
+    Exit;
+  Runtime := TGraphSeriesRuntime.Create;
+  Runtime.ChartSeries := Chart.AddSeries(ASeriesConfig.Caption);
+  Runtime.ChartSeries.Color := ASeriesConfig.Color;
+  Runtime.ChartSeries.Visible := ASeriesConfig.Visible;
+  Runtime.LastSampleIndex := -1;
+  Runtime.WaitingForFirstSample := True;
+  Runtime.LastAcceptedPointKey := FLastPointKey;
+  FSeriesRuntime.Add(ASeriesConfig, Runtime);
+  Result := Runtime.ChartSeries;
+end;
+
+function TFrameGraphsWorkspace.GetSeriesSamples(AMeterValue: TMeterValue;
+  out ASamples: TArray<TMeterValueSample>): Boolean;
+begin
+  SetLength(ASamples, 0);
+  Result := AMeterValue <> nil;
+  if Result then
+  begin
+    ASamples := AMeterValue.GetStabilitySamples;
+    Result := Length(ASamples) > 0;
+  end;
+end;
+
+procedure TFrameGraphsWorkspace.UpdateSeriesPoints(AGraphIndex: Integer;
+  ASeriesConfig: TGraphSeriesConfig; AChartSeries: TChartSeries;
+  AMeterValue: TMeterValue; var AAddedCount: Integer);
+var
+  Runtime: TGraphSeriesRuntime;
+  Samples: TArray<TMeterValueSample>;
+  Sample: TMeterValueSample;
+  SampleIndex, Added, Skipped: Integer;
+  BaseY, DisplayY, X: Double;
+  RejectReason: string;
+  FirstRejectedLogged, FirstAcceptedLogged: Boolean;
+  NewestSampleTimeMs: Int64;
+begin
+  if (ASeriesConfig = nil) or (AChartSeries = nil) or
+     not FSeriesRuntime.TryGetValue(ASeriesConfig, Runtime) then
+    Exit;
+  Added := 0;
+  Skipped := 0;
+  FirstRejectedLogged := False;
+  FirstAcceptedLogged := False;
+  GetSeriesSamples(AMeterValue, Samples);
+  NewestSampleTimeMs := 0;
+  if Length(Samples) > 0 then
+    NewestSampleTimeMs := Samples[High(Samples)].TimeStampMs;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesSamplesRead',
+      'Прочитаны отсчёты пользовательской серии', Format(
+      'GraphIndex=%d; ChannelUUID=%s; SamplesCount=%d; SegmentStartMs=%d; NewestSampleTimeMs=%d',
+      [AGraphIndex, ASeriesConfig.ChannelUUID, Length(Samples),
+       FSharedSegmentStartMs, NewestSampleTimeMs]));
+  if (Length(Samples) = 0) and Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesSampleDecision',
+      'Буфер отсчётов пользовательской серии пуст', Format(
+      'GraphIndex=%d; ChannelUUID=%s; SampleIndex=-1; SampleTimeMs=0; Value=0; Accepted=False; RejectReason=SampleBufferEmpty',
+      [AGraphIndex, ASeriesConfig.ChannelUUID]));
+  for SampleIndex := 0 to High(Samples) do
+  begin
+    Sample := Samples[SampleIndex];
+    BaseY := Sample.Value;
+    RejectReason := '';
+    if Sample.TimeStampMs < FSharedSegmentStartMs then
+      RejectReason := 'SampleBeforeSegment'
+    else if Sample.TimeStampMs < FRuntimeResetTimeMs then
+      RejectReason := 'SampleBeforeReset'
+    else if (Sample.TimeStampMs < Runtime.LastSampleTimeMs) or
+            ((Sample.TimeStampMs = Runtime.LastSampleTimeMs) and
+             (SampleIndex <= Runtime.LastSampleIndex)) then
+      RejectReason := 'SampleAlreadyProcessed'
+    else if IsNan(BaseY) or IsInfinite(BaseY) or (Abs(BaseY) >= MaxDouble) then
+      RejectReason := 'SampleInvalidValue'
+    else
+    begin
+      X := (Sample.TimeStampMs - FSharedSegmentStartMs) / 1000.0;
+      if X < 0 then
+        RejectReason := 'SampleNegativeTime'
+      else if Runtime.WaitingForFirstSample and IsPointTransitionStage and
+              SameValue(BaseY, 0.0, 1E-12) then
+        RejectReason := 'WaitingTransition';
+    end;
+    if RejectReason <> '' then
+    begin
+      Inc(Skipped);
+      if (not FirstRejectedLogged) and Assigned(ProtocolManager) then
+      begin
+        ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesSampleDecision',
+          'Отсчёт пользовательской серии отклонён', Format(
+          'GraphIndex=%d; ChannelUUID=%s; SampleIndex=%d; SampleTimeMs=%d; Value=%g; Accepted=False; RejectReason=%s',
+          [AGraphIndex, ASeriesConfig.ChannelUUID, SampleIndex,
+           Sample.TimeStampMs, BaseY, RejectReason]));
+        FirstRejectedLogged := True;
+      end;
+      Continue;
+    end;
+    DisplayY := BaseY;
+    if SameText(ASeriesConfig.MeterValueKey, 'ValueFlow') or
+       SameText(ASeriesConfig.MeterValueKey, 'FlowRate') then
+      DisplayY := ConvertFlowToDisplayUnits(BaseY);
+    AChartSeries.AddPoint(X, DisplayY);
+    Runtime.LastSampleTimeMs := Sample.TimeStampMs;
+    Runtime.LastSampleIndex := SampleIndex;
+    Runtime.WaitingForFirstSample := False;
+    Runtime.LastAcceptedValue := BaseY;
+    Runtime.LastAcceptedPointKey := FLastPointKey;
+    Inc(Added);
+    Inc(AAddedCount);
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesPointAdded',
+        'Точка добавлена в визуальную серию', Format(
+        'GraphIndex=%d; ChannelUUID=%s; X=%g; BaseY=%g; DisplayY=%g; PointsCount=%d; SampleTimeMs=%d',
+        [AGraphIndex, ASeriesConfig.ChannelUUID, X, BaseY, DisplayY,
+         AChartSeries.Points.Count, Sample.TimeStampMs]));
+    if (not FirstAcceptedLogged) and Assigned(ProtocolManager) then
+    begin
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesSampleDecision',
+        'Отсчёт пользовательской серии принят', Format(
+        'GraphIndex=%d; ChannelUUID=%s; SampleIndex=%d; SampleTimeMs=%d; Value=%g; Accepted=True; RejectReason=',
+        [AGraphIndex, ASeriesConfig.ChannelUUID, SampleIndex,
+         Sample.TimeStampMs, BaseY]));
+      FirstAcceptedLogged := True;
+    end;
+  end;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesUpdateDone',
+      'Обновление пользовательской серии завершено', Format(
+      'GraphIndex=%d; ChannelUUID=%s; SamplesRead=%d; AddedCount=%d; SkippedCount=%d; PointsCount=%d; LastSampleTimeMs=%d',
+      [AGraphIndex, ASeriesConfig.ChannelUUID, Length(Samples), Added,
+       Skipped, AChartSeries.Points.Count, Runtime.LastSampleTimeMs]));
 end;
 
 function TFrameGraphsWorkspace.IsSamplingActive: Boolean;
@@ -1270,23 +1490,42 @@ end;
 
 procedure TFrameGraphsWorkspace.UpdateGraphs;
 var
-  GraphIndex, SampleIndex, PointIndex: Integer;
+  GraphIndex, PointIndex, SeriesProcessed, SeriesResolved,
+    SeriesFailed, PointsAdded, GraphsInvalidated, SeriesAddedBefore: Integer;
   Config: TGraphSeriesConfig; Runtime: TGraphSeriesRuntime;
   Channel: TChannel; MeterValue: TMeterValue;
-  Samples: TArray<TMeterValueSample>; Sample: TMeterValueSample;
-  Chart: TSimpleChart; NowMs: Int64; TimeSec, Value: Double;
+  Chart: TSimpleChart; NowMs: Int64;
   RunActive, SamplingActive, NewRunStarted, PointChanged, Changed,
     SegmentStartRequired, PointStateStored: Boolean;
-  PointKey, StoredPointKey, SelectedReason, Decision: string;
+  PointKey, StoredPointKey, SelectedReason, Decision, ResolveReason: string;
   SegmentReason: TGraphSegmentStartReason;
+  VisualSeries: TChartSeries;
+  RuntimeLastSampleTimeMs: Int64;
+  RuntimeLastSampleIndex: Integer;
+  RuntimeWaitingForFirstSample: Boolean;
 begin
   if (FConfig = nil) or (FSeriesRuntime = nil) then Exit;
+  if FWorkTable = nil then
+  begin
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphWorkspaceUpdateDone',
+        'Рабочая область графиков не обновлена',
+        'SeriesProcessed=0; SeriesResolved=0; SeriesFailed=0; PointsAdded=0; GraphsInvalidated=0');
+    Exit;
+  end;
   NowMs := TMeterValue.GetMonotonicTimeMs;
   RunActive := (FWorkTable <> nil) and
     (FWorkTable.MeasurementRun is TMeasurementRun) and
     not (TMeasurementRun(FWorkTable.MeasurementRun).Stage in [msNone, msDone]);
   SamplingActive := IsSamplingActive and not IsPointTransitionStage;
   PointKey := CurrentPointKey(PointIndex);
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphWorkspaceUpdateBegin',
+      'Начато обновление визуальных серий рабочей области', Format(
+      'GraphCount=%d; RunActive=%s; SamplingActive=%s; SegmentStartMs=%d; RuntimeResetTimeMs=%d; CurrentPointKey=%s',
+      [FConfig.GraphCount, BoolToStr(RunActive, True),
+       BoolToStr(SamplingActive, True), FSharedSegmentStartMs,
+       FRuntimeResetTimeMs, PointKey]));
   StoredPointKey := FLastPointKey;
   NewRunStarted := RunActive and not FLastRunActive;
   PointChanged := (PointKey <> '') and
@@ -1334,59 +1573,108 @@ begin
   CheckFlowUnitsChanged;
   CalculateSharedTimeRange(NowMs);
 
+  SeriesProcessed := 0;
+  SeriesResolved := 0;
+  SeriesFailed := 0;
+  PointsAdded := 0;
+  GraphsInvalidated := 0;
   for GraphIndex := 0 to FConfig.GraphCount - 1 do
   begin
     Chart := ChartByIndex(GraphIndex); Changed := False;
     for Config in FConfig.Panels[GraphIndex].Series do
     begin
-      if not FSeriesRuntime.TryGetValue(Config, Runtime) then
+      Inc(SeriesProcessed);
+      VisualSeries := EnsureVisualSeries(GraphIndex, Config);
+      Runtime := nil;
+      FSeriesRuntime.TryGetValue(Config, Runtime);
+      RuntimeLastSampleTimeMs := 0;
+      RuntimeLastSampleIndex := -1;
+      RuntimeWaitingForFirstSample := False;
+      if Runtime <> nil then
       begin
-        Runtime := TGraphSeriesRuntime.Create;
-        Runtime.ChartSeries := Chart.AddSeries(Config.Caption);
-        Runtime.ChartSeries.Color := Config.Color;
-        Runtime.LastSampleIndex := -1; Runtime.WaitingForFirstSample := True;
-        FSeriesRuntime.Add(Config, Runtime);
+        RuntimeLastSampleTimeMs := Runtime.LastSampleTimeMs;
+        RuntimeLastSampleIndex := Runtime.LastSampleIndex;
+        RuntimeWaitingForFirstSample := Runtime.WaitingForFirstSample;
       end;
-      Channel := ResolveChannel(Config); MeterValue := ResolveMeterValue(Config, Channel);
-      if (not SamplingActive) or (Channel = nil) or not Channel.Enabled or
-         (MeterValue = nil) or (PointKey = '') then Continue;
-      Samples := MeterValue.GetStabilitySamples;
-      for SampleIndex := 0 to High(Samples) do
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesUpdateBegin',
+          'Начато обновление пользовательской серии', Format(
+          'GraphIndex=%d; ChannelUUID=%s; OwnerKind=%d; MeterValueKey=%s; VisualSeriesAssigned=%s; Visible=%s; LastSampleTimeMs=%d; LastSampleIndex=%d; WaitingForFirstSample=%s',
+          [GraphIndex, Config.ChannelUUID, Ord(Config.OwnerKind),
+           Config.MeterValueKey, BoolToStr(VisualSeries <> nil, True),
+           BoolToStr(Config.Visible, True),
+           RuntimeLastSampleTimeMs, RuntimeLastSampleIndex,
+           BoolToStr(RuntimeWaitingForFirstSample, True)]));
+      if VisualSeries = nil then
       begin
-        Sample := Samples[SampleIndex];
-        if (Sample.TimeStampMs < FSharedSegmentStartMs) or
-           (Sample.TimeStampMs <= Runtime.LastSampleTimeMs) then Continue;
-        Runtime.LastSampleTimeMs := Sample.TimeStampMs;
-        Runtime.LastSampleIndex := SampleIndex;
-        Value := Sample.Value;
-        if IsNan(Value) or IsInfinite(Value) or (Abs(Value) >= MaxDouble) then Continue;
-        if Runtime.WaitingForFirstSample and SameValue(Value, 0.0, 1E-12) then
-          Continue;
-        TimeSec := (Sample.TimeStampMs - FSharedSegmentStartMs) / 1000.0;
-        if SameText(Config.MeterValueKey, 'ValueFlow') or
-           SameText(Config.MeterValueKey, 'FlowRate') then
-          Value := ConvertFlowToDisplayUnits(Value);
-        Runtime.ChartSeries.AddPoint(TimeSec, Value);
-        if Runtime.WaitingForFirstSample and Assigned(ProtocolManager) then
-          ProtocolManager.AddMessage(pcProc, psForm, 'GraphPointFirstSampleAccepted',
-            'Принят первый отсчёт сегмента', Format(
-            'GraphIndex=%d; ChannelUUID=%s; PointKey=%s; SampleTimeMs=%d; Value=%g; TimeSec=%g',
-            [GraphIndex, Config.ChannelUUID, PointKey, Sample.TimeStampMs,
-             Sample.Value, TimeSec]));
-        Runtime.WaitingForFirstSample := False;
-        Runtime.LastAcceptedValue := Sample.Value;
-        Runtime.LastAcceptedPointKey := PointKey; Changed := True;
+        Inc(SeriesFailed);
+        if Assigned(ProtocolManager) then
+          ProtocolManager.AddMessage(pcProc, psForm,
+            'GraphSeriesSourceResolveFailed', 'Визуальная серия недоступна',
+            Format('GraphIndex=%d; ChannelUUID=%s; Reason=VisualSeriesMissing',
+              [GraphIndex, Config.ChannelUUID]));
+        Continue;
       end;
+      VisualSeries.Visible := Config.Visible;
+      if not Config.Visible then
+      begin
+        Inc(SeriesFailed);
+        Continue;
+      end;
+      if not ResolveSeriesSource(Config, Channel, MeterValue, ResolveReason) then
+      begin
+        Inc(SeriesFailed);
+        if Assigned(ProtocolManager) then
+          ProtocolManager.AddMessage(pcProc, psForm,
+            'GraphSeriesSourceResolveFailed', 'Источник серии не разрешён',
+            Format('GraphIndex=%d; ChannelUUID=%s; Reason=%s',
+              [GraphIndex, Config.ChannelUUID, ResolveReason]));
+        Continue;
+      end;
+      Inc(SeriesResolved);
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesSourceResolved',
+          'Источник пользовательской серии разрешён', Format(
+          'GraphIndex=%d; ChannelUUID=%s; ChannelAssigned=True; MeterValueAssigned=True; MeterValueClass=%s; SampleBufferAvailable=True',
+          [GraphIndex, Config.ChannelUUID, MeterValue.ClassName]));
+      if not Channel.Enabled then
+      begin
+        Inc(SeriesFailed);
+        if Assigned(ProtocolManager) then
+          ProtocolManager.AddMessage(pcProc, psForm,
+            'GraphSeriesSourceResolveFailed', 'Канал источника отключён',
+            Format('GraphIndex=%d; ChannelUUID=%s; Reason=ChannelDisabled',
+              [GraphIndex, Config.ChannelUUID]));
+        Continue;
+      end;
+      if not SamplingActive then
+        Continue;
+      SeriesAddedBefore := PointsAdded;
+      UpdateSeriesPoints(GraphIndex, Config, VisualSeries, MeterValue,
+        PointsAdded);
+      if PointsAdded > SeriesAddedBefore then
+        Changed := True;
       while (FConfig.VisibleDurationSec > 0) and
-        (Runtime.ChartSeries.Points.Count > 0) and
-        (Runtime.ChartSeries.Points[0].X < FSharedAxisMinX) do
-        Runtime.ChartSeries.Points.Delete(0);
+        (VisualSeries.Points.Count > 0) and
+        (VisualSeries.Points[0].X < FSharedAxisMinX) do
+        VisualSeries.Points.Delete(0);
+    end;
+    if Changed then
+    begin
+      UpdateIndependentYAxis(GraphIndex);
+      Chart.InvalidateChart;
+      Inc(GraphsInvalidated);
     end;
     if Changed then UpdateIndependentYAxis(GraphIndex);
   end;
   ApplySharedXAxis;
   UpdateToleranceLines;
-  for GraphIndex := 0 to FConfig.GraphCount - 1 do ChartByIndex(GraphIndex).InvalidateChart;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphWorkspaceUpdateDone',
+      'Обновление визуальных серий рабочей области завершено', Format(
+      'SeriesProcessed=%d; SeriesResolved=%d; SeriesFailed=%d; PointsAdded=%d; GraphsInvalidated=%d',
+      [SeriesProcessed, SeriesResolved, SeriesFailed, PointsAdded,
+       GraphsInvalidated]));
   FLastRunActive := RunActive;
 end;
 

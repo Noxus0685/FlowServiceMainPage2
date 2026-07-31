@@ -50,5 +50,30 @@ def test_segment_reset_sets_series_runtime_once():
         assert statement in body
 
 
-def test_version_is_1_0_32():
-    assert "APP_VERSION = '1.0.32';" in VERSION
+def test_version_is_1_0_33():
+    assert "APP_VERSION = '1.0.33';" in VERSION
+
+
+def test_visual_series_pipeline_is_explicit_and_diagnostic():
+    update = routine("procedure TFrameGraphsWorkspace.UpdateGraphs")
+    for statement in (
+        "EnsureVisualSeries(GraphIndex, Config)",
+        "ResolveSeriesSource(Config, Channel, MeterValue, ResolveReason)",
+        "UpdateSeriesPoints(GraphIndex, Config, VisualSeries, MeterValue",
+        "GraphWorkspaceUpdateBegin",
+        "GraphSeriesUpdateBegin",
+        "GraphSeriesSourceResolved",
+        "GraphWorkspaceUpdateDone",
+    ):
+        assert statement in update
+    point_update = routine("procedure TFrameGraphsWorkspace.UpdateSeriesPoints")
+    assert "AMeterValue.GetStabilitySamples" not in point_update  # delegated helper
+    assert "AChartSeries.AddPoint(X, DisplayY);" in point_update
+    assert "GraphSeriesPointAdded" in point_update
+    assert "SampleBeforeSegment" in point_update
+    assert "SampleBeforeReset" in point_update
+
+
+def test_workspace_update_is_called_once_from_main_refresh():
+    main = (ROOT / "frmMainTable.pas").read_text(encoding="utf-8-sig")
+    assert main.count("FGraphsWorkspace.UpdateGraphs;") == 1
