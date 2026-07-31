@@ -1232,13 +1232,9 @@ begin
   EmptyLabel.TextSettings.HorzAlign := TTextAlign.Center;
 
   PopupMenu := TPopupMenu.Create(AOwner);
-  Root.PopupMenu := PopupMenu;
-  Header.PopupMenu := PopupMenu;
-  TitleLabel.PopupMenu := PopupMenu;
-  Chart.PopupMenu := PopupMenu;
-  EmptyLabel.PopupMenu := PopupMenu;
-  LegendHost.PopupMenu := PopupMenu;
-  LegendLayout.PopupMenu := PopupMenu;
+  { Do not assign PopupMenu to the chart controls.  FMX would attempt its own
+    context-menu dispatch after GraphViewMouseDown has already opened it,
+    which can enter a second modal popup loop and freeze the UI. }
 end;
 
 destructor TGraphPanelView.Destroy;
@@ -7054,6 +7050,8 @@ begin
        (FGraphViews[FGraphPopupIndex].PopupMenu <> nil) then
     begin
       ScreenPoint := TControl(Sender).LocalToScreen(PointF(X, Y));
+      FGraphViews[FGraphPopupIndex].PopupMenu.PopupComponent :=
+        TControl(Sender);
       FGraphViews[FGraphPopupIndex].PopupMenu.Popup(ScreenPoint.X,
         ScreenPoint.Y);
     end;

@@ -46,7 +46,11 @@ def test_context_menu_commands_mouse_binding_and_audit_events():
         assert event in FRAME
     assert "if Button = TMouseButton.mbRight then" in FRAME
     assert "ScreenPoint := TControl(Sender).LocalToScreen(PointF(X, Y));" in FRAME
+    assert "PopupMenu.PopupComponent :=" in FRAME
     assert "FGraphViews[FGraphPopupIndex].PopupMenu.Popup(ScreenPoint.X," in FRAME
+    constructor = FRAME[FRAME.index("constructor TGraphPanelView.Create"):]
+    constructor = constructor[:constructor.index("destructor TGraphPanelView.Destroy")]
+    assert ".PopupMenu := PopupMenu" not in constructor
 
 
 def test_visual_series_share_samples_but_keep_local_state():
