@@ -59,6 +59,7 @@ type
     MeterValueKey: string;
     Serial: string;
     SourceCaption: string;
+    RemoveSource: Boolean;
   end;
 
   TGraphSeriesColorMenuItem = class(TMenuItem)
@@ -128,11 +129,6 @@ type
     destructor Destroy; override;
   end;
 
-  TGraphColumnMenuItem = class(TMenuItem)
-  public
-    ColumnCount: Integer;
-  end;
-
   TFrameGraphsWorkspace = class(TFrame)
     LayoutWorkspaceRoot: TLayout;
     LayoutWorkspaceBody: TLayout;
@@ -153,7 +149,6 @@ type
     MenuItemShowToleranceInLegend: TMenuItem;
     MenuItemAddGraph: TMenuItem;
     MenuItemDeleteGraph: TMenuItem;
-    MenuItemLayout: TMenuItem;
     MenuItemClearGraphValues: TMenuItem;
     MenuItemClearGraph: TMenuItem;
     procedure GraphControlMouseDown(Sender: TObject; Button: TMouseButton;
@@ -163,7 +158,6 @@ type
     procedure GraphPopup(Sender: TObject);
     procedure ClearGraphValuesClick(Sender: TObject);
     procedure ClearGraphClick(Sender: TObject);
-    procedure GraphColumnModeClick(Sender: TObject);
     procedure SeriesColorClick(Sender: TObject);
     procedure GraphDurationClick(Sender: TObject);
     procedure ShowLegendClick(Sender: TObject);
@@ -760,6 +754,8 @@ end;
 procedure TFrameGraphsWorkspace.BuildSourceMenu(out AEtalonCount,
   ADeviceCount: Integer);
 var Channel: TChannel;
+  Config: TGraphSeriesConfig;
+  RemoveItem: TGraphSourceMenuItem;
 begin
   AEtalonCount := 0; ADeviceCount := 0;
   ClearDynamicMenu(MenuItemEtalons); ClearDynamicMenu(MenuItemDevices);
@@ -794,6 +790,18 @@ begin
   Item := TGraphSourceMenuItem(Sender);
   if (Item.GraphIndex < 0) or (Item.GraphIndex >= FConfig.GraphCount) then Exit;
   Existing := FindSeries(Item.GraphIndex, Item.ChannelUUID, Item.MeterValueKey);
+  if Item.RemoveSource then
+  begin
+    if Existing <> nil then
+    begin
+      if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+        'GraphSourceRemoved', 'Источник удалён из графика',
+        Format('GraphIndex=%d; SourceName=%s', [Item.GraphIndex, Existing.Caption]));
+      DeleteSource(Item.GraphIndex, Existing);
+      UpdateToleranceLinesForGraph(Item.GraphIndex);
+    end;
+    Exit;
+  end;
   if Existing <> nil then
   begin
     if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
@@ -1109,21 +1117,7 @@ const
 var
   I: Integer;
   Item: TGraphDurationMenuItem;
-  LayoutItem: TGraphColumnMenuItem;
 begin
-  ClearDynamicMenu(MenuItemLayout);
-  for I := 0 to 6 do
-  begin
-    LayoutItem := TGraphColumnMenuItem.Create(nil);
-    LayoutItem.ColumnCount := I;
-    if I = 0 then LayoutItem.Text := 'Автоматически'
-    else if I = 1 then LayoutItem.Text := '1 столбец'
-    else LayoutItem.Text := Format('%d столбца', [I]);
-    LayoutItem.IsChecked := (FConfig.AutoGrid and (I = 0)) or
-      ((not FConfig.AutoGrid) and (FConfig.PreferredColumnCount = I));
-    LayoutItem.OnClick := GraphColumnModeClick;
-    MenuItemLayout.AddObject(LayoutItem);
-  end;
   ClearDynamicMenu(MenuItemGraphLength);
   for I := Low(Durations) to High(Durations) do
   begin
