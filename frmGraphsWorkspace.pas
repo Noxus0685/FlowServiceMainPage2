@@ -846,12 +846,14 @@ begin
   if (ASeries.OwnerKind = gsokEtalon) and
      (FWorkTable.EtalonChannels <> nil) then
     for Channel in FWorkTable.EtalonChannels do
-      if (Channel <> nil) and NormalizeUUID(Channel.UUID) = NormalizeUUID(ASeries.ChannelUUID) then
+      if (Channel <> nil) and
+         (NormalizeUUID(Channel.UUID) = NormalizeUUID(ASeries.ChannelUUID)) then
         Exit(Channel);
   if (ASeries.OwnerKind = gsokDevice) and
      (FWorkTable.DeviceChannels <> nil) then
     for Channel in FWorkTable.DeviceChannels do
-      if (Channel <> nil) and NormalizeUUID(Channel.UUID) = NormalizeUUID(ASeries.ChannelUUID) then
+      if (Channel <> nil) and
+         (NormalizeUUID(Channel.UUID) = NormalizeUUID(ASeries.ChannelUUID)) then
         Exit(Channel);
 end;
 
@@ -913,15 +915,18 @@ begin
   WantedUUID := NormalizeUUID(ASeriesConfig.ChannelUUID);
   if (ASeriesConfig.OwnerKind = gsokEtalon) and
      (FWorkTable.EtalonChannels <> nil) then
+  begin
     for Candidate in FWorkTable.EtalonChannels do
       if (Candidate <> nil) and
          (NormalizeUUID(Candidate.UUID) = WantedUUID) then
       begin
         AChannel := Candidate;
         Break;
-      end
+      end;
+  end
   else if (ASeriesConfig.OwnerKind = gsokDevice) and
           (FWorkTable.DeviceChannels <> nil) then
+  begin
     for Candidate in FWorkTable.DeviceChannels do
       if (Candidate <> nil) and
          (NormalizeUUID(Candidate.UUID) = WantedUUID) then
@@ -929,6 +934,7 @@ begin
         AChannel := Candidate;
         Break;
       end;
+  end;
   if AChannel = nil then
   begin
     AReason := 'ChannelNotFound';
