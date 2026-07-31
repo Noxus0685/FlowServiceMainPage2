@@ -300,48 +300,130 @@ begin
 end;
 
 procedure TFrameGraphsWorkspace.ClearDynamicMenu(AParent: TMenuItem);
+var
+  Item: TMenuItem;
+  ItemIndex: Integer;
 begin
   if AParent = nil then
     Exit;
-  while AParent.ChildrenCount > 0 do
-    AParent.Children[0].Free;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuClearBegin',
+      'Начата очистка меню источников графика',
+      Format('ParentName=%s; ItemsCount=%d',
+        [AParent.Name, AParent.ItemsCount]));
+  while AParent.ItemsCount > 0 do
+  begin
+    ItemIndex := AParent.ItemsCount - 1;
+    Item := TMenuItem(AParent.Items[ItemIndex]);
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuClearItem',
+        'Удаляется пункт меню источников графика',
+        Format('Index=%d; ClassName=%s; Text=%s',
+          [ItemIndex, Item.ClassName, Item.Text]));
+    Item.Free;
+  end;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuClearDone',
+      'Очистка меню источников графика завершена',
+      Format('ParentName=%s; ItemsCount=%d',
+        [AParent.Name, AParent.ItemsCount]));
 end;
 
 procedure TFrameGraphsWorkspace.AddEmptyMenuItem(AParent: TMenuItem;
   const ACaption: string);
-var Item: TMenuItem;
+var
+  Item: TMenuItem;
 begin
-  Item := TMenuItem.Create(AParent);
-  Item.Parent := AParent;
-  Item.Text := ACaption;
-  Item.Enabled := False;
+  if AParent = nil then
+    raise EArgumentNilException.Create('AParent');
+  Item := nil;
+  try
+    Item := TMenuItem.Create(nil);
+    Item.Text := ACaption;
+    Item.Enabled := False;
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuAddBegin',
+        'Начато добавление пункта меню источников графика',
+        Format('ParentName=%s; ParentItemsCount=%d; ItemClass=%s; ItemText=%s',
+          [AParent.Name, AParent.ItemsCount, Item.ClassName, Item.Text]));
+    try
+      AParent.AddObject(Item);
+    except
+      on E: Exception do
+      begin
+        if Assigned(ProtocolManager) then
+          ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuAddError',
+            'Ошибка добавления пункта меню источников графика',
+            Format('ExceptionClass=%s; ExceptionMessage=%s',
+              [E.ClassName, E.Message]));
+        raise;
+      end;
+    end;
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuAddDone',
+        'Пункт меню источников графика добавлен',
+        Format('ParentName=%s; ParentItemsCount=%d',
+          [AParent.Name, AParent.ItemsCount]));
+    Item := nil;
+  finally
+    Item.Free;
+  end;
 end;
 
 procedure TFrameGraphsWorkspace.AddChannelMenuItem(AParent: TMenuItem;
   AChannel: TChannel; const AOwnerKind: TGraphSeriesOwnerKind);
-var Item: TGraphSourceMenuItem;
+var
+  Item: TGraphSourceMenuItem;
 begin
   if AParent = nil then
     raise EArgumentNilException.Create('AParent');
   if AChannel = nil then
     raise EArgumentNilException.Create('AChannel');
-  Item := TGraphSourceMenuItem.Create(AParent);
-  Item.Parent := AParent;
-  Item.GraphIndex := FContextGraphIndex;
-  Item.OwnerKind := AOwnerKind;
-  Item.SourceKind := gskFlow;
-  Item.ChannelUUID := AChannel.UUID;
-  Item.MeterValueKey := 'ValueFlow';
-  Item.Serial := Trim(AChannel.Serial);
-  Item.SourceCaption := Trim(AChannel.Name);
-  if Item.SourceCaption = '' then
-    Item.SourceCaption := Trim(AChannel.Text);
-  if Item.Serial <> '' then
-    Item.Text := Format('%s — %s', [Item.Serial, Item.SourceCaption])
-  else
-    Item.Text := Item.SourceCaption;
-  Item.SourceCaption := Item.Text;
-  Item.OnClick := SourceMenuItemClick;
+  Item := nil;
+  try
+    Item := TGraphSourceMenuItem.Create(nil);
+    Item.GraphIndex := FContextGraphIndex;
+    Item.OwnerKind := AOwnerKind;
+    Item.SourceKind := gskFlow;
+    Item.ChannelUUID := AChannel.UUID;
+    Item.MeterValueKey := 'ValueFlow';
+    Item.Serial := Trim(AChannel.Serial);
+    Item.SourceCaption := Trim(AChannel.Name);
+    if Item.SourceCaption = '' then
+      Item.SourceCaption := Trim(AChannel.Text);
+    if Item.Serial <> '' then
+      Item.Text := Format('%s — %s', [Item.Serial, Item.SourceCaption])
+    else
+      Item.Text := Item.SourceCaption;
+    Item.SourceCaption := Item.Text;
+    Item.OnClick := SourceMenuItemClick;
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuAddBegin',
+        'Начато добавление пункта меню источников графика',
+        Format('ParentName=%s; ParentItemsCount=%d; ItemClass=%s; ItemText=%s',
+          [AParent.Name, AParent.ItemsCount, Item.ClassName, Item.Text]));
+    try
+      AParent.AddObject(Item);
+    except
+      on E: Exception do
+      begin
+        if Assigned(ProtocolManager) then
+          ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuAddError',
+            'Ошибка добавления пункта меню источников графика',
+            Format('ExceptionClass=%s; ExceptionMessage=%s',
+              [E.ClassName, E.Message]));
+        raise;
+      end;
+    end;
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuAddDone',
+        'Пункт меню источников графика добавлен',
+        Format('ParentName=%s; ParentItemsCount=%d',
+          [AParent.Name, AParent.ItemsCount]));
+    Item := nil;
+  finally
+    Item.Free;
+  end;
 end;
 
 procedure TFrameGraphsWorkspace.BuildSourceMenu(out AEtalonCount,
