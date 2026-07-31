@@ -8,7 +8,7 @@ uses
   FMX.Controls, FMX.Forms, FMX.Layouts, FMX.ListBox, FMX.Menus, FMX.Objects,
   FMX.StdCtrls, FMX.Types, FMX.SimpleChart,
   uBaseProcedures, uClasses, uDeviceClass, uGraphsViewConfig, uMeasurementRun, uMeterValue, uProtocols,
-  uWorkTable, uFlowMeter;
+  uWorkTable, uFlowMeter, FMX.Controls.Presentation;
 
 type
   TGraphSeriesToleranceInfo = record
