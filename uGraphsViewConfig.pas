@@ -39,6 +39,7 @@ type
     ShowTarget: Boolean;
     ShowTolerance: Boolean;
     ShowLegend: Boolean;
+    VisibleDurationSec: Integer;
     AutoScaleMode: TGraphAutoScaleMode;
     constructor Create(const ATitle: string);
     destructor Destroy; override;
@@ -59,6 +60,7 @@ type
     destructor Destroy; override;
     procedure Reset;
     procedure EnsurePanelCount(const ACount: Integer);
+    procedure DeletePanel(const AIndex: Integer);
     property Panels: TObjectList<TGraphPanelConfig> read FPanels;
   end;
 
@@ -85,8 +87,21 @@ begin
   ShowTarget := True;
   ShowTolerance := True;
   ShowLegend := True;
+  VisibleDurationSec := 0;
   AutoScaleMode := gasWorkingValues;
   FSeries := TObjectList<TGraphSeriesConfig>.Create(True);
+end;
+
+procedure TGraphsViewConfig.DeletePanel(const AIndex: Integer);
+var
+  I: Integer;
+begin
+  if (FPanels.Count <= 1) or (AIndex < 0) or (AIndex >= FPanels.Count) then
+    Exit;
+  FPanels.Delete(AIndex);
+  for I := AIndex to FPanels.Count - 1 do
+    FPanels[I].Title := Format('График %d', [I + 1]);
+  GraphCount := FPanels.Count;
 end;
 
 destructor TGraphPanelConfig.Destroy;

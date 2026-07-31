@@ -1,11 +1,11 @@
-unit frmGraphsWorkspace;
+﻿unit frmGraphsWorkspace;
 
 interface
 
 uses
   System.Classes, System.SysUtils, System.Types, System.Math, System.UITypes,
   System.Generics.Collections,
-  FMX.Controls, FMX.Forms, FMX.Layouts, FMX.ListBox, FMX.Menus, FMX.Objects,
+  FMX.Controls, FMX.Forms, FMX.Layouts, FMX.Menus, FMX.Objects,
   FMX.StdCtrls, FMX.Types, FMX.SimpleChart,
   uBaseProcedures, uGraphsViewConfig, uMeasurementRun, uMeterValue, uProtocols,
   uWorkTable;
@@ -24,6 +24,19 @@ type
     SourceCaption: string;
   end;
 
+  TGraphSeriesColorMenuItem = class(TMenuItem)
+  public
+    GraphIndex: Integer;
+    ChannelUUID: string;
+    MeterValueKey: string;
+    NewColor: TAlphaColor;
+  end;
+
+  TGraphDurationMenuItem = class(TMenuItem)
+  public
+    DurationSec: Integer;
+  end;
+
   TGraphSeriesRuntime = class
   public
     ChartSeries: TChartSeries;
@@ -34,11 +47,8 @@ type
   TFrameGraphsWorkspace = class(TFrame)
     LayoutWorkspaceRoot: TLayout;
     PanelGraphSettings: TPanel;
-    LabelGraphCount: TLabel;
-    ComboGraphCount: TComboBox;
     LabelGraphLayout: TLabel;
     ComboGraphLayout: TComboBox;
-    CheckShowLegend: TCheckBox;
     ButtonClearAll: TButton;
     ButtonReset: TButton;
     LayoutWorkspaceBody: TLayout;
@@ -67,22 +77,17 @@ type
     LabelGraphTitle4: TLabel;
     ChartGraph4: TSimpleChart;
     RectangleGraphHit4: TRectangle;
-    SplitterSeries: TSplitter;
-    PanelSeries: TPanel;
-    LabelSelectedGraph: TLabel;
-    ListGraphSeries: TListBox;
     PopupMenuGraph: TPopupMenu;
     MenuItemEtalons: TMenuItem;
     MenuItemDevices: TMenuItem;
-    MenuAddSeries: TMenuItem;
-    MenuDeleteSeries: TMenuItem;
-    MenuMoveSeries: TMenuItem;
-    MenuShowAllSeries: TMenuItem;
-    MenuHideAllSeries: TMenuItem;
-    MenuClearGraph: TMenuItem;
-    procedure GraphCountChange(Sender: TObject);
+    MenuItemSettings: TMenuItem;
+    MenuItemSeriesColors: TMenuItem;
+    MenuItemGraphLength: TMenuItem;
+    MenuItemShowLegend: TMenuItem;
+    MenuItemAddGraph: TMenuItem;
+    MenuItemDeleteGraph: TMenuItem;
+    MenuItemClearGraph: TMenuItem;
     procedure GraphLayoutChange(Sender: TObject);
-    procedure ShowLegendChange(Sender: TObject);
     procedure ClearAllClick(Sender: TObject);
     procedure ResetClick(Sender: TObject);
     procedure GraphControlMouseDown(Sender: TObject; Button: TMouseButton;
@@ -90,13 +95,12 @@ type
     procedure GraphHitMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
     procedure GraphPopup(Sender: TObject);
-    procedure AddSeriesClick(Sender: TObject);
-    procedure DeleteSeriesClick(Sender: TObject);
-    procedure MoveSeriesClick(Sender: TObject);
-    procedure ShowAllSeriesClick(Sender: TObject);
-    procedure HideAllSeriesClick(Sender: TObject);
     procedure ClearGraphClick(Sender: TObject);
-    procedure SeriesListChange(Sender: TObject);
+    procedure SeriesColorClick(Sender: TObject);
+    procedure GraphDurationClick(Sender: TObject);
+    procedure ShowLegendClick(Sender: TObject);
+    procedure AddGraphClick(Sender: TObject);
+    procedure DeleteGraphClick(Sender: TObject);
     procedure SourceMenuItemClick(Sender: TObject);
   private
     FWorkTable: TWorkTable;
@@ -104,9 +108,6 @@ type
     FSelectedGraph: Integer;
     FContextGraphIndex: Integer;
     FUpdatingControls: Boolean;
-    FOnAddSeries: TGraphSourceEvent;
-    FOnDeleteSeries: TGraphSourceEvent;
-    FOnMoveSeries: TGraphSourceEvent;
     FSeriesRuntime: TObjectDictionary<TGraphSeriesConfig, TGraphSeriesRuntime>;
     FLastRunActive: Boolean;
     FSegmentStartMs: Int64;
@@ -116,12 +117,18 @@ type
     function SlotByIndex(const AIndex: Integer): TLayout;
     function AreaByIndex(const AIndex: Integer): TLayout;
     procedure SelectGraph(const AIndex: Integer);
-    procedure UpdateSeriesList;
     procedure SyncControls;
     procedure ClearChart(const AIndex: Integer; const AClearAssignments: Boolean);
     procedure PlaceSlot(const ASlot, AArea: Integer; const AAlign: TAlignLayout);
     procedure ClearDynamicMenu(AParent: TMenuItem);
     procedure BuildSourceMenu(out AEtalonCount, ADeviceCount: Integer);
+    procedure BuildSeriesColorsMenu;
+    procedure UpdateGraphSettingsMenu;
+    function NextSeriesColor(const AGraphIndex: Integer): TAlphaColor;
+    function FindSeries(const AGraphIndex: Integer; const AChannelUUID,
+      AMeterValueKey: string): TGraphSeriesConfig;
+    procedure DeleteSource(const AGraphIndex: Integer; ASeries: TGraphSeriesConfig);
+    procedure NormalizeLayout;
     procedure AddEmptyMenuItem(AParent: TMenuItem; const ACaption: string);
     procedure AddChannelMenuItem(AParent: TMenuItem; AChannel: TChannel;
       const AOwnerKind: TGraphSeriesOwnerKind);
@@ -142,9 +149,6 @@ type
     procedure ClearAllGraphs;
     function AddSource(const AGraphIndex: Integer;
       ASource: TGraphSeriesConfig): Boolean;
-    property OnAddSeries: TGraphSourceEvent read FOnAddSeries write FOnAddSeries;
-    property OnDeleteSeries: TGraphSourceEvent read FOnDeleteSeries write FOnDeleteSeries;
-    property OnMoveSeries: TGraphSourceEvent read FOnMoveSeries write FOnMoveSeries;
   end;
 
 implementation
@@ -180,7 +184,6 @@ begin
   end;
   SyncControls;
   ApplyLayout;
-  UpdateSeriesList;
 end;
 
 function TFrameGraphsWorkspace.ChartByIndex(const AIndex: Integer): TSimpleChart;
@@ -253,24 +256,23 @@ begin
       for I := 0 to FConfig.GraphCount - 1 do begin AreaByIndex(I).Visible := True; AreaByIndex(I).Align := TAlignLayout.None; AreaByIndex(I).Position.X := (I mod 2) * LayoutGraphsHost.Width / 2; AreaByIndex(I).Position.Y := (I div 2) * LayoutGraphsHost.Height / 2; AreaByIndex(I).Width := LayoutGraphsHost.Width / 2; AreaByIndex(I).Height := LayoutGraphsHost.Height / 2; PlaceSlot(I, I, TAlignLayout.Client); end;
   end;
   for I := 0 to FConfig.GraphCount - 1 do
+  begin
     if not SlotByIndex(I).Visible then PlaceSlot(I, Min(I, 3), TAlignLayout.Client);
+    ChartByIndex(I).ShowLegend := FConfig.Panels[I].ShowLegend;
+  end;
 end;
 
 procedure TFrameGraphsWorkspace.SyncControls;
 begin
   FUpdatingControls := True;
   try
-    ComboGraphCount.ItemIndex := FConfig.GraphCount - 1;
     ComboGraphLayout.ItemIndex := Ord(FConfig.LayoutKind);
-    CheckShowLegend.IsChecked := FConfig.ShowLegend;
-  finally FUpdatingControls := False end;
+  finally
+    FUpdatingControls := False;
+  end;
 end;
 
-procedure TFrameGraphsWorkspace.GraphCountChange(Sender: TObject);
-begin
-  if FUpdatingControls or (FConfig = nil) then Exit;
-  FConfig.EnsurePanelCount(ComboGraphCount.ItemIndex + 1); ApplyLayout;
-end;
+
 
 procedure TFrameGraphsWorkspace.GraphLayoutChange(Sender: TObject);
 begin
@@ -278,13 +280,12 @@ begin
   FConfig.LayoutKind := TGraphLayoutKind(ComboGraphLayout.ItemIndex); ApplyLayout;
 end;
 
-procedure TFrameGraphsWorkspace.ShowLegendChange(Sender: TObject);
-begin if (not FUpdatingControls) and (FConfig <> nil) then FConfig.ShowLegend := CheckShowLegend.IsChecked end;
+
 
 procedure TFrameGraphsWorkspace.SelectGraph(const AIndex: Integer);
 begin
   if (FConfig = nil) or (AIndex < 0) or (AIndex >= FConfig.GraphCount) then Exit;
-  FSelectedGraph := AIndex; LabelSelectedGraph.Text := Format('Серии графика %d', [AIndex + 1]); UpdateSeriesList;
+  FSelectedGraph := AIndex;
 end;
 
 procedure TFrameGraphsWorkspace.GraphControlMouseDown(Sender: TObject;
@@ -314,11 +315,8 @@ begin
         'PopupMenuGraph не загружен из frmGraphsWorkspace.fmx');
     FContextGraphIndex := GraphIndex;
     BuildSourceMenu(EtalonCount, DeviceCount);
-    if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(pcProc, psForm, 'GraphContextMenuOpened',
-        'Открыто контекстное меню графика',
-        Format('GraphIndex=%d; EtalonCount=%d; DeviceCount=%d',
-          [FContextGraphIndex, EtalonCount, DeviceCount]));
+    BuildSeriesColorsMenu;
+    UpdateGraphSettingsMenu;
     P := TControl(Sender).LocalToScreen(PointF(X, Y));
     PopupMenuGraph.Popup(P.X, P.Y);
   end;
@@ -327,252 +325,374 @@ end;
 procedure TFrameGraphsWorkspace.ClearDynamicMenu(AParent: TMenuItem);
 var
   Item: TMenuItem;
-  ItemIndex: Integer;
 begin
-  if AParent = nil then
-    Exit;
-  if Assigned(ProtocolManager) then
-    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuClearBegin',
-      'Начата очистка меню источников графика',
-      Format('ParentName=%s; ItemsCount=%d',
-        [AParent.Name, AParent.ItemsCount]));
+  if AParent = nil then Exit;
   while AParent.ItemsCount > 0 do
   begin
-    ItemIndex := AParent.ItemsCount - 1;
-    Item := TMenuItem(AParent.Items[ItemIndex]);
-    if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuClearItem',
-        'Удаляется пункт меню источников графика',
-        Format('Index=%d; ClassName=%s; Text=%s',
-          [ItemIndex, Item.ClassName, Item.Text]));
+    Item := TMenuItem(AParent.Items[AParent.ItemsCount - 1]);
     Item.Free;
   end;
-  if Assigned(ProtocolManager) then
-    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuClearDone',
-      'Очистка меню источников графика завершена',
-      Format('ParentName=%s; ItemsCount=%d',
-        [AParent.Name, AParent.ItemsCount]));
 end;
 
 procedure TFrameGraphsWorkspace.AddEmptyMenuItem(AParent: TMenuItem;
   const ACaption: string);
-var
-  Item: TMenuItem;
+var Item: TMenuItem;
 begin
-  if AParent = nil then
-    raise EArgumentNilException.Create('AParent');
-  Item := nil;
-  try
-    Item := TMenuItem.Create(nil);
-    Item.Text := ACaption;
-    Item.Enabled := False;
-    if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuAddBegin',
-        'Начато добавление пункта меню источников графика',
-        Format('ParentName=%s; ParentItemsCount=%d; ItemClass=%s; ItemText=%s',
-          [AParent.Name, AParent.ItemsCount, Item.ClassName, Item.Text]));
-    try
-      AParent.AddObject(Item);
-    except
-      on E: Exception do
-      begin
-        if Assigned(ProtocolManager) then
-          ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuAddError',
-            'Ошибка добавления пункта меню источников графика',
-            Format('ExceptionClass=%s; ExceptionMessage=%s',
-              [E.ClassName, E.Message]));
-        raise;
-      end;
-    end;
-    if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuAddDone',
-        'Пункт меню источников графика добавлен',
-        Format('ParentName=%s; ParentItemsCount=%d',
-          [AParent.Name, AParent.ItemsCount]));
-    Item := nil;
-  finally
-    Item.Free;
-  end;
+  if AParent = nil then raise EArgumentNilException.Create('AParent');
+  Item := TMenuItem.Create(nil);
+  Item.Text := ACaption;
+  Item.Enabled := False;
+  AParent.AddObject(Item);
 end;
 
 procedure TFrameGraphsWorkspace.AddChannelMenuItem(AParent: TMenuItem;
   AChannel: TChannel; const AOwnerKind: TGraphSeriesOwnerKind);
-var
-  Item: TGraphSourceMenuItem;
+var Item: TGraphSourceMenuItem;
 begin
-  if AParent = nil then
-    raise EArgumentNilException.Create('AParent');
-  if AChannel = nil then
-    raise EArgumentNilException.Create('AChannel');
-  Item := nil;
-  try
-    Item := TGraphSourceMenuItem.Create(nil);
-    Item.GraphIndex := FContextGraphIndex;
-    Item.OwnerKind := AOwnerKind;
-    Item.SourceKind := gskFlow;
-    Item.ChannelUUID := AChannel.UUID;
-    Item.MeterValueKey := 'ValueFlow';
-    Item.Serial := Trim(AChannel.Serial);
-    Item.SourceCaption := Trim(AChannel.Name);
-    if Item.SourceCaption = '' then
-      Item.SourceCaption := Trim(AChannel.Text);
-    if Item.Serial <> '' then
-      Item.Text := Format('%s — %s', [Item.Serial, Item.SourceCaption])
-    else
-      Item.Text := Item.SourceCaption;
-    Item.SourceCaption := Item.Text;
-    Item.OnClick := SourceMenuItemClick;
-    if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuAddBegin',
-        'Начато добавление пункта меню источников графика',
-        Format('ParentName=%s; ParentItemsCount=%d; ItemClass=%s; ItemText=%s',
-          [AParent.Name, AParent.ItemsCount, Item.ClassName, Item.Text]));
-    try
-      AParent.AddObject(Item);
-    except
-      on E: Exception do
-      begin
-        if Assigned(ProtocolManager) then
-          ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuAddError',
-            'Ошибка добавления пункта меню источников графика',
-            Format('ExceptionClass=%s; ExceptionMessage=%s',
-              [E.ClassName, E.Message]));
-        raise;
-      end;
-    end;
-    if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuAddDone',
-        'Пункт меню источников графика добавлен',
-        Format('ParentName=%s; ParentItemsCount=%d',
-          [AParent.Name, AParent.ItemsCount]));
-    Item := nil;
-  finally
-    Item.Free;
-  end;
+  if AParent = nil then raise EArgumentNilException.Create('AParent');
+  if AChannel = nil then raise EArgumentNilException.Create('AChannel');
+  Item := TGraphSourceMenuItem.Create(nil);
+  Item.GraphIndex := FContextGraphIndex;
+  Item.OwnerKind := AOwnerKind;
+  Item.SourceKind := gskFlow;
+  Item.ChannelUUID := AChannel.UUID;
+  Item.MeterValueKey := 'ValueFlow';
+  Item.Serial := Trim(AChannel.Serial);
+  Item.SourceCaption := Trim(AChannel.Name);
+  if Item.SourceCaption = '' then Item.SourceCaption := Trim(AChannel.Text);
+  if Item.Serial <> '' then Item.Text := Format('%s — %s', [Item.Serial, Item.SourceCaption])
+  else Item.Text := Item.SourceCaption;
+  Item.SourceCaption := Item.Text;
+  Item.IsChecked := FindSeries(FContextGraphIndex, Item.ChannelUUID, Item.MeterValueKey) <> nil;
+  Item.OnClick := SourceMenuItemClick;
+  AParent.AddObject(Item);
 end;
 
 procedure TFrameGraphsWorkspace.BuildSourceMenu(out AEtalonCount,
   ADeviceCount: Integer);
-var
-  Channel: TChannel;
+var Channel: TChannel;
 begin
-  AEtalonCount := 0;
-  ADeviceCount := 0;
-  if Assigned(ProtocolManager) then
-    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuBuildBegin',
-      'Начато построение меню источников графика',
-      Format('FrameAssigned=True; WorkTableAssigned=%s; PopupAssigned=%s; EtalonsMenuAssigned=%s; DevicesMenuAssigned=%s; GraphIndex=%d',
-        [BoolToStr(FWorkTable <> nil, True),
-         BoolToStr(PopupMenuGraph <> nil, True),
-         BoolToStr(MenuItemEtalons <> nil, True),
-         BoolToStr(MenuItemDevices <> nil, True), FContextGraphIndex]));
-  try
-    if MenuItemEtalons = nil then
-      raise EInvalidOperation.Create(
-        'MenuItemEtalons не загружен из frmGraphsWorkspace.fmx');
-    if MenuItemDevices = nil then
-      raise EInvalidOperation.Create(
-        'MenuItemDevices не загружен из frmGraphsWorkspace.fmx');
-
-    ClearDynamicMenu(MenuItemEtalons);
-    ClearDynamicMenu(MenuItemDevices);
-    MenuItemEtalons.Enabled := False;
-    MenuItemDevices.Enabled := False;
-
-    if FWorkTable = nil then
-    begin
-      AddEmptyMenuItem(MenuItemEtalons, 'Нет включённых эталонов');
-      AddEmptyMenuItem(MenuItemDevices, 'Нет включённых приборов');
-    end
-    else
-    begin
-      if FWorkTable.EtalonChannels <> nil then
-        for Channel in FWorkTable.EtalonChannels do
-          if (Channel <> nil) and Channel.Enabled and
-             (Channel.FlowMeter <> nil) then
-          begin
-            AddChannelMenuItem(MenuItemEtalons, Channel, gsokEtalon);
-            Inc(AEtalonCount);
-          end;
-      if FWorkTable.DeviceChannels <> nil then
-        for Channel in FWorkTable.DeviceChannels do
-          if (Channel <> nil) and Channel.Enabled and
-             (Channel.FlowMeter <> nil) then
-          begin
-            AddChannelMenuItem(MenuItemDevices, Channel, gsokDevice);
-            Inc(ADeviceCount);
-          end;
-      if AEtalonCount = 0 then
-        AddEmptyMenuItem(MenuItemEtalons, 'Нет включённых эталонов');
-      if ADeviceCount = 0 then
-        AddEmptyMenuItem(MenuItemDevices, 'Нет включённых приборов');
-      MenuItemEtalons.Enabled := AEtalonCount > 0;
-      MenuItemDevices.Enabled := ADeviceCount > 0;
-    end;
-
-    if Assigned(ProtocolManager) then
-    begin
-      if (AEtalonCount = 0) and (ADeviceCount = 0) then
-        ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuEmpty',
-          'Нет доступных источников графика',
-          Format('GraphIndex=%d', [FContextGraphIndex]));
-      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuBuildDone',
-        'Построение меню источников графика завершено',
-        Format('GraphIndex=%d; EtalonCount=%d; DeviceCount=%d',
-          [FContextGraphIndex, AEtalonCount, ADeviceCount]));
-    end;
-  except
-    on E: Exception do
-    begin
-      if Assigned(ProtocolManager) then
-        ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuBuildError',
-          'Ошибка построения меню источников графика',
-          Format('ExceptionClass=%s; ExceptionMessage=%s',
-            [E.ClassName, E.Message]));
-      raise;
-    end;
+  AEtalonCount := 0; ADeviceCount := 0;
+  ClearDynamicMenu(MenuItemEtalons); ClearDynamicMenu(MenuItemDevices);
+  if FWorkTable <> nil then
+  begin
+    if FWorkTable.EtalonChannels <> nil then
+      for Channel in FWorkTable.EtalonChannels do
+        if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) then
+        begin AddChannelMenuItem(MenuItemEtalons, Channel, gsokEtalon); Inc(AEtalonCount) end;
+    if FWorkTable.DeviceChannels <> nil then
+      for Channel in FWorkTable.DeviceChannels do
+        if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) then
+        begin AddChannelMenuItem(MenuItemDevices, Channel, gsokDevice); Inc(ADeviceCount) end;
   end;
+  if AEtalonCount = 0 then AddEmptyMenuItem(MenuItemEtalons, 'Нет включённых эталонов');
+  if ADeviceCount = 0 then AddEmptyMenuItem(MenuItemDevices, 'Нет включённых приборов');
+  MenuItemEtalons.Enabled := AEtalonCount > 0;
+  MenuItemDevices.Enabled := ADeviceCount > 0;
 end;
 
 procedure TFrameGraphsWorkspace.SourceMenuItemClick(Sender: TObject);
 var
   Item: TGraphSourceMenuItem;
-  Source: TGraphSeriesConfig;
+  Source, Existing: TGraphSeriesConfig;
   Added: Boolean;
 begin
   if not (Sender is TGraphSourceMenuItem) then Exit;
   if FConfig = nil then Exit;
   Item := TGraphSourceMenuItem(Sender);
   if (Item.GraphIndex < 0) or (Item.GraphIndex >= FConfig.GraphCount) then Exit;
+  Existing := FindSeries(Item.GraphIndex, Item.ChannelUUID, Item.MeterValueKey);
+  if Existing <> nil then
+  begin
+    DeleteSource(Item.GraphIndex, Existing);
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceRemoved',
+        'Источник удалён из графика',
+        Format('GraphIndex=%d; ChannelUUID=%s; MeterValueKey=%s',
+          [Item.GraphIndex, Item.ChannelUUID, Item.MeterValueKey]));
+    Exit;
+  end;
   Source := TGraphSeriesConfig.Create;
   Source.OwnerKind := Item.OwnerKind;
   Source.SourceKind := Item.SourceKind;
   Source.ChannelUUID := Item.ChannelUUID;
   Source.MeterValueKey := Item.MeterValueKey;
   Source.Caption := Item.SourceCaption;
+  Source.Color := NextSeriesColor(Item.GraphIndex);
   Added := AddSource(Item.GraphIndex, Source);
   SelectGraph(Item.GraphIndex);
   if Assigned(ProtocolManager) then
-    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceSelected',
-      'Выбран источник графика',
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceAdded',
+      'Источник добавлен в график',
       Format('GraphIndex=%d; SourceKind=%d; Serial=%s; ChannelUUID=%s; MeterValueKey=%s; Existing=%s',
         [Item.GraphIndex, Ord(Item.OwnerKind), Item.Serial, Item.ChannelUUID,
          Item.MeterValueKey, BoolToStr(not Added, True)]));
 end;
 
-procedure TFrameGraphsWorkspace.GraphPopup(Sender: TObject);
+function TFrameGraphsWorkspace.FindSeries(const AGraphIndex: Integer;
+  const AChannelUUID, AMeterValueKey: string): TGraphSeriesConfig;
+var
+  S: TGraphSeriesConfig;
 begin
-  MenuDeleteSeries.Enabled := ListGraphSeries.ItemIndex >= 0;
-  MenuMoveSeries.Enabled := (ListGraphSeries.ItemIndex >= 0) and (FConfig.GraphCount > 1);
+  Result := nil;
+  if (FConfig = nil) or (AGraphIndex < 0) or
+     (AGraphIndex >= FConfig.Panels.Count) then Exit;
+  for S in FConfig.Panels[AGraphIndex].Series do
+    if SameText(S.ChannelUUID, AChannelUUID) and
+       SameText(S.MeterValueKey, AMeterValueKey) then Exit(S);
 end;
 
-procedure TFrameGraphsWorkspace.UpdateSeriesList;
-var S: TGraphSeriesConfig; Item: TListBoxItem;
+function TFrameGraphsWorkspace.NextSeriesColor(
+  const AGraphIndex: Integer): TAlphaColor;
+const
+  Palette: array[0..9] of TAlphaColor = ($FFFF3030, $FF2878D0,
+    $FF20A050, $FFFF8C20, $FF8848C0, $FF20A8A8, $FFE0C020, $FFE85090,
+    $FF808080, $FF202020);
+var
+  I: Integer;
+  S: TGraphSeriesConfig;
+  Used: Boolean;
 begin
-  ListGraphSeries.Clear;
-  if (FConfig = nil) or (FSelectedGraph >= FConfig.Panels.Count) then Exit;
-  for S in FConfig.Panels[FSelectedGraph].Series do begin Item := TListBoxItem.Create(ListGraphSeries); Item.Parent := ListGraphSeries; Item.Text := S.Caption; Item.IsChecked := S.Visible; end;
+  Result := Palette[0];
+  for I := Low(Palette) to High(Palette) do
+  begin
+    Used := False;
+    for S in FConfig.Panels[AGraphIndex].Series do
+      if S.Color = Palette[I] then begin Used := True; Break end;
+    if not Used then Exit(Palette[I]);
+  end;
+  Result := Palette[FConfig.Panels[AGraphIndex].Series.Count mod Length(Palette)];
 end;
+
+procedure TFrameGraphsWorkspace.DeleteSource(const AGraphIndex: Integer;
+  ASeries: TGraphSeriesConfig);
+var
+  Chart: TSimpleChart;
+begin
+  if ASeries = nil then Exit;
+  Chart := ChartByIndex(AGraphIndex);
+  RemoveRuntimeSeries(ASeries, Chart);
+  FConfig.Panels[AGraphIndex].Series.Remove(ASeries);
+  if Chart <> nil then Chart.InvalidateChart;
+end;
+
+procedure TFrameGraphsWorkspace.BuildSeriesColorsMenu;
+const
+  ColorNames: array[0..9] of string = ('Красный', 'Синий', 'Зелёный',
+    'Оранжевый', 'Фиолетовый', 'Бирюзовый', 'Жёлтый', 'Розовый',
+    'Серый', 'Чёрный');
+  Colors: array[0..9] of TAlphaColor = ($FFFF3030, $FF2878D0,
+    $FF20A050, $FFFF8C20, $FF8848C0, $FF20A8A8, $FFE0C020, $FFE85090,
+    $FF808080, $FF202020);
+var
+  S: TGraphSeriesConfig;
+  SeriesItem: TMenuItem;
+  ColorItem: TGraphSeriesColorMenuItem;
+  I: Integer;
+begin
+  ClearDynamicMenu(MenuItemSeriesColors);
+  MenuItemSeriesColors.Enabled := (FConfig <> nil) and
+    (FContextGraphIndex < FConfig.Panels.Count) and
+    (FConfig.Panels[FContextGraphIndex].Series.Count > 0);
+  if not MenuItemSeriesColors.Enabled then
+  begin
+    AddEmptyMenuItem(MenuItemSeriesColors, 'Нет добавленных серий');
+    Exit;
+  end;
+  for S in FConfig.Panels[FContextGraphIndex].Series do
+  begin
+    SeriesItem := TMenuItem.Create(nil);
+    SeriesItem.Text := S.Caption;
+    MenuItemSeriesColors.AddObject(SeriesItem);
+    for I := Low(Colors) to High(Colors) do
+    begin
+      ColorItem := TGraphSeriesColorMenuItem.Create(nil);
+      ColorItem.Text := ColorNames[I];
+      ColorItem.GraphIndex := FContextGraphIndex;
+      ColorItem.ChannelUUID := S.ChannelUUID;
+      ColorItem.MeterValueKey := S.MeterValueKey;
+      ColorItem.NewColor := Colors[I];
+      ColorItem.IsChecked := S.Color = Colors[I];
+      ColorItem.OnClick := SeriesColorClick;
+      SeriesItem.AddObject(ColorItem);
+    end;
+  end;
+end;
+
+procedure TFrameGraphsWorkspace.UpdateGraphSettingsMenu;
+const
+  Durations: array[0..6] of Integer = (30, 60, 120, 300, 600, 1800, 0);
+  Captions: array[0..6] of string = ('30 секунд', '1 минута', '2 минуты',
+    '5 минут', '10 минут', '30 минут', 'Без ограничения');
+var
+  I: Integer;
+  Item: TGraphDurationMenuItem;
+begin
+  ClearDynamicMenu(MenuItemGraphLength);
+  for I := Low(Durations) to High(Durations) do
+  begin
+    Item := TGraphDurationMenuItem.Create(nil);
+    Item.Text := Captions[I];
+    Item.DurationSec := Durations[I];
+    Item.IsChecked := FConfig.Panels[FContextGraphIndex].VisibleDurationSec = Durations[I];
+    Item.OnClick := GraphDurationClick;
+    MenuItemGraphLength.AddObject(Item);
+  end;
+  MenuItemShowLegend.IsChecked := FConfig.Panels[FContextGraphIndex].ShowLegend;
+  MenuItemAddGraph.Enabled := FConfig.GraphCount < 4;
+  MenuItemDeleteGraph.Enabled := FConfig.GraphCount > 1;
+end;
+
+procedure TFrameGraphsWorkspace.SeriesColorClick(Sender: TObject);
+var
+  Item: TGraphSeriesColorMenuItem;
+  S: TGraphSeriesConfig;
+  Runtime: TGraphSeriesRuntime;
+  OldColor: TAlphaColor;
+begin
+  if not (Sender is TGraphSeriesColorMenuItem) then Exit;
+  Item := TGraphSeriesColorMenuItem(Sender);
+  S := FindSeries(Item.GraphIndex, Item.ChannelUUID, Item.MeterValueKey);
+  if S = nil then Exit;
+  OldColor := S.Color;
+  S.Color := Item.NewColor;
+  if FSeriesRuntime.TryGetValue(S, Runtime) and (Runtime.ChartSeries <> nil) then
+    Runtime.ChartSeries.Color := S.Color;
+  ChartByIndex(Item.GraphIndex).InvalidateChart;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesColorChanged',
+      'Изменён цвет серии графика', Format(
+      'GraphIndex=%d; ChannelUUID=%s; MeterValueKey=%s; OldColor=%u; NewColor=%u',
+      [Item.GraphIndex, Item.ChannelUUID, Item.MeterValueKey, OldColor, S.Color]));
+end;
+
+procedure TFrameGraphsWorkspace.GraphDurationClick(Sender: TObject);
+var
+  Item: TGraphDurationMenuItem;
+  OldValue: Integer;
+begin
+  if not (Sender is TGraphDurationMenuItem) then Exit;
+  Item := TGraphDurationMenuItem(Sender);
+  OldValue := FConfig.Panels[FContextGraphIndex].VisibleDurationSec;
+  FConfig.Panels[FContextGraphIndex].VisibleDurationSec := Item.DurationSec;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphVisibleDurationChanged',
+      'Изменена длина графика', Format('GraphIndex=%d; OldValue=%d; NewValue=%d',
+      [FContextGraphIndex, OldValue, Item.DurationSec]));
+end;
+
+procedure TFrameGraphsWorkspace.ShowLegendClick(Sender: TObject);
+var
+  Value: Boolean;
+begin
+  Value := not FConfig.Panels[FContextGraphIndex].ShowLegend;
+  FConfig.Panels[FContextGraphIndex].ShowLegend := Value;
+  ChartByIndex(FContextGraphIndex).ShowLegend := Value;
+  ChartByIndex(FContextGraphIndex).InvalidateChart;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphLegendChanged',
+      'Изменено отображение легенды', Format('GraphIndex=%d; ShowLegend=%s',
+      [FContextGraphIndex, BoolToStr(Value, True)]));
+end;
+
+procedure TFrameGraphsWorkspace.NormalizeLayout;
+begin
+  if FConfig.GraphCount = 1 then FConfig.LayoutKind := glSingle
+  else if FConfig.GraphCount = 2 then
+  begin
+    if not (FConfig.LayoutKind in [glTwoRows, glTwoColumns]) then
+      FConfig.LayoutKind := glTwoRows;
+  end
+  else if FConfig.GraphCount = 3 then
+  begin
+    if not (FConfig.LayoutKind in [glTwoRows, glTwoColumns, glThreePanels]) then
+      FConfig.LayoutKind := glThreePanels;
+  end
+  else FConfig.LayoutKind := glGrid2x2;
+  SyncControls;
+end;
+
+procedure TFrameGraphsWorkspace.AddGraphClick(Sender: TObject);
+var OldCount: Integer;
+begin
+  OldCount := FConfig.GraphCount;
+  if OldCount >= 4 then Exit;
+  FConfig.EnsurePanelCount(OldCount + 1);
+  NormalizeLayout; ApplyLayout; SelectGraph(FConfig.GraphCount - 1);
+  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+    'GraphAdded', 'Добавлен график', Format('GraphIndex=%d; OldGraphCount=%d; NewGraphCount=%d',
+    [FSelectedGraph, OldCount, FConfig.GraphCount]));
+end;
+
+procedure TFrameGraphsWorkspace.DeleteGraphClick(Sender: TObject);
+var
+  OldCount, DeletedIndex, I, PointIndex: Integer;
+  S: TGraphSeriesConfig;
+  Runtime: TGraphSeriesRuntime;
+  SavedPoints: TDictionary<TGraphSeriesConfig, TArray<TPointF>>;
+  Points: TArray<TPointF>;
+  Chart: TSimpleChart;
+begin
+  OldCount := FConfig.GraphCount;
+  if OldCount <= 1 then Exit;
+  DeletedIndex := FContextGraphIndex;
+  SavedPoints := TDictionary<TGraphSeriesConfig, TArray<TPointF>>.Create;
+  try
+    { Snapshot the shifted panels' displayed points before their series are
+      rebound to the designer charts on the left. }
+    for I := DeletedIndex + 1 to OldCount - 1 do
+      for S in FConfig.Panels[I].Series do
+        if FSeriesRuntime.TryGetValue(S, Runtime) and
+           (Runtime.ChartSeries <> nil) then
+        begin
+          SetLength(Points, Runtime.ChartSeries.Points.Count);
+          for PointIndex := 0 to Runtime.ChartSeries.Points.Count - 1 do
+            Points[PointIndex] := Runtime.ChartSeries.Points[PointIndex];
+          SavedPoints.Add(S, Points);
+        end;
+    for I := DeletedIndex to OldCount - 1 do RemoveGraphRuntimeSeries(I);
+    FConfig.DeletePanel(DeletedIndex);
+    for I := DeletedIndex to FConfig.GraphCount - 1 do
+    begin
+      Chart := ChartByIndex(I);
+      for S in FConfig.Panels[I].Series do
+      begin
+        SetLength(Points, 0);
+        S.GraphIndex := I;
+        Runtime := TGraphSeriesRuntime.Create;
+        Runtime.ChartSeries := Chart.AddSeries(S.Caption);
+        Runtime.ChartSeries.Color := S.Color;
+        Runtime.LastSampleIndex := -1;
+        if SavedPoints.TryGetValue(S, Points) then
+          for PointIndex := 0 to High(Points) do
+            Runtime.ChartSeries.AddPoint(Points[PointIndex].X, Points[PointIndex].Y);
+        if Length(Points) > 0 then
+          Runtime.LastSampleTimeMs := FSegmentStartMs +
+            Round(Points[High(Points)].X * 1000);
+        FSeriesRuntime.Add(S, Runtime);
+      end;
+      Chart.InvalidateChart;
+    end;
+  finally
+    SavedPoints.Free;
+  end;
+  NormalizeLayout; ApplyLayout;
+  SelectGraph(Min(DeletedIndex, FConfig.GraphCount - 1));
+  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+    'GraphDeleted', 'Удалён график', Format('GraphIndex=%d; OldGraphCount=%d; NewGraphCount=%d',
+    [DeletedIndex, OldCount, FConfig.GraphCount]));
+end;
+
+procedure TFrameGraphsWorkspace.GraphPopup(Sender: TObject);
+var
+  EtalonCount, DeviceCount: Integer;
+begin
+  BuildSourceMenu(EtalonCount, DeviceCount);
+  BuildSeriesColorsMenu;
+  UpdateGraphSettingsMenu;
+end;
+
+
 
 procedure TFrameGraphsWorkspace.ClearChart(const AIndex: Integer; const AClearAssignments: Boolean);
 var Chart: TSimpleChart; I: Integer;
@@ -589,12 +709,18 @@ begin
 end;
 
 procedure TFrameGraphsWorkspace.ClearGraph(const AGraphIndex: Integer);
-begin ClearChart(AGraphIndex, True); if AGraphIndex = FSelectedGraph then UpdateSeriesList end;
+begin ClearChart(AGraphIndex, True) end;
 procedure TFrameGraphsWorkspace.ClearAllGraphs;
-var I: Integer; begin if FConfig <> nil then for I := 0 to FConfig.GraphCount - 1 do ClearChart(I, True); UpdateSeriesList end;
+var I: Integer; begin if FConfig <> nil then for I := 0 to FConfig.GraphCount - 1 do ClearChart(I, True) end;
 procedure TFrameGraphsWorkspace.ClearAllClick(Sender: TObject); begin ClearAllGraphs end;
-procedure TFrameGraphsWorkspace.ClearGraphClick(Sender: TObject); begin ClearGraph(FContextGraphIndex) end;
-procedure TFrameGraphsWorkspace.ResetClick(Sender: TObject); begin FConfig.Reset; SyncControls; ApplyLayout; UpdateSeriesList end;
+procedure TFrameGraphsWorkspace.ClearGraphClick(Sender: TObject);
+begin
+  ClearGraph(FContextGraphIndex);
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphCleared',
+      'График очищен', Format('GraphIndex=%d', [FContextGraphIndex]));
+end;
+procedure TFrameGraphsWorkspace.ResetClick(Sender: TObject); begin FConfig.Reset; SyncControls; ApplyLayout end;
 
 function TFrameGraphsWorkspace.AddSource(const AGraphIndex: Integer; ASource: TGraphSeriesConfig): Boolean;
 var
@@ -624,17 +750,19 @@ begin
       Chart.InvalidateChart;
     end;
   end;
-  if AGraphIndex = FSelectedGraph then UpdateSeriesList;
 end;
 
-procedure TFrameGraphsWorkspace.AddSeriesClick(Sender: TObject); begin if Assigned(FOnAddSeries) then FOnAddSeries(Self, FContextGraphIndex) end;
-procedure TFrameGraphsWorkspace.DeleteSeriesClick(Sender: TObject); begin if Assigned(FOnDeleteSeries) then FOnDeleteSeries(Self, FContextGraphIndex) end;
-procedure TFrameGraphsWorkspace.MoveSeriesClick(Sender: TObject); begin if Assigned(FOnMoveSeries) then FOnMoveSeries(Self, FContextGraphIndex) end;
-procedure TFrameGraphsWorkspace.ShowAllSeriesClick(Sender: TObject);
-var S: TGraphSeriesConfig; begin for S in FConfig.Panels[FContextGraphIndex].Series do S.Visible := True; UpdateSeriesList end;
-procedure TFrameGraphsWorkspace.HideAllSeriesClick(Sender: TObject);
-var S: TGraphSeriesConfig; begin for S in FConfig.Panels[FContextGraphIndex].Series do S.Visible := False; UpdateSeriesList end;
-procedure TFrameGraphsWorkspace.SeriesListChange(Sender: TObject); begin end;
+
+
+
+
+
+
+
+
+
+
+
 
 function TFrameGraphsWorkspace.ResolveChannel(
   const ASeries: TGraphSeriesConfig): TChannel;
@@ -801,6 +929,15 @@ begin
     begin
       RuntimeAssigned := FSeriesRuntime.TryGetValue(Config, Runtime) and
         (Runtime <> nil) and (Runtime.ChartSeries <> nil);
+      if not RuntimeAssigned then
+      begin
+        Runtime := TGraphSeriesRuntime.Create;
+        Runtime.ChartSeries := Chart.AddSeries(Config.Caption);
+        Runtime.ChartSeries.Color := Config.Color;
+        Runtime.LastSampleIndex := -1;
+        FSeriesRuntime.Add(Config, Runtime);
+        RuntimeAssigned := True;
+      end;
       Channel := ResolveChannel(Config);
       MeterValue := ResolveMeterValue(Config, Channel);
       if DiagnosticDue and Assigned(ProtocolManager) then
@@ -870,7 +1007,16 @@ begin
         end;
       end;
       if SeriesAdded then
+      begin
+        if FConfig.Panels[GraphIndex].VisibleDurationSec > 0 then
+          while (Runtime.ChartSeries.Points.Count > 0) and
+            (Runtime.ChartSeries.Points[0].X < TimeSec -
+              FConfig.Panels[GraphIndex].VisibleDurationSec) do
+            Runtime.ChartSeries.Points.Delete(0);
+        while Runtime.ChartSeries.Points.Count > 10000 do
+          Runtime.ChartSeries.Points.Delete(0);
         ChartChanged[GraphIndex] := True;
+      end;
     end;
     if ChartChanged[GraphIndex] then
     begin
