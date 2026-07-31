@@ -3,7 +3,7 @@ unit frmGraphsWorkspace;
 interface
 
 uses
-  System.Classes, System.SysUtils, System.Types, System.Math,
+  System.Classes, System.SysUtils, System.Types, System.Math, System.UITypes,
   FMX.Controls, FMX.Forms, FMX.Layouts, FMX.ListBox, FMX.Menus, FMX.Objects,
   FMX.StdCtrls, FMX.Types, FMX.SimpleChart,
   uGraphsViewConfig, uProtocols, uWorkTable;
@@ -137,6 +137,15 @@ end;
 
 procedure TFrameGraphsWorkspace.Initialize(AWorkTable: TWorkTable);
 begin
+  if PopupMenuGraph = nil then
+    raise EInvalidOperation.Create(
+      'PopupMenuGraph не загружен из frmGraphsWorkspace.fmx');
+  if MenuItemEtalons = nil then
+    raise EInvalidOperation.Create(
+      'MenuItemEtalons не загружен из frmGraphsWorkspace.fmx');
+  if MenuItemDevices = nil then
+    raise EInvalidOperation.Create(
+      'MenuItemDevices не загружен из frmGraphsWorkspace.fmx');
   FWorkTable := AWorkTable;
   if FConfig = nil then
   begin
@@ -261,19 +270,30 @@ end;
 
 procedure TFrameGraphsWorkspace.GraphHitMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
-var P: TPointF;
-    EtalonCount, DeviceCount: Integer;
+var
+  P: TPointF;
+  EtalonCount, DeviceCount, GraphIndex: Integer;
 begin
-  if not (Sender is TControl) then Exit;
-  SelectGraph(TControl(Sender).Tag);
+  if not (Sender is TControl) then
+    Exit;
+  if FConfig = nil then
+    Exit;
+  GraphIndex := TControl(Sender).Tag;
+  if (GraphIndex < 0) or (GraphIndex >= FConfig.GraphCount) then
+    Exit;
+  SelectGraph(GraphIndex);
   if Button = TMouseButton.mbRight then
   begin
-    FContextGraphIndex := TControl(Sender).Tag;
+    if PopupMenuGraph = nil then
+      raise EInvalidOperation.Create(
+        'PopupMenuGraph не загружен из frmGraphsWorkspace.fmx');
+    FContextGraphIndex := GraphIndex;
     BuildSourceMenu(EtalonCount, DeviceCount);
-    ProtocolManager.AddMessage(pcProc, psForm, 'GraphContextMenuOpened',
-      'Открыто контекстное меню графика',
-      Format('GraphIndex=%d; EtalonCount=%d; DeviceCount=%d',
-        [FContextGraphIndex, EtalonCount, DeviceCount]));
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphContextMenuOpened',
+        'Открыто контекстное меню графика',
+        Format('GraphIndex=%d; EtalonCount=%d; DeviceCount=%d',
+          [FContextGraphIndex, EtalonCount, DeviceCount]));
     P := TControl(Sender).LocalToScreen(PointF(X, Y));
     PopupMenuGraph.Popup(P.X, P.Y);
   end;
@@ -281,7 +301,9 @@ end;
 
 procedure TFrameGraphsWorkspace.ClearDynamicMenu(AParent: TMenuItem);
 begin
-  while (AParent <> nil) and (AParent.ChildrenCount > 0) do
+  if AParent = nil then
+    Exit;
+  while AParent.ChildrenCount > 0 do
     AParent.Children[0].Free;
 end;
 
@@ -299,6 +321,10 @@ procedure TFrameGraphsWorkspace.AddChannelMenuItem(AParent: TMenuItem;
   AChannel: TChannel; const AOwnerKind: TGraphSeriesOwnerKind);
 var Item: TGraphSourceMenuItem;
 begin
+  if AParent = nil then
+    raise EArgumentNilException.Create('AParent');
+  if AChannel = nil then
+    raise EArgumentNilException.Create('AChannel');
   Item := TGraphSourceMenuItem.Create(AParent);
   Item.Parent := AParent;
   Item.GraphIndex := FContextGraphIndex;
@@ -320,37 +346,85 @@ end;
 
 procedure TFrameGraphsWorkspace.BuildSourceMenu(out AEtalonCount,
   ADeviceCount: Integer);
-var Channel: TChannel;
+var
+  Channel: TChannel;
 begin
   AEtalonCount := 0;
   ADeviceCount := 0;
-  ClearDynamicMenu(MenuItemEtalons);
-  ClearDynamicMenu(MenuItemDevices);
-  MenuItemEtalons.Enabled := FWorkTable <> nil;
-  MenuItemDevices.Enabled := FWorkTable <> nil;
-  if FWorkTable <> nil then
-  begin
-    for Channel in FWorkTable.EtalonChannels do
-      if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) then
-      begin
-        AddChannelMenuItem(MenuItemEtalons, Channel, gsokEtalon);
-        Inc(AEtalonCount);
-      end;
-    for Channel in FWorkTable.DeviceChannels do
-      if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) then
-      begin
-        AddChannelMenuItem(MenuItemDevices, Channel, gsokDevice);
-        Inc(ADeviceCount);
-      end;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuBuildBegin',
+      'Начато построение меню источников графика',
+      Format('FrameAssigned=True; WorkTableAssigned=%s; PopupAssigned=%s; EtalonsMenuAssigned=%s; DevicesMenuAssigned=%s; GraphIndex=%d',
+        [BoolToStr(FWorkTable <> nil, True),
+         BoolToStr(PopupMenuGraph <> nil, True),
+         BoolToStr(MenuItemEtalons <> nil, True),
+         BoolToStr(MenuItemDevices <> nil, True), FContextGraphIndex]));
+  try
+    if MenuItemEtalons = nil then
+      raise EInvalidOperation.Create(
+        'MenuItemEtalons не загружен из frmGraphsWorkspace.fmx');
+    if MenuItemDevices = nil then
+      raise EInvalidOperation.Create(
+        'MenuItemDevices не загружен из frmGraphsWorkspace.fmx');
+
+    ClearDynamicMenu(MenuItemEtalons);
+    ClearDynamicMenu(MenuItemDevices);
+    MenuItemEtalons.Enabled := False;
+    MenuItemDevices.Enabled := False;
+
+    if FWorkTable = nil then
+    begin
+      AddEmptyMenuItem(MenuItemEtalons, 'Нет включённых эталонов');
+      AddEmptyMenuItem(MenuItemDevices, 'Нет включённых приборов');
+    end
+    else
+    begin
+      if FWorkTable.EtalonChannels <> nil then
+        for Channel in FWorkTable.EtalonChannels do
+          if (Channel <> nil) and Channel.Enabled and
+             (Channel.FlowMeter <> nil) then
+          begin
+            AddChannelMenuItem(MenuItemEtalons, Channel, gsokEtalon);
+            Inc(AEtalonCount);
+          end;
+      if FWorkTable.DeviceChannels <> nil then
+        for Channel in FWorkTable.DeviceChannels do
+          if (Channel <> nil) and Channel.Enabled and
+             (Channel.FlowMeter <> nil) then
+          begin
+            AddChannelMenuItem(MenuItemDevices, Channel, gsokDevice);
+            Inc(ADeviceCount);
+          end;
+      if AEtalonCount = 0 then
+        AddEmptyMenuItem(MenuItemEtalons, 'Нет включённых эталонов');
+      if ADeviceCount = 0 then
+        AddEmptyMenuItem(MenuItemDevices, 'Нет включённых приборов');
+      MenuItemEtalons.Enabled := AEtalonCount > 0;
+      MenuItemDevices.Enabled := ADeviceCount > 0;
+    end;
+
+    if Assigned(ProtocolManager) then
+    begin
+      if (AEtalonCount = 0) and (ADeviceCount = 0) then
+        ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuEmpty',
+          'Нет доступных источников графика',
+          Format('GraphIndex=%d', [FContextGraphIndex]));
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuBuildDone',
+        'Построение меню источников графика завершено',
+        Format('GraphIndex=%d; EtalonCount=%d; DeviceCount=%d',
+          [FContextGraphIndex, AEtalonCount, ADeviceCount]));
+    end;
+  except
+    on E: Exception do
+    begin
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuBuildError',
+          'Ошибка построения меню источников графика',
+          Format('ExceptionClass=%s; ExceptionMessage=%s',
+            [E.ClassName, E.Message]));
+      raise;
+    end;
   end;
-  if AEtalonCount = 0 then
-    AddEmptyMenuItem(MenuItemEtalons, 'Нет включённых эталонов');
-  if ADeviceCount = 0 then
-    AddEmptyMenuItem(MenuItemDevices, 'Нет включённых приборов');
-  if (AEtalonCount = 0) and (ADeviceCount = 0) then
-    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuEmpty',
-      'Нет доступных источников графика',
-      Format('GraphIndex=%d', [FContextGraphIndex]));
 end;
 
 procedure TFrameGraphsWorkspace.SourceMenuItemClick(Sender: TObject);
@@ -360,20 +434,23 @@ var
   Added: Boolean;
 begin
   if not (Sender is TGraphSourceMenuItem) then Exit;
+  if FConfig = nil then Exit;
   Item := TGraphSourceMenuItem(Sender);
+  if (Item.GraphIndex < 0) or (Item.GraphIndex >= FConfig.GraphCount) then Exit;
   Source := TGraphSeriesConfig.Create;
   Source.OwnerKind := Item.OwnerKind;
   Source.SourceKind := Item.SourceKind;
   Source.ChannelUUID := Item.ChannelUUID;
   Source.MeterValueKey := Item.MeterValueKey;
   Source.Caption := Item.SourceCaption;
-  Added := AddSource(FContextGraphIndex, Source);
-  SelectGraph(FContextGraphIndex);
-  ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceSelected',
-    'Выбран источник графика',
-    Format('GraphIndex=%d; SourceKind=%d; Serial=%s; ChannelUUID=%s; MeterValueKey=%s; Existing=%s',
-      [FContextGraphIndex, Ord(Item.OwnerKind), Item.Serial, Item.ChannelUUID,
-       Item.MeterValueKey, BoolToStr(not Added, True)]));
+  Added := AddSource(Item.GraphIndex, Source);
+  SelectGraph(Item.GraphIndex);
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceSelected',
+      'Выбран источник графика',
+      Format('GraphIndex=%d; SourceKind=%d; Serial=%s; ChannelUUID=%s; MeterValueKey=%s; Existing=%s',
+        [Item.GraphIndex, Ord(Item.OwnerKind), Item.Serial, Item.ChannelUUID,
+         Item.MeterValueKey, BoolToStr(not Added, True)]));
 end;
 
 procedure TFrameGraphsWorkspace.GraphPopup(Sender: TObject);
