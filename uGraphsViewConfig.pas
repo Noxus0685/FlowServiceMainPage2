@@ -57,6 +57,10 @@ type
     LayoutKind: TGraphLayoutKind;
     ShowLegend: Boolean;
     SettingsPanelVisible: Boolean;
+    AutoGrid: Boolean;
+    PreferredColumnCount: Integer;
+    MinimumGraphWidth: Single;
+    MinimumGraphHeight: Single;
     { One time window belongs to the workspace, not to an individual panel. }
     VisibleDurationSec: Integer;
     constructor Create;
@@ -164,7 +168,6 @@ var
 begin
   Wanted := ACount;
   if Wanted < 1 then Wanted := 1;
-  if Wanted > 4 then Wanted := 4;
   while FPanels.Count < Wanted do
     FPanels.Add(TGraphPanelConfig.Create(Format('График %d', [FPanels.Count + 1])));
   GraphCount := Wanted;
@@ -177,6 +180,10 @@ begin
   ShowLegend := True;
   SettingsPanelVisible := True;
   VisibleDurationSec := 60;
+  AutoGrid := True;
+  PreferredColumnCount := 0;
+  MinimumGraphWidth := 420;
+  MinimumGraphHeight := 260;
   FPanels.Clear;
   EnsurePanelCount(GraphCount);
   { The initial two-panel layout is etalons first and devices second.  These
