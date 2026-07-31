@@ -272,6 +272,16 @@
         Text = #1055#1086#1082#1072#1079#1099#1074#1072#1090#1100' '#1083#1077#1075#1077#1085#1076#1091
         OnClick = ShowLegendClick
       end
+      object MenuItemShowTargetLine: TMenuItem
+        AutoCheck = False
+        Text = #1055#1086#1082#1072#1079#1099#1074#1072#1090#1100' '#1094#1077#1083#1077#1074#1091#1102' '#1083#1080#1085#1080#1102
+        OnClick = ToleranceVisibilityClick
+      end
+      object MenuItemShowToleranceLines: TMenuItem
+        AutoCheck = False
+        Text = #1055#1086#1082#1072#1079#1099#1074#1072#1090#1100' '#1075#1088#1072#1085#1080#1094#1099' '#1076#1086#1087#1091#1089#1082#1072
+        OnClick = ToleranceVisibilityClick
+      end
     end
     object MenuItemAddGraph: TMenuItem
       Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1075#1088#1072#1092#1080#1082

@@ -91,6 +91,8 @@ type
     MenuItemGraphLength: TMenuItem;
     MenuItemFlowUnits: TMenuItem;
     MenuItemShowLegend: TMenuItem;
+    MenuItemShowTargetLine: TMenuItem;
+    MenuItemShowToleranceLines: TMenuItem;
     MenuItemAddGraph: TMenuItem;
     MenuItemDeleteGraph: TMenuItem;
     MenuItemClearGraph: TMenuItem;
@@ -106,6 +108,7 @@ type
     procedure SeriesColorClick(Sender: TObject);
     procedure GraphDurationClick(Sender: TObject);
     procedure ShowLegendClick(Sender: TObject);
+    procedure ToleranceVisibilityClick(Sender: TObject);
     procedure AddGraphClick(Sender: TObject);
     procedure DeleteGraphClick(Sender: TObject);
     procedure SourceMenuItemClick(Sender: TObject);
@@ -132,6 +135,9 @@ type
     FUpperSeries: array[0..3] of TChartSeries;
     FLastFallbackSampleMs: Int64;
     FLastUpdateDiagnosticMs: Int64;
+    FDefaultSourcesInitialized: Boolean;
+    FLastToleranceDiagnosticMs: Int64;
+    FLastToleranceDiagnosticReason: string;
     function ChartByIndex(const AIndex: Integer): TSimpleChart;
     function SlotByIndex(const AIndex: Integer): TLayout;
     function AreaByIndex(const AIndex: Integer): TLayout;
@@ -184,6 +190,8 @@ type
     procedure ApplySharedXAxis;
     procedure EnsureLimitSeries(const AGraphIndex: Integer);
     procedure UpdateToleranceLines;
+    function ResolvePointTolerance(out ATarget, ALower, AUpper,
+      AErrorPercent: Double; out AReason: string): Boolean;
     procedure UpdateIndependentYAxis(const AGraphIndex: Integer);
     procedure RemoveRuntimeSeries(const AConfig: TGraphSeriesConfig;
       AChart: TSimpleChart);
@@ -198,6 +206,8 @@ type
     procedure ResetRuntimeGraphData;
     function AddSource(const AGraphIndex: Integer;
       ASource: TGraphSeriesConfig): Boolean;
+    procedure EnsureDefaultEnabledSources;
+    procedure RefreshEnabledSources;
   end;
 
 implementation
@@ -248,6 +258,7 @@ begin
     ApplySharedXAxis;
     UpdateToleranceLines;
   end;
+  EnsureDefaultEnabledSources;
 end;
 
 function TFrameGraphsWorkspace.ChartByIndex(const AIndex: Integer): TSimpleChart;
@@ -506,7 +517,7 @@ begin
   if (FConfig = nil) or (AGraphIndex < 0) or
      (AGraphIndex >= FConfig.Panels.Count) then Exit;
   for S in FConfig.Panels[AGraphIndex].Series do
-    if SameText(S.ChannelUUID, AChannelUUID) and
+    if (NormalizeUUID(S.ChannelUUID) = NormalizeUUID(AChannelUUID)) and
        SameText(S.MeterValueKey, AMeterValueKey) then Exit(S);
 end;
 
@@ -608,6 +619,10 @@ begin
   end;
   MenuItemFlowUnits.Text := 'Единицы расхода: ' + GetCurrentFlowUnitText;
   MenuItemShowLegend.IsChecked := FConfig.Panels[FContextGraphIndex].ShowLegend;
+  MenuItemShowTargetLine.IsChecked :=
+    FConfig.Panels[FContextGraphIndex].ShowTargetLine;
+  MenuItemShowToleranceLines.IsChecked :=
+    FConfig.Panels[FContextGraphIndex].ShowToleranceLines;
   MenuItemAddGraph.Enabled := FConfig.GraphCount < 4;
   MenuItemDeleteGraph.Enabled := FConfig.GraphCount > 1;
 end;
@@ -666,6 +681,29 @@ begin
       [FContextGraphIndex, BoolToStr(Value, True)]));
 end;
 
+procedure TFrameGraphsWorkspace.ToleranceVisibilityClick(Sender: TObject);
+var
+  Panel: TGraphPanelConfig;
+begin
+  if (FConfig = nil) or (FContextGraphIndex < 0) or
+     (FContextGraphIndex >= FConfig.Panels.Count) then Exit;
+  Panel := FConfig.Panels[FContextGraphIndex];
+  if Sender = MenuItemShowTargetLine then
+    Panel.ShowTargetLine := not Panel.ShowTargetLine
+  else if Sender = MenuItemShowToleranceLines then
+    Panel.ShowToleranceLines := not Panel.ShowToleranceLines
+  else
+    Exit;
+  UpdateToleranceLines;
+  UpdateGraphSettingsMenu;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphToleranceVisibilityChanged',
+      'Изменена видимость линий допуска', Format(
+      'GraphIndex=%d; ShowTargetLine=%s; ShowToleranceLines=%s',
+      [FContextGraphIndex, BoolToStr(Panel.ShowTargetLine, True),
+       BoolToStr(Panel.ShowToleranceLines, True)]));
+end;
+
 procedure TFrameGraphsWorkspace.NormalizeLayout;
 begin
   if FConfig.GraphCount = 1 then FConfig.LayoutKind := glSingle
@@ -690,6 +728,7 @@ begin
   if OldCount >= 4 then Exit;
   FConfig.EnsurePanelCount(OldCount + 1);
   NormalizeLayout; ApplyLayout; SelectGraph(FConfig.GraphCount - 1);
+  RefreshEnabledSources;
   if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
     'GraphAdded', 'Добавлен график', Format('GraphIndex=%d; OldGraphCount=%d; NewGraphCount=%d',
     [FSelectedGraph, OldCount, FConfig.GraphCount]));
@@ -777,7 +816,98 @@ begin
   begin
     RemoveGraphRuntimeSeries(AIndex);
     FConfig.Panels[AIndex].Series.Clear;
+    FConfig.Panels[AIndex].DefaultAssignmentSuppressed := True;
   end;
+end;
+
+procedure TFrameGraphsWorkspace.RefreshEnabledSources;
+var
+  Channel: TChannel;
+  Source, Existing: TGraphSeriesConfig;
+  Runtime: TGraphSeriesRuntime;
+  GraphIndex, AddedCount, ExistingCount, UnavailableCount,
+    EtalonsEnabled, DevicesEnabled: Integer;
+  Caption: string;
+
+  procedure Synchronize(AChannel: TChannel; AOwner: TGraphSeriesOwnerKind);
+  begin
+    if (AChannel = nil) or not AChannel.Enabled then Exit;
+    if AOwner = gsokEtalon then Inc(EtalonsEnabled) else Inc(DevicesEnabled);
+    if FConfig.GraphCount = 1 then GraphIndex := 0
+    else if AOwner = gsokEtalon then GraphIndex := 0 else GraphIndex := 1;
+    if FConfig.Panels[GraphIndex].DefaultAssignmentSuppressed then Exit;
+    if (Trim(AChannel.UUID) = '') or (AChannel.FlowMeter = nil) or
+       (AChannel.FlowMeter.ValueFlow = nil) then
+    begin
+      Inc(UnavailableCount);
+      if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+        'GraphDefaultSourceUnavailable', 'Источник графика недоступен',
+        Format('GraphIndex=%d; ChannelUUID=%s', [GraphIndex, AChannel.UUID]));
+      Exit;
+    end;
+    Existing := FindSeries(GraphIndex, NormalizeUUID(AChannel.UUID), 'ValueFlow');
+    if Existing <> nil then
+    begin
+      Inc(ExistingCount);
+      if FSeriesRuntime.TryGetValue(Existing, Runtime) and
+         (Runtime.ChartSeries <> nil) then Runtime.ChartSeries.Visible := True;
+      Exit;
+    end;
+    Caption := Trim(AChannel.Name);
+    if Caption = '' then Caption := Trim(AChannel.Text);
+    if Trim(AChannel.Serial) <> '' then
+      Caption := Format('%s — %s', [Trim(AChannel.Serial), Caption]);
+    Source := TGraphSeriesConfig.Create;
+    Source.OwnerKind := AOwner;
+    Source.SourceKind := gskFlow;
+    Source.ChannelUUID := AChannel.UUID;
+    Source.MeterValueKey := 'ValueFlow';
+    Source.Caption := Caption;
+    Source.Color := NextSeriesColor(GraphIndex);
+    Source.Visible := True;
+    if AddSource(GraphIndex, Source) then
+    begin
+      Inc(AddedCount);
+      if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+        'GraphDefaultSourceAdded', 'Добавлен источник графика по умолчанию',
+        Format('GraphIndex=%d; OwnerKind=%d; ChannelUUID=%s; Caption=%s; MeterValueKey=ValueFlow',
+          [GraphIndex, Ord(AOwner), AChannel.UUID, Caption]));
+    end;
+  end;
+
+begin
+  if (FConfig = nil) or (FWorkTable = nil) then Exit;
+  AddedCount := 0; ExistingCount := 0; UnavailableCount := 0;
+  EtalonsEnabled := 0; DevicesEnabled := 0;
+  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+    'GraphDefaultSourcesRefreshBegin', 'Начата синхронизация источников графиков',
+    Format('GraphCount=%d', [FConfig.GraphCount]));
+  if FWorkTable.EtalonChannels <> nil then
+    for Channel in FWorkTable.EtalonChannels do Synchronize(Channel, gsokEtalon);
+  if FWorkTable.DeviceChannels <> nil then
+    for Channel in FWorkTable.DeviceChannels do Synchronize(Channel, gsokDevice);
+  { Existing assignments remain intact when a channel is disabled. }
+  for GraphIndex := 0 to FConfig.GraphCount - 1 do
+    for Existing in FConfig.Panels[GraphIndex].Series do
+      if FSeriesRuntime.TryGetValue(Existing, Runtime) and
+         (Runtime.ChartSeries <> nil) then
+      begin
+        Channel := ResolveChannel(Existing);
+        Runtime.ChartSeries.Visible := Existing.Visible and (Channel <> nil) and
+          Channel.Enabled and (Channel.FlowMeter <> nil) and
+          (Channel.FlowMeter.ValueFlow <> nil);
+      end;
+  FDefaultSourcesInitialized := (EtalonsEnabled + DevicesEnabled) > 0;
+  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+    'GraphDefaultSourcesRefreshDone', 'Завершена синхронизация источников графиков',
+    Format('EtalonsEnabled=%d; DevicesEnabled=%d; AddedCount=%d; ExistingCount=%d; UnavailableCount=%d; GraphCount=%d',
+      [EtalonsEnabled, DevicesEnabled, AddedCount, ExistingCount,
+       UnavailableCount, FConfig.GraphCount]));
+end;
+
+procedure TFrameGraphsWorkspace.EnsureDefaultEnabledSources;
+begin
+  if not FDefaultSourcesInitialized then RefreshEnabledSources;
 end;
 
 procedure TFrameGraphsWorkspace.ClearGraph(const AGraphIndex: Integer);
@@ -1466,57 +1596,95 @@ begin
   end;
 end;
 
+function TFrameGraphsWorkspace.ResolvePointTolerance(out ATarget, ALower,
+  AUpper, AErrorPercent: Double; out AReason: string): Boolean;
+var
+  CurrentPoint: TDevicePoint;
+  Run: TMeasurementRun;
+  ToleranceValue: Double;
+begin
+  Result := False;
+  ATarget := 0; ALower := 0; AUpper := 0; AErrorPercent := 0;
+  AReason := '';
+  if FWorkTable = nil then begin AReason := 'WorkTableMissing'; Exit end;
+  if not (FWorkTable.MeasurementRun is TMeasurementRun) then
+  begin AReason := 'MeasurementRunMissing'; Exit end;
+  Run := TMeasurementRun(FWorkTable.MeasurementRun);
+  CurrentPoint := Run.CurrentPoint;
+  if CurrentPoint = nil then begin AReason := 'CurrentPointMissing'; Exit end;
+  ATarget := CurrentPoint.Q;
+  AErrorPercent := CurrentPoint.Error;
+  if IsNan(ATarget) or IsInfinite(ATarget) or (Abs(ATarget) >= MaxDouble) then
+  begin AReason := 'InvalidTargetQ'; Exit end;
+  if IsNan(AErrorPercent) or IsInfinite(AErrorPercent) or
+     (Abs(AErrorPercent) >= MaxDouble) or (AErrorPercent <= 0) then
+  begin AReason := 'InvalidPointError'; Exit end;
+  if SameValue(ATarget, 0.0, 1E-12) then
+  begin AReason := 'ZeroTargetWithoutAbsoluteTolerance'; Exit end;
+  ToleranceValue := Abs(ATarget) * Abs(AErrorPercent) / 100.0;
+  ALower := ATarget - ToleranceValue;
+  AUpper := ATarget + ToleranceValue;
+  Result := True;
+end;
+
 procedure TFrameGraphsWorkspace.UpdateToleranceLines;
 var
-  I: Integer; Run: TMeasurementRun; Point: TDevicePoint;
-  MinPercent, MaxPercent, BaseLower, BaseUpper: Double;
+  I, PointIndex: Integer;
+  BaseTarget, BaseLower, BaseUpper, ErrorPercent, ToleranceValue: Double;
+  DisplayTarget, DisplayLower, DisplayUpper: Double;
   Available: Boolean;
+  Reason, PointKey: string;
+  NowMs: Int64;
 begin
-  Run := nil; Point := nil;
-  if (FWorkTable <> nil) and (FWorkTable.MeasurementRun is TMeasurementRun) then
+  Available := ResolvePointTolerance(BaseTarget, BaseLower, BaseUpper,
+    ErrorPercent, Reason);
+  DisplayTarget := ConvertFlowToDisplayUnits(BaseTarget);
+  DisplayLower := ConvertFlowToDisplayUnits(BaseLower);
+  DisplayUpper := ConvertFlowToDisplayUnits(BaseUpper);
+  PointKey := CurrentPointKey(PointIndex);
+  NowMs := TMeterValue.GetMonotonicTimeMs;
+  if Assigned(ProtocolManager) and ((FLastToleranceDiagnosticMs = 0) or
+     (NowMs - FLastToleranceDiagnosticMs >= 2000) or
+     (FLastToleranceDiagnosticReason <> Reason)) then
   begin
-    Run := TMeasurementRun(FWorkTable.MeasurementRun); Point := Run.CurrentPoint;
-  end;
-  Available := (Point <> nil) and AccuracyToRange(Point.FlowAccuracy,
-    MinPercent, MaxPercent);
-  if Available then
-    CalculateTargetLimits(Point.Q, Abs(MaxPercent), Abs(MinPercent), 0,
-      BaseLower, BaseUpper);
-  if Assigned(ProtocolManager) and (FLastUpdateDiagnosticMs = 0) then
     if Available then
-      ProtocolManager.AddMessage(pcProc, psForm, 'GraphToleranceResolved',
-        'Разрешены границы допуска графиков', Format(
-        'PointAssigned=True; BaseTarget=%g; BaseLower=%g; BaseUpper=%g; DisplayUnit=%s; DisplayTarget=%g; DisplayLower=%g; DisplayUpper=%g',
-        [Point.Q, BaseLower, BaseUpper, GetCurrentFlowUnitText,
-         ConvertFlowToDisplayUnits(Point.Q), ConvertFlowToDisplayUnits(BaseLower),
-         ConvertFlowToDisplayUnits(BaseUpper)]))
+    begin
+      ToleranceValue := Abs(BaseTarget) * Abs(ErrorPercent) / 100.0;
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphPointToleranceResolved',
+        'Разрешены границы допуска текущей точки', Format(
+        'PointKey=%s; PointIndex=%d; TargetQ=%g; ErrorPercent=%g; ToleranceValue=%g; Lower=%g; Upper=%g; DisplayUnit=%s; DisplayTarget=%g; DisplayLower=%g; DisplayUpper=%g',
+        [PointKey, PointIndex, BaseTarget, ErrorPercent, ToleranceValue,
+         BaseLower, BaseUpper, GetCurrentFlowUnitText, DisplayTarget,
+         DisplayLower, DisplayUpper]));
+    end
     else
-      ProtocolManager.AddMessage(pcProc, psForm, 'GraphToleranceUnavailable',
-        'Границы допуска графиков недоступны',
-        'PointAssigned=' + BoolToStr(Point <> nil, True));
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphPointToleranceUnavailable',
+        'Границы допуска текущей точки недоступны', Format(
+        'PointKey=%s; PointIndex=%d; TargetQ=%g; ErrorValue=%g; Reason=%s',
+        [PointKey, PointIndex, BaseTarget, ErrorPercent, Reason]));
+    FLastToleranceDiagnosticMs := NowMs;
+    FLastToleranceDiagnosticReason := Reason;
+  end;
   for I := 0 to FConfig.GraphCount - 1 do
   begin
     EnsureLimitSeries(I);
     FTargetSeries[I].ClearPoints; FLowerSeries[I].ClearPoints;
     FUpperSeries[I].ClearPoints;
-    FTargetSeries[I].Visible := Point <> nil;
-    FLowerSeries[I].Visible := Available; FUpperSeries[I].Visible := Available;
-    if Point <> nil then
-    begin
-      FTargetSeries[I].AddPoint(FSharedAxisMinX, ConvertFlowToDisplayUnits(Point.Q));
-      FTargetSeries[I].AddPoint(FSharedAxisMaxX, ConvertFlowToDisplayUnits(Point.Q));
-    end;
+    FTargetSeries[I].Visible := Available and FConfig.Panels[I].ShowTargetLine;
+    FLowerSeries[I].Visible := Available and FConfig.Panels[I].ShowToleranceLines;
+    FUpperSeries[I].Visible := Available and FConfig.Panels[I].ShowToleranceLines;
     if Available then
     begin
-      FLowerSeries[I].AddPoint(FSharedAxisMinX, ConvertFlowToDisplayUnits(BaseLower));
-      FLowerSeries[I].AddPoint(FSharedAxisMaxX, ConvertFlowToDisplayUnits(BaseLower));
-      FUpperSeries[I].AddPoint(FSharedAxisMinX, ConvertFlowToDisplayUnits(BaseUpper));
-      FUpperSeries[I].AddPoint(FSharedAxisMaxX, ConvertFlowToDisplayUnits(BaseUpper));
+      FTargetSeries[I].AddPoint(FSharedAxisMinX, DisplayTarget);
+      FTargetSeries[I].AddPoint(FSharedAxisMaxX, DisplayTarget);
+      FLowerSeries[I].AddPoint(FSharedAxisMinX, DisplayLower);
+      FLowerSeries[I].AddPoint(FSharedAxisMaxX, DisplayLower);
+      FUpperSeries[I].AddPoint(FSharedAxisMinX, DisplayUpper);
+      FUpperSeries[I].AddPoint(FSharedAxisMaxX, DisplayUpper);
     end;
     UpdateIndependentYAxis(I);
   end;
-  if Assigned(ProtocolManager) and Available and
-     (FLastUpdateDiagnosticMs = 0) then
+  if Assigned(ProtocolManager) and Available then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphToleranceLinesUpdated',
       'Обновлены линии допуска графиков', Format(
       'GraphCount=%d; AxisMinX=%g; AxisMaxX=%g',
@@ -1597,6 +1765,7 @@ begin
         'SeriesProcessed=0; SeriesResolved=0; SeriesFailed=0; PointsAdded=0; GraphsInvalidated=0');
     Exit;
   end;
+  EnsureDefaultEnabledSources;
   NowMs := TMeterValue.GetMonotonicTimeMs;
   RunActive := (FWorkTable <> nil) and
     (FWorkTable.MeasurementRun is TMeasurementRun) and
@@ -1726,6 +1895,7 @@ begin
           [GraphIndex, Config.ChannelUUID, MeterValue.ClassName]));
       if not Channel.Enabled then
       begin
+        VisualSeries.Visible := False;
         Inc(SeriesFailed);
         if Assigned(ProtocolManager) then
           ProtocolManager.AddMessage(pcProc, psForm,
@@ -1734,6 +1904,7 @@ begin
               [GraphIndex, Config.ChannelUUID]));
         Continue;
       end;
+      VisualSeries.Visible := Config.Visible;
       if not SamplingActive then
         Continue;
       SeriesAddedBefore := PointsAdded;
@@ -1756,7 +1927,7 @@ begin
   end;
   ApplySharedXAxis;
   UpdateToleranceLines;
-  if DoFallback and (SeriesProcessed > 0) then
+  if DoFallback then
     FLastFallbackSampleMs := NowMs;
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphWorkspaceUpdateDone',
