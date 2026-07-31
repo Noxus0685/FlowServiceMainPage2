@@ -38,6 +38,7 @@ uses
   frmCalibrCoefs,
   frmChannelProperties,
   frmFlowMeterProperties,
+  frmGraphsWorkspace,
   frmWorkTableProperties,
   frmMeasurementRun,
   frmMRResults,
@@ -767,6 +768,7 @@ type
     FGraphSamplingActive: Boolean;
     FLastGraphRunActive: Boolean;
     FGraphsViewConfig: TGraphsViewConfig;
+    FGraphsWorkspace: TFrameGraphsWorkspace;
     FGraphsRoot: TLayout;
     FGraphsSettings: TPanel;
     FGraphsSettingsContent: TVertScrollBox;
@@ -6306,6 +6308,8 @@ var
   PointIndex, StageOrdinal, WorkTableStateOrdinal: Integer;
   MeasurementSegment, RunActive, NewRunStarted, PointChanged, SampleAdded: Boolean;
 begin
+  if FGraphsWorkspace <> nil then
+    FGraphsWorkspace.UpdateGraphs;
   if FFlowGraphHistory = nil then
     Exit;
 
@@ -6473,82 +6477,20 @@ begin
 end;
 
 procedure TFrameMainTable.AttachGraphsTo(AParent: TFmxObject);
-var
-  Splitter: TSplitter;
-  I: Integer;
 begin
   if AParent = nil then
     Exit;
-  if FGraphsViewConfig = nil then
-    FGraphsViewConfig := TGraphsViewConfig.Create;
-  if FGraphViews = nil then
-    FGraphViews := TObjectList<TGraphPanelView>.Create(True);
-  if FGraphSplitters = nil then
-    FGraphSplitters := TObjectList<TSplitter>.Create(False);
-  if FGraphLayoutContainers = nil then
-    FGraphLayoutContainers := TObjectList<TLayout>.Create(False);
-  if FGraphRenderTimer = nil then
+
+  if FGraphsWorkspace = nil then
   begin
-    FGraphRenderTimer := TTimer.Create(Self);
-    FGraphRenderTimer.Enabled := False;
-    FGraphRenderTimer.Interval := 1;
-    FGraphRenderTimer.OnTimer := GraphRenderTimerTimer;
-  end;
-  FInitializingGraphs := True;
-  try
-    FSelectedGraphIndex := 0;
-    if FGraphsRoot = nil then
-    begin
-      FGraphsRoot := TLayout.Create(Self);
-      FGraphsRoot.Name := 'LayoutGraphsRoot';
-      FGraphsRoot.Align := TAlignLayout.Client;
-      FGraphsSettingsWidth := 340;
+    FGraphsWorkspace := TFrameGraphsWorkspace.Create(Self);
+    FGraphsWorkspace.Parent := AParent;
+    FGraphsWorkspace.Align := TAlignLayout.Client;
+  end
+  else if FGraphsWorkspace.Parent <> AParent then
+    FGraphsWorkspace.Parent := AParent;
 
-      FGraphsSettings := TPanel.Create(FGraphsRoot);
-      FGraphsSettings.Name := 'LayoutGraphsSettings';
-      FGraphsSettings.Parent := FGraphsRoot;
-      FGraphsSettings.Align := TAlignLayout.Right;
-      FGraphsSettings.Width := FGraphsSettingsWidth;
-
-      Splitter := TSplitter.Create(FGraphsRoot);
-      Splitter.Name := 'SplitterGraphsSettings';
-      Splitter.Parent := FGraphsRoot;
-      Splitter.Align := TAlignLayout.Right;
-      Splitter.Width := 6;
-
-      if LayoutGraphsClient <> nil then
-      begin
-        LayoutGraphsClient.Parent := FGraphsRoot;
-        LayoutGraphsClient.Align := TAlignLayout.Client;
-        for I := 0 to LayoutGraphsClient.ChildrenCount - 1 do
-          if LayoutGraphsClient.Children[I] is TControl then
-            TControl(LayoutGraphsClient.Children[I]).Visible := False;
-      end;
-      if LayoutGraphCommands <> nil then
-        LayoutGraphCommands.Visible := False;
-      BuildGraphsSettingsPanel;
-    end;
-    FGraphsRoot.Parent := AParent;
-    FGraphsRoot.Align := TAlignLayout.Client;
-    if TabItemWorkTableGraphs <> nil then
-    begin
-      TabItemWorkTableGraphs.Visible := False;
-      TabItemWorkTableGraphs.Parent := nil;
-    end;
-    if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(
-        pcInfo,
-        psForm,
-        'AttachGraphsTo',
-        'Рабочая область графиков перенесена',
-        Format('TargetParent=%s; ActualParent=%s; Align=%d',
-          [AParent.Name, FGraphsRoot.Parent.Name, Ord(FGraphsRoot.Align)]));
-    ApplyGraphsLayout;
-    RebuildSelectedGraphLegend;
-  finally
-    FInitializingGraphs := False;
-  end;
-  QueueRenderGraphViews;
+  FGraphsWorkspace.Initialize(FActiveWorkTable);
 end;
 
 procedure TFrameMainTable.BuildGraphsSettingsPanel;
