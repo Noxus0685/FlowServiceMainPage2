@@ -1141,21 +1141,21 @@ const
 var
   I: Integer;
   Item: TGraphDurationMenuItem;
-  LayoutItem: TGraphColumnMenuItem;
+  LayoutItem: TMenuItem;
   LayoutMenu: TMenuItem;
 begin
   LayoutMenu := ResolveGraphLayoutMenu;
   ClearDynamicMenu(LayoutMenu);
   for I := 0 to 6 do
   begin
-    LayoutItem := TGraphColumnMenuItem.Create(nil);
-    LayoutItem.ColumnCount := I;
+    LayoutItem := TMenuItem.Create(nil);
+    LayoutItem.Tag := I;
     if I = 0 then LayoutItem.Text := 'Автоматически'
     else if I = 1 then LayoutItem.Text := '1 столбец'
     else LayoutItem.Text := Format('%d столбца', [I]);
     LayoutItem.IsChecked := (FConfig.AutoGrid and (I = 0)) or
       ((not FConfig.AutoGrid) and (FConfig.PreferredColumnCount = I));
-    LayoutItem.OnClick := GraphColumnModeClick;
+    LayoutItem.OnClick := GraphDurationClick;
     LayoutMenu.AddObject(LayoutItem);
   end;
   ClearDynamicMenu(MenuItemGraphLength);
@@ -1178,20 +1178,6 @@ begin
     FConfig.Panels[FContextGraphIndex].ShowToleranceInLegend;
   MenuItemAddGraph.Enabled := True;
   MenuItemDeleteGraph.Enabled := FConfig.GraphCount > 1;
-end;
-
-procedure TFrameGraphsWorkspace.GraphColumnModeClick(Sender: TObject);
-var Item: TGraphColumnMenuItem;
-begin
-  if not (Sender is TGraphColumnMenuItem) then Exit;
-  Item := TGraphColumnMenuItem(Sender);
-  FConfig.AutoGrid := Item.ColumnCount = 0;
-  FConfig.PreferredColumnCount := Item.ColumnCount;
-  ApplyDynamicGridLayout;
-  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
-    'GraphColumnModeChanged', 'Изменён режим колонок графиков', Format(
-    'AutoGrid=%s; PreferredColumnCount=%d', [BoolToStr(FConfig.AutoGrid, True),
-     FConfig.PreferredColumnCount]));
 end;
 
 procedure TFrameGraphsWorkspace.ClearGraphValuesClick(Sender: TObject);
@@ -1229,8 +1215,26 @@ end;
 procedure TFrameGraphsWorkspace.GraphDurationClick(Sender: TObject);
 var
   Item: TGraphDurationMenuItem;
+  MenuItem: TMenuItem;
   OldValue: Integer;
 begin
+  { Layout entries are ordinary TMenuItem instances.  Keeping their column
+    count in Tag avoids a custom runtime menu class and works with all dcc32
+    versions used by this project. }
+  if (Sender is TMenuItem) and not (Sender is TGraphDurationMenuItem) then
+  begin
+    MenuItem := TMenuItem(Sender);
+    if MenuItem.Parent <> ResolveGraphLayoutMenu then Exit;
+    FConfig.AutoGrid := MenuItem.Tag = 0;
+    FConfig.PreferredColumnCount := MenuItem.Tag;
+    ApplyDynamicGridLayout;
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphColumnModeChanged',
+        'Изменён режим колонок графиков', Format(
+        'AutoGrid=%s; PreferredColumnCount=%d',
+        [BoolToStr(FConfig.AutoGrid, True), FConfig.PreferredColumnCount]));
+    Exit;
+  end;
   if not (Sender is TGraphDurationMenuItem) then Exit;
   Item := TGraphDurationMenuItem(Sender);
   OldValue := FConfig.VisibleDurationSec;
