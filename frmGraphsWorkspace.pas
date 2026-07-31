@@ -59,6 +59,7 @@ type
     MeterValueKey: string;
     Serial: string;
     SourceCaption: string;
+    RemoveSource: Boolean;
   end;
 
   TGraphSeriesColorMenuItem = class(TMenuItem)
@@ -128,11 +129,6 @@ type
     destructor Destroy; override;
   end;
 
-  TGraphColumnMenuItem = class(TMenuItem)
-  public
-    ColumnCount: Integer;
-  end;
-
   TFrameGraphsWorkspace = class(TFrame)
     LayoutWorkspaceRoot: TLayout;
     LayoutWorkspaceBody: TLayout;
@@ -162,7 +158,6 @@ type
     procedure GraphPopup(Sender: TObject);
     procedure ClearGraphValuesClick(Sender: TObject);
     procedure ClearGraphClick(Sender: TObject);
-    procedure GraphColumnModeClick(Sender: TObject);
     procedure SeriesColorClick(Sender: TObject);
     procedure GraphDurationClick(Sender: TObject);
     procedure ShowLegendClick(Sender: TObject);
@@ -761,6 +756,8 @@ end;
 procedure TFrameGraphsWorkspace.BuildSourceMenu(out AEtalonCount,
   ADeviceCount: Integer);
 var Channel: TChannel;
+  Config: TGraphSeriesConfig;
+  RemoveItem: TGraphSourceMenuItem;
 begin
   AEtalonCount := 0; ADeviceCount := 0;
   ClearDynamicMenu(MenuItemEtalons); ClearDynamicMenu(MenuItemDevices);
@@ -795,6 +792,18 @@ begin
   Item := TGraphSourceMenuItem(Sender);
   if (Item.GraphIndex < 0) or (Item.GraphIndex >= FConfig.GraphCount) then Exit;
   Existing := FindSeries(Item.GraphIndex, Item.ChannelUUID, Item.MeterValueKey);
+  if Item.RemoveSource then
+  begin
+    if Existing <> nil then
+    begin
+      if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+        'GraphSourceRemoved', 'Источник удалён из графика',
+        Format('GraphIndex=%d; SourceName=%s', [Item.GraphIndex, Existing.Caption]));
+      DeleteSource(Item.GraphIndex, Existing);
+      UpdateToleranceLinesForGraph(Item.GraphIndex);
+    end;
+    Exit;
+  end;
   if Existing <> nil then
   begin
     if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
