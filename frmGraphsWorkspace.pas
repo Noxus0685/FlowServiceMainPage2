@@ -1665,6 +1665,7 @@ begin
       Chart.InvalidateChart;
       Inc(GraphsInvalidated);
     end;
+    if Changed then UpdateIndependentYAxis(GraphIndex);
   end;
   ApplySharedXAxis;
   UpdateToleranceLines;
