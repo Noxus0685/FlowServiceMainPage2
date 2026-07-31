@@ -4,12 +4,23 @@ interface
 
 uses
   System.Classes, System.SysUtils, System.Types, System.Math,
-  FMX.Controls, FMX.Forms, FMX.Layouts, FMX.ListBox, FMX.Menus, FMX.StdCtrls,
-  FMX.Types, FMX.SimpleChart,
-  uGraphsViewConfig, uWorkTable;
+  FMX.Controls, FMX.Forms, FMX.Layouts, FMX.ListBox, FMX.Menus, FMX.Objects,
+  FMX.StdCtrls, FMX.Types, FMX.SimpleChart,
+  uGraphsViewConfig, uProtocols, uWorkTable;
 
 type
   TGraphSourceEvent = procedure(Sender: TObject; const AGraphIndex: Integer) of object;
+
+  TGraphSourceMenuItem = class(TMenuItem)
+  public
+    GraphIndex: Integer;
+    OwnerKind: TGraphSeriesOwnerKind;
+    SourceKind: TGraphSourceKind;
+    ChannelUUID: string;
+    MeterValueKey: string;
+    Serial: string;
+    SourceCaption: string;
+  end;
 
   TFrameGraphsWorkspace = class(TFrame)
     LayoutWorkspaceRoot: TLayout;
@@ -34,20 +45,26 @@ type
     LayoutGraphSlot1: TLayout;
     LabelGraphTitle1: TLabel;
     ChartGraph1: TSimpleChart;
+    RectangleGraphHit1: TRectangle;
     LayoutGraphSlot2: TLayout;
     LabelGraphTitle2: TLabel;
     ChartGraph2: TSimpleChart;
+    RectangleGraphHit2: TRectangle;
     LayoutGraphSlot3: TLayout;
     LabelGraphTitle3: TLabel;
     ChartGraph3: TSimpleChart;
+    RectangleGraphHit3: TRectangle;
     LayoutGraphSlot4: TLayout;
     LabelGraphTitle4: TLabel;
     ChartGraph4: TSimpleChart;
+    RectangleGraphHit4: TRectangle;
     SplitterSeries: TSplitter;
     PanelSeries: TPanel;
     LabelSelectedGraph: TLabel;
     ListGraphSeries: TListBox;
-    PopupGraph: TPopupMenu;
+    PopupMenuGraph: TPopupMenu;
+    MenuItemEtalons: TMenuItem;
+    MenuItemDevices: TMenuItem;
     MenuAddSeries: TMenuItem;
     MenuDeleteSeries: TMenuItem;
     MenuMoveSeries: TMenuItem;
@@ -61,6 +78,8 @@ type
     procedure ResetClick(Sender: TObject);
     procedure GraphControlMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
+    procedure GraphHitMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure GraphPopup(Sender: TObject);
     procedure AddSeriesClick(Sender: TObject);
     procedure DeleteSeriesClick(Sender: TObject);
@@ -69,11 +88,12 @@ type
     procedure HideAllSeriesClick(Sender: TObject);
     procedure ClearGraphClick(Sender: TObject);
     procedure SeriesListChange(Sender: TObject);
+    procedure SourceMenuItemClick(Sender: TObject);
   private
     FWorkTable: TWorkTable;
     FConfig: TGraphsViewConfig;
     FSelectedGraph: Integer;
-    FContextGraph: Integer;
+    FContextGraphIndex: Integer;
     FUpdatingControls: Boolean;
     FOnAddSeries: TGraphSourceEvent;
     FOnDeleteSeries: TGraphSourceEvent;
@@ -86,6 +106,11 @@ type
     procedure SyncControls;
     procedure ClearChart(const AIndex: Integer; const AClearAssignments: Boolean);
     procedure PlaceSlot(const ASlot, AArea: Integer; const AAlign: TAlignLayout);
+    procedure ClearDynamicMenu(AParent: TMenuItem);
+    procedure BuildSourceMenu(out AEtalonCount, ADeviceCount: Integer);
+    procedure AddEmptyMenuItem(AParent: TMenuItem; const ACaption: string);
+    procedure AddChannelMenuItem(AParent: TMenuItem; AChannel: TChannel;
+      const AOwnerKind: TGraphSeriesOwnerKind);
   public
     destructor Destroy; override;
     procedure Initialize(AWorkTable: TWorkTable);
@@ -114,9 +139,11 @@ procedure TFrameGraphsWorkspace.Initialize(AWorkTable: TWorkTable);
 begin
   FWorkTable := AWorkTable;
   if FConfig = nil then
+  begin
     FConfig := TGraphsViewConfig.Create;
-  FSelectedGraph := 0;
-  FContextGraph := 0;
+    FSelectedGraph := 0;
+    FContextGraphIndex := 0;
+  end;
   SyncControls;
   ApplyLayout;
   UpdateSeriesList;
@@ -228,16 +255,125 @@ end;
 
 procedure TFrameGraphsWorkspace.GraphControlMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+begin
+  GraphHitMouseDown(Sender, Button, Shift, X, Y);
+end;
+
+procedure TFrameGraphsWorkspace.GraphHitMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 var P: TPointF;
+    EtalonCount, DeviceCount: Integer;
 begin
   if not (Sender is TControl) then Exit;
   SelectGraph(TControl(Sender).Tag);
   if Button = TMouseButton.mbRight then
   begin
-    FContextGraph := TControl(Sender).Tag;
+    FContextGraphIndex := TControl(Sender).Tag;
+    BuildSourceMenu(EtalonCount, DeviceCount);
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphContextMenuOpened',
+      'Открыто контекстное меню графика',
+      Format('GraphIndex=%d; EtalonCount=%d; DeviceCount=%d',
+        [FContextGraphIndex, EtalonCount, DeviceCount]));
     P := TControl(Sender).LocalToScreen(PointF(X, Y));
-    PopupGraph.Popup(P.X, P.Y);
+    PopupMenuGraph.Popup(P.X, P.Y);
   end;
+end;
+
+procedure TFrameGraphsWorkspace.ClearDynamicMenu(AParent: TMenuItem);
+begin
+  while (AParent <> nil) and (AParent.ChildrenCount > 0) do
+    AParent.Children[0].Free;
+end;
+
+procedure TFrameGraphsWorkspace.AddEmptyMenuItem(AParent: TMenuItem;
+  const ACaption: string);
+var Item: TMenuItem;
+begin
+  Item := TMenuItem.Create(AParent);
+  Item.Parent := AParent;
+  Item.Text := ACaption;
+  Item.Enabled := False;
+end;
+
+procedure TFrameGraphsWorkspace.AddChannelMenuItem(AParent: TMenuItem;
+  AChannel: TChannel; const AOwnerKind: TGraphSeriesOwnerKind);
+var Item: TGraphSourceMenuItem;
+begin
+  Item := TGraphSourceMenuItem.Create(AParent);
+  Item.Parent := AParent;
+  Item.GraphIndex := FContextGraphIndex;
+  Item.OwnerKind := AOwnerKind;
+  Item.SourceKind := gskFlow;
+  Item.ChannelUUID := AChannel.UUID;
+  Item.MeterValueKey := 'ValueFlow';
+  Item.Serial := Trim(AChannel.Serial);
+  Item.SourceCaption := Trim(AChannel.Name);
+  if Item.SourceCaption = '' then
+    Item.SourceCaption := Trim(AChannel.Text);
+  if Item.Serial <> '' then
+    Item.Text := Format('%s — %s', [Item.Serial, Item.SourceCaption])
+  else
+    Item.Text := Item.SourceCaption;
+  Item.SourceCaption := Item.Text;
+  Item.OnClick := SourceMenuItemClick;
+end;
+
+procedure TFrameGraphsWorkspace.BuildSourceMenu(out AEtalonCount,
+  ADeviceCount: Integer);
+var Channel: TChannel;
+begin
+  AEtalonCount := 0;
+  ADeviceCount := 0;
+  ClearDynamicMenu(MenuItemEtalons);
+  ClearDynamicMenu(MenuItemDevices);
+  MenuItemEtalons.Enabled := FWorkTable <> nil;
+  MenuItemDevices.Enabled := FWorkTable <> nil;
+  if FWorkTable <> nil then
+  begin
+    for Channel in FWorkTable.EtalonChannels do
+      if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) then
+      begin
+        AddChannelMenuItem(MenuItemEtalons, Channel, gsokEtalon);
+        Inc(AEtalonCount);
+      end;
+    for Channel in FWorkTable.DeviceChannels do
+      if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) then
+      begin
+        AddChannelMenuItem(MenuItemDevices, Channel, gsokDevice);
+        Inc(ADeviceCount);
+      end;
+  end;
+  if AEtalonCount = 0 then
+    AddEmptyMenuItem(MenuItemEtalons, 'Нет включённых эталонов');
+  if ADeviceCount = 0 then
+    AddEmptyMenuItem(MenuItemDevices, 'Нет включённых приборов');
+  if (AEtalonCount = 0) and (ADeviceCount = 0) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceMenuEmpty',
+      'Нет доступных источников графика',
+      Format('GraphIndex=%d', [FContextGraphIndex]));
+end;
+
+procedure TFrameGraphsWorkspace.SourceMenuItemClick(Sender: TObject);
+var
+  Item: TGraphSourceMenuItem;
+  Source: TGraphSeriesConfig;
+  Added: Boolean;
+begin
+  if not (Sender is TGraphSourceMenuItem) then Exit;
+  Item := TGraphSourceMenuItem(Sender);
+  Source := TGraphSeriesConfig.Create;
+  Source.OwnerKind := Item.OwnerKind;
+  Source.SourceKind := Item.SourceKind;
+  Source.ChannelUUID := Item.ChannelUUID;
+  Source.MeterValueKey := Item.MeterValueKey;
+  Source.Caption := Item.SourceCaption;
+  Added := AddSource(FContextGraphIndex, Source);
+  SelectGraph(FContextGraphIndex);
+  ProtocolManager.AddMessage(pcProc, psForm, 'GraphSourceSelected',
+    'Выбран источник графика',
+    Format('GraphIndex=%d; SourceKind=%d; Serial=%s; ChannelUUID=%s; MeterValueKey=%s; Existing=%s',
+      [FContextGraphIndex, Ord(Item.OwnerKind), Item.Serial, Item.ChannelUUID,
+       Item.MeterValueKey, BoolToStr(not Added, True)]));
 end;
 
 procedure TFrameGraphsWorkspace.GraphPopup(Sender: TObject);
@@ -268,26 +404,42 @@ begin ClearChart(AGraphIndex, True); if AGraphIndex = FSelectedGraph then Update
 procedure TFrameGraphsWorkspace.ClearAllGraphs;
 var I: Integer; begin if FConfig <> nil then for I := 0 to FConfig.GraphCount - 1 do ClearChart(I, True); UpdateSeriesList end;
 procedure TFrameGraphsWorkspace.ClearAllClick(Sender: TObject); begin ClearAllGraphs end;
-procedure TFrameGraphsWorkspace.ClearGraphClick(Sender: TObject); begin ClearGraph(FContextGraph) end;
+procedure TFrameGraphsWorkspace.ClearGraphClick(Sender: TObject); begin ClearGraph(FContextGraphIndex) end;
 procedure TFrameGraphsWorkspace.ResetClick(Sender: TObject); begin FConfig.Reset; SyncControls; ApplyLayout; UpdateSeriesList end;
 
 function TFrameGraphsWorkspace.AddSource(const AGraphIndex: Integer; ASource: TGraphSeriesConfig): Boolean;
+var
+  Chart: TSimpleChart;
+  Series: TChartSeries;
 begin
   Result := False;
   if (ASource = nil) or (FConfig = nil) or (AGraphIndex < 0) or (AGraphIndex >= FConfig.Panels.Count) then Exit;
   ASource.GraphIndex := AGraphIndex;
   Result := FConfig.Panels[AGraphIndex].AddSeries(ASource);
-  if not Result then ASource.Free;
+  if not Result then
+    ASource.Free
+  else
+  begin
+    Chart := ChartByIndex(AGraphIndex);
+    if Chart <> nil then
+    begin
+      Series := Chart.AddSeries(ASource.Caption);
+      Series.Color := ASource.Color;
+      Series.Visible := True;
+      Chart.InvalidateChart;
+    end;
+  end;
   if AGraphIndex = FSelectedGraph then UpdateSeriesList;
 end;
 
-procedure TFrameGraphsWorkspace.AddSeriesClick(Sender: TObject); begin if Assigned(FOnAddSeries) then FOnAddSeries(Self, FContextGraph) end;
-procedure TFrameGraphsWorkspace.DeleteSeriesClick(Sender: TObject); begin if Assigned(FOnDeleteSeries) then FOnDeleteSeries(Self, FContextGraph) end;
-procedure TFrameGraphsWorkspace.MoveSeriesClick(Sender: TObject); begin if Assigned(FOnMoveSeries) then FOnMoveSeries(Self, FContextGraph) end;
+procedure TFrameGraphsWorkspace.AddSeriesClick(Sender: TObject); begin if Assigned(FOnAddSeries) then FOnAddSeries(Self, FContextGraphIndex) end;
+procedure TFrameGraphsWorkspace.DeleteSeriesClick(Sender: TObject); begin if Assigned(FOnDeleteSeries) then FOnDeleteSeries(Self, FContextGraphIndex) end;
+procedure TFrameGraphsWorkspace.MoveSeriesClick(Sender: TObject); begin if Assigned(FOnMoveSeries) then FOnMoveSeries(Self, FContextGraphIndex) end;
 procedure TFrameGraphsWorkspace.ShowAllSeriesClick(Sender: TObject);
-var S: TGraphSeriesConfig; begin for S in FConfig.Panels[FContextGraph].Series do S.Visible := True; UpdateSeriesList end;
+var S: TGraphSeriesConfig; begin for S in FConfig.Panels[FContextGraphIndex].Series do S.Visible := True; UpdateSeriesList end;
 procedure TFrameGraphsWorkspace.HideAllSeriesClick(Sender: TObject);
-var S: TGraphSeriesConfig; begin for S in FConfig.Panels[FContextGraph].Series do S.Visible := False; UpdateSeriesList end;
+var S: TGraphSeriesConfig; begin for S in FConfig.Panels[FContextGraphIndex].Series do S.Visible := False; UpdateSeriesList end;
 procedure TFrameGraphsWorkspace.SeriesListChange(Sender: TObject); begin end;
 procedure TFrameGraphsWorkspace.UpdateGraphs; begin { data is supplied through configured sources by the host update cycle } end;
+
 end.

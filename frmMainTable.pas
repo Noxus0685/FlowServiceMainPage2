@@ -6309,7 +6309,10 @@ var
   MeasurementSegment, RunActive, NewRunStarted, PointChanged, SampleAdded: Boolean;
 begin
   if FGraphsWorkspace <> nil then
+  begin
+    FGraphsWorkspace.Initialize(FActiveWorkTable);
     FGraphsWorkspace.UpdateGraphs;
+  end;
   if FFlowGraphHistory = nil then
     Exit;
 

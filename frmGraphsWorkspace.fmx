@@ -141,14 +141,22 @@ object FrameGraphsWorkspace: TFrameGraphsWorkspace
             OnMouseDown = GraphControlMouseDown
           end
           object ChartGraph1: TSimpleChart
-            Tag = 0
             Align = Client
             Position.Y = 28.000000000000000000
             Size.Width = 824.000000000000000000
             Size.Height = 296.000000000000000000
             Title = #1043#1088#1072#1092#1080#1082' 1'
             XTitle = #1042#1088#1077#1084#1103
-            OnMouseDown = GraphControlMouseDown
+          end
+          object RectangleGraphHit1: TRectangle
+            Tag = 0
+            Align = Client
+            Cursor = crDefault
+            Fill.Kind = None
+            HitTest = True
+            Opacity = 1.000000000000000000
+            Stroke.Kind = None
+            OnMouseDown = GraphHitMouseDown
           end
         end
         object LayoutGraphSlot2: TLayout
@@ -167,14 +175,22 @@ object FrameGraphsWorkspace: TFrameGraphsWorkspace
             OnMouseDown = GraphControlMouseDown
           end
           object ChartGraph2: TSimpleChart
-            Tag = 1
             Align = Client
             Position.Y = 28.000000000000000000
             Size.Width = 824.000000000000000000
             Size.Height = 291.000000000000000000
             Title = #1043#1088#1072#1092#1080#1082' 2'
             XTitle = #1042#1088#1077#1084#1103
-            OnMouseDown = GraphControlMouseDown
+          end
+          object RectangleGraphHit2: TRectangle
+            Tag = 1
+            Align = Client
+            Cursor = crDefault
+            Fill.Kind = None
+            HitTest = True
+            Opacity = 1.000000000000000000
+            Stroke.Kind = None
+            OnMouseDown = GraphHitMouseDown
           end
         end
         object LayoutGraphSlot3: TLayout
@@ -193,14 +209,22 @@ object FrameGraphsWorkspace: TFrameGraphsWorkspace
             OnMouseDown = GraphControlMouseDown
           end
           object ChartGraph3: TSimpleChart
-            Tag = 2
             Align = Client
             Position.Y = 28.000000000000000000
             Size.Width = 400.000000000000000000
             Size.Height = 272.000000000000000000
             Title = #1043#1088#1072#1092#1080#1082' 3'
             XTitle = #1042#1088#1077#1084#1103
-            OnMouseDown = GraphControlMouseDown
+          end
+          object RectangleGraphHit3: TRectangle
+            Tag = 2
+            Align = Client
+            Cursor = crDefault
+            Fill.Kind = None
+            HitTest = True
+            Opacity = 1.000000000000000000
+            Stroke.Kind = None
+            OnMouseDown = GraphHitMouseDown
           end
         end
         object LayoutGraphSlot4: TLayout
@@ -219,14 +243,22 @@ object FrameGraphsWorkspace: TFrameGraphsWorkspace
             OnMouseDown = GraphControlMouseDown
           end
           object ChartGraph4: TSimpleChart
-            Tag = 3
             Align = Client
             Position.Y = 28.000000000000000000
             Size.Width = 400.000000000000000000
             Size.Height = 272.000000000000000000
             Title = #1043#1088#1072#1092#1080#1082' 4'
             XTitle = #1042#1088#1077#1084#1103
-            OnMouseDown = GraphControlMouseDown
+          end
+          object RectangleGraphHit4: TRectangle
+            Tag = 3
+            Align = Client
+            Cursor = crDefault
+            Fill.Kind = None
+            HitTest = True
+            Opacity = 1.000000000000000000
+            Stroke.Kind = None
+            OnMouseDown = GraphHitMouseDown
           end
         end
       end
@@ -258,8 +290,14 @@ object FrameGraphsWorkspace: TFrameGraphsWorkspace
       end
     end
   end
-  object PopupGraph: TPopupMenu
+  object PopupMenuGraph: TPopupMenu
     OnPopup = GraphPopup
+    object MenuItemEtalons: TMenuItem
+      Text = #1069#1090#1072#1083#1086#1085#1099
+    end
+    object MenuItemDevices: TMenuItem
+      Text = #1055#1088#1080#1073#1086#1088#1099
+    end
     object MenuAddSeries: TMenuItem
       Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1089#1077#1088#1080#1102
       OnClick = AddSeriesClick
