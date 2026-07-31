@@ -4,9 +4,11 @@ interface
 
 uses
   System.Classes, System.SysUtils, System.Types, System.Math, System.UITypes,
+  System.Generics.Collections,
   FMX.Controls, FMX.Forms, FMX.Layouts, FMX.ListBox, FMX.Menus, FMX.Objects,
   FMX.StdCtrls, FMX.Types, FMX.SimpleChart,
-  uGraphsViewConfig, uProtocols, uWorkTable;
+  uBaseProcedures, uGraphsViewConfig, uMeasurementRun, uMeterValue, uProtocols,
+  uWorkTable;
 
 type
   TGraphSourceEvent = procedure(Sender: TObject; const AGraphIndex: Integer) of object;
@@ -20,6 +22,13 @@ type
     MeterValueKey: string;
     Serial: string;
     SourceCaption: string;
+  end;
+
+  TGraphSeriesRuntime = class
+  public
+    ChartSeries: TChartSeries;
+    LastSampleTimeMs: Int64;
+    LastSampleIndex: Integer;
   end;
 
   TFrameGraphsWorkspace = class(TFrame)
@@ -98,6 +107,11 @@ type
     FOnAddSeries: TGraphSourceEvent;
     FOnDeleteSeries: TGraphSourceEvent;
     FOnMoveSeries: TGraphSourceEvent;
+    FSeriesRuntime: TObjectDictionary<TGraphSeriesConfig, TGraphSeriesRuntime>;
+    FLastRunActive: Boolean;
+    FSegmentStartMs: Int64;
+    FLastFallbackSampleMs: Int64;
+    FLastUpdateDiagnosticMs: Int64;
     function ChartByIndex(const AIndex: Integer): TSimpleChart;
     function SlotByIndex(const AIndex: Integer): TLayout;
     function AreaByIndex(const AIndex: Integer): TLayout;
@@ -111,6 +125,14 @@ type
     procedure AddEmptyMenuItem(AParent: TMenuItem; const ACaption: string);
     procedure AddChannelMenuItem(AParent: TMenuItem; AChannel: TChannel;
       const AOwnerKind: TGraphSeriesOwnerKind);
+    function ResolveChannel(const ASeries: TGraphSeriesConfig): TChannel;
+    function ResolveMeterValue(const ASeries: TGraphSeriesConfig;
+      AChannel: TChannel): TMeterValue;
+    function IsSamplingActive: Boolean;
+    procedure ResetSeriesSegment(const AStartMs: Int64);
+    procedure RemoveRuntimeSeries(const AConfig: TGraphSeriesConfig;
+      AChart: TSimpleChart);
+    procedure RemoveGraphRuntimeSeries(const AGraphIndex: Integer);
   public
     destructor Destroy; override;
     procedure Initialize(AWorkTable: TWorkTable);
@@ -131,6 +153,7 @@ implementation
 
 destructor TFrameGraphsWorkspace.Destroy;
 begin
+  FSeriesRuntime.Free;
   FConfig.Free;
   inherited;
 end;
@@ -150,6 +173,8 @@ begin
   if FConfig = nil then
   begin
     FConfig := TGraphsViewConfig.Create;
+    FSeriesRuntime := TObjectDictionary<TGraphSeriesConfig,
+      TGraphSeriesRuntime>.Create([doOwnsValues]);
     FSelectedGraph := 0;
     FContextGraphIndex := 0;
   end;
@@ -555,7 +580,12 @@ begin
   Chart := ChartByIndex(AIndex); if Chart = nil then Exit;
   for I := 0 to Chart.SeriesCount - 1 do Chart.Series[I].ClearPoints;
   Chart.InvalidateChart;
-  if AClearAssignments and (FConfig <> nil) and (AIndex < FConfig.Panels.Count) then FConfig.Panels[AIndex].Series.Clear;
+  if AClearAssignments and (FConfig <> nil) and
+     (AIndex < FConfig.Panels.Count) then
+  begin
+    RemoveGraphRuntimeSeries(AIndex);
+    FConfig.Panels[AIndex].Series.Clear;
+  end;
 end;
 
 procedure TFrameGraphsWorkspace.ClearGraph(const AGraphIndex: Integer);
@@ -585,6 +615,12 @@ begin
       Series := Chart.AddSeries(ASource.Caption);
       Series.Color := ASource.Color;
       Series.Visible := True;
+      if FSeriesRuntime = nil then
+        FSeriesRuntime := TObjectDictionary<TGraphSeriesConfig,
+          TGraphSeriesRuntime>.Create([doOwnsValues]);
+      FSeriesRuntime.Add(ASource, TGraphSeriesRuntime.Create);
+      FSeriesRuntime[ASource].ChartSeries := Series;
+      FSeriesRuntime[ASource].LastSampleIndex := -1;
       Chart.InvalidateChart;
     end;
   end;
@@ -599,6 +635,265 @@ var S: TGraphSeriesConfig; begin for S in FConfig.Panels[FContextGraphIndex].Ser
 procedure TFrameGraphsWorkspace.HideAllSeriesClick(Sender: TObject);
 var S: TGraphSeriesConfig; begin for S in FConfig.Panels[FContextGraphIndex].Series do S.Visible := False; UpdateSeriesList end;
 procedure TFrameGraphsWorkspace.SeriesListChange(Sender: TObject); begin end;
-procedure TFrameGraphsWorkspace.UpdateGraphs; begin { data is supplied through configured sources by the host update cycle } end;
+
+function TFrameGraphsWorkspace.ResolveChannel(
+  const ASeries: TGraphSeriesConfig): TChannel;
+var
+  Channel: TChannel;
+begin
+  Result := nil;
+  if (ASeries = nil) or (FWorkTable = nil) then
+    Exit;
+  if (ASeries.OwnerKind = gsokEtalon) and
+     (FWorkTable.EtalonChannels <> nil) then
+    for Channel in FWorkTable.EtalonChannels do
+      if (Channel <> nil) and SameText(Channel.UUID, ASeries.ChannelUUID) then
+        Exit(Channel);
+  if (ASeries.OwnerKind = gsokDevice) and
+     (FWorkTable.DeviceChannels <> nil) then
+    for Channel in FWorkTable.DeviceChannels do
+      if (Channel <> nil) and SameText(Channel.UUID, ASeries.ChannelUUID) then
+        Exit(Channel);
+end;
+
+function TFrameGraphsWorkspace.ResolveMeterValue(
+  const ASeries: TGraphSeriesConfig; AChannel: TChannel): TMeterValue;
+begin
+  Result := nil;
+  if (ASeries = nil) or (FWorkTable = nil) then
+    Exit;
+  if ASeries.OwnerKind = gsokWorkTable then
+  begin
+    if SameText(ASeries.MeterValueKey, 'ValueFlow') or
+       SameText(ASeries.MeterValueKey, 'FlowRate') then
+      Result := FWorkTable.ValueFlowRate
+    else if SameText(ASeries.MeterValueKey, 'ValueQuantity') then
+      Result := FWorkTable.ValueQuantity;
+    Exit;
+  end;
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) then
+    Exit;
+  if SameText(ASeries.MeterValueKey, 'ValueFlow') or
+     SameText(ASeries.MeterValueKey, 'FlowRate') then
+    Result := AChannel.FlowMeter.ValueFlow
+  else if SameText(ASeries.MeterValueKey, 'ValueQuantity') or
+          SameText(ASeries.MeterValueKey, 'Volume') or
+          SameText(ASeries.MeterValueKey, 'Mass') then
+    Result := AChannel.FlowMeter.ValueQuantity;
+end;
+
+function TFrameGraphsWorkspace.IsSamplingActive: Boolean;
+var
+  Run: TMeasurementRun;
+begin
+  Result := (FWorkTable <> nil) and (FWorkTable.State in
+    [swtSTARTMONITOR, swtSTARTMONITORWAIT, swtMONITOR, swtSTARTTEST,
+     swtSTARTWAIT, swtEXECUTE, swtSTOPTEST, swtSTOPWAIT, swtFINALREAD]);
+  if (not Result) and (FWorkTable <> nil) and
+     (FWorkTable.MeasurementRun is TMeasurementRun) then
+  begin
+    Run := TMeasurementRun(FWorkTable.MeasurementRun);
+    Result := not (Run.Stage in [msNone, msDone]);
+  end;
+end;
+
+procedure TFrameGraphsWorkspace.ResetSeriesSegment(const AStartMs: Int64);
+var
+  Pair: TPair<TGraphSeriesConfig, TGraphSeriesRuntime>;
+begin
+  FSegmentStartMs := AStartMs;
+  if FSeriesRuntime = nil then
+    Exit;
+  for Pair in FSeriesRuntime do
+    if Pair.Value <> nil then
+    begin
+      Pair.Value.LastSampleTimeMs := 0;
+      Pair.Value.LastSampleIndex := -1;
+      if Pair.Value.ChartSeries <> nil then
+        Pair.Value.ChartSeries.ClearPoints;
+    end;
+end;
+
+procedure TFrameGraphsWorkspace.RemoveRuntimeSeries(
+  const AConfig: TGraphSeriesConfig; AChart: TSimpleChart);
+var
+  Runtime: TGraphSeriesRuntime;
+  I: Integer;
+begin
+  if (AConfig = nil) or (FSeriesRuntime = nil) or
+     not FSeriesRuntime.TryGetValue(AConfig, Runtime) then
+    Exit;
+  if (AChart <> nil) and (Runtime.ChartSeries <> nil) then
+    for I := AChart.SeriesCount - 1 downto 0 do
+      if AChart.Series[I] = Runtime.ChartSeries then
+      begin
+        AChart.RemoveSeries(I);
+        Break;
+      end;
+  FSeriesRuntime.Remove(AConfig);
+end;
+
+procedure TFrameGraphsWorkspace.RemoveGraphRuntimeSeries(
+  const AGraphIndex: Integer);
+var
+  Config: TGraphSeriesConfig;
+  Chart: TSimpleChart;
+begin
+  if (FConfig = nil) or (AGraphIndex < 0) or
+     (AGraphIndex >= FConfig.Panels.Count) then
+    Exit;
+  Chart := ChartByIndex(AGraphIndex);
+  for Config in FConfig.Panels[AGraphIndex].Series do
+    RemoveRuntimeSeries(Config, Chart);
+end;
+
+procedure TFrameGraphsWorkspace.UpdateGraphs;
+const
+  DiagnosticIntervalMs = 5000;
+  FallbackSampleIntervalMs = 1000;
+var
+  GraphIndex, SampleIndex, AddedCount: Integer;
+  Config: TGraphSeriesConfig;
+  Runtime: TGraphSeriesRuntime;
+  Channel: TChannel;
+  MeterValue: TMeterValue;
+  Samples: TArray<TMeterValueSample>;
+  Sample: TMeterValueSample;
+  Chart: TSimpleChart;
+  ChartChanged: array[0..3] of Boolean;
+  NowMs, SampleTimeMs: Int64;
+  TimeSec, Value: Double;
+  RunActive, SamplingActive, DiagnosticDue, RuntimeAssigned,
+    SeriesAdded, DoFallback: Boolean;
+begin
+  if (FConfig = nil) or (FSeriesRuntime = nil) then
+    Exit;
+  NowMs := TMeterValue.GetMonotonicTimeMs;
+  RunActive := (FWorkTable <> nil) and
+    (FWorkTable.MeasurementRun is TMeasurementRun) and
+    not (TMeasurementRun(FWorkTable.MeasurementRun).Stage in [msNone, msDone]);
+  SamplingActive := IsSamplingActive;
+  DiagnosticDue := (FLastUpdateDiagnosticMs = 0) or
+    (NowMs - FLastUpdateDiagnosticMs >= DiagnosticIntervalMs);
+  DoFallback := SamplingActive and ((FLastFallbackSampleMs = 0) or
+    (NowMs - FLastFallbackSampleMs >= FallbackSampleIntervalMs));
+  if RunActive and not FLastRunActive then
+    ResetSeriesSegment(NowMs)
+  else if SamplingActive and (FSegmentStartMs = 0) then
+    FSegmentStartMs := NowMs;
+  FLastRunActive := RunActive;
+  AddedCount := 0;
+  FillChar(ChartChanged, SizeOf(ChartChanged), 0);
+
+  if DiagnosticDue and Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphWorkspaceUpdateBegin',
+      'Начато обновление рабочей области графиков',
+      Format('GraphCount=%d; RunActive=%s; SamplingActive=%s',
+        [FConfig.GraphCount, BoolToStr(RunActive, True),
+         BoolToStr(SamplingActive, True)]));
+
+  for GraphIndex := 0 to FConfig.GraphCount - 1 do
+  begin
+    Chart := ChartByIndex(GraphIndex);
+    if Chart = nil then
+      Continue;
+    for Config in FConfig.Panels[GraphIndex].Series do
+    begin
+      RuntimeAssigned := FSeriesRuntime.TryGetValue(Config, Runtime) and
+        (Runtime <> nil) and (Runtime.ChartSeries <> nil);
+      Channel := ResolveChannel(Config);
+      MeterValue := ResolveMeterValue(Config, Channel);
+      if DiagnosticDue and Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcProc, psForm,
+          'GraphWorkspaceSeriesResolve', 'Разрешение источника серии графика',
+          Format('GraphIndex=%d; ChannelUUID=%s; MeterValueKey=%s; ChannelFound=%s; MeterValueFound=%s; ChartSeriesAssigned=%s',
+            [GraphIndex, Config.ChannelUUID, Config.MeterValueKey,
+             BoolToStr(Channel <> nil, True), BoolToStr(MeterValue <> nil, True),
+             BoolToStr(RuntimeAssigned, True)]));
+      if (not RuntimeAssigned) or (MeterValue = nil) then
+      begin
+        if DiagnosticDue and Assigned(ProtocolManager) then
+          ProtocolManager.AddMessage(pcProc, psForm,
+            'GraphWorkspacePointSkipped', 'Точка графика пропущена',
+            Format('GraphIndex=%d; ChannelUUID=%s; MeterValueKey=%s; Reason=SourceNotResolved',
+              [GraphIndex, Config.ChannelUUID, Config.MeterValueKey]));
+        Continue;
+      end;
+      Runtime.ChartSeries.Visible := Config.Visible;
+      if (not Config.Visible) or (not SamplingActive) then
+        Continue;
+      SeriesAdded := False;
+      Samples := MeterValue.GetStabilitySamples;
+      for SampleIndex := 0 to High(Samples) do
+      begin
+        Sample := Samples[SampleIndex];
+        if Sample.TimeStampMs <= Runtime.LastSampleTimeMs then
+          Continue;
+        Runtime.LastSampleTimeMs := Sample.TimeStampMs;
+        Runtime.LastSampleIndex := SampleIndex;
+        if (FSegmentStartMs > 0) and (Sample.TimeStampMs < FSegmentStartMs) then
+          Continue;
+        Value := Sample.Value;
+        if IsNan(Value) or IsInfinite(Value) or (Abs(Value) >= MaxDouble) then
+          Continue;
+        if FSegmentStartMs = 0 then
+          FSegmentStartMs := Sample.TimeStampMs;
+        TimeSec := (Sample.TimeStampMs - FSegmentStartMs) / 1000.0;
+        Runtime.ChartSeries.AddPoint(TimeSec, Value);
+        Inc(AddedCount);
+        SeriesAdded := True;
+        if DiagnosticDue and Assigned(ProtocolManager) then
+          ProtocolManager.AddMessage(pcProc, psForm,
+            'GraphWorkspacePointAdded', 'Добавлена точка графика',
+            Format('GraphIndex=%d; ChannelUUID=%s; TimeSec=%g; Value=%g; PointsCount=%d',
+              [GraphIndex, Config.ChannelUUID, TimeSec, Value,
+               Runtime.ChartSeries.Points.Count]));
+      end;
+      if (not SeriesAdded) and DoFallback then
+      begin
+        Value := MeterValue.GetDoubleValue;
+        if not IsNan(Value) and not IsInfinite(Value) and
+           (Abs(Value) < MaxDouble) then
+        begin
+          SampleTimeMs := NowMs;
+          TimeSec := Max(0.0, (SampleTimeMs - FSegmentStartMs) / 1000.0);
+          Runtime.ChartSeries.AddPoint(TimeSec, Value);
+          Runtime.LastSampleTimeMs := Max(Runtime.LastSampleTimeMs, SampleTimeMs);
+          Inc(AddedCount);
+          SeriesAdded := True;
+          if DiagnosticDue and Assigned(ProtocolManager) then
+            ProtocolManager.AddMessage(pcProc, psForm,
+              'GraphWorkspacePointAdded', 'Добавлена текущая точка графика',
+              Format('GraphIndex=%d; ChannelUUID=%s; TimeSec=%g; Value=%g; PointsCount=%d',
+                [GraphIndex, Config.ChannelUUID, TimeSec, Value,
+                 Runtime.ChartSeries.Points.Count]));
+        end;
+      end;
+      if SeriesAdded then
+        ChartChanged[GraphIndex] := True;
+    end;
+    if ChartChanged[GraphIndex] then
+    begin
+      Chart.AutoRangeX := True;
+      Chart.AutoRangeY := True;
+      Chart.InvalidateChart;
+      if DiagnosticDue and Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcProc, psForm, 'GraphScale',
+          'Автоматический масштаб графика',
+          Format('GraphIndex=%d; AutoRangeX=True; AutoRangeY=True',
+            [GraphIndex]));
+    end;
+  end;
+  if DoFallback then
+    FLastFallbackSampleMs := NowMs;
+  if DiagnosticDue then
+  begin
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphWorkspaceUpdateDone',
+        'Обновление рабочей области графиков завершено',
+        Format('AddedPoints=%d', [AddedCount]));
+    FLastUpdateDiagnosticMs := NowMs;
+  end;
+end;
 
 end.
