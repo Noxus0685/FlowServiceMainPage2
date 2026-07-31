@@ -20,18 +20,30 @@ def test_series_runtime_owns_individual_tolerance_visual():
     assert 'ARuntime.ToleranceVisual := Result' in SOURCE
 
 
+def test_delphi_loop_and_resolver_variables_are_local():
+    destructor = routine('destructor TGraphToleranceVisual.Destroy')
+    assert 'procedure RemoveItem(AItem: TChartSeries);\n  var\n    I: Integer;' in destructor
+    point_resolver = routine('function TFrameGraphsWorkspace.ResolveSeriesPoint')
+    assert 'RunPoint: TDevicePoint;' in point_resolver
+    tolerance_resolver = routine(
+        'function TFrameGraphsWorkspace.ResolveSeriesTolerance')
+    assert 'SourceDevice: TDevice;' in tolerance_resolver
+    assert 'SourcePoint: TDevicePoint;' in tolerance_resolver
+    assert 'SourcePointIndex: Integer;' in tolerance_resolver
+
+
 def test_series_point_is_resolved_within_owning_channel_device():
     body = routine('function TFrameGraphsWorkspace.ResolveSeriesPoint')
     assert 'Channel := ResolveChannel(ASeriesConfig)' in body
     assert 'ADevice := Channel.FlowMeter.Device' in body
     assert 'ADevice.Points[Run.CurrentPointIndex]' in body
-    assert 'SameValue(Candidate.Q, Run.CurrentPoint.Q, Epsilon)' in body
+    assert 'SameValue(Candidate.Q, RunPoint.Q, Epsilon)' in body
 
 
 def test_tolerance_uses_source_point_q_and_error():
     body = routine('function TFrameGraphsWorkspace.ResolveSeriesTolerance')
-    assert 'AInfo.TargetQ := AInfo.SourcePoint.Q' in body
-    assert 'AInfo.ErrorPercent := Abs(AInfo.SourcePoint.Error)' in body
+    assert 'AInfo.TargetQ := SourcePoint.Q' in body
+    assert 'AInfo.ErrorPercent := Abs(SourcePoint.Error)' in body
     assert 'Run.CurrentPoint.Error' not in body
     assert 'Abs(AInfo.TargetQ) * Abs(AInfo.ErrorPercent) / 100.0' in body
 

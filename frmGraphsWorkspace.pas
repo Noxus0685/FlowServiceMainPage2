@@ -323,9 +323,9 @@ begin
 end;
 
 destructor TGraphToleranceVisual.Destroy;
-var
-  I: Integer;
   procedure RemoveItem(AItem: TChartSeries);
+  var
+    I: Integer;
   begin
     if (Chart = nil) or (AItem = nil) then Exit;
     for I := Chart.SeriesCount - 1 downto 0 do
@@ -2060,75 +2060,12 @@ function TFrameGraphsWorkspace.ResolveSeriesPoint(
   out AReason: string): Boolean;
 var
   Run: TMeasurementRun;
+  RunPoint: TDevicePoint;
   Channel: TChannel;
-  Device: TDevice;
-  ResolvedIndex: Integer;
-  IndexMismatch: Boolean;
   Candidate: TDevicePoint;
   I: Integer;
-  QMatches: Boolean;
+  QMatches, IndexMismatch: Boolean;
   Epsilon: Double;
-
-  procedure SetSource(ADevice: TDevice; APoint: TDevicePoint;
-    const APointIndex: Integer; const ASourceKind: string);
-  begin
-    AInfo.Device := ADevice;
-    AInfo.Point := APoint;
-    if ADevice <> nil then
-      AInfo.DeviceUUID := ADevice.UUID;
-    AInfo.PointUUID := APoint.UUID;
-    AInfo.PointIndex := APointIndex;
-    AInfo.TargetQ := APoint.Q;
-    AInfo.ErrorPercent := APoint.Error;
-    AInfo.SourceKind := ASourceKind;
-  end;
-
-  function FindByUUID(out ADevice: TDevice;
-    out APointIndex: Integer): TDevicePoint;
-  var
-    J: Integer;
-    LocalChannel: TChannel;
-  begin
-    Result := nil; ADevice := nil; APointIndex := -1;
-    if (RunPoint = nil) or (Trim(RunPoint.UUID) = '') or
-       (FWorkTable.DeviceChannels = nil) then Exit;
-    for LocalChannel in FWorkTable.DeviceChannels do
-      if (LocalChannel <> nil) and LocalChannel.Enabled and
-         (LocalChannel.FlowMeter <> nil) then
-      begin
-        ADevice := LocalChannel.FlowMeter.Device;
-        if (ADevice = nil) or (ADevice.Points = nil) then Continue;
-        for J := 0 to ADevice.Points.Count - 1 do
-          if (ADevice.Points[J] <> nil) and SameText(
-             NormalizeUUID(ADevice.Points[J].UUID), NormalizeUUID(RunPoint.UUID)) then
-          begin APointIndex := J; Exit(ADevice.Points[J]) end;
-      end;
-    ADevice := nil;
-  end;
-
-  function FindByQAndName(out ADevice: TDevice;
-    out APointIndex: Integer): TDevicePoint;
-  var
-    J: Integer;
-    LocalChannel: TChannel;
-  begin
-    Result := nil; ADevice := nil; APointIndex := -1;
-    if (RunPoint = nil) or (FWorkTable.DeviceChannels = nil) then Exit;
-    for LocalChannel in FWorkTable.DeviceChannels do
-      if (LocalChannel <> nil) and LocalChannel.Enabled and
-         (LocalChannel.FlowMeter <> nil) then
-      begin
-        ADevice := LocalChannel.FlowMeter.Device;
-        if (ADevice = nil) or (ADevice.Points = nil) then Continue;
-        for J := 0 to ADevice.Points.Count - 1 do
-          if (ADevice.Points[J] <> nil) and SameValue(ADevice.Points[J].Q,
-             RunPoint.Q, Max(1E-9, Abs(RunPoint.Q) * 1E-6)) and
-             SameText(Trim(ADevice.Points[J].Name), Trim(RunPoint.Name)) then
-          begin APointIndex := J; Exit(ADevice.Points[J]) end;
-      end;
-    ADevice := nil;
-  end;
-
 begin
   Result := False;
   ADevice := nil;
@@ -2147,16 +2084,17 @@ begin
   if not (FWorkTable.MeasurementRun is TMeasurementRun) then
   begin AReason := 'PointMissing'; Exit end;
   Run := TMeasurementRun(FWorkTable.MeasurementRun);
-  if Run.CurrentPoint = nil then begin AReason := 'PointMissing'; Exit end;
-  Epsilon := Max(1E-9, Abs(Run.CurrentPoint.Q) * 1E-6);
+  RunPoint := Run.CurrentPoint;
+  if RunPoint = nil then begin AReason := 'PointMissing'; Exit end;
+  Epsilon := Max(1E-9, Abs(RunPoint.Q) * 1E-6);
 
   { The common point UUID is the strongest identity and is resolved only
     inside the device which owns this series' channel. }
-  if Trim(Run.CurrentPoint.UUID) <> '' then
+  if Trim(RunPoint.UUID) <> '' then
     for I := 0 to ADevice.Points.Count - 1 do
       if (ADevice.Points[I] <> nil) and SameText(
         NormalizeUUID(ADevice.Points[I].UUID),
-        NormalizeUUID(Run.CurrentPoint.UUID)) then
+        NormalizeUUID(RunPoint.UUID)) then
       begin APoint := ADevice.Points[I]; APointIndex := I; Break end;
   if APoint <> nil then Exit(True);
 
@@ -2167,10 +2105,10 @@ begin
     Candidate := ADevice.Points[Run.CurrentPointIndex];
     if Candidate <> nil then
     begin
-      QMatches := SameValue(Candidate.Q, Run.CurrentPoint.Q, Epsilon);
-      if ((Trim(Run.CurrentPoint.UUID) <> '') and
+      QMatches := SameValue(Candidate.Q, RunPoint.Q, Epsilon);
+      if ((Trim(RunPoint.UUID) <> '') and
           SameText(NormalizeUUID(Candidate.UUID),
-            NormalizeUUID(Run.CurrentPoint.UUID))) or QMatches then
+            NormalizeUUID(RunPoint.UUID))) or QMatches then
       begin
         APoint := Candidate;
         APointIndex := Run.CurrentPointIndex;
@@ -2183,16 +2121,16 @@ begin
   { Q matching also uses the unconverted base flow value. }
   for I := 0 to ADevice.Points.Count - 1 do
     if (ADevice.Points[I] <> nil) and SameValue(ADevice.Points[I].Q,
-      Run.CurrentPoint.Q, Epsilon) then
+      RunPoint.Q, Epsilon) then
     begin APoint := ADevice.Points[I]; APointIndex := I; Exit(True) end;
   for I := 0 to ADevice.Points.Count - 1 do
     if (ADevice.Points[I] <> nil) and
-       SameText(Trim(ADevice.Points[I].Name), Trim(Run.CurrentPoint.Name)) and
-       SameValue(ADevice.Points[I].Q, Run.CurrentPoint.Q, Epsilon) then
+       SameText(Trim(ADevice.Points[I].Name), Trim(RunPoint.Name)) and
+       SameValue(ADevice.Points[I].Q, RunPoint.Q, Epsilon) then
     begin APoint := ADevice.Points[I]; APointIndex := I; Exit(True) end;
 
   if IndexMismatch then AReason := 'SeriesPointIndexMismatch'
-  else if Trim(Run.CurrentPoint.UUID) <> '' then
+  else if Trim(RunPoint.UUID) <> '' then
     AReason := 'SeriesPointUUIDMismatch'
   else AReason := 'SeriesPointQMismatch';
 end;
@@ -2202,6 +2140,9 @@ function TFrameGraphsWorkspace.ResolveSeriesTolerance(
   out AInfo: TGraphSeriesToleranceInfo; out AReason: string): Boolean;
 var
   Run: TMeasurementRun;
+  SourceDevice: TDevice;
+  SourcePoint: TDevicePoint;
+  SourcePointIndex: Integer;
   ToleranceValue: Double;
   OwnerText: string;
 begin
@@ -2229,15 +2170,18 @@ begin
     [AGraphIndex, OwnerText, ASeriesConfig.ChannelUUID,
      ASeriesConfig.MeterValueKey, ASeriesConfig.Caption, Run.CurrentPointIndex]));
   if IsPointTransitionStage then begin AReason := 'TransitionStage'; Exit end;
-  if not ResolveSeriesPoint(ASeriesConfig, AInfo.SourceDevice,
-     AInfo.SourcePoint, AInfo.PointIndex, AReason) then Exit;
-  if not IsValidTolerancePoint(AInfo.SourcePoint) then
+  if not ResolveSeriesPoint(ASeriesConfig, SourceDevice, SourcePoint,
+     SourcePointIndex, AReason) then Exit;
+  if not IsValidTolerancePoint(SourcePoint) then
   begin AReason := 'PointInvalid'; Exit end;
-  AInfo.DeviceUUID := AInfo.SourceDevice.UUID;
-  AInfo.PointUUID := AInfo.SourcePoint.UUID;
-  AInfo.PointName := AInfo.SourcePoint.Name;
-  AInfo.TargetQ := AInfo.SourcePoint.Q;
-  AInfo.ErrorPercent := Abs(AInfo.SourcePoint.Error);
+  AInfo.SourceDevice := SourceDevice;
+  AInfo.SourcePoint := SourcePoint;
+  AInfo.PointIndex := SourcePointIndex;
+  AInfo.DeviceUUID := SourceDevice.UUID;
+  AInfo.PointUUID := SourcePoint.UUID;
+  AInfo.PointName := SourcePoint.Name;
+  AInfo.TargetQ := SourcePoint.Q;
+  AInfo.ErrorPercent := Abs(SourcePoint.Error);
   AInfo.SourceKind := OwnerText + 'DevicePoint';
   LogToleranceEvent('GraphSeriesToleranceSourceResolved',
     Format('%d|%s|%s', [AGraphIndex, AInfo.ChannelUUID, AInfo.PointUUID]),
