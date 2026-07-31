@@ -216,6 +216,7 @@ type
       const AKind: TGraphSourceKind; const ACaption, AKey: string);
     procedure UpdateGraphHeader(const AGraphIndex: Integer);
     procedure BuildSeriesColorsMenu;
+    procedure EnsureGraphLayoutMenu;
     procedure UpdateGraphSettingsMenu;
     function NextSeriesColor(const AGraphIndex: Integer): TAlphaColor;
     function FindSeries(const AGraphIndex: Integer; const AChannelUUID,
@@ -432,6 +433,7 @@ var
 begin
   if PopupMenuGraph = nil then
     raise EInvalidOperation.Create('PopupMenuGraph не загружен из frmGraphsWorkspace.fmx');
+  EnsureGraphLayoutMenu;
   FWorkTable := AWorkTable;
   FirstInitialization := FConfig = nil;
   if FConfig = nil then
@@ -1109,6 +1111,23 @@ begin
   end;
 end;
 
+procedure TFrameGraphsWorkspace.EnsureGraphLayoutMenu;
+begin
+  { Keep the column selector available even when an older FMX resource without
+    MenuItemLayout is loaded (for example after an incremental application
+    update).  The checked column entries themselves are rebuilt on popup. }
+  if MenuItemLayout <> nil then Exit;
+  if MenuItemSettings = nil then
+    raise EInvalidOperation.Create('MenuItemSettings не загружен из frmGraphsWorkspace.fmx');
+  MenuItemLayout := TMenuItem.Create(Self);
+  MenuItemLayout.Name := 'MenuItemLayout';
+  MenuItemLayout.Text := 'Компоновка';
+  MenuItemSettings.AddObject(MenuItemLayout);
+  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+    'GraphLayoutMenuRestored', 'Восстановлено меню компоновки графиков',
+    'Source=RuntimeFallback; Modes=Auto|1|2|3|4|5|6');
+end;
+
 procedure TFrameGraphsWorkspace.UpdateGraphSettingsMenu;
 const
   Durations: array[0..6] of Integer = (30, 60, 120, 300, 600, 1800, 0);
@@ -1118,6 +1137,20 @@ var
   I: Integer;
   Item: TGraphDurationMenuItem;
 begin
+  EnsureGraphLayoutMenu;
+  ClearDynamicMenu(MenuItemLayout);
+  for I := 0 to 6 do
+  begin
+    LayoutItem := TGraphColumnMenuItem.Create(nil);
+    LayoutItem.ColumnCount := I;
+    if I = 0 then LayoutItem.Text := 'Автоматически'
+    else if I = 1 then LayoutItem.Text := '1 столбец'
+    else LayoutItem.Text := Format('%d столбца', [I]);
+    LayoutItem.IsChecked := (FConfig.AutoGrid and (I = 0)) or
+      ((not FConfig.AutoGrid) and (FConfig.PreferredColumnCount = I));
+    LayoutItem.OnClick := GraphColumnModeClick;
+    MenuItemLayout.AddObject(LayoutItem);
+  end;
   ClearDynamicMenu(MenuItemGraphLength);
   for I := Low(Durations) to High(Durations) do
   begin

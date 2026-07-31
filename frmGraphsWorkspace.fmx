@@ -77,6 +77,9 @@
         Text = 'Показывать служебные линии в легенде'
         OnClick = ToleranceVisibilityClick
       end
+      object MenuItemLayout: TMenuItem
+        Text = 'Компоновка'
+      end
     end
     object MenuItemAddGraph: TMenuItem
       Text = 'Добавить график'
