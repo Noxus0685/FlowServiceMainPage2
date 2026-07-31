@@ -216,7 +216,7 @@ type
       const AKind: TGraphSourceKind; const ACaption, AKey: string);
     procedure UpdateGraphHeader(const AGraphIndex: Integer);
     procedure BuildSeriesColorsMenu;
-    procedure EnsureGraphLayoutMenu;
+    function ResolveGraphLayoutMenu: TMenuItem;
     procedure UpdateGraphSettingsMenu;
     function NextSeriesColor(const AGraphIndex: Integer): TAlphaColor;
     function FindSeries(const AGraphIndex: Integer; const AChannelUUID,
@@ -433,7 +433,7 @@ var
 begin
   if PopupMenuGraph = nil then
     raise EInvalidOperation.Create('PopupMenuGraph не загружен из frmGraphsWorkspace.fmx');
-  EnsureGraphLayoutMenu;
+  ResolveGraphLayoutMenu;
   FWorkTable := AWorkTable;
   FirstInitialization := FConfig = nil;
   if FConfig = nil then
@@ -1111,18 +1111,23 @@ begin
   end;
 end;
 
-procedure TFrameGraphsWorkspace.EnsureGraphLayoutMenu;
+function TFrameGraphsWorkspace.ResolveGraphLayoutMenu: TMenuItem;
+var
+  Component: TComponent;
 begin
-  { Keep the column selector available even when an older FMX resource without
-    MenuItemLayout is loaded (for example after an incremental application
-    update).  The checked column entries themselves are rebuilt on popup. }
-  if MenuItemLayout <> nil then Exit;
+  { Resolve by streamed component name instead of relying on a generated form
+    field: this also supports older/incrementally updated FMX resources. }
+  Result := nil;
+  Component := FindComponent('MenuItemLayout');
+  if Component is TMenuItem then
+    Result := TMenuItem(Component);
+  if Result <> nil then Exit;
   if MenuItemSettings = nil then
     raise EInvalidOperation.Create('MenuItemSettings не загружен из frmGraphsWorkspace.fmx');
-  MenuItemLayout := TMenuItem.Create(Self);
-  MenuItemLayout.Name := 'MenuItemLayout';
-  MenuItemLayout.Text := 'Компоновка';
-  MenuItemSettings.AddObject(MenuItemLayout);
+  Result := TMenuItem.Create(Self);
+  Result.Name := 'MenuItemLayout';
+  Result.Text := 'Компоновка';
+  MenuItemSettings.AddObject(Result);
   if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
     'GraphLayoutMenuRestored', 'Восстановлено меню компоновки графиков',
     'Source=RuntimeFallback; Modes=Auto|1|2|3|4|5|6');
@@ -1136,9 +1141,11 @@ const
 var
   I: Integer;
   Item: TGraphDurationMenuItem;
+  LayoutItem: TGraphColumnMenuItem;
+  LayoutMenu: TMenuItem;
 begin
-  EnsureGraphLayoutMenu;
-  ClearDynamicMenu(MenuItemLayout);
+  LayoutMenu := ResolveGraphLayoutMenu;
+  ClearDynamicMenu(LayoutMenu);
   for I := 0 to 6 do
   begin
     LayoutItem := TGraphColumnMenuItem.Create(nil);
@@ -1149,7 +1156,7 @@ begin
     LayoutItem.IsChecked := (FConfig.AutoGrid and (I = 0)) or
       ((not FConfig.AutoGrid) and (FConfig.PreferredColumnCount = I));
     LayoutItem.OnClick := GraphColumnModeClick;
-    MenuItemLayout.AddObject(LayoutItem);
+    LayoutMenu.AddObject(LayoutItem);
   end;
   ClearDynamicMenu(MenuItemGraphLength);
   for I := Low(Durations) to High(Durations) do
