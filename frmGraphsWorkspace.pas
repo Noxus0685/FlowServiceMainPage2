@@ -164,7 +164,9 @@ type
       out ASamples: TArray<TMeterValueSample>): Boolean;
     procedure UpdateSeriesPoints(AGraphIndex: Integer;
       ASeriesConfig: TGraphSeriesConfig; AChartSeries: TChartSeries;
-      AMeterValue: TMeterValue; var AAddedCount: Integer);
+      AMeterValue: TMeterValue; const ANowMs: Int64;
+      const ADoFallback, ASamplingActive: Boolean;
+      var AAddedCount: Integer);
     function IsSamplingActive: Boolean;
     procedure ResetSeriesSegment(const AStartMs: Int64;
       const APointKey: string);
@@ -989,14 +991,16 @@ end;
 
 procedure TFrameGraphsWorkspace.UpdateSeriesPoints(AGraphIndex: Integer;
   ASeriesConfig: TGraphSeriesConfig; AChartSeries: TChartSeries;
-  AMeterValue: TMeterValue; var AAddedCount: Integer);
+  AMeterValue: TMeterValue; const ANowMs: Int64;
+  const ADoFallback, ASamplingActive: Boolean; var AAddedCount: Integer);
 var
   Runtime: TGraphSeriesRuntime;
   Samples: TArray<TMeterValueSample>;
   Sample: TMeterValueSample;
-  SampleIndex, Added, Skipped: Integer;
+  SampleIndex, Added, Skipped, BufferedAddedCount,
+    FallbackAddedCount: Integer;
   BaseY, DisplayY, X: Double;
-  RejectReason: string;
+  RejectReason, FallbackSkipReason: string;
   FirstRejectedLogged, FirstAcceptedLogged: Boolean;
   NewestSampleTimeMs: Int64;
 begin
@@ -1005,6 +1009,8 @@ begin
     Exit;
   Added := 0;
   Skipped := 0;
+  BufferedAddedCount := 0;
+  FallbackAddedCount := 0;
   FirstRejectedLogged := False;
   FirstAcceptedLogged := False;
   GetSeriesSamples(AMeterValue, Samples);
@@ -1071,6 +1077,7 @@ begin
     Runtime.LastAcceptedValue := BaseY;
     Runtime.LastAcceptedPointKey := FLastPointKey;
     Inc(Added);
+    Inc(BufferedAddedCount);
     Inc(AAddedCount);
     if Assigned(ProtocolManager) then
       ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesPointAdded',
@@ -1088,12 +1095,79 @@ begin
       FirstAcceptedLogged := True;
     end;
   end;
+  FallbackSkipReason := '';
+  if not ASamplingActive then
+    FallbackSkipReason := 'SamplingInactive'
+  else if not ADoFallback then
+    FallbackSkipReason := 'FallbackIntervalNotElapsed'
+  else if BufferedAddedCount > 0 then
+    FallbackSkipReason := 'BufferedSampleAlreadyAdded'
+  else if IsPointTransitionStage then
+    FallbackSkipReason := 'PointTransitionStage'
+  else if AMeterValue = nil then
+    FallbackSkipReason := 'MeterValueMissing'
+  else if AChartSeries = nil then
+    FallbackSkipReason := 'VisualSeriesMissing'
+  else
+  begin
+    BaseY := AMeterValue.GetDoubleValue;
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesFallbackAttempt',
+        'Выполнена попытка резервного обновления серии', Format(
+        'GraphIndex=%d; ChannelUUID=%s; MeterValueKey=%s; DoFallback=%s; SamplingActive=%s; TransitionStage=%s; WaitingForFirstSample=%s; BufferAddedCount=%d; CurrentValue=%g; NowMs=%d; SegmentStartMs=%d; RuntimeResetTimeMs=%d',
+        [AGraphIndex, ASeriesConfig.ChannelUUID, ASeriesConfig.MeterValueKey,
+         BoolToStr(ADoFallback, True), BoolToStr(ASamplingActive, True),
+         BoolToStr(IsPointTransitionStage, True),
+         BoolToStr(Runtime.WaitingForFirstSample, True), BufferedAddedCount,
+         BaseY, ANowMs, FSharedSegmentStartMs, FRuntimeResetTimeMs]));
+    if IsNan(BaseY) or IsInfinite(BaseY) or (Abs(BaseY) >= MaxDouble) then
+      FallbackSkipReason := 'InvalidCurrentValue'
+    else if (FSharedSegmentStartMs = 0) or
+            (ANowMs < FSharedSegmentStartMs) then
+      FallbackSkipReason := 'BeforeSegment'
+    else if ANowMs < FRuntimeResetTimeMs then
+      FallbackSkipReason := 'BeforeRuntimeReset'
+    else if Runtime.WaitingForFirstSample and
+            SameValue(BaseY, 0.0, 1E-12) and
+            (ANowMs - FSharedSegmentStartMs < 1000) then
+      FallbackSkipReason := 'WaitingForFirstSampleZero'
+    else
+    begin
+      X := (ANowMs - FSharedSegmentStartMs) / 1000.0;
+      DisplayY := BaseY;
+      if SameText(ASeriesConfig.MeterValueKey, 'ValueFlow') or
+         SameText(ASeriesConfig.MeterValueKey, 'FlowRate') then
+        DisplayY := ConvertFlowToDisplayUnits(BaseY);
+      AChartSeries.AddPoint(X, DisplayY);
+      Runtime.LastSampleTimeMs := ANowMs;
+      Runtime.LastSampleIndex := -1;
+      Runtime.LastAcceptedValue := BaseY;
+      Runtime.LastAcceptedPointKey := FLastPointKey;
+      Runtime.WaitingForFirstSample := False;
+      Inc(Added);
+      Inc(FallbackAddedCount);
+      Inc(AAddedCount);
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesFallbackAdded',
+          'Резервная точка добавлена в визуальную серию', Format(
+          'GraphIndex=%d; ChannelUUID=%s; TimeSec=%g; BaseValue=%g; DisplayValue=%g; PointsCount=%d; SampleTimeMs=%d',
+          [AGraphIndex, ASeriesConfig.ChannelUUID, X, BaseY, DisplayY,
+           AChartSeries.Points.Count, ANowMs]));
+    end;
+  end;
+  if (FallbackSkipReason <> '') and ADoFallback and
+     Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesFallbackSkipped',
+      'Резервная точка пользовательской серии пропущена', Format(
+      'GraphIndex=%d; ChannelUUID=%s; Reason=%s',
+      [AGraphIndex, ASeriesConfig.ChannelUUID, FallbackSkipReason]));
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesUpdateDone',
       'Обновление пользовательской серии завершено', Format(
-      'GraphIndex=%d; ChannelUUID=%s; SamplesRead=%d; AddedCount=%d; SkippedCount=%d; PointsCount=%d; LastSampleTimeMs=%d',
+      'GraphIndex=%d; ChannelUUID=%s; SamplesRead=%d; AddedCount=%d; BufferedAddedCount=%d; FallbackAddedCount=%d; SkippedCount=%d; PointsCount=%d; LastSampleTimeMs=%d',
       [AGraphIndex, ASeriesConfig.ChannelUUID, Length(Samples), Added,
-       Skipped, AChartSeries.Points.Count, Runtime.LastSampleTimeMs]));
+       BufferedAddedCount, FallbackAddedCount, Skipped,
+       AChartSeries.Points.Count, Runtime.LastSampleTimeMs]));
 end;
 
 function TFrameGraphsWorkspace.IsSamplingActive: Boolean;
@@ -1308,6 +1382,7 @@ begin
     Exit;
   end;
   ResetSeriesSegment(StartMs, APointKey);
+  FLastFallbackSampleMs := 0;
   FSharedTimeInitialized := True;
   FSharedCurrentTimeSec := 0;
   FSharedAxisMinX := 0;
@@ -1474,6 +1549,7 @@ var
 begin
   Count := 0; Cleared := 0;
   FRuntimeResetTimeMs := TMeterValue.GetMonotonicTimeMs;
+  FLastFallbackSampleMs := 0;
   PointKey := CurrentPointKey(PointIndex);
   for Pair in FSeriesRuntime do
   begin
@@ -1495,6 +1571,8 @@ begin
 end;
 
 procedure TFrameGraphsWorkspace.UpdateGraphs;
+const
+  FallbackSampleIntervalMs = 1000;
 var
   GraphIndex, PointIndex, SeriesProcessed, SeriesResolved,
     SeriesFailed, PointsAdded, GraphsInvalidated, SeriesAddedBefore: Integer;
@@ -1502,7 +1580,7 @@ var
   Channel: TChannel; MeterValue: TMeterValue;
   Chart: TSimpleChart; NowMs: Int64;
   RunActive, SamplingActive, NewRunStarted, PointChanged, Changed,
-    SegmentStartRequired, PointStateStored: Boolean;
+    SegmentStartRequired, PointStateStored, DoFallback: Boolean;
   PointKey, StoredPointKey, SelectedReason, Decision, ResolveReason: string;
   SegmentReason: TGraphSegmentStartReason;
   VisualSeries: TChartSeries;
@@ -1524,6 +1602,9 @@ begin
     (FWorkTable.MeasurementRun is TMeasurementRun) and
     not (TMeasurementRun(FWorkTable.MeasurementRun).Stage in [msNone, msDone]);
   SamplingActive := IsSamplingActive and not IsPointTransitionStage;
+  DoFallback := SamplingActive and
+    ((FLastFallbackSampleMs = 0) or
+     (NowMs - FLastFallbackSampleMs >= FallbackSampleIntervalMs));
   PointKey := CurrentPointKey(PointIndex);
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphWorkspaceUpdateBegin',
@@ -1657,7 +1738,7 @@ begin
         Continue;
       SeriesAddedBefore := PointsAdded;
       UpdateSeriesPoints(GraphIndex, Config, VisualSeries, MeterValue,
-        PointsAdded);
+        NowMs, DoFallback, SamplingActive, PointsAdded);
       if PointsAdded > SeriesAddedBefore then
         Changed := True;
       while (FConfig.VisibleDurationSec > 0) and
@@ -1675,6 +1756,8 @@ begin
   end;
   ApplySharedXAxis;
   UpdateToleranceLines;
+  if DoFallback and (SeriesProcessed > 0) then
+    FLastFallbackSampleMs := NowMs;
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphWorkspaceUpdateDone',
       'Обновление визуальных серий рабочей области завершено', Format(

@@ -50,8 +50,8 @@ def test_segment_reset_sets_series_runtime_once():
         assert statement in body
 
 
-def test_version_is_1_0_33():
-    assert "APP_VERSION = '1.0.33';" in VERSION
+def test_version_is_1_0_34():
+    assert "APP_VERSION = '1.0.34';" in VERSION
 
 
 def test_visual_series_pipeline_is_explicit_and_diagnostic():
@@ -77,3 +77,24 @@ def test_visual_series_pipeline_is_explicit_and_diagnostic():
 def test_workspace_update_is_called_once_from_main_refresh():
     main = (ROOT / "frmMainTable.pas").read_text(encoding="utf-8-sig")
     assert main.count("FGraphsWorkspace.UpdateGraphs;") == 1
+
+
+def test_empty_sample_buffer_has_shared_one_second_fallback():
+    update = routine("procedure TFrameGraphsWorkspace.UpdateGraphs")
+    points = routine("procedure TFrameGraphsWorkspace.UpdateSeriesPoints")
+    start = routine("procedure TFrameGraphsWorkspace.StartSharedSegment")
+    reset = routine("procedure TFrameGraphsWorkspace.ResetRuntimeGraphData")
+    assert "FallbackSampleIntervalMs = 1000;" in update
+    assert update.index("DoFallback := SamplingActive") < update.index(
+        "for GraphIndex := 0 to FConfig.GraphCount - 1 do"
+    )
+    assert update.index("FLastFallbackSampleMs := NowMs;") > update.index(
+        "for GraphIndex := 0 to FConfig.GraphCount - 1 do"
+    )
+    assert "BufferedAddedCount > 0" in points
+    assert "BaseY := AMeterValue.GetDoubleValue;" in points
+    assert "AChartSeries.AddPoint(X, DisplayY);" in points
+    assert "IsPointTransitionStage" in points
+    assert "FSharedSegmentStartMs" in points
+    assert "FLastFallbackSampleMs := 0;" in start
+    assert "FLastFallbackSampleMs := 0;" in reset
