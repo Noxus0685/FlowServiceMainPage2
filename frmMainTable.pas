@@ -1508,6 +1508,10 @@ begin
   finally
     IsUpdating := False;
   end;
+  { Channel notifications only synchronize graph assignments/availability;
+    they deliberately do not reinitialize or clear graph runtime data. }
+  if FGraphsWorkspace <> nil then
+    FGraphsWorkspace.RefreshEnabledSources;
 end;
 
 procedure TFrameMainTable.ApplyMonitorIndicatorColor(const AColor: TAlphaColor);

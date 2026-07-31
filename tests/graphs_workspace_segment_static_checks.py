@@ -50,8 +50,8 @@ def test_segment_reset_sets_series_runtime_once():
         assert statement in body
 
 
-def test_version_is_1_0_34():
-    assert "APP_VERSION = '1.0.34';" in VERSION
+def test_version_is_1_0_35():
+    assert "APP_VERSION = '1.0.35';" in VERSION
 
 
 def test_visual_series_pipeline_is_explicit_and_diagnostic():

@@ -36,8 +36,9 @@ type
     FSeries: TObjectList<TGraphSeriesConfig>;
   public
     Title: string;
-    ShowTarget: Boolean;
-    ShowTolerance: Boolean;
+    ShowTargetLine: Boolean;
+    ShowToleranceLines: Boolean;
+    DefaultAssignmentSuppressed: Boolean;
     ShowLegend: Boolean;
     VisibleDurationSec: Integer;
     AutoScaleMode: TGraphAutoScaleMode;
@@ -86,8 +87,9 @@ constructor TGraphPanelConfig.Create(const ATitle: string);
 begin
   inherited Create;
   Title := ATitle;
-  ShowTarget := True;
-  ShowTolerance := True;
+  ShowTargetLine := True;
+  ShowToleranceLines := True;
+  DefaultAssignmentSuppressed := False;
   ShowLegend := True;
   VisibleDurationSec := 0;
   AutoScaleMode := gasWorkingValues;
