@@ -124,10 +124,12 @@ type
   published
     property Align;
     property Anchors;
+    property Tag;
     property Margins;
     property Padding;
     property Visible;
     property Enabled;
+    property OnMouseDown;
 
     // Глобальные настройки осей и диапазонов
     property AutoRangeX: Boolean read FAutoRangeX write SetAutoRangeX default True;
