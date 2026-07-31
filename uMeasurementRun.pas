@@ -5030,6 +5030,24 @@ begin
     Exit;
   end;
 
+  if IsStopRequested then
+  begin
+    SetStopReason(msrCancelledBeforeStart);
+    SetCurrentPointStatus(mptsCancelled);
+
+    ProtocolManager.AddMessage(pcProc, psMeasurement,
+      'ProcessWaitPointSetup',
+      'Ожидание установки точки отменено пользователем',
+      Format('PointIndex=%d; WaitMs=%d',
+        [FCurrentPointIndex,
+         TMeterValue.GetMonotonicTimeMs - FSetupStartedMs]));
+
+    SetStage(msDone);
+    Exit;
+  end;
+
+
+
   if FWorkTable.State <> swtMONITOR then
   begin
     if (FSetupStartedMs > 0) and (CurrentMs - FSetupStartedMs > SETUP_TIMEOUT_S * 1000) then

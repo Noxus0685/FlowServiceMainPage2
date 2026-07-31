@@ -2188,11 +2188,6 @@ end;
 
 procedure TFrameMainTable.OnChangeState(const ANewState: EStateWorkTable); //ChangeStateHandler
 begin
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.State <> ANewState) then
-  begin
-    FActiveWorkTable.State := ANewState;
-    Exit;
-  end;
 
   case ANewState of
     swtNONE:
