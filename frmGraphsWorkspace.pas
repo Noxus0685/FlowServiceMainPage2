@@ -3,7 +3,8 @@
 interface
 
 uses
-  System.Classes, System.SysUtils, System.Types, System.Math, System.UITypes,
+  System.Classes, System.SysUtils, System.StrUtils, System.Types, System.Math,
+  System.UITypes,
   System.Generics.Collections,
   FMX.Controls, FMX.Forms, FMX.Layouts, FMX.ListBox, FMX.Menus, FMX.Objects,
   FMX.StdCtrls, FMX.Types, FMX.SimpleChart,
@@ -284,10 +285,13 @@ type
       out ASourceKind, AReason: string): Boolean;
     function ResolveActiveEtalonTolerance(out ATargetQ, AErrorPercent: Double;
       out APoint: TDevicePoint; out AChannel: TChannel;
-      out AReason: string): Boolean;
+      out APointFlowBase: Double; out ASourceField, AReason: string): Boolean;
     function GetActiveEtalonChannel: TChannel;
-    function FindPointByTargetQ(ADevice: TDevice; const ATargetQ: Double;
-      out APoint: TDevicePoint; out APointIndex: Integer): Boolean;
+    function NormalizePointFlowToBase(APoint: TDevicePoint;
+      const AValue: Double; const ASourceKind: string;
+      out ANormalizedValue: Double; out AReason: string): Boolean;
+    function ResolveEtalonPointFlowInBaseUnits(APoint: TDevicePoint;
+      out AFlowBase: Double; out ASourceField, AReason: string): Boolean;
     function GraphHasVisibleSources(const AGraphIndex: Integer): Boolean;
     procedure HideGraphToleranceLines(const AGraphIndex: Integer);
     procedure UpdateGraphToleranceVisual(const AGraphIndex: Integer;
@@ -305,9 +309,10 @@ type
       out ADevice: TDevice; out APoint: TDevicePoint;
       out APointIndex: Integer; out AReason: string): Boolean;
     function FindEtalonPointByTargetQ(ADevice: TDevice;
-      const ATargetQ: Double; const ARunPointName: string;
+      const ARunTargetQ: Double; const ARunPointName: string;
       const ARunPointIndex: Integer; out APoint: TDevicePoint;
-      out APointIndex: Integer; out AReason: string): Boolean;
+      out APointIndex: Integer; out APointFlowBase: Double;
+      out ASourceField, AReason: string): Boolean;
     function EnsureSeriesToleranceVisual(const AGraphIndex: Integer;
       ASeriesConfig: TGraphSeriesConfig;
       ARuntime: TGraphSeriesRuntime): TGraphToleranceVisual;
@@ -2428,64 +2433,6 @@ begin
   else AReason := 'SeriesPointQMismatch';
 end;
 
-function TFrameGraphsWorkspace.FindEtalonPointByTargetQ(ADevice: TDevice;
-  const ATargetQ: Double; const ARunPointName: string;
-  const ARunPointIndex: Integer; out APoint: TDevicePoint;
-  out APointIndex: Integer; out AReason: string): Boolean;
-var
-  I, FirstIndex, NamedIndex, MatchCount: Integer;
-  Candidate: TDevicePoint;
-  ToleranceQ: Double;
-  InvalidErrorFound: Boolean;
-begin
-  Result := False;
-  APoint := nil;
-  APointIndex := -1;
-  AReason := '';
-  if (ADevice = nil) or (ADevice.Points = nil) then
-  begin AReason := 'EtalonPointsMissing'; Exit end;
-  ToleranceQ := Max(1E-9, Abs(ATargetQ) * 1E-6);
-  FirstIndex := -1;
-  NamedIndex := -1;
-  MatchCount := 0;
-  InvalidErrorFound := False;
-  for I := 0 to ADevice.Points.Count - 1 do
-  begin
-    Candidate := ADevice.Points[I];
-    if (Candidate = nil) or IsNan(Candidate.Q) or IsInfinite(Candidate.Q) or
-       (Abs(Candidate.Q) >= MaxDouble) then Continue;
-    if not SameValue(Candidate.Q, ATargetQ, ToleranceQ) then Continue;
-    if IsNan(Candidate.Error) or IsInfinite(Candidate.Error) or
-       (Abs(Candidate.Error) >= MaxDouble) or (Candidate.Error = 0) then
-    begin
-      InvalidErrorFound := True;
-      Continue;
-    end;
-    Inc(MatchCount);
-    if FirstIndex < 0 then FirstIndex := I;
-    if (NamedIndex < 0) and (Trim(ARunPointName) <> '') and
-       SameText(Trim(Candidate.Name), Trim(ARunPointName)) then
-      NamedIndex := I;
-  end;
-  if MatchCount = 0 then
-  begin
-    if InvalidErrorFound then AReason := 'EtalonPointErrorInvalid'
-    else AReason := 'EtalonPointQNotFound';
-    Exit;
-  end;
-  { Name wins for duplicate Q values.  The run index is accepted only after
-    that indexed point has already passed the Q and Error checks above. }
-  if NamedIndex >= 0 then APointIndex := NamedIndex
-  else if (ARunPointIndex >= 0) and (ARunPointIndex < ADevice.Points.Count) and
-          IsValidTolerancePoint(ADevice.Points[ARunPointIndex]) and
-          SameValue(ADevice.Points[ARunPointIndex].Q, ATargetQ, ToleranceQ) then
-    APointIndex := ARunPointIndex
-  else
-    APointIndex := FirstIndex;
-  APoint := ADevice.Points[APointIndex];
-  Result := True;
-end;
-
 function TFrameGraphsWorkspace.ResolveEtalonSeriesPoint(
   ASeriesConfig: TGraphSeriesConfig; out ADevice: TDevice;
   out APoint: TDevicePoint; out APointIndex: Integer;
@@ -2494,6 +2441,8 @@ var
   Run: TMeasurementRun;
   RunPoint: TDevicePoint;
   Channel: TChannel;
+  PointFlowBase: Double;
+  FlowSourceField: string;
 begin
   Result := False;
   ADevice := nil;
@@ -2521,7 +2470,8 @@ begin
   if (ADevice.Points = nil) or (ADevice.Points.Count = 0) then
   begin AReason := 'EtalonPointsMissing'; Exit end;
   Result := FindEtalonPointByTargetQ(ADevice, RunPoint.Q, RunPoint.Name,
-    Run.CurrentPointIndex, APoint, APointIndex, AReason);
+    Run.CurrentPointIndex, APoint, APointIndex, PointFlowBase,
+    FlowSourceField, AReason);
   if Result and not IsValidTolerancePoint(APoint) then
   begin
     APoint := nil;
@@ -2870,78 +2820,168 @@ begin
   end;
 end;
 
-function TFrameGraphsWorkspace.FindPointByTargetQ(ADevice: TDevice;
-  const ATargetQ: Double; out APoint: TDevicePoint;
-  out APointIndex: Integer): Boolean;
+function TFrameGraphsWorkspace.NormalizePointFlowToBase(
+  APoint: TDevicePoint; const AValue: Double; const ASourceKind: string;
+  out ANormalizedValue: Double; out AReason: string): Boolean;
+const
+  M3H_PER_LS = 3.6;
+begin
+  Result := False;
+  ANormalizedValue := 0;
+  AReason := '';
+  if APoint = nil then begin AReason := 'EtalonPointFlowMissing'; Exit end;
+  if IsNan(AValue) or IsInfinite(AValue) or (Abs(AValue) >= MaxDouble) then
+  begin AReason := 'EtalonPointFlowInvalid'; Exit end;
+
+  { TDevicePoint.Q and TMeasurementRun.CurrentPoint.Q are documented and used
+    by the measurement FSM as l/s.  FlowRate on imported etalon points is the
+    displayed m3/h value used by the etalon channel. }
+  if SameText(ASourceKind, 'Q') then
+    ANormalizedValue := AValue
+  else if SameText(ASourceKind, 'FlowRate') then
+    ANormalizedValue := AValue / M3H_PER_LS
+  else
+  begin AReason := 'EtalonPointFlowUnitUnknown'; Exit end;
+
+  if IsNan(ANormalizedValue) or IsInfinite(ANormalizedValue) or
+     (Abs(ANormalizedValue) >= MaxDouble) then
+  begin AReason := 'EtalonPointFlowNormalizationFailed'; Exit end;
+  Result := True;
+end;
+
+function TFrameGraphsWorkspace.ResolveEtalonPointFlowInBaseUnits(
+  APoint: TDevicePoint; out AFlowBase: Double;
+  out ASourceField, AReason: string): Boolean;
+begin
+  Result := False; AFlowBase := 0; ASourceField := ''; AReason := '';
+  if APoint = nil then begin AReason := 'EtalonPointFlowMissing'; Exit end;
+
+  { Q is the canonical l/s field throughout point selection, range checking,
+    ConfigureStabilityByPoint and ConfigureTargetRangeByPoint.  Older imported
+    etalon point sets may leave Q unset and retain their displayed m3/h flow. }
+  if not IsNan(APoint.Q) and not IsInfinite(APoint.Q) and
+     (Abs(APoint.Q) < MaxDouble) and (APoint.Q <> 0) then
+    ASourceField := 'Q'
+  else if not IsNan(APoint.FlowRate) and not IsInfinite(APoint.FlowRate) and
+          (Abs(APoint.FlowRate) < MaxDouble) and (APoint.FlowRate <> 0) then
+    ASourceField := 'FlowRate'
+  else
+  begin AReason := 'EtalonPointFlowMissing'; Exit end;
+  Result := NormalizePointFlowToBase(APoint,
+    IfThen(SameText(ASourceField, 'Q'), APoint.Q, APoint.FlowRate),
+    ASourceField, AFlowBase, AReason);
+end;
+
+function TFrameGraphsWorkspace.FindEtalonPointByTargetQ(ADevice: TDevice;
+  const ARunTargetQ: Double; const ARunPointName: string;
+  const ARunPointIndex: Integer; out APoint: TDevicePoint;
+  out APointIndex: Integer; out APointFlowBase: Double;
+  out ASourceField, AReason: string): Boolean;
 var
-  I, FirstIndex, NamedIndex: Integer;
-  Point, RunPoint: TDevicePoint;
-  Run: TMeasurementRun;
-  ToleranceQ: Double;
+  I, FirstIndex, NamedIndex, NormalizedCount: Integer;
+  Candidate: TDevicePoint;
+  CandidateFlow, ToleranceQ: Double;
+  CandidateSource, CandidateReason: string;
+  Flows: TArray<Double>;
+  Sources: TArray<string>;
 begin
   Result := False; APoint := nil; APointIndex := -1;
-  if (ADevice = nil) or (ADevice.Points = nil) then Exit;
-  RunPoint := nil;
-  if (FWorkTable <> nil) and (FWorkTable.MeasurementRun is TMeasurementRun) then
-  begin
-    Run := TMeasurementRun(FWorkTable.MeasurementRun);
-    RunPoint := Run.CurrentPoint;
-  end;
-  ToleranceQ := Max(1E-9, Abs(ATargetQ) * 1E-6);
-  FirstIndex := -1; NamedIndex := -1;
+  APointFlowBase := 0; ASourceField := ''; AReason := '';
+  if ADevice = nil then begin AReason := 'EtalonDeviceMissing'; Exit end;
+  if (ADevice.Points = nil) or (ADevice.Points.Count = 0) then
+  begin AReason := 'EtalonPointsMissing'; Exit end;
+  if IsNan(ARunTargetQ) or IsInfinite(ARunTargetQ) or
+     (Abs(ARunTargetQ) >= MaxDouble) then
+  begin AReason := 'RunTargetQInvalid'; Exit end;
+
+  ToleranceQ := Max(1E-9, Abs(ARunTargetQ) * 1E-6);
+  SetLength(Flows, ADevice.Points.Count);
+  SetLength(Sources, ADevice.Points.Count);
+  FirstIndex := -1; NamedIndex := -1; NormalizedCount := 0;
   for I := 0 to ADevice.Points.Count - 1 do
   begin
-    Point := ADevice.Points[I];
-    if (Point = nil) or IsNan(Point.Q) or IsInfinite(Point.Q) or
-       (Abs(Point.Q) >= MaxDouble) then Continue;
-    if not SameValue(Point.Q, ATargetQ, ToleranceQ) then Continue;
+    Candidate := ADevice.Points[I];
+    if not ResolveEtalonPointFlowInBaseUnits(Candidate, CandidateFlow,
+      CandidateSource, CandidateReason) then
+    begin
+      if AReason = '' then AReason := CandidateReason;
+      Continue;
+    end;
+    Inc(NormalizedCount); Flows[I] := CandidateFlow; Sources[I] := CandidateSource;
+    LogToleranceEvent('GraphEtalonPointCandidate',
+      Format('%s|%d|%g', [Candidate.UUID, I, ARunTargetQ]),
+      Format('GraphIndex=0; ChannelUUID=; DeviceUUID=%s; CandidateIndex=%d; CandidateUUID=%s; CandidateName=%s; RawQ=%g; RawFlowRate=%g; FlowSourceField=%s; FlowSourceUnit=%s; NormalizedFlow=%g; RunTargetQ=%g; Difference=%g; ToleranceQ=%g; PointError=%g; Matched=%s',
+      [ADevice.UUID, I, Candidate.UUID, Candidate.Name, Candidate.Q,
+       Candidate.FlowRate, CandidateSource,
+       IfThen(SameText(CandidateSource, 'Q'), 'l/s', 'm3/h'), CandidateFlow,
+       ARunTargetQ, CandidateFlow - ARunTargetQ, ToleranceQ, Candidate.Error,
+       BoolToStr(SameValue(CandidateFlow, ARunTargetQ, ToleranceQ), True)]));
+    LogToleranceEvent('GraphEtalonFlowNormalization', Candidate.UUID,
+      Format('ChannelUUID=; PointUUID=%s; SourceField=%s; SourceUnit=%s; RawValue=%g; ConversionFactor=%g; NormalizedValue=%g; BaseUnit=l/s',
+      [Candidate.UUID, CandidateSource,
+       IfThen(SameText(CandidateSource, 'Q'), 'l/s', 'm3/h'),
+       IfThen(SameText(CandidateSource, 'Q'), Candidate.Q, Candidate.FlowRate),
+       IfThen(SameText(CandidateSource, 'Q'), 1.0, 1.0 / 3.6), CandidateFlow]));
+    if not SameValue(CandidateFlow, ARunTargetQ, ToleranceQ) then Continue;
+    if IsNan(Candidate.Error) or IsInfinite(Candidate.Error) or
+       (Abs(Candidate.Error) >= MaxDouble) or (Candidate.Error = 0) then
+    begin AReason := 'EtalonPointErrorInvalid'; Continue end;
     if FirstIndex < 0 then FirstIndex := I;
-    if (RunPoint <> nil) and (NamedIndex < 0) and
-       (Trim(RunPoint.Name) <> '') and SameText(Trim(Point.Name),
-       Trim(RunPoint.Name)) then NamedIndex := I;
+    if (NamedIndex < 0) and (Trim(ARunPointName) <> '') and
+       SameText(Trim(Candidate.Name), Trim(ARunPointName)) then NamedIndex := I;
+  end;
+  if FirstIndex < 0 then
+  begin
+    if AReason = '' then AReason := 'EtalonPointQNotFound';
+    Exit;
   end;
   if NamedIndex >= 0 then APointIndex := NamedIndex
-  else if (RunPoint <> nil) and (Run.CurrentPointIndex >= 0) and
-          (Run.CurrentPointIndex < ADevice.Points.Count) and
-          SameValue(ADevice.Points[Run.CurrentPointIndex].Q, ATargetQ,
-            ToleranceQ) then APointIndex := Run.CurrentPointIndex
+  else if (ARunPointIndex >= 0) and (ARunPointIndex < Length(Flows)) and
+          (Sources[ARunPointIndex] <> '') and
+          SameValue(Flows[ARunPointIndex], ARunTargetQ, ToleranceQ) then
+    APointIndex := ARunPointIndex
   else APointIndex := FirstIndex;
-  if APointIndex < 0 then Exit;
-  APoint := ADevice.Points[APointIndex];
-  Result := True;
+  APoint := ADevice.Points[APointIndex]; APointFlowBase := Flows[APointIndex];
+  ASourceField := Sources[APointIndex]; AReason := ''; Result := True;
 end;
 
 function TFrameGraphsWorkspace.ResolveActiveEtalonTolerance(
   out ATargetQ, AErrorPercent: Double; out APoint: TDevicePoint;
-  out AChannel: TChannel; out AReason: string): Boolean;
+  out AChannel: TChannel; out APointFlowBase: Double;
+  out ASourceField, AReason: string): Boolean;
 var
   Run: TMeasurementRun;
   Device: TDevice;
   PointIndex: Integer;
 begin
-  Result := False; ATargetQ := 0; AErrorPercent := 0;
-  APoint := nil; AChannel := nil; AReason := '';
+  Result := False; ATargetQ := 0; AErrorPercent := 0; APointFlowBase := 0;
+  APoint := nil; AChannel := nil; ASourceField := ''; AReason := '';
   if FWorkTable = nil then begin AReason := 'WorkTableMissing'; Exit end;
   if not (FWorkTable.MeasurementRun is TMeasurementRun) then
   begin AReason := 'MeasurementRunMissing'; Exit end;
   Run := TMeasurementRun(FWorkTable.MeasurementRun);
   if Run.CurrentPoint = nil then begin AReason := 'RunPointMissing'; Exit end;
   ATargetQ := Run.CurrentPoint.Q;
-  if IsNan(ATargetQ) or IsInfinite(ATargetQ) or (Abs(ATargetQ) >= MaxDouble) then
-  begin AReason := 'RunTargetQInvalid'; Exit end;
   AChannel := GetActiveEtalonChannel;
   if AChannel = nil then begin AReason := 'NoActiveEtalonChannel'; Exit end;
   if AChannel.FlowMeter = nil then begin AReason := 'EtalonDeviceMissing'; Exit end;
   Device := AChannel.FlowMeter.Device;
-  if Device = nil then begin AReason := 'EtalonDeviceMissing'; Exit end;
-  if (Device.Points = nil) or (Device.Points.Count = 0) then
-  begin AReason := 'EtalonPointsMissing'; Exit end;
-  if not FindPointByTargetQ(Device, ATargetQ, APoint, PointIndex) then
-  begin AReason := 'EtalonPointQNotFound'; Exit end;
-  if IsNan(APoint.Error) or IsInfinite(APoint.Error) or
-     (Abs(APoint.Error) >= MaxDouble) then
-  begin AReason := 'EtalonPointErrorInvalid'; Exit end;
+  if not FindEtalonPointByTargetQ(Device, ATargetQ, Run.CurrentPoint.Name,
+    Run.CurrentPointIndex, APoint, PointIndex, APointFlowBase, ASourceField,
+    AReason) then
+  begin
+    LogToleranceEvent('GraphEtalonPointSearchFailed', AReason,
+      Format('GraphIndex=0; ChannelUUID=%s; DeviceUUID=%s; Reason=%s; CandidateCount=%d; NormalizedCandidateCount=0; MinNormalizedQ=0; MaxNormalizedQ=0; ClosestPointIndex=-1; ClosestPointName=; ClosestNormalizedQ=0; ClosestDifference=0',
+        [AChannel.UUID, Device.UUID, AReason, Device.Points.Count]));
+    Exit;
+  end;
   AErrorPercent := Abs(APoint.Error);
+  LogToleranceEvent('GraphEtalonPointMatched', APoint.UUID,
+    Format('GraphIndex=0; ChannelUUID=%s; DeviceUUID=%s; PointIndex=%d; PointUUID=%s; PointName=%s; RawPointQ=%g; RawPointFlowRate=%g; NormalizedPointFlow=%g; RunTargetQ=%g; Difference=%g; PointError=%g; MatchKind=%s',
+    [AChannel.UUID, Device.UUID, PointIndex, APoint.UUID, APoint.Name, APoint.Q,
+     APoint.FlowRate, APointFlowBase, ATargetQ, APointFlowBase - ATargetQ,
+     APoint.Error, IfThen(SameText(APoint.Name, Run.CurrentPoint.Name), 'Name',
+       IfThen(PointIndex = Run.CurrentPointIndex, 'Index', 'FirstMatched'))]));
   Result := True;
 end;
 
@@ -2954,12 +2994,14 @@ var
   Channel: TChannel;
   PointIndex: Integer;
   ToleranceValue: Double;
-  GraphKind, ChannelUUID, DeviceUUID: string;
+  GraphKind, ChannelUUID, DeviceUUID, FlowSourceField: string;
+  NormalizedPointFlow: Double;
 begin
   Result := False; ATargetQ := 0; AErrorPercent := 0;
   ALowerQ := 0; AUpperQ := 0; ASourceKind := ''; AReason := '';
   Run := nil; RunPoint := nil; SourcePoint := nil; Channel := nil;
   PointIndex := -1; ChannelUUID := ''; DeviceUUID := '';
+  NormalizedPointFlow := 0; FlowSourceField := '';
   if FWorkTable = nil then begin AReason := 'WorkTableMissing'; Exit end;
   if not (FWorkTable.MeasurementRun is TMeasurementRun) then
   begin AReason := 'MeasurementRunMissing'; Exit end;
@@ -2973,8 +3015,8 @@ begin
   if AGraphIndex = 0 then
   begin
     if not ResolveActiveEtalonTolerance(ATargetQ, AErrorPercent, SourcePoint,
-      Channel, AReason) then Exit;
-    ASourceKind := 'ActiveEtalonPointByQ';
+      Channel, NormalizedPointFlow, FlowSourceField, AReason) then Exit;
+    ASourceKind := 'ActiveEtalonPointByNormalizedQ';
     PointIndex := Channel.FlowMeter.Device.Points.IndexOf(SourcePoint);
     ChannelUUID := Channel.UUID; DeviceUUID := Channel.FlowMeter.Device.UUID;
   end
@@ -2989,13 +3031,14 @@ begin
     begin AReason := 'DevicePointErrorInvalid'; Exit end;
     AErrorPercent := Abs(SourcePoint.Error);
     ASourceKind := 'CurrentDevicePoint'; PointIndex := Run.CurrentPointIndex;
+    NormalizedPointFlow := SourcePoint.Q; FlowSourceField := 'Q';
   end;
   LogToleranceEvent('GraphToleranceSourceResolved',
     Format('%d|%s|%s', [AGraphIndex, ASourceKind, SourcePoint.UUID]), Format(
-    'GraphIndex=%d; GraphKind=%s; SourceKind=%s; ChannelUUID=%s; DeviceUUID=%s; PointUUID=%s; PointIndex=%d; PointName=%s; PointQ=%g; PointError=%g; TargetQ=%g',
+    'GraphIndex=%d; GraphKind=%s; SourceKind=%s; ChannelUUID=%s; DeviceUUID=%s; PointUUID=%s; PointIndex=%d; PointName=%s; PointQ=%g; PointError=%g; RunTargetQ=%g; NormalizedPointFlow=%g; FlowSourceField=%s',
     [AGraphIndex, GraphKind, ASourceKind, ChannelUUID, DeviceUUID,
      SourcePoint.UUID, PointIndex, SourcePoint.Name, SourcePoint.Q,
-     SourcePoint.Error, ATargetQ]));
+     SourcePoint.Error, ATargetQ, NormalizedPointFlow, FlowSourceField]));
   ToleranceValue := Abs(ATargetQ) * Abs(AErrorPercent) / 100.0;
   ALowerQ := ATargetQ - ToleranceValue; AUpperQ := ATargetQ + ToleranceValue;
   LogToleranceEvent('GraphToleranceCalculated', Format('%d', [AGraphIndex]),
