@@ -7,10 +7,13 @@ uses
   System.Generics.Collections,
   FMX.Controls, FMX.Forms, FMX.Layouts, FMX.Menus, FMX.Objects,
   FMX.StdCtrls, FMX.Types, FMX.SimpleChart,
-  uBaseProcedures, uGraphsViewConfig, uMeasurementRun, uMeterValue, uProtocols,
+  uBaseProcedures, uClasses, uDeviceClass, uGraphsViewConfig, uMeasurementRun, uMeterValue, uProtocols,
   uWorkTable;
 
 type
+  TGraphSegmentStartReason = (gssrNone, gssrRunStarted,
+    gssrPointChanged);
+
   TGraphSourceEvent = procedure(Sender: TObject; const AGraphIndex: Integer) of object;
 
   TGraphSourceMenuItem = class(TMenuItem)
@@ -42,6 +45,9 @@ type
     ChartSeries: TChartSeries;
     LastSampleTimeMs: Int64;
     LastSampleIndex: Integer;
+    WaitingForFirstSample: Boolean;
+    LastAcceptedValue: Double;
+    LastAcceptedPointKey: string;
   end;
 
   TFrameGraphsWorkspace = class(TFrame)
@@ -83,6 +89,7 @@ type
     MenuItemSettings: TMenuItem;
     MenuItemSeriesColors: TMenuItem;
     MenuItemGraphLength: TMenuItem;
+    MenuItemFlowUnits: TMenuItem;
     MenuItemShowLegend: TMenuItem;
     MenuItemAddGraph: TMenuItem;
     MenuItemDeleteGraph: TMenuItem;
@@ -110,7 +117,19 @@ type
     FUpdatingControls: Boolean;
     FSeriesRuntime: TObjectDictionary<TGraphSeriesConfig, TGraphSeriesRuntime>;
     FLastRunActive: Boolean;
-    FSegmentStartMs: Int64;
+    FSharedSegmentStartMs: Int64;
+    FSharedCurrentTimeSec: Double;
+    FSharedAxisMinX: Double;
+    FSharedAxisMaxX: Double;
+    FSharedTimeInitialized: Boolean;
+    FLastPointKey: string;
+    FLastPointIndex: Integer;
+    FRuntimeResetTimeMs: Int64;
+    FLastSegmentDecision: string;
+    FLastFlowUnitKey: string;
+    FTargetSeries: array[0..3] of TChartSeries;
+    FLowerSeries: array[0..3] of TChartSeries;
+    FUpperSeries: array[0..3] of TChartSeries;
     FLastFallbackSampleMs: Int64;
     FLastUpdateDiagnosticMs: Int64;
     function ChartByIndex(const AIndex: Integer): TSimpleChart;
@@ -136,7 +155,23 @@ type
     function ResolveMeterValue(const ASeries: TGraphSeriesConfig;
       AChannel: TChannel): TMeterValue;
     function IsSamplingActive: Boolean;
-    procedure ResetSeriesSegment(const AStartMs: Int64);
+    procedure ResetSeriesSegment(const AStartMs: Int64;
+      const APointKey: string);
+    function GetCurrentFlowUnitText: string;
+    function GetCurrentFlowUnitKey: string;
+    function ConvertFlowToDisplayUnits(const AValue: Double): Double;
+    procedure CheckFlowUnitsChanged;
+    procedure RebuildSeriesForCurrentUnits;
+    procedure UpdateChartAxisUnits;
+    function CurrentPointKey(out APointIndex: Integer): string;
+    function IsPointTransitionStage: Boolean;
+    procedure StartSharedSegment(const AReason: TGraphSegmentStartReason;
+      const APointKey: string; const APointIndex: Integer);
+    procedure CalculateSharedTimeRange(const ANowMs: Int64);
+    procedure ApplySharedXAxis;
+    procedure EnsureLimitSeries(const AGraphIndex: Integer);
+    procedure UpdateToleranceLines;
+    procedure UpdateIndependentYAxis(const AGraphIndex: Integer);
     procedure RemoveRuntimeSeries(const AConfig: TGraphSeriesConfig;
       AChart: TSimpleChart);
     procedure RemoveGraphRuntimeSeries(const AGraphIndex: Integer);
@@ -147,6 +182,7 @@ type
     procedure ApplyLayout;
     procedure ClearGraph(const AGraphIndex: Integer);
     procedure ClearAllGraphs;
+    procedure ResetRuntimeGraphData;
     function AddSource(const AGraphIndex: Integer;
       ASource: TGraphSeriesConfig): Boolean;
   end;
@@ -163,6 +199,9 @@ begin
 end;
 
 procedure TFrameGraphsWorkspace.Initialize(AWorkTable: TWorkTable);
+var
+  FirstInitialization: Boolean;
+  PointIndex: Integer;
 begin
   if PopupMenuGraph = nil then
     raise EInvalidOperation.Create(
@@ -174,6 +213,7 @@ begin
     raise EInvalidOperation.Create(
       'MenuItemDevices не загружен из frmGraphsWorkspace.fmx');
   FWorkTable := AWorkTable;
+  FirstInitialization := FConfig = nil;
   if FConfig = nil then
   begin
     FConfig := TGraphsViewConfig.Create;
@@ -181,9 +221,20 @@ begin
       TGraphSeriesRuntime>.Create([doOwnsValues]);
     FSelectedGraph := 0;
     FContextGraphIndex := 0;
+    FLastPointIndex := -1;
+    FSharedAxisMinX := 0;
+    FSharedAxisMaxX := 60;
+    FRuntimeResetTimeMs := TMeterValue.GetMonotonicTimeMs;
   end;
   SyncControls;
   ApplyLayout;
+  if FirstInitialization then
+  begin
+    FLastPointKey := CurrentPointKey(PointIndex);
+    FLastPointIndex := PointIndex;
+    ApplySharedXAxis;
+    UpdateToleranceLines;
+  end;
 end;
 
 function TFrameGraphsWorkspace.ChartByIndex(const AIndex: Integer): TSimpleChart;
@@ -260,6 +311,10 @@ begin
     if not SlotByIndex(I).Visible then PlaceSlot(I, Min(I, 3), TAlignLayout.Client);
     ChartByIndex(I).ShowLegend := FConfig.Panels[I].ShowLegend;
   end;
+  { Align/Parent changes above enqueue FMX alignment automatically.  Realign is
+    protected in the Delphi version used by the application and must not be
+    called from the frame. }
+  ApplySharedXAxis;
 end;
 
 procedure TFrameGraphsWorkspace.SyncControls;
@@ -534,10 +589,11 @@ begin
     Item := TGraphDurationMenuItem.Create(nil);
     Item.Text := Captions[I];
     Item.DurationSec := Durations[I];
-    Item.IsChecked := FConfig.Panels[FContextGraphIndex].VisibleDurationSec = Durations[I];
+    Item.IsChecked := FConfig.VisibleDurationSec = Durations[I];
     Item.OnClick := GraphDurationClick;
     MenuItemGraphLength.AddObject(Item);
   end;
+  MenuItemFlowUnits.Text := 'Единицы расхода: ' + GetCurrentFlowUnitText;
   MenuItemShowLegend.IsChecked := FConfig.Panels[FContextGraphIndex].ShowLegend;
   MenuItemAddGraph.Enabled := FConfig.GraphCount < 4;
   MenuItemDeleteGraph.Enabled := FConfig.GraphCount > 1;
@@ -573,8 +629,10 @@ var
 begin
   if not (Sender is TGraphDurationMenuItem) then Exit;
   Item := TGraphDurationMenuItem(Sender);
-  OldValue := FConfig.Panels[FContextGraphIndex].VisibleDurationSec;
-  FConfig.Panels[FContextGraphIndex].VisibleDurationSec := Item.DurationSec;
+  OldValue := FConfig.VisibleDurationSec;
+  FConfig.VisibleDurationSec := Item.DurationSec;
+  CalculateSharedTimeRange(TMeterValue.GetMonotonicTimeMs);
+  ApplySharedXAxis;
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphVisibleDurationChanged',
       'Изменена длина графика', Format('GraphIndex=%d; OldValue=%d; NewValue=%d',
@@ -663,11 +721,12 @@ begin
         Runtime.ChartSeries := Chart.AddSeries(S.Caption);
         Runtime.ChartSeries.Color := S.Color;
         Runtime.LastSampleIndex := -1;
+        Runtime.WaitingForFirstSample := True;
         if SavedPoints.TryGetValue(S, Points) then
           for PointIndex := 0 to High(Points) do
             Runtime.ChartSeries.AddPoint(Points[PointIndex].X, Points[PointIndex].Y);
         if Length(Points) > 0 then
-          Runtime.LastSampleTimeMs := FSegmentStartMs +
+          Runtime.LastSampleTimeMs := FSharedSegmentStartMs +
             Round(Points[High(Points)].X * 1000);
         FSeriesRuntime.Add(S, Runtime);
       end;
@@ -709,9 +768,9 @@ begin
 end;
 
 procedure TFrameGraphsWorkspace.ClearGraph(const AGraphIndex: Integer);
-begin ClearChart(AGraphIndex, True) end;
+begin ClearChart(AGraphIndex, True); UpdateToleranceLines end;
 procedure TFrameGraphsWorkspace.ClearAllGraphs;
-var I: Integer; begin if FConfig <> nil then for I := 0 to FConfig.GraphCount - 1 do ClearChart(I, True) end;
+var I: Integer; begin if FConfig <> nil then begin for I := 0 to FConfig.GraphCount - 1 do ClearChart(I, True); UpdateToleranceLines end end;
 procedure TFrameGraphsWorkspace.ClearAllClick(Sender: TObject); begin ClearAllGraphs end;
 procedure TFrameGraphsWorkspace.ClearGraphClick(Sender: TObject);
 begin
@@ -720,7 +779,7 @@ begin
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphCleared',
       'График очищен', Format('GraphIndex=%d', [FContextGraphIndex]));
 end;
-procedure TFrameGraphsWorkspace.ResetClick(Sender: TObject); begin FConfig.Reset; SyncControls; ApplyLayout end;
+procedure TFrameGraphsWorkspace.ResetClick(Sender: TObject); begin ResetRuntimeGraphData end;
 
 function TFrameGraphsWorkspace.AddSource(const AGraphIndex: Integer; ASource: TGraphSeriesConfig): Boolean;
 var
@@ -747,6 +806,7 @@ begin
       FSeriesRuntime.Add(ASource, TGraphSeriesRuntime.Create);
       FSeriesRuntime[ASource].ChartSeries := Series;
       FSeriesRuntime[ASource].LastSampleIndex := -1;
+      FSeriesRuntime[ASource].WaitingForFirstSample := True;
       Chart.InvalidateChart;
     end;
   end;
@@ -825,21 +885,36 @@ begin
   end;
 end;
 
-procedure TFrameGraphsWorkspace.ResetSeriesSegment(const AStartMs: Int64);
+procedure TFrameGraphsWorkspace.ResetSeriesSegment(const AStartMs: Int64;
+  const APointKey: string);
 var
   Pair: TPair<TGraphSeriesConfig, TGraphSeriesRuntime>;
+  SeriesCount, ClearedPoints: Integer;
 begin
-  FSegmentStartMs := AStartMs;
+  FSharedSegmentStartMs := AStartMs;
   if FSeriesRuntime = nil then
     Exit;
+  SeriesCount := 0;
+  ClearedPoints := 0;
   for Pair in FSeriesRuntime do
     if Pair.Value <> nil then
     begin
+      Inc(SeriesCount);
       Pair.Value.LastSampleTimeMs := 0;
       Pair.Value.LastSampleIndex := -1;
+      Pair.Value.WaitingForFirstSample := True;
+      Pair.Value.LastAcceptedPointKey := APointKey;
       if Pair.Value.ChartSeries <> nil then
+      begin
+        Inc(ClearedPoints, Pair.Value.ChartSeries.Points.Count);
         Pair.Value.ChartSeries.ClearPoints;
+      end;
     end;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesRuntimeReset',
+      'Сброшено runtime-состояние серий', Format(
+      'SeriesCount=%d; ClearedPointsCount=%d; SegmentStartMs=%d; PointKey=%s',
+      [SeriesCount, ClearedPoints, AStartMs, APointKey]));
 end;
 
 procedure TFrameGraphsWorkspace.RemoveRuntimeSeries(
@@ -875,171 +950,444 @@ begin
     RemoveRuntimeSeries(Config, Chart);
 end;
 
-procedure TFrameGraphsWorkspace.UpdateGraphs;
-const
-  DiagnosticIntervalMs = 5000;
-  FallbackSampleIntervalMs = 1000;
+function TFrameGraphsWorkspace.GetCurrentFlowUnitText: string;
+begin
+  Result := 'л/с';
+  if (FWorkTable <> nil) and (FWorkTable.ValueFlowRate <> nil) then
+    Result := FWorkTable.ValueFlowRate.GetDimName;
+end;
+
+function TFrameGraphsWorkspace.GetCurrentFlowUnitKey: string;
+begin
+  Result := GetCurrentFlowUnitText;
+  if (FWorkTable <> nil) and (FWorkTable.ValueFlowRate <> nil) then
+    Result := Format('%d|%s', [FWorkTable.ValueFlowRate.CurrentDimIndex, Result]);
+end;
+
+function TFrameGraphsWorkspace.ConvertFlowToDisplayUnits(
+  const AValue: Double): Double;
+begin
+  Result := AValue;
+  if (FWorkTable <> nil) and (FWorkTable.ValueFlowRate <> nil) then
+    Result := FWorkTable.ValueFlowRate.GetDoubleNum(AValue,
+      FWorkTable.ValueFlowRate.CurrentDimIndex);
+end;
+
+procedure TFrameGraphsWorkspace.UpdateChartAxisUnits;
+var I: Integer;
+begin
+  for I := 0 to FConfig.GraphCount - 1 do
+  begin
+    ChartByIndex(I).XTitle := 'Время, с';
+    ChartByIndex(I).YTitle := 'Расход, ' + GetCurrentFlowUnitText;
+  end;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphAxisUnitsUpdated',
+      'Обновлены единицы осей графиков', 'Unit=' + GetCurrentFlowUnitText);
+end;
+
+procedure TFrameGraphsWorkspace.RebuildSeriesForCurrentUnits;
 var
-  GraphIndex, SampleIndex, AddedCount: Integer;
-  Config: TGraphSeriesConfig;
-  Runtime: TGraphSeriesRuntime;
+  Pair: TPair<TGraphSeriesConfig, TGraphSeriesRuntime>;
   Channel: TChannel;
   MeterValue: TMeterValue;
   Samples: TArray<TMeterValueSample>;
   Sample: TMeterValueSample;
-  Chart: TSimpleChart;
-  ChartChanged: array[0..3] of Boolean;
-  NowMs, SampleTimeMs: Int64;
-  TimeSec, Value: Double;
-  RunActive, SamplingActive, DiagnosticDue, RuntimeAssigned,
-    SeriesAdded, DoFallback: Boolean;
 begin
-  if (FConfig = nil) or (FSeriesRuntime = nil) then
+  for Pair in FSeriesRuntime do
+  begin
+    Pair.Value.ChartSeries.ClearPoints;
+    Pair.Value.LastSampleTimeMs := 0;
+    Pair.Value.LastSampleIndex := -1;
+    Channel := ResolveChannel(Pair.Key);
+    MeterValue := ResolveMeterValue(Pair.Key, Channel);
+    if MeterValue = nil then Continue;
+    Samples := MeterValue.GetStabilitySamples;
+    for Sample in Samples do
+      if (Sample.TimeStampMs >= FSharedSegmentStartMs) and
+         (Sample.TimeStampMs > Pair.Value.LastSampleTimeMs) then
+      begin
+        Pair.Value.ChartSeries.AddPoint(
+          (Sample.TimeStampMs - FSharedSegmentStartMs) / 1000.0,
+          IfThen(SameText(Pair.Key.MeterValueKey, 'ValueFlow') or
+            SameText(Pair.Key.MeterValueKey, 'FlowRate'),
+            ConvertFlowToDisplayUnits(Sample.Value), Sample.Value));
+        Pair.Value.LastSampleTimeMs := Sample.TimeStampMs;
+      end;
+  end;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesRebuiltForUnits',
+      'Серии перестроены в выбранных единицах',
+      'Unit=' + GetCurrentFlowUnitText);
+end;
+
+procedure TFrameGraphsWorkspace.CheckFlowUnitsChanged;
+var NewKey, OldKey: string; OldCoef, NewCoef: Double;
+begin
+  NewKey := GetCurrentFlowUnitKey;
+  if FLastFlowUnitKey = '' then
+  begin
+    FLastFlowUnitKey := NewKey;
+    UpdateChartAxisUnits;
     Exit;
+  end;
+  if SameText(NewKey, FLastFlowUnitKey) then Exit;
+  OldKey := FLastFlowUnitKey;
+  OldCoef := 1; NewCoef := ConvertFlowToDisplayUnits(1);
+  FLastFlowUnitKey := NewKey;
+  RebuildSeriesForCurrentUnits;
+  UpdateChartAxisUnits;
+  UpdateToleranceLines;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphFlowUnitsChanged',
+      'Изменены единицы расхода', Format(
+      'OldUnit=%s; NewUnit=%s; OldCoef=%g; NewCoef=%g',
+      [OldKey, NewKey, OldCoef, NewCoef]));
+end;
+
+function TFrameGraphsWorkspace.CurrentPointKey(out APointIndex: Integer): string;
+var Run: TMeasurementRun; Point: TDevicePoint;
+begin
+  Result := ''; APointIndex := -1;
+  if (FWorkTable = nil) or not (FWorkTable.MeasurementRun is TMeasurementRun) then Exit;
+  Run := TMeasurementRun(FWorkTable.MeasurementRun);
+  Point := Run.CurrentPoint;
+  APointIndex := Run.CurrentPointIndex;
+  if Point = nil then Exit;
+  if Trim(Point.UUID) <> '' then Result := Point.UUID
+  else Result := Format('%d|%s|%.12g', [APointIndex, Point.Name, Point.Q]);
+end;
+
+function TFrameGraphsWorkspace.IsPointTransitionStage: Boolean;
+var Stage: EMeasurementState;
+begin
+  Result := False;
+  if (FWorkTable = nil) or not (FWorkTable.MeasurementRun is TMeasurementRun) then Exit;
+  Stage := TMeasurementRun(FWorkTable.MeasurementRun).Stage;
+  Result := Stage in [msSelectPoint, msSelectEtalon, msSetupPoint];
+end;
+
+procedure TFrameGraphsWorkspace.StartSharedSegment(
+  const AReason: TGraphSegmentStartReason; const APointKey: string;
+  const APointIndex: Integer);
+var
+  StartMs: Int64;
+  ReasonText: string;
+begin
+  StartMs := Max(TMeterValue.GetMonotonicTimeMs, FRuntimeResetTimeMs);
+  case AReason of
+    gssrRunStarted: ReasonText := 'RunStarted';
+    gssrPointChanged: ReasonText := 'PointChanged';
+  else
+    Exit;
+  end;
+  ResetSeriesSegment(StartMs, APointKey);
+  FSharedTimeInitialized := True;
+  FSharedCurrentTimeSec := 0;
+  FSharedAxisMinX := 0;
+  if FConfig.VisibleDurationSec > 0 then
+    FSharedAxisMaxX := FConfig.VisibleDurationSec
+  else
+    FSharedAxisMaxX := 60;
+  FLastPointKey := APointKey; FLastPointIndex := APointIndex;
+  ApplySharedXAxis;
+  UpdateToleranceLines;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSharedTimeSegmentStarted',
+      'Начат общий временной сегмент', Format(
+      'Reason=%s; SegmentStartMs=%d; PointKey=%s; PointIndex=%d; GraphCount=%d',
+      [ReasonText, StartMs, APointKey, APointIndex, FConfig.GraphCount]));
+end;
+
+procedure TFrameGraphsWorkspace.CalculateSharedTimeRange(const ANowMs: Int64);
+var Duration: Integer;
+begin
+  if FSharedTimeInitialized then
+    FSharedCurrentTimeSec := Max(0.0, (ANowMs - FSharedSegmentStartMs) / 1000.0)
+  else FSharedCurrentTimeSec := 0;
+  Duration := FConfig.VisibleDurationSec;
+  if Duration = 0 then
+  begin
+    FSharedAxisMinX := 0;
+    FSharedAxisMaxX := Max(60.0, FSharedCurrentTimeSec);
+  end
+  else if FSharedCurrentTimeSec <= Duration then
+  begin
+    FSharedAxisMinX := 0; FSharedAxisMaxX := Duration;
+  end
+  else
+  begin
+    FSharedAxisMinX := FSharedCurrentTimeSec - Duration;
+    FSharedAxisMaxX := FSharedCurrentTimeSec;
+  end;
+  if Assigned(ProtocolManager) and
+     ((FLastUpdateDiagnosticMs = 0) or (ANowMs - FLastUpdateDiagnosticMs >= 1000)) then
+  begin
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSharedTimeRangeUpdated',
+      'Обновлён общий диапазон времени', Format(
+      'CurrentTimeSec=%g; VisibleDurationSec=%d; AxisMinX=%g; AxisMaxX=%g',
+      [FSharedCurrentTimeSec, Duration, FSharedAxisMinX, FSharedAxisMaxX]));
+    FLastUpdateDiagnosticMs := ANowMs;
+  end;
+end;
+
+procedure TFrameGraphsWorkspace.ApplySharedXAxis;
+var I: Integer; Chart: TSimpleChart;
+begin
+  for I := 0 to FConfig.GraphCount - 1 do
+  begin
+    Chart := ChartByIndex(I);
+    Chart.AutoRangeX := False;
+    Chart.XMin := FSharedAxisMinX; Chart.XMax := FSharedAxisMaxX;
+  end;
+  if Assigned(ProtocolManager) and not FSharedTimeInitialized then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphXAxisSynchronized',
+      'Оси времени графиков синхронизированы', Format(
+      'GraphCount=%d; AxisMinX=%g; AxisMaxX=%g',
+      [FConfig.GraphCount, FSharedAxisMinX, FSharedAxisMaxX]));
+end;
+
+procedure TFrameGraphsWorkspace.EnsureLimitSeries(const AGraphIndex: Integer);
+var Chart: TSimpleChart;
+begin
+  Chart := ChartByIndex(AGraphIndex);
+  if FTargetSeries[AGraphIndex] = nil then
+  begin
+    FTargetSeries[AGraphIndex] := Chart.AddSeries('Целевой расход');
+    FTargetSeries[AGraphIndex].Color := TAlphaColors.Green;
+    FTargetSeries[AGraphIndex].ShowMarkers := False;
+    FLowerSeries[AGraphIndex] := Chart.AddSeries('Нижняя допустимая граница');
+    FLowerSeries[AGraphIndex].Color := TAlphaColors.Red;
+    FLowerSeries[AGraphIndex].ShowMarkers := False;
+    FUpperSeries[AGraphIndex] := Chart.AddSeries('Верхняя допустимая граница');
+    FUpperSeries[AGraphIndex].Color := TAlphaColors.Red;
+    FUpperSeries[AGraphIndex].ShowMarkers := False;
+  end;
+end;
+
+procedure TFrameGraphsWorkspace.UpdateToleranceLines;
+var
+  I: Integer; Run: TMeasurementRun; Point: TDevicePoint;
+  MinPercent, MaxPercent, BaseLower, BaseUpper: Double;
+  Available: Boolean;
+begin
+  Run := nil; Point := nil;
+  if (FWorkTable <> nil) and (FWorkTable.MeasurementRun is TMeasurementRun) then
+  begin
+    Run := TMeasurementRun(FWorkTable.MeasurementRun); Point := Run.CurrentPoint;
+  end;
+  Available := (Point <> nil) and AccuracyToRange(Point.FlowAccuracy,
+    MinPercent, MaxPercent);
+  if Available then
+    CalculateTargetLimits(Point.Q, Abs(MaxPercent), Abs(MinPercent), 0,
+      BaseLower, BaseUpper);
+  if Assigned(ProtocolManager) and (FLastUpdateDiagnosticMs = 0) then
+    if Available then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphToleranceResolved',
+        'Разрешены границы допуска графиков', Format(
+        'PointAssigned=True; BaseTarget=%g; BaseLower=%g; BaseUpper=%g; DisplayUnit=%s; DisplayTarget=%g; DisplayLower=%g; DisplayUpper=%g',
+        [Point.Q, BaseLower, BaseUpper, GetCurrentFlowUnitText,
+         ConvertFlowToDisplayUnits(Point.Q), ConvertFlowToDisplayUnits(BaseLower),
+         ConvertFlowToDisplayUnits(BaseUpper)]))
+    else
+      ProtocolManager.AddMessage(pcProc, psForm, 'GraphToleranceUnavailable',
+        'Границы допуска графиков недоступны',
+        'PointAssigned=' + BoolToStr(Point <> nil, True));
+  for I := 0 to FConfig.GraphCount - 1 do
+  begin
+    EnsureLimitSeries(I);
+    FTargetSeries[I].ClearPoints; FLowerSeries[I].ClearPoints;
+    FUpperSeries[I].ClearPoints;
+    FTargetSeries[I].Visible := Point <> nil;
+    FLowerSeries[I].Visible := Available; FUpperSeries[I].Visible := Available;
+    if Point <> nil then
+    begin
+      FTargetSeries[I].AddPoint(FSharedAxisMinX, ConvertFlowToDisplayUnits(Point.Q));
+      FTargetSeries[I].AddPoint(FSharedAxisMaxX, ConvertFlowToDisplayUnits(Point.Q));
+    end;
+    if Available then
+    begin
+      FLowerSeries[I].AddPoint(FSharedAxisMinX, ConvertFlowToDisplayUnits(BaseLower));
+      FLowerSeries[I].AddPoint(FSharedAxisMaxX, ConvertFlowToDisplayUnits(BaseLower));
+      FUpperSeries[I].AddPoint(FSharedAxisMinX, ConvertFlowToDisplayUnits(BaseUpper));
+      FUpperSeries[I].AddPoint(FSharedAxisMaxX, ConvertFlowToDisplayUnits(BaseUpper));
+    end;
+    UpdateIndependentYAxis(I);
+  end;
+  if Assigned(ProtocolManager) and Available and
+     (FLastUpdateDiagnosticMs = 0) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphToleranceLinesUpdated',
+      'Обновлены линии допуска графиков', Format(
+      'GraphCount=%d; AxisMinX=%g; AxisMaxX=%g',
+      [FConfig.GraphCount, FSharedAxisMinX, FSharedAxisMaxX]));
+end;
+
+procedure TFrameGraphsWorkspace.UpdateIndependentYAxis(const AGraphIndex: Integer);
+var I, J: Integer; Chart: TSimpleChart; V, Lo, Hi, Pad: Double; HasValue: Boolean;
+begin
+  Chart := ChartByIndex(AGraphIndex); HasValue := False; Lo := 0; Hi := 0;
+  for I := 0 to Chart.SeriesCount - 1 do
+    if Chart.Series[I].Visible then
+      for J := 0 to Chart.Series[I].Points.Count - 1 do
+      begin
+        V := Chart.Series[I].Points[J].Y;
+        if not HasValue then begin Lo := V; Hi := V; HasValue := True end
+        else begin Lo := Min(Lo, V); Hi := Max(Hi, V) end;
+      end;
+  if not HasValue then begin Lo := 0; Hi := 1 end;
+  Pad := Hi - Lo;
+  if Pad <= 0 then Pad := Max(Abs(Lo) * 0.01, 0.001) else Pad := Pad * 0.1;
+  Chart.AutoRangeY := False; Chart.YMin := Lo - Pad; Chart.YMax := Hi + Pad;
+end;
+
+procedure TFrameGraphsWorkspace.ResetRuntimeGraphData;
+var
+  Pair: TPair<TGraphSeriesConfig, TGraphSeriesRuntime>;
+  Count, Cleared, PointIndex: Integer;
+  PointKey: string;
+begin
+  Count := 0; Cleared := 0;
+  FRuntimeResetTimeMs := TMeterValue.GetMonotonicTimeMs;
+  PointKey := CurrentPointKey(PointIndex);
+  for Pair in FSeriesRuntime do
+  begin
+    Inc(Count); Inc(Cleared, Pair.Value.ChartSeries.Points.Count);
+    Pair.Value.ChartSeries.ClearPoints; Pair.Value.LastSampleTimeMs := 0;
+    Pair.Value.LastSampleIndex := -1; Pair.Value.WaitingForFirstSample := True;
+    Pair.Value.LastAcceptedPointKey := PointKey;
+  end;
+  FSharedSegmentStartMs := FRuntimeResetTimeMs;
+  FSharedTimeInitialized := False; FSharedCurrentTimeSec := 0;
+  FSharedAxisMinX := 0; FSharedAxisMaxX := 60; FLastRunActive := False;
+  FLastPointKey := PointKey; FLastPointIndex := PointIndex;
+  ApplySharedXAxis; UpdateToleranceLines;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphRuntimeReset',
+      'Сброшены runtime-данные графиков', Format(
+      'GraphCount=%d; SeriesCount=%d; ClearedPointsCount=%d; AssignmentsPreserved=True; VisibleDurationSec=%d',
+      [FConfig.GraphCount, Count, Cleared, FConfig.VisibleDurationSec]));
+end;
+
+procedure TFrameGraphsWorkspace.UpdateGraphs;
+var
+  GraphIndex, SampleIndex, PointIndex: Integer;
+  Config: TGraphSeriesConfig; Runtime: TGraphSeriesRuntime;
+  Channel: TChannel; MeterValue: TMeterValue;
+  Samples: TArray<TMeterValueSample>; Sample: TMeterValueSample;
+  Chart: TSimpleChart; NowMs: Int64; TimeSec, Value: Double;
+  RunActive, SamplingActive, NewRunStarted, PointChanged, Changed,
+    SegmentStartRequired, PointStateStored: Boolean;
+  PointKey, StoredPointKey, SelectedReason, Decision: string;
+  SegmentReason: TGraphSegmentStartReason;
+begin
+  if (FConfig = nil) or (FSeriesRuntime = nil) then Exit;
   NowMs := TMeterValue.GetMonotonicTimeMs;
   RunActive := (FWorkTable <> nil) and
     (FWorkTable.MeasurementRun is TMeasurementRun) and
     not (TMeasurementRun(FWorkTable.MeasurementRun).Stage in [msNone, msDone]);
-  SamplingActive := IsSamplingActive;
-  DiagnosticDue := (FLastUpdateDiagnosticMs = 0) or
-    (NowMs - FLastUpdateDiagnosticMs >= DiagnosticIntervalMs);
-  DoFallback := SamplingActive and ((FLastFallbackSampleMs = 0) or
-    (NowMs - FLastFallbackSampleMs >= FallbackSampleIntervalMs));
-  if RunActive and not FLastRunActive then
-    ResetSeriesSegment(NowMs)
-  else if SamplingActive and (FSegmentStartMs = 0) then
-    FSegmentStartMs := NowMs;
-  FLastRunActive := RunActive;
-  AddedCount := 0;
-  FillChar(ChartChanged, SizeOf(ChartChanged), 0);
-
-  if DiagnosticDue and Assigned(ProtocolManager) then
-    ProtocolManager.AddMessage(pcProc, psForm, 'GraphWorkspaceUpdateBegin',
-      'Начато обновление рабочей области графиков',
-      Format('GraphCount=%d; RunActive=%s; SamplingActive=%s',
-        [FConfig.GraphCount, BoolToStr(RunActive, True),
-         BoolToStr(SamplingActive, True)]));
+  SamplingActive := IsSamplingActive and not IsPointTransitionStage;
+  PointKey := CurrentPointKey(PointIndex);
+  StoredPointKey := FLastPointKey;
+  NewRunStarted := RunActive and not FLastRunActive;
+  PointChanged := (PointKey <> '') and
+    (FLastPointKey <> '') and (PointKey <> FLastPointKey);
+  SegmentReason := gssrNone;
+  if NewRunStarted then
+    SegmentReason := gssrRunStarted
+  else if PointChanged then
+    SegmentReason := gssrPointChanged;
+  SegmentStartRequired := SegmentReason <> gssrNone;
+  case SegmentReason of
+    gssrRunStarted: SelectedReason := 'RunStarted';
+    gssrPointChanged: SelectedReason := 'PointChanged';
+  else
+    SelectedReason := 'None';
+  end;
+  Decision := Format('%s|%s|%s|%s|%s|%s|%s',
+    [BoolToStr(RunActive, True), BoolToStr(FLastRunActive, True),
+     BoolToStr(NewRunStarted, True), PointKey, StoredPointKey,
+     BoolToStr(PointChanged, True), SelectedReason]);
+  if (Decision <> FLastSegmentDecision) and Assigned(ProtocolManager) then
+  begin
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphSegmentDecision',
+      'Принято решение о временном сегменте графиков', Format(
+      'RunActive=%s; LastRunActive=%s; NewRunStarted=%s; CurrentPointKey=%s; StoredPointKey=%s; PointChanged=%s; SelectedReason=%s; SegmentStartRequired=%s',
+      [BoolToStr(RunActive, True), BoolToStr(FLastRunActive, True),
+       BoolToStr(NewRunStarted, True), PointKey, StoredPointKey,
+       BoolToStr(PointChanged, True), SelectedReason,
+       BoolToStr(SegmentStartRequired, True)]));
+    FLastSegmentDecision := Decision;
+  end;
+  PointStateStored := (PointKey <> '') and
+    ((FLastPointKey <> PointKey) or (FLastPointIndex <> PointIndex));
+  if SegmentStartRequired then
+    StartSharedSegment(SegmentReason, PointKey, PointIndex);
+  if PointKey <> '' then
+  begin
+    FLastPointKey := PointKey;
+    FLastPointIndex := PointIndex;
+  end;
+  if PointStateStored and Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphPointStateStored',
+      'Сохранено состояние поверочной точки графиков', Format(
+      'PointKey=%s; PointIndex=%d', [PointKey, PointIndex]));
+  CheckFlowUnitsChanged;
+  CalculateSharedTimeRange(NowMs);
 
   for GraphIndex := 0 to FConfig.GraphCount - 1 do
   begin
-    Chart := ChartByIndex(GraphIndex);
-    if Chart = nil then
-      Continue;
+    Chart := ChartByIndex(GraphIndex); Changed := False;
     for Config in FConfig.Panels[GraphIndex].Series do
     begin
-      RuntimeAssigned := FSeriesRuntime.TryGetValue(Config, Runtime) and
-        (Runtime <> nil) and (Runtime.ChartSeries <> nil);
-      if not RuntimeAssigned then
+      if not FSeriesRuntime.TryGetValue(Config, Runtime) then
       begin
         Runtime := TGraphSeriesRuntime.Create;
         Runtime.ChartSeries := Chart.AddSeries(Config.Caption);
         Runtime.ChartSeries.Color := Config.Color;
-        Runtime.LastSampleIndex := -1;
+        Runtime.LastSampleIndex := -1; Runtime.WaitingForFirstSample := True;
         FSeriesRuntime.Add(Config, Runtime);
-        RuntimeAssigned := True;
       end;
-      Channel := ResolveChannel(Config);
-      MeterValue := ResolveMeterValue(Config, Channel);
-      if DiagnosticDue and Assigned(ProtocolManager) then
-        ProtocolManager.AddMessage(pcProc, psForm,
-          'GraphWorkspaceSeriesResolve', 'Разрешение источника серии графика',
-          Format('GraphIndex=%d; ChannelUUID=%s; MeterValueKey=%s; ChannelFound=%s; MeterValueFound=%s; ChartSeriesAssigned=%s',
-            [GraphIndex, Config.ChannelUUID, Config.MeterValueKey,
-             BoolToStr(Channel <> nil, True), BoolToStr(MeterValue <> nil, True),
-             BoolToStr(RuntimeAssigned, True)]));
-      if (not RuntimeAssigned) or (MeterValue = nil) then
-      begin
-        if DiagnosticDue and Assigned(ProtocolManager) then
-          ProtocolManager.AddMessage(pcProc, psForm,
-            'GraphWorkspacePointSkipped', 'Точка графика пропущена',
-            Format('GraphIndex=%d; ChannelUUID=%s; MeterValueKey=%s; Reason=SourceNotResolved',
-              [GraphIndex, Config.ChannelUUID, Config.MeterValueKey]));
-        Continue;
-      end;
-      Runtime.ChartSeries.Visible := Config.Visible;
-      if (not Config.Visible) or (not SamplingActive) then
-        Continue;
-      SeriesAdded := False;
+      Channel := ResolveChannel(Config); MeterValue := ResolveMeterValue(Config, Channel);
+      if (not SamplingActive) or (Channel = nil) or not Channel.Enabled or
+         (MeterValue = nil) or (PointKey = '') then Continue;
       Samples := MeterValue.GetStabilitySamples;
       for SampleIndex := 0 to High(Samples) do
       begin
         Sample := Samples[SampleIndex];
-        if Sample.TimeStampMs <= Runtime.LastSampleTimeMs then
-          Continue;
+        if (Sample.TimeStampMs < FSharedSegmentStartMs) or
+           (Sample.TimeStampMs <= Runtime.LastSampleTimeMs) then Continue;
         Runtime.LastSampleTimeMs := Sample.TimeStampMs;
         Runtime.LastSampleIndex := SampleIndex;
-        if (FSegmentStartMs > 0) and (Sample.TimeStampMs < FSegmentStartMs) then
-          Continue;
         Value := Sample.Value;
-        if IsNan(Value) or IsInfinite(Value) or (Abs(Value) >= MaxDouble) then
+        if IsNan(Value) or IsInfinite(Value) or (Abs(Value) >= MaxDouble) then Continue;
+        if Runtime.WaitingForFirstSample and SameValue(Value, 0.0, 1E-12) then
           Continue;
-        if FSegmentStartMs = 0 then
-          FSegmentStartMs := Sample.TimeStampMs;
-        TimeSec := (Sample.TimeStampMs - FSegmentStartMs) / 1000.0;
+        TimeSec := (Sample.TimeStampMs - FSharedSegmentStartMs) / 1000.0;
+        if SameText(Config.MeterValueKey, 'ValueFlow') or
+           SameText(Config.MeterValueKey, 'FlowRate') then
+          Value := ConvertFlowToDisplayUnits(Value);
         Runtime.ChartSeries.AddPoint(TimeSec, Value);
-        Inc(AddedCount);
-        SeriesAdded := True;
-        if DiagnosticDue and Assigned(ProtocolManager) then
-          ProtocolManager.AddMessage(pcProc, psForm,
-            'GraphWorkspacePointAdded', 'Добавлена точка графика',
-            Format('GraphIndex=%d; ChannelUUID=%s; TimeSec=%g; Value=%g; PointsCount=%d',
-              [GraphIndex, Config.ChannelUUID, TimeSec, Value,
-               Runtime.ChartSeries.Points.Count]));
+        if Runtime.WaitingForFirstSample and Assigned(ProtocolManager) then
+          ProtocolManager.AddMessage(pcProc, psForm, 'GraphPointFirstSampleAccepted',
+            'Принят первый отсчёт сегмента', Format(
+            'GraphIndex=%d; ChannelUUID=%s; PointKey=%s; SampleTimeMs=%d; Value=%g; TimeSec=%g',
+            [GraphIndex, Config.ChannelUUID, PointKey, Sample.TimeStampMs,
+             Sample.Value, TimeSec]));
+        Runtime.WaitingForFirstSample := False;
+        Runtime.LastAcceptedValue := Sample.Value;
+        Runtime.LastAcceptedPointKey := PointKey; Changed := True;
       end;
-      if (not SeriesAdded) and DoFallback then
-      begin
-        Value := MeterValue.GetDoubleValue;
-        if not IsNan(Value) and not IsInfinite(Value) and
-           (Abs(Value) < MaxDouble) then
-        begin
-          SampleTimeMs := NowMs;
-          TimeSec := Max(0.0, (SampleTimeMs - FSegmentStartMs) / 1000.0);
-          Runtime.ChartSeries.AddPoint(TimeSec, Value);
-          Runtime.LastSampleTimeMs := Max(Runtime.LastSampleTimeMs, SampleTimeMs);
-          Inc(AddedCount);
-          SeriesAdded := True;
-          if DiagnosticDue and Assigned(ProtocolManager) then
-            ProtocolManager.AddMessage(pcProc, psForm,
-              'GraphWorkspacePointAdded', 'Добавлена текущая точка графика',
-              Format('GraphIndex=%d; ChannelUUID=%s; TimeSec=%g; Value=%g; PointsCount=%d',
-                [GraphIndex, Config.ChannelUUID, TimeSec, Value,
-                 Runtime.ChartSeries.Points.Count]));
-        end;
-      end;
-      if SeriesAdded then
-      begin
-        if FConfig.Panels[GraphIndex].VisibleDurationSec > 0 then
-          while (Runtime.ChartSeries.Points.Count > 0) and
-            (Runtime.ChartSeries.Points[0].X < TimeSec -
-              FConfig.Panels[GraphIndex].VisibleDurationSec) do
-            Runtime.ChartSeries.Points.Delete(0);
-        while Runtime.ChartSeries.Points.Count > 10000 do
-          Runtime.ChartSeries.Points.Delete(0);
-        ChartChanged[GraphIndex] := True;
-      end;
+      while (FConfig.VisibleDurationSec > 0) and
+        (Runtime.ChartSeries.Points.Count > 0) and
+        (Runtime.ChartSeries.Points[0].X < FSharedAxisMinX) do
+        Runtime.ChartSeries.Points.Delete(0);
     end;
-    if ChartChanged[GraphIndex] then
-    begin
-      Chart.AutoRangeX := True;
-      Chart.AutoRangeY := True;
-      Chart.InvalidateChart;
-      if DiagnosticDue and Assigned(ProtocolManager) then
-        ProtocolManager.AddMessage(pcProc, psForm, 'GraphScale',
-          'Автоматический масштаб графика',
-          Format('GraphIndex=%d; AutoRangeX=True; AutoRangeY=True',
-            [GraphIndex]));
-    end;
+    if Changed then UpdateIndependentYAxis(GraphIndex);
   end;
-  if DoFallback then
-    FLastFallbackSampleMs := NowMs;
-  if DiagnosticDue then
-  begin
-    if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(pcProc, psForm, 'GraphWorkspaceUpdateDone',
-        'Обновление рабочей области графиков завершено',
-        Format('AddedPoints=%d', [AddedCount]));
-    FLastUpdateDiagnosticMs := NowMs;
-  end;
+  ApplySharedXAxis;
+  UpdateToleranceLines;
+  for GraphIndex := 0 to FConfig.GraphCount - 1 do ChartByIndex(GraphIndex).InvalidateChart;
+  FLastRunActive := RunActive;
 end;
 
 end.
