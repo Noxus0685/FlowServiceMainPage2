@@ -125,6 +125,10 @@ object FrameGraphsWorkspace: TFrameGraphsWorkspace
         Text = 'Показывать служебные линии в легенде'
         OnClick = ToleranceVisibilityClick
       end
+      object MenuItemShowToleranceInLegend: TMenuItem
+        Text = 'Показывать служебные линии в легенде'
+        OnClick = ToleranceVisibilityClick
+      end
       object MenuItemLayout: TMenuItem
         Locked = True
         Text = #1050#1086#1084#1087#1086#1085#1086#1074#1082#1072
