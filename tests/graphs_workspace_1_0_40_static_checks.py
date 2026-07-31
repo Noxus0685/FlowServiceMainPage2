@@ -71,3 +71,10 @@ def test_graph_sources_are_utf8_bom_without_mojibake_or_manual_recoding():
 
 def test_version_is_1_0_40():
     assert "APP_VERSION = '1.0.40';" in VERSION
+
+
+def test_delphi_control_units_and_nested_loop_variables_are_valid():
+    assert "FMX.Layouts, FMX.ListBox, FMX.Menus" in SOURCE
+    resolver = routine("function TFrameGraphsWorkspace.ResolveToleranceSource")
+    assert resolver.count("LocalChannel: TChannel;") == 2
+    assert resolver.count("for LocalChannel in FWorkTable.DeviceChannels do") == 2
