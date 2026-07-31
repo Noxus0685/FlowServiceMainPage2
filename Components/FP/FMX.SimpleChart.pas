@@ -10,6 +10,7 @@ uses
   FMX.Controls, FMX.Types, FMX.Graphics, FMX.Forms;
 
 type
+  TChartLineStyle = (clsSolid, clsDash);
   // ---------------------------------------------------------------------------
   // Серия данных (одна линия на графике)
   // ---------------------------------------------------------------------------
@@ -22,6 +23,7 @@ type
     FMarkerRadius: Single;
     FLegendName: string;
     FVisible: Boolean;
+    FLineStyle: TChartLineStyle;
     procedure SetColor(const Value: TAlphaColor);
     procedure SetThickness(const Value: Single);
     procedure SetShowMarkers(const Value: Boolean);
@@ -40,6 +42,7 @@ type
     property MarkerRadius: Single read FMarkerRadius write SetMarkerRadius;
     property LegendName: string read FLegendName write SetLegendName;
     property Visible: Boolean read FVisible write SetVisible;
+    property LineStyle: TChartLineStyle read FLineStyle write FLineStyle;
   end;
 
   // ---------------------------------------------------------------------------
@@ -187,6 +190,7 @@ begin
   FMarkerRadius := 3;
   FLegendName := '';
   FVisible := True;
+  FLineStyle := clsSolid;
 end;
 
 destructor TChartSeries.Destroy;
@@ -702,6 +706,8 @@ var
   i, j: Integer;
   screenPoints: TArray<TPointF>;
   series: TChartSeries;
+  Delta: TPointF;
+  LengthPx, DashPos: Single;
 begin
   for i := 0 to FSeries.Count - 1 do
   begin
@@ -718,7 +724,22 @@ begin
     Canvas.Stroke.Kind := TBrushKind.Solid;
 
     for j := 0 to Length(screenPoints) - 2 do
-      Canvas.DrawLine(screenPoints[j], screenPoints[j+1], 1);
+      if series.LineStyle = clsSolid then
+        Canvas.DrawLine(screenPoints[j], screenPoints[j+1], 1)
+      else
+      begin
+        { FMX has no portable dashed stroke.  Split each segment into short
+          strokes, which keeps the style consistent on every backend. }
+        Delta := screenPoints[j + 1] - screenPoints[j];
+        LengthPx := Sqrt(Sqr(Delta.X) + Sqr(Delta.Y));
+        DashPos := 0;
+        while (LengthPx > 0) and (DashPos < LengthPx) do
+        begin
+          Canvas.DrawLine(screenPoints[j] + Delta * (DashPos / LengthPx),
+            screenPoints[j] + Delta * (Min(DashPos + 6, LengthPx) / LengthPx), 1);
+          DashPos := DashPos + 10;
+        end;
+      end;
 
     if series.ShowMarkers then
       DrawMarkersForSeries(series);
