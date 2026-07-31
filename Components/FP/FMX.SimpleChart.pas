@@ -10,6 +10,7 @@ uses
   FMX.Controls, FMX.Types, FMX.Graphics, FMX.Forms;
 
 type
+  TChartLineStyle = (clsSolid, clsDash);
   // ---------------------------------------------------------------------------
   // Серия данных (одна линия на графике)
   // ---------------------------------------------------------------------------
@@ -22,6 +23,7 @@ type
     FMarkerRadius: Single;
     FLegendName: string;
     FVisible: Boolean;
+    FLineStyle: TChartLineStyle;
     procedure SetColor(const Value: TAlphaColor);
     procedure SetThickness(const Value: Single);
     procedure SetShowMarkers(const Value: Boolean);
@@ -40,6 +42,7 @@ type
     property MarkerRadius: Single read FMarkerRadius write SetMarkerRadius;
     property LegendName: string read FLegendName write SetLegendName;
     property Visible: Boolean read FVisible write SetVisible;
+    property LineStyle: TChartLineStyle read FLineStyle write FLineStyle;
   end;
 
   // ---------------------------------------------------------------------------
@@ -58,6 +61,7 @@ type
     FLineColor: TAlphaColor;
     FLineThickness: Single;
     FShowGrid: Boolean;
+    FShowLegend: Boolean;
     FShowMarkers: Boolean;
     FMarkerRadius: Single;
     FGridColor: TAlphaColor;
@@ -101,6 +105,7 @@ type
     function GetNiceTicks(minVal, maxVal: Double; approxTicks: Integer): TArray<Double>;
     procedure DrawAxesAndGrid;    // рисует оси, сетку, подписи, заголовки
     procedure DrawSeries;         // рисует все видимые серии
+    procedure DrawLegend;
     procedure DrawMarkersForSeries(Series: TChartSeries); // маркеры для одной серии
     function GetSeries(Index: Integer): TChartSeries;
     function GetSeriesCount: Integer;
@@ -124,10 +129,12 @@ type
   published
     property Align;
     property Anchors;
+    property Tag;
     property Margins;
     property Padding;
     property Visible;
     property Enabled;
+    property OnMouseDown;
 
     // Глобальные настройки осей и диапазонов
     property AutoRangeX: Boolean read FAutoRangeX write SetAutoRangeX default True;
@@ -146,6 +153,7 @@ type
 
     // Оформление
     property ShowGrid: Boolean read FShowGrid write SetShowGrid default True;
+    property ShowLegend: Boolean read FShowLegend write FShowLegend default True;
     property GridColor: TAlphaColor read FGridColor write SetGridColor;
     property AxisColor: TAlphaColor read FAxisColor write SetAxisColor;
     property BackgroundColor: TAlphaColor read FBackgroundColor write SetBackgroundColor;
@@ -182,6 +190,7 @@ begin
   FMarkerRadius := 3;
   FLegendName := '';
   FVisible := True;
+  FLineStyle := clsSolid;
 end;
 
 destructor TChartSeries.Destroy;
@@ -261,6 +270,7 @@ begin
   FLineColor := $FF0000FF;
   FLineThickness := 2;
   FShowGrid := True;
+  FShowLegend := True;
   FShowMarkers := True;
   FMarkerRadius := 3;
   FGridColor := $FFCCCCCC;
@@ -696,6 +706,8 @@ var
   i, j: Integer;
   screenPoints: TArray<TPointF>;
   series: TChartSeries;
+  Delta: TPointF;
+  LengthPx, DashPos: Single;
 begin
   for i := 0 to FSeries.Count - 1 do
   begin
@@ -712,7 +724,22 @@ begin
     Canvas.Stroke.Kind := TBrushKind.Solid;
 
     for j := 0 to Length(screenPoints) - 2 do
-      Canvas.DrawLine(screenPoints[j], screenPoints[j+1], 1);
+      if series.LineStyle = clsSolid then
+        Canvas.DrawLine(screenPoints[j], screenPoints[j+1], 1)
+      else
+      begin
+        { FMX has no portable dashed stroke.  Split each segment into short
+          strokes, which keeps the style consistent on every backend. }
+        Delta := screenPoints[j + 1] - screenPoints[j];
+        LengthPx := Sqrt(Sqr(Delta.X) + Sqr(Delta.Y));
+        DashPos := 0;
+        while (LengthPx > 0) and (DashPos < LengthPx) do
+        begin
+          Canvas.DrawLine(screenPoints[j] + Delta * (DashPos / LengthPx),
+            screenPoints[j] + Delta * (Min(DashPos + 6, LengthPx) / LengthPx), 1);
+          DashPos := DashPos + 10;
+        end;
+      end;
 
     if series.ShowMarkers then
       DrawMarkersForSeries(series);
@@ -730,9 +757,33 @@ begin
   try
     DrawAxesAndGrid;
     DrawSeries;
+    if FShowLegend then
+      DrawLegend;
   finally
     Canvas.EndScene;
   end;
+end;
+
+procedure TSimpleChart.DrawLegend;
+var
+  I: Integer;
+  R: TRectF;
+begin
+  Canvas.Fill.Color := FAxisColor;
+  Canvas.Font.Size := 11;
+  for I := 0 to FSeries.Count - 1 do
+    if FSeries[I].Visible and (FSeries[I].LegendName <> '') then
+    begin
+      R := RectF(Width - FMarginRight - 155, FMarginTop + I * 18,
+        Width - FMarginRight, FMarginTop + I * 18 + 16);
+      Canvas.Stroke.Color := FSeries[I].Color;
+      Canvas.Stroke.Thickness := 3;
+      Canvas.DrawLine(PointF(R.Left, R.CenterPoint.Y),
+        PointF(R.Left + 20, R.CenterPoint.Y), 1);
+      R.Left := R.Left + 25;
+      Canvas.FillText(R, FSeries[I].LegendName, False, 1, [],
+        TTextAlign.Leading, TTextAlign.Center);
+    end;
 end;
 
 // -----------------------------------------------------------------------------
