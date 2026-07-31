@@ -139,7 +139,6 @@ type
     MenuItemEtalons: TMenuItem;
     MenuItemDevices: TMenuItem;
     MenuItemOther: TMenuItem;
-    MenuItemRemoveSource: TMenuItem;
     MenuItemSettings: TMenuItem;
     MenuItemSeriesColors: TMenuItem;
     MenuItemGraphLength: TMenuItem;
@@ -493,7 +492,7 @@ begin
   Result.Chart.Align := TAlignLayout.Client;
   Result.Chart.ClipParent := True;
   Result.Chart.Tag := AGraphIndex;
-  Result.Chart.Title := Result.TitleLabel.Text;
+  Result.Chart.Title := '';
   Result.Chart.XTitle := 'Время, с';
   Result.Chart.YTitle := '';
   Result.Chart.OnMouseDown := GraphControlMouseDown;
@@ -541,8 +540,7 @@ begin
     Slot.TitleLabel.Tag := I;
     Slot.Chart.Tag := I;
     if Slot.HitControl <> nil then Slot.HitControl.Tag := I;
-    Slot.TitleLabel.Text := Format('График %d', [I + 1]);
-    Slot.Chart.Title := Slot.TitleLabel.Text;
+    UpdateGraphHeader(I);
   end;
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphSlotsReindexed',
@@ -764,21 +762,6 @@ begin
   ClearDynamicMenu(MenuItemOther);
   AddEnvironmentMenuItem(MenuItemOther, gskTemperature, 'Температура', 'FluidTemp');
   AddEnvironmentMenuItem(MenuItemOther, gskPressure, 'Давление', 'FluidPress');
-  ClearDynamicMenu(MenuItemRemoveSource);
-  if (FConfig <> nil) and (FContextGraphIndex < FConfig.Panels.Count) then
-    for Config in FConfig.Panels[FContextGraphIndex].Series do
-    begin
-      RemoveItem := TGraphSourceMenuItem.Create(nil);
-      RemoveItem.GraphIndex := FContextGraphIndex;
-      RemoveItem.ChannelUUID := Config.ChannelUUID;
-      RemoveItem.MeterValueKey := Config.MeterValueKey;
-      RemoveItem.SourceCaption := Config.Caption;
-      RemoveItem.Text := Config.Caption;
-      RemoveItem.RemoveSource := True;
-      RemoveItem.OnClick := SourceMenuItemClick;
-      MenuItemRemoveSource.AddObject(RemoveItem);
-    end;
-  MenuItemRemoveSource.Enabled := MenuItemRemoveSource.ItemsCount > 0;
   if FWorkTable <> nil then
   begin
     if FWorkTable.EtalonChannels <> nil then
@@ -821,10 +804,15 @@ begin
   end;
   if Existing <> nil then
   begin
-    Existing.Visible := True;
-    if FSeriesRuntime.ContainsKey(Existing) then
-      FSeriesRuntime[Existing].ChartSeries.Visible := True;
-    UpdateGraphHeader(Item.GraphIndex);
+    if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+      'GraphSourceRemoved', 'Источник удалён из графика',
+      Format('GraphIndex=%d; SourceKind=%s; SourceName=%s',
+        [Item.GraphIndex, IfThen(Existing.SourceKind = gskTemperature, 'Temperature',
+          IfThen(Existing.SourceKind = gskPressure, 'Pressure',
+            IfThen(Existing.OwnerKind = gsokEtalon, 'Etalon', 'Device'))),
+         Existing.Caption]));
+    DeleteSource(Item.GraphIndex, Existing);
+    UpdateToleranceLinesForGraph(Item.GraphIndex);
     Exit;
   end;
   Source := TGraphSeriesConfig.Create;
@@ -1020,27 +1008,45 @@ end;
 
 procedure TFrameGraphsWorkspace.UpdateGraphHeader(const AGraphIndex: Integer);
 var
-  Config: TGraphSeriesConfig;
-  HeaderText, Names: string;
+  Config, FirstVisible: TGraphSeriesConfig;
+  HeaderText, Names, DimensionText: string;
   Slot: TGraphVisualSlot;
 begin
   if (FConfig = nil) or (AGraphIndex < 0) or
      (AGraphIndex >= FConfig.Panels.Count) then Exit;
   Names := '';
+  FirstVisible := nil;
   for Config in FConfig.Panels[AGraphIndex].Series do
     if Config.Visible then
     begin
+      if FirstVisible = nil then FirstVisible := Config;
       if Names <> '' then Names := Names + ', ';
       Names := Names + Config.Caption;
     end;
-  HeaderText := Format('График %d', [AGraphIndex + 1]);
-  if Names <> '' then HeaderText := HeaderText + ': ' + Names;
+  if FirstVisible = nil then
+    HeaderText := Format('График %d', [AGraphIndex + 1])
+  else
+  begin
+    case FirstVisible.SourceKind of
+      gskTemperature: DimensionText := 'Температура, °C';
+      gskPressure: DimensionText := 'Давление, bar';
+    else
+      DimensionText := 'Расход, ' + GetCurrentFlowUnitText;
+    end;
+    { The former Y-axis caption is now part of the one visible graph header. }
+    if (FirstVisible.SourceKind in [gskTemperature, gskPressure]) and
+       SameText(Names, FirstVisible.Caption) then
+      HeaderText := DimensionText
+    else
+      HeaderText := DimensionText + ': ' + Names;
+  end;
   FConfig.Panels[AGraphIndex].Title := HeaderText;
   Slot := GraphSlotByIndex(AGraphIndex);
   if Slot <> nil then
   begin
     Slot.TitleLabel.Text := HeaderText;
-    Slot.Chart.Title := HeaderText;
+    { TSimpleChart has its own title area; keep it empty to avoid a duplicate. }
+    Slot.Chart.Title := '';
   end;
   if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
     'GraphHeaderUpdated', 'Обновлён заголовок графика',
@@ -1132,6 +1138,20 @@ begin
     FConfig.Panels[FContextGraphIndex].ShowToleranceInLegend;
   MenuItemAddGraph.Enabled := True;
   MenuItemDeleteGraph.Enabled := FConfig.GraphCount > 1;
+end;
+
+procedure TFrameGraphsWorkspace.GraphColumnModeClick(Sender: TObject);
+var Item: TGraphColumnMenuItem;
+begin
+  if not (Sender is TGraphColumnMenuItem) then Exit;
+  Item := TGraphColumnMenuItem(Sender);
+  FConfig.AutoGrid := Item.ColumnCount = 0;
+  FConfig.PreferredColumnCount := Item.ColumnCount;
+  ApplyDynamicGridLayout;
+  if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
+    'GraphColumnModeChanged', 'Изменён режим колонок графиков', Format(
+    'AutoGrid=%s; PreferredColumnCount=%d', [BoolToStr(FConfig.AutoGrid, True),
+     FConfig.PreferredColumnCount]));
 end;
 
 procedure TFrameGraphsWorkspace.ClearGraphValuesClick(Sender: TObject);

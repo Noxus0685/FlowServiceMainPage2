@@ -43,9 +43,6 @@
         Text = 'Прочее'
       end
     end
-    object MenuItemRemoveSource: TMenuItem
-      Text = 'Удалить источник'
-    end
     object MenuItemSettings: TMenuItem
       Text = 'Настройки'
       object MenuItemSeriesColors: TMenuItem
