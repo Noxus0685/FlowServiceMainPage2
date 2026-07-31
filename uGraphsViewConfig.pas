@@ -1,4 +1,4 @@
-unit uGraphsViewConfig;
+﻿unit uGraphsViewConfig;
 
 interface
 
