@@ -75,6 +75,9 @@ type
 
   TGraphHistoryLoadMode = (ghlmCurrentSegmentHistory, ghlmAfterLocalReset);
 
+  TGraphToleranceResolveState = (gtrsNotResolved, gtrsPendingPoint,
+    gtrsResolved, gtrsUnavailable);
+
   TGraphSeriesRuntime = class
   public
     ChartSeries: TChartSeries;
@@ -87,9 +90,13 @@ type
     HistoryLoaded: Boolean;
     HistoryLoadMode: TGraphHistoryLoadMode;
     ToleranceVisual: TGraphToleranceVisual;
+    ToleranceResolveState: TGraphToleranceResolveState;
     TolerancePointKey: string;
+    LastToleranceAttemptMs: Int64;
+    LastToleranceReason: string;
     ToleranceTargetQ: Double;
     ToleranceErrorPercent: Double;
+    constructor Create;
     destructor Destroy; override;
   end;
 
@@ -279,6 +286,13 @@ type
       ASeriesConfig: TGraphSeriesConfig; ARuntime: TGraphSeriesRuntime);
     procedure ClearSeriesToleranceLines(ARuntime: TGraphSeriesRuntime);
     function IsValidTolerancePoint(APoint: TDevicePoint): Boolean;
+    function TryGetValidRunPoint(out ARun: TMeasurementRun;
+      out ARunPoint: TDevicePoint; out APointKey, AReason: string): Boolean;
+    function BuildRunTolerancePointKey(ARunPoint: TDevicePoint;
+      const ARunPointIndex: Integer): string;
+    function IsTemporaryToleranceReason(const AReason: string): Boolean;
+    procedure HideSeriesToleranceVisual(ARuntime: TGraphSeriesRuntime);
+    procedure InvalidateToleranceForGraph(const AGraphIndex: Integer);
     function PointsMatch(ARunPoint, ADevicePoint: TDevicePoint): Boolean;
     function BuildSeriesTolerancePointKey(const AChannelUUID, APointUUID,
       AMeterValueKey: string; const ATargetQ, AErrorPercent: Double): string;
@@ -359,6 +373,15 @@ destructor TGraphSeriesRuntime.Destroy;
 begin
   ToleranceVisual.Free;
   inherited;
+end;
+
+constructor TGraphSeriesRuntime.Create;
+begin
+  inherited Create;
+  ToleranceResolveState := gtrsNotResolved;
+  TolerancePointKey := '';
+  LastToleranceAttemptMs := 0;
+  LastToleranceReason := '';
 end;
 
 destructor TGraphVisualSlot.Destroy;
@@ -891,7 +914,8 @@ begin
     LayoutItem := TGraphColumnMenuItem.Create(nil);
     LayoutItem.ColumnCount := I;
     if I = 0 then LayoutItem.Text := 'Автоматически'
-    else LayoutItem.Text := Format('%d столбцов', [I]);
+    else if I = 1 then LayoutItem.Text := '1 столбец'
+    else LayoutItem.Text := Format('%d столбца', [I]);
     LayoutItem.IsChecked := (FConfig.AutoGrid and (I = 0)) or
       ((not FConfig.AutoGrid) and (FConfig.PreferredColumnCount = I));
     LayoutItem.OnClick := GraphColumnModeClick;
@@ -1006,19 +1030,24 @@ end;
 procedure TFrameGraphsWorkspace.ToleranceVisibilityClick(Sender: TObject);
 var
   Panel: TGraphPanelConfig;
+  MenuItem: TMenuItem;
 begin
   if (FConfig = nil) or (FContextGraphIndex < 0) or
      (FContextGraphIndex >= FConfig.Panels.Count) then Exit;
   Panel := FConfig.Panels[FContextGraphIndex];
+  if not (Sender is TMenuItem) then Exit;
+  MenuItem := TMenuItem(Sender);
+  MenuItem.IsChecked := not MenuItem.IsChecked;
   if Sender = MenuItemShowTargetLine then
-    Panel.ShowTargetLine := not Panel.ShowTargetLine
+    Panel.ShowTargetLine := MenuItem.IsChecked
   else if Sender = MenuItemShowToleranceLines then
-    Panel.ShowToleranceLines := not Panel.ShowToleranceLines
+    Panel.ShowToleranceLines := MenuItem.IsChecked
   else if Sender = MenuItemShowToleranceInLegend then
     Panel.ShowToleranceInLegend := not Panel.ShowToleranceInLegend
   else
     Exit;
-  UpdateToleranceLines;
+  InvalidateToleranceForGraph(FContextGraphIndex);
+  UpdateToleranceLinesForGraph(FContextGraphIndex);
   UpdateGraphSettingsMenu;
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphToleranceVisibilityChanged',
@@ -1220,9 +1249,11 @@ begin
       FSeriesRuntime[ASource].RuntimeResetTimeMs := 0;
       FSeriesRuntime[ASource].HistoryLoadMode := ghlmCurrentSegmentHistory;
       FSeriesRuntime[ASource].HistoryLoaded := False;
-      LoadSeriesCurrentSegmentHistory(AGraphIndex, ASource,
+      FSeriesRuntime[ASource].ToleranceResolveState := gtrsPendingPoint;
+      EnsureSeriesToleranceVisual(AGraphIndex, ASource,
         FSeriesRuntime[ASource]);
-      UpdateSeriesToleranceLines(AGraphIndex, ASource,
+      HideSeriesToleranceVisual(FSeriesRuntime[ASource]);
+      LoadSeriesCurrentSegmentHistory(AGraphIndex, ASource,
         FSeriesRuntime[ASource]);
       Chart.InvalidateChart;
     end;
@@ -1747,6 +1778,9 @@ begin
         Pair.Value.ChartSeries.ClearPoints;
       end;
       ClearSeriesToleranceLines(Pair.Value);
+      Pair.Value.ToleranceResolveState := gtrsNotResolved;
+      Pair.Value.TolerancePointKey := '';
+      Pair.Value.LastToleranceReason := '';
     end;
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesRuntimeReset',
@@ -2024,6 +2058,95 @@ begin
     (Abs(APoint.Error) < MaxDouble) and (APoint.Error <> 0);
 end;
 
+function TFrameGraphsWorkspace.BuildRunTolerancePointKey(
+  ARunPoint: TDevicePoint; const ARunPointIndex: Integer): string;
+begin
+  if ARunPoint = nil then
+    Exit('');
+  Result := Format('%s|%d|%.12g|%.12g|%s',
+    [NormalizeUUID(ARunPoint.UUID), ARunPointIndex, ARunPoint.Q,
+     ARunPoint.Error, Trim(ARunPoint.Name)]);
+end;
+
+function TFrameGraphsWorkspace.TryGetValidRunPoint(
+  out ARun: TMeasurementRun; out ARunPoint: TDevicePoint;
+  out APointKey, AReason: string): Boolean;
+var
+  RunActive: Boolean;
+begin
+  Result := False;
+  ARun := nil;
+  ARunPoint := nil;
+  APointKey := '';
+  AReason := 'TolerancePointPending';
+  if FWorkTable = nil then
+  begin AReason := 'MeasurementRunMissing'; Exit end;
+  if not (FWorkTable.MeasurementRun is TMeasurementRun) then
+  begin AReason := 'MeasurementRunMissing'; Exit end;
+  ARun := TMeasurementRun(FWorkTable.MeasurementRun);
+  ARunPoint := ARun.CurrentPoint;
+  if ARunPoint = nil then
+  begin AReason := 'RunPointMissing'; Exit end;
+  if IsNan(ARunPoint.Q) or IsInfinite(ARunPoint.Q) or
+     (Abs(ARunPoint.Q) >= MaxDouble) then
+  begin AReason := 'RunTargetQNotAssigned'; Exit end;
+  if ARunPoint.Q = 0 then
+  begin AReason := 'RunTargetQNotAssigned'; Exit end;
+  if IsPointTransitionStage then
+  begin AReason := 'TransitionStage'; Exit end;
+  RunActive := not (ARun.Stage in [msNone, msDone]);
+  if not RunActive then
+  begin AReason := 'TolerancePointPending'; Exit end;
+  if FSharedSegmentStartMs = 0 then
+  begin AReason := 'SegmentNotStarted'; Exit end;
+  { CurrentPointIndex=-1 is intentionally accepted: a fully populated point
+    can become available before the run publishes its list index. }
+  APointKey := BuildRunTolerancePointKey(ARunPoint, ARun.CurrentPointIndex);
+  Result := APointKey <> '';
+  if not Result then AReason := 'TolerancePointPending' else AReason := '';
+end;
+
+function TFrameGraphsWorkspace.IsTemporaryToleranceReason(
+  const AReason: string): Boolean;
+begin
+  Result := SameText(AReason, 'MeasurementRunMissing') or
+    SameText(AReason, 'RunPointMissing') or
+    SameText(AReason, 'RunTargetQZero') or
+    SameText(AReason, 'RunTargetQNotAssigned') or
+    SameText(AReason, 'CurrentPointIndexPending') or
+    SameText(AReason, 'SegmentNotStarted') or
+    SameText(AReason, 'TransitionStage') or
+    SameText(AReason, 'TolerancePointPending');
+end;
+
+procedure TFrameGraphsWorkspace.HideSeriesToleranceVisual(
+  ARuntime: TGraphSeriesRuntime);
+begin
+  if (ARuntime = nil) or (ARuntime.ToleranceVisual = nil) then Exit;
+  if ARuntime.ToleranceVisual.TargetSeries <> nil then
+    ARuntime.ToleranceVisual.TargetSeries.Visible := False;
+  if ARuntime.ToleranceVisual.LowerSeries <> nil then
+    ARuntime.ToleranceVisual.LowerSeries.Visible := False;
+  if ARuntime.ToleranceVisual.UpperSeries <> nil then
+    ARuntime.ToleranceVisual.UpperSeries.Visible := False;
+end;
+
+procedure TFrameGraphsWorkspace.InvalidateToleranceForGraph(
+  const AGraphIndex: Integer);
+var
+  SeriesConfig: TGraphSeriesConfig;
+  Runtime: TGraphSeriesRuntime;
+begin
+  if (FConfig = nil) or (AGraphIndex < 0) or
+     (AGraphIndex >= FConfig.GraphCount) then Exit;
+  for SeriesConfig in FConfig.Panels[AGraphIndex].Series do
+    if FSeriesRuntime.TryGetValue(SeriesConfig, Runtime) then
+    begin
+      Runtime.ToleranceResolveState := gtrsNotResolved;
+      Runtime.TolerancePointKey := '';
+    end;
+end;
+
 function TFrameGraphsWorkspace.PointsMatch(ARunPoint,
   ADevicePoint: TDevicePoint): Boolean;
 begin
@@ -2271,6 +2394,7 @@ function TFrameGraphsWorkspace.ResolveSeriesTolerance(
 var
   Run: TMeasurementRun;
   RunPoint: TDevicePoint;
+  RunPointKey: string;
   SourceDevice: TDevice;
   SourcePoint: TDevicePoint;
   SourcePointIndex: Integer;
@@ -2294,18 +2418,16 @@ begin
   else begin AReason := 'UnsupportedMeterValue'; Exit end;
   if (ASeriesConfig.SourceKind <> gskFlow) then
   begin AReason := 'UnsupportedMeterValue'; Exit end;
-  if (FWorkTable = nil) or
-     not (FWorkTable.MeasurementRun is TMeasurementRun) then
-  begin AReason := 'PointMissing'; Exit end;
-  Run := TMeasurementRun(FWorkTable.MeasurementRun);
-  RunPoint := Run.CurrentPoint;
-  if RunPoint = nil then begin AReason := 'RunPointMissing'; Exit end;
+  if not TryGetValidRunPoint(Run, RunPoint, RunPointKey, AReason) then
+  begin
+    AReason := 'TolerancePointPending';
+    Exit;
+  end;
   LogToleranceEvent('GraphSeriesToleranceResolveBegin',
     Format('%d|%s', [AGraphIndex, ASeriesConfig.ChannelUUID]), Format(
     'GraphIndex=%d; OwnerKind=%s; ChannelUUID=%s; MeterValueKey=%s; SeriesCaption=%s; RunPointIndex=%d',
     [AGraphIndex, OwnerText, ASeriesConfig.ChannelUUID,
      ASeriesConfig.MeterValueKey, ASeriesConfig.Caption, Run.CurrentPointIndex]));
-  if IsPointTransitionStage then begin AReason := 'TransitionStage'; Exit end;
   if ASeriesConfig.OwnerKind = gsokEtalon then
   begin
     EtalonDeviceUUID := '';
@@ -2445,68 +2567,127 @@ var
   Info: TGraphSeriesToleranceInfo;
   Visual: TGraphToleranceVisual;
   Panel: TGraphPanelConfig;
-  Reason, NewKey: string;
-  Rebuild: Boolean;
+  Run: TMeasurementRun;
+  RunPoint: TDevicePoint;
+  Reason, CurrentPointKey, PreviousReason, PreviousKey, OwnerText: string;
+  PreviousState: TGraphToleranceResolveState;
+  MainSeriesVisible, WasPending: Boolean;
+  RunActive: Boolean;
+  RunStage, RunPointIndex: Integer;
+  RunPointUUID: string;
+  RunPointQ: Double;
 begin
   if (ARuntime = nil) or (FConfig = nil) then Exit;
+  PreviousState := ARuntime.ToleranceResolveState;
+  PreviousReason := ARuntime.LastToleranceReason;
+  PreviousKey := ARuntime.TolerancePointKey;
+  ARuntime.LastToleranceAttemptMs := TMeterValue.GetMonotonicTimeMs;
+  if not TryGetValidRunPoint(Run, RunPoint, CurrentPointKey, Reason) then
+  begin
+    ARuntime.ToleranceResolveState := gtrsPendingPoint;
+    ARuntime.TolerancePointKey := '';
+    ARuntime.LastToleranceReason := 'TolerancePointPending';
+    HideSeriesToleranceVisual(ARuntime);
+    RunActive := False;
+    RunStage := -1;
+    RunPointIndex := -1;
+    RunPointUUID := '';
+    RunPointQ := 0;
+    if Run <> nil then
+    begin
+      RunActive := not (Run.Stage in [msNone, msDone]);
+      RunStage := Ord(Run.Stage);
+      RunPointIndex := Run.CurrentPointIndex;
+    end;
+    if RunPoint <> nil then
+    begin
+      RunPointUUID := RunPoint.UUID;
+      RunPointQ := RunPoint.Q;
+    end;
+    LogToleranceEvent('GraphTolerancePointPending', Reason, Format(
+      'RunActive=%s; Stage=%d; RunPointUUID=%s; RunPointIndex=%d; RunPointQ=%g; SegmentStartMs=%d; Reason=%s',
+      [BoolToStr(RunActive, True), RunStage, RunPointUUID, RunPointIndex,
+       RunPointQ, FSharedSegmentStartMs, Reason]));
+    Exit;
+  end;
+  if (ARuntime.ToleranceResolveState in [gtrsResolved, gtrsUnavailable]) and
+     SameText(ARuntime.TolerancePointKey, CurrentPointKey) then Exit;
+  if (PreviousState = gtrsPendingPoint) then Reason := 'PointBecameAvailable'
+  else if not SameText(PreviousKey, CurrentPointKey) then Reason := 'PointChanged'
+  else Reason := 'VisibilityChanged';
+  if ASeriesConfig.OwnerKind = gsokEtalon then OwnerText := 'Etalon'
+  else OwnerText := 'Device';
+  LogToleranceEvent('GraphSeriesToleranceRetry',
+    Format('%d|%s|%s', [AGraphIndex, ASeriesConfig.ChannelUUID, CurrentPointKey]),
+    Format('GraphIndex=%d; OwnerKind=%s; ChannelUUID=%s; PreviousState=%d; PreviousReason=%s; OldPointKey=%s; NewPointKey=%s; RetryReason=%s',
+      [AGraphIndex, OwnerText, ASeriesConfig.ChannelUUID, Ord(PreviousState),
+       PreviousReason, PreviousKey, CurrentPointKey, Reason]));
+  WasPending := PreviousState = gtrsPendingPoint;
   if not ResolveSeriesTolerance(AGraphIndex, ASeriesConfig, Info, Reason) then
   begin
-    ClearSeriesToleranceLines(ARuntime);
-    LogToleranceEvent('GraphSeriesToleranceSourceUnavailable',
-      Format('%d|%s|%s', [AGraphIndex, ASeriesConfig.ChannelUUID, Reason]),
-      Format('GraphIndex=%d; ChannelUUID=%s; Reason=%s',
-        [AGraphIndex, ASeriesConfig.ChannelUUID, Reason]));
+    ARuntime.LastToleranceReason := Reason;
+    if IsTemporaryToleranceReason(Reason) then
+    begin
+      ARuntime.ToleranceResolveState := gtrsPendingPoint;
+      ARuntime.TolerancePointKey := '';
+      HideSeriesToleranceVisual(ARuntime);
+    end
+    else
+    begin
+      ARuntime.ToleranceResolveState := gtrsUnavailable;
+      ARuntime.TolerancePointKey := CurrentPointKey;
+      HideSeriesToleranceVisual(ARuntime);
+    end;
     Exit;
   end;
   Visual := EnsureSeriesToleranceVisual(AGraphIndex, ASeriesConfig, ARuntime);
-  if Visual = nil then Exit;
   Panel := FConfig.Panels[AGraphIndex];
-  NewKey := BuildSeriesTolerancePointKey(Info.ChannelUUID, Info.PointUUID,
-    Info.MeterValueKey, Info.TargetQ, Info.ErrorPercent);
-  Rebuild := not SameText(NewKey, ARuntime.TolerancePointKey) or
-    (Visual.TargetSeries.Points.Count <> 2) or
-    (Visual.TargetSeries.Points[0].X <> FSharedAxisMinX) or
-    (Visual.TargetSeries.Points[1].X <> FSharedAxisMaxX);
-  if Rebuild then
-  begin
-    Visual.TargetSeries.ClearPoints;
-    Visual.LowerSeries.ClearPoints;
-    Visual.UpperSeries.ClearPoints;
-    Visual.TargetSeries.AddPoint(FSharedAxisMinX, Info.DisplayTarget);
-    Visual.TargetSeries.AddPoint(FSharedAxisMaxX, Info.DisplayTarget);
-    Visual.LowerSeries.AddPoint(FSharedAxisMinX, Info.DisplayLower);
-    Visual.LowerSeries.AddPoint(FSharedAxisMaxX, Info.DisplayLower);
-    Visual.UpperSeries.AddPoint(FSharedAxisMinX, Info.DisplayUpper);
-    Visual.UpperSeries.AddPoint(FSharedAxisMaxX, Info.DisplayUpper);
-    ARuntime.TolerancePointKey := NewKey;
-    ARuntime.ToleranceTargetQ := Info.TargetQ;
-    ARuntime.ToleranceErrorPercent := Info.ErrorPercent;
-    Visual.PointKey := NewKey;
-  end;
-  Visual.TargetSeries.Visible := Panel.ShowTargetLine and
-    (ARuntime.ChartSeries <> nil) and ARuntime.ChartSeries.Visible;
-  Visual.LowerSeries.Visible := Panel.ShowToleranceLines and
-    (ARuntime.ChartSeries <> nil) and ARuntime.ChartSeries.Visible;
-  Visual.UpperSeries.Visible := Panel.ShowToleranceLines and
-    (ARuntime.ChartSeries <> nil) and ARuntime.ChartSeries.Visible;
+  if (Visual = nil) or (Visual.TargetSeries = nil) or
+     (Visual.LowerSeries = nil) or (Visual.UpperSeries = nil) or
+     (ARuntime.ChartSeries = nil) or (Panel = nil) then Exit;
+  Visual.TargetSeries.ClearPoints;
+  Visual.LowerSeries.ClearPoints;
+  Visual.UpperSeries.ClearPoints;
+  Visual.TargetSeries.AddPoint(FSharedAxisMinX, Info.DisplayTarget);
+  Visual.TargetSeries.AddPoint(FSharedAxisMaxX, Info.DisplayTarget);
+  Visual.LowerSeries.AddPoint(FSharedAxisMinX, Info.DisplayLower);
+  Visual.LowerSeries.AddPoint(FSharedAxisMaxX, Info.DisplayLower);
+  Visual.UpperSeries.AddPoint(FSharedAxisMinX, Info.DisplayUpper);
+  Visual.UpperSeries.AddPoint(FSharedAxisMaxX, Info.DisplayUpper);
+  ARuntime.ToleranceResolveState := gtrsResolved;
+  ARuntime.TolerancePointKey := CurrentPointKey;
+  ARuntime.LastToleranceReason := '';
+  ARuntime.ToleranceTargetQ := Info.TargetQ;
+  ARuntime.ToleranceErrorPercent := Info.ErrorPercent;
+  Visual.PointKey := CurrentPointKey;
+  MainSeriesVisible := (ARuntime.ChartSeries <> nil) and ARuntime.ChartSeries.Visible;
+  Visual.TargetSeries.Visible := Panel.ShowTargetLine and MainSeriesVisible;
+  Visual.LowerSeries.Visible := Panel.ShowToleranceLines and MainSeriesVisible;
+  Visual.UpperSeries.Visible := Panel.ShowToleranceLines and MainSeriesVisible;
   if Panel.ShowToleranceInLegend then
   begin
     Visual.TargetSeries.LegendName := ASeriesConfig.Caption + ' — целевой расход';
     Visual.LowerSeries.LegendName := ASeriesConfig.Caption + ' — нижняя допустимая граница';
     Visual.UpperSeries.LegendName := ASeriesConfig.Caption + ' — верхняя допустимая граница';
-  end
-  else
-  begin
+  end else begin
     Visual.TargetSeries.LegendName := '';
     Visual.LowerSeries.LegendName := '';
     Visual.UpperSeries.LegendName := '';
   end;
-  LogToleranceEvent('GraphSeriesToleranceLinesUpdated',
-    Format('%d|%s|%s', [AGraphIndex, Info.ChannelUUID, NewKey]), Format(
-    'GraphIndex=%d; ChannelUUID=%s; TargetVisible=%s; ToleranceVisible=%s; AxisMinX=%g; AxisMaxX=%g; TargetY=%g; LowerY=%g; UpperY=%g',
-    [AGraphIndex, Info.ChannelUUID, BoolToStr(Visual.TargetSeries.Visible, True),
-     BoolToStr(Visual.LowerSeries.Visible, True), FSharedAxisMinX,
-     FSharedAxisMaxX, Info.DisplayTarget, Info.DisplayLower, Info.DisplayUpper]));
+  if WasPending then
+    LogToleranceEvent('GraphSeriesToleranceResolvedAfterPending', CurrentPointKey,
+      Format('GraphIndex=%d; OwnerKind=%s; ChannelUUID=%s; PointKey=%s; TargetQ=%g; ErrorPercent=%g; DisplayTarget=%g; DisplayLower=%g; DisplayUpper=%g',
+       [AGraphIndex, OwnerText, Info.ChannelUUID, CurrentPointKey, Info.TargetQ,
+        Info.ErrorPercent, Info.DisplayTarget, Info.DisplayLower, Info.DisplayUpper]));
+  LogToleranceEvent('GraphSeriesToleranceVisualState', CurrentPointKey, Format(
+    'GraphIndex=%d; ChannelUUID=%s; MainSeriesVisible=%s; ShowTargetLine=%s; ShowToleranceLines=%s; TargetSeriesAssigned=%s; LowerSeriesAssigned=%s; UpperSeriesAssigned=%s; TargetPointsCount=%d; LowerPointsCount=%d; UpperPointsCount=%d; TargetVisible=%s; LowerVisible=%s; UpperVisible=%s',
+    [AGraphIndex, Info.ChannelUUID, BoolToStr(MainSeriesVisible, True),
+     BoolToStr(Panel.ShowTargetLine, True), BoolToStr(Panel.ShowToleranceLines, True),
+     BoolToStr(Visual.TargetSeries <> nil, True), BoolToStr(Visual.LowerSeries <> nil, True),
+     BoolToStr(Visual.UpperSeries <> nil, True), Visual.TargetSeries.Points.Count,
+     Visual.LowerSeries.Points.Count, Visual.UpperSeries.Points.Count,
+     BoolToStr(Visual.TargetSeries.Visible, True), BoolToStr(Visual.LowerSeries.Visible, True),
+     BoolToStr(Visual.UpperSeries.Visible, True)]));
 end;
 
 procedure TFrameGraphsWorkspace.UpdateToleranceLinesForGraph(
@@ -2533,17 +2714,42 @@ begin
 end;
 
 procedure TFrameGraphsWorkspace.UpdateIndependentYAxis(const AGraphIndex: Integer);
-var I, J: Integer; Chart: TSimpleChart; V, Lo, Hi, Pad: Double; HasValue: Boolean;
+var
+  I, J: Integer;
+  Chart: TSimpleChart;
+  V, Lo, Hi, Pad: Double;
+  HasValue: Boolean;
+  SeriesConfig: TGraphSeriesConfig;
+  Runtime: TGraphSeriesRuntime;
+  Visual: TGraphToleranceVisual;
+
+  procedure IncludeSeries(ASeries: TChartSeries);
+  var K: Integer;
+  begin
+    if (ASeries = nil) or not ASeries.Visible then Exit;
+    for K := 0 to ASeries.Points.Count - 1 do
+    begin
+      V := ASeries.Points[K].Y;
+      if not HasValue then begin Lo := V; Hi := V; HasValue := True end
+      else begin Lo := Min(Lo, V); Hi := Max(Hi, V) end;
+    end;
+  end;
 begin
   Chart := ChartByIndex(AGraphIndex); HasValue := False; Lo := 0; Hi := 0;
+  if Chart = nil then Exit;
   for I := 0 to Chart.SeriesCount - 1 do
-    if Chart.Series[I].Visible then
-      for J := 0 to Chart.Series[I].Points.Count - 1 do
-      begin
-        V := Chart.Series[I].Points[J].Y;
-        if not HasValue then begin Lo := V; Hi := V; HasValue := True end
-        else begin Lo := Min(Lo, V); Hi := Max(Hi, V) end;
-      end;
+    IncludeSeries(Chart.Series[I]);
+  { Individual per-source tolerance visuals are authoritative.  Do not use
+    legacy fixed graph-level limit series for scaling. }
+  for SeriesConfig in FConfig.Panels[AGraphIndex].Series do
+    if FSeriesRuntime.TryGetValue(SeriesConfig, Runtime) and
+       (Runtime.ToleranceVisual <> nil) then
+    begin
+      Visual := Runtime.ToleranceVisual;
+      IncludeSeries(Visual.TargetSeries);
+      IncludeSeries(Visual.LowerSeries);
+      IncludeSeries(Visual.UpperSeries);
+    end;
   if not HasValue then begin Lo := 0; Hi := 1 end;
   Pad := Hi - Lo;
   if Pad <= 0 then Pad := Max(Abs(Lo) * 0.01, 0.001) else Pad := Pad * 0.1;
