@@ -23,12 +23,12 @@ def test_one_graph_level_tolerance_set_and_no_runtime_work_path():
 def test_etalon_source_is_direct_channel_device_and_q_lookup():
     active = routine('function TFrameGraphsWorkspace.GetActiveEtalonChannel')
     resolve = routine('function TFrameGraphsWorkspace.ResolveActiveEtalonTolerance')
-    finder = routine('function TFrameGraphsWorkspace.FindPointByTargetQ')
+    finder = routine('function TFrameGraphsWorkspace.FindEtalonPointByTargetQ')
     assert 'FWorkTable.EtalonChannels[I]' in active and 'Channel.Enabled' in active
     assert 'Device := AChannel.FlowMeter.Device' in resolve
-    assert 'FindPointByTargetQ(Device, ATargetQ' in resolve
-    assert 'SameValue(Point.Q, ATargetQ, ToleranceQ)' in finder
-    assert 'UUID' not in finder
+    assert 'FindEtalonPointByTargetQ(Device, ATargetQ' in resolve
+    assert 'SameValue(CandidateFlow, ARunTargetQ, ToleranceQ)' in finder
+    assert 'Candidate.UUID' in finder
 
 def test_device_calculation_and_common_axis_scaling_are_preserved():
     resolve = routine('function TFrameGraphsWorkspace.ResolveGraphTolerance')
@@ -50,9 +50,9 @@ def test_expected_display_regressions():
     assert math.isclose(conv(q-device_delta), .355722541224969, abs_tol=1e-12)
     assert math.isclose(conv(q+device_delta), .370241828621907, abs_tol=1e-12)
 
-def test_protocol_and_version_1_0_45():
+def test_protocol_and_version_is_superseded_by_1_0_46():
     for event in ('GraphToleranceResolveBegin', 'GraphToleranceSourceResolved',
                   'GraphToleranceCalculated', 'GraphToleranceVisualUpdated',
                   'GraphToleranceSourceUnavailable'):
         assert event in SOURCE
-    assert "APP_VERSION = '1.0.45';" in VERSION
+    assert "APP_VERSION = '1.0.46';" in VERSION
