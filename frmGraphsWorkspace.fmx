@@ -195,7 +195,6 @@ object FrameGraphsWorkspace: TFrameGraphsWorkspace
           end
           object ChartGraph1: TSimpleChart
             Align = Client
-            HitTest = True
             PopupMenu = PopupMenuGraph
             Tag = 0
             XMax = 100.000000000000000000
@@ -237,7 +236,6 @@ object FrameGraphsWorkspace: TFrameGraphsWorkspace
           end
           object ChartGraph2: TSimpleChart
             Align = Client
-            HitTest = True
             PopupMenu = PopupMenuGraph
             Tag = 1
             XMax = 100.000000000000000000
@@ -279,7 +277,6 @@ object FrameGraphsWorkspace: TFrameGraphsWorkspace
           end
           object ChartGraph3: TSimpleChart
             Align = Client
-            HitTest = True
             PopupMenu = PopupMenuGraph
             Tag = 2
             XMax = 100.000000000000000000
@@ -321,7 +318,6 @@ object FrameGraphsWorkspace: TFrameGraphsWorkspace
           end
           object ChartGraph4: TSimpleChart
             Align = Client
-            HitTest = True
             PopupMenu = PopupMenuGraph
             Tag = 3
             XMax = 100.000000000000000000

@@ -143,6 +143,7 @@ type
     function Slot(AIndex: Integer): TLayout;
     function Chart(AIndex: Integer): TSimpleChart;
     function GraphIndexOf(Sender: TObject): Integer;
+    procedure ClearChartSeriesData(AChart: TSimpleChart);
     procedure SelectGraph(AIndex: Integer);
     procedure SetAllSeriesVisible(AVisible: Boolean);
     procedure UpdateSeriesPanel;
@@ -351,6 +352,26 @@ begin
   end;
 end;
 
+procedure TFrameGraphsWorkspace.ClearChartSeriesData(AChart: TSimpleChart);
+var
+  SeriesIndex: Integer;
+begin
+  if AChart = nil then
+    Exit;
+
+  { TSimpleChart has no Clear method.  Retain every series object (including
+    any designer-owned series) and clear only its data through the actual
+    TChartSeries API. }
+  AChart.BeginUpdate;
+  try
+    for SeriesIndex := 0 to AChart.SeriesCount - 1 do
+      if AChart.Series[SeriesIndex] <> nil then
+        AChart.Series[SeriesIndex].ClearPoints;
+  finally
+    AChart.EndUpdate;
+  end;
+end;
+
 procedure TFrameGraphsWorkspace.ComboBoxGraphCountChange(Sender: TObject);
 begin if FApplyingState or (ComboBoxGraphCount.ItemIndex < 0) then Exit;
   FState.ActiveGraphCount := ComboBoxGraphCount.ItemIndex + 1; RefreshFromState; end;
@@ -360,7 +381,16 @@ begin if FApplyingState or (ComboBoxLayoutMode.ItemIndex < 0) then Exit;
 procedure TFrameGraphsWorkspace.CheckBoxShowLegendChange(Sender: TObject);
 begin if not FApplyingState then FState.ShowLegend := CheckBoxShowLegend.IsChecked; end;
 procedure TFrameGraphsWorkspace.ButtonClearGraphsClick(Sender: TObject);
-var I: Integer; begin for I := 0 to DesignedGraphSlotCount - 1 do begin FState.Assignments(I).Clear; Chart(I).Clear; end; UpdateSeriesPanel; end;
+var
+  I: Integer;
+begin
+  for I := 0 to FState.ActiveGraphCount - 1 do
+  begin
+    FState.Assignments(I).Clear;
+    ClearChartSeriesData(Chart(I));
+  end;
+  UpdateSeriesPanel;
+end;
 procedure TFrameGraphsWorkspace.ButtonResetGraphsClick(Sender: TObject);
 begin FState.Free; FState := TGraphWorkspaceState.Create; RefreshFromState; end;
 
@@ -386,7 +416,17 @@ procedure TFrameGraphsWorkspace.MenuItemMoveSeriesClick(Sender: TObject); begin 
 procedure TFrameGraphsWorkspace.SetAllSeriesVisible(AVisible: Boolean); var A: TGraphSourceAssignment; begin for A in FState.Assignments(FContextGraphIndex) do A.Visible := AVisible; UpdateSeriesPanel; end;
 procedure TFrameGraphsWorkspace.MenuItemShowAllSeriesClick(Sender: TObject); begin SetAllSeriesVisible(True); end;
 procedure TFrameGraphsWorkspace.MenuItemHideAllSeriesClick(Sender: TObject); begin SetAllSeriesVisible(False); end;
-procedure TFrameGraphsWorkspace.MenuItemClearGraphClick(Sender: TObject); begin FState.Assignments(FContextGraphIndex).Clear; Chart(FContextGraphIndex).Clear; UpdateSeriesPanel; end;
+procedure TFrameGraphsWorkspace.MenuItemClearGraphClick(Sender: TObject);
+var
+  GraphIndex: Integer;
+begin
+  GraphIndex := FContextGraphIndex;
+  if not InRange(GraphIndex, 0, FState.ActiveGraphCount - 1) then
+    GraphIndex := FState.SelectedGraphIndex;
+  FState.Assignments(GraphIndex).Clear;
+  ClearChartSeriesData(Chart(GraphIndex));
+  UpdateSeriesPanel;
+end;
 
 procedure TFrameGraphsWorkspace.RebuildAddSeriesMenu;
   procedure AddChannels(AChannels: TObjectList<TChannel>; const APrefix: string;
