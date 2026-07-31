@@ -42,7 +42,8 @@ uses
   uControlRegister in 'uControlRegister.pas',
   uSyncSetup in 'uSyncSetup.pas',
   FmxHelper in 'FmxHelper.pas',
-  FMX.SimpleChart in '..\FMXFP\Components\FP\FMX.SimpleChart.pas';
+  FMX.SimpleChart in '..\FMXFP\Components\FP\FMX.SimpleChart.pas',
+  frmGraphsWorkspace in 'frmGraphsWorkspace.pas' {Frame1: TFrame};
 
 {$R *.res}
 
