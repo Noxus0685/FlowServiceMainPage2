@@ -179,6 +179,13 @@ begin
   VisibleDurationSec := 60;
   FPanels.Clear;
   EnsurePanelCount(GraphCount);
+  { The initial two-panel layout is etalons first and devices second.  These
+    defaults are set only while creating/resetting the configuration; source
+    refreshes never overwrite a user's visibility choices. }
+  FPanels[0].ShowTargetLine := False;
+  FPanels[0].ShowToleranceLines := False;
+  FPanels[1].ShowTargetLine := True;
+  FPanels[1].ShowToleranceLines := True;
 end;
 
 end.
