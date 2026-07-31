@@ -291,7 +291,9 @@ begin
     if not SlotByIndex(I).Visible then PlaceSlot(I, Min(I, 3), TAlignLayout.Client);
     ChartByIndex(I).ShowLegend := FConfig.Panels[I].ShowLegend;
   end;
-  LayoutGraphsHost.Realign;
+  { Align/Parent changes above enqueue FMX alignment automatically.  Realign is
+    protected in the Delphi version used by the application and must not be
+    called from the frame. }
   ApplySharedXAxis;
 end;
 
@@ -1232,7 +1234,7 @@ var
   Samples: TArray<TMeterValueSample>; Sample: TMeterValueSample;
   Chart: TSimpleChart; NowMs: Int64; TimeSec, Value: Double;
   RunActive, SamplingActive, PointChanged, Changed: Boolean;
-  PointKey: string;
+  PointKey, SegmentReason: string;
 begin
   if (FConfig = nil) or (FSeriesRuntime = nil) then Exit;
   NowMs := TMeterValue.GetMonotonicTimeMs;
@@ -1244,8 +1246,13 @@ begin
   PointChanged := RunActive and (PointKey <> '') and
     (FLastPointKey <> '') and (PointKey <> FLastPointKey);
   if (RunActive and not FLastRunActive) or PointChanged then
-    StartSharedSegment(NowMs, PointKey, PointIndex,
-      IfThen(PointChanged, 'PointChanged', 'RunStarted'))
+  begin
+    if PointChanged then
+      SegmentReason := 'PointChanged'
+    else
+      SegmentReason := 'RunStarted';
+    StartSharedSegment(NowMs, PointKey, PointIndex, SegmentReason);
+  end
   else if SamplingActive and not FSharedTimeInitialized then
     StartSharedSegment(NowMs, PointKey, PointIndex, 'SamplingStarted');
   FLastRunActive := RunActive;
