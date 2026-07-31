@@ -7,72 +7,22 @@
     Size.Width = 1100.000000000000000000
     Size.Height = 700.000000000000000000
     Size.PlatformDefault = False
-    object PanelGraphSettings: TPanel
-      Align = Top
-      Size.Width = 1100.000000000000000000
-      Size.Height = 52.000000000000000000
-      Size.PlatformDefault = False
-      object LabelGraphLayout: TLabel
-        Align = Left
-        Size.Width = 120.000000000000000000
-        Size.Height = 52.000000000000000000
-        Size.PlatformDefault = False
-        Text = #1050#1086#1084#1087#1086#1085#1086#1074#1082#1072
-      end
-      object ComboGraphLayout: TComboBox
-        Align = Left
-        Items.Strings = (
-          #1040#1074#1090#1086#1084#1072#1090#1080#1095#1077#1089#1082#1080
-          '1 '#1089#1090#1086#1083#1073#1077#1094
-          '2 '#1089#1090#1086#1083#1073#1094#1072
-          '3 '#1089#1090#1086#1083#1073#1094#1072
-          '4 '#1089#1090#1086#1083#1073#1094#1072
-          '5 '#1089#1090#1086#1083#1073#1094#1086#1074
-          '6 '#1089#1090#1086#1083#1073#1094#1086#1074)
-        ItemIndex = 0
-        Position.X = 120.000000000000000000
-        Size.Width = 190.000000000000000000
-        Size.Height = 52.000000000000000000
-        Size.PlatformDefault = False
-        OnChange = GraphLayoutChange
-      end
-      object ButtonClearAll: TButton
-        Align = Right
-        Position.X = 930.000000000000000000
-        Size.Width = 90.000000000000000000
-        Size.Height = 52.000000000000000000
-        Size.PlatformDefault = False
-        Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1074#1089#1077
-        TextSettings.Trimming = None
-        OnClick = ClearAllClick
-      end
-      object ButtonReset: TButton
-        Align = Right
-        Position.X = 1020.000000000000000000
-        Size.Width = 80.000000000000000000
-        Size.Height = 52.000000000000000000
-        Size.PlatformDefault = False
-        Text = #1057#1073#1088#1086#1089
-        TextSettings.Trimming = None
-        OnClick = ResetClick
-      end
-    end
     object LayoutWorkspaceBody: TLayout
       Align = Client
       Size.Width = 1100.000000000000000000
-      Size.Height = 648.000000000000000000
+      Size.Height = 700.000000000000000000
       Size.PlatformDefault = False
       object ScrollBoxGraphs: TVertScrollBox
         Align = Client
         Size.Width = 1100.000000000000000000
-        Size.Height = 648.000000000000000000
+        Size.Height = 700.000000000000000000
         Size.PlatformDefault = False
         Viewport.Width = 1100.000000000000000000
         Viewport.Height = 648.000000000000000000
         object LayoutGraphsHost: TLayout
           Align = Top
           Size.Width = 1100.000000000000000000
-          Size.Height = 648.000000000000000000
+          Size.Height = 700.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
         end
@@ -81,11 +31,17 @@
   end
   object PopupMenuGraph: TPopupMenu
     OnPopup = GraphPopup
-    object MenuItemEtalons: TMenuItem
-      Text = 'Эталоны'
-    end
-    object MenuItemDevices: TMenuItem
-      Text = 'Приборы'
+    object MenuItemAddSource: TMenuItem
+      Text = 'Добавить источник'
+      object MenuItemEtalons: TMenuItem
+        Text = 'Эталоны'
+      end
+      object MenuItemDevices: TMenuItem
+        Text = 'Приборы'
+      end
+      object MenuItemOther: TMenuItem
+        Text = 'Прочее'
+      end
     end
     object MenuItemSettings: TMenuItem
       Text = 'Настройки'
@@ -122,7 +78,6 @@
         OnClick = ToleranceVisibilityClick
       end
       object MenuItemLayout: TMenuItem
-        Locked = True
         Text = 'Компоновка'
       end
     end
