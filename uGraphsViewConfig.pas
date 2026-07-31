@@ -191,8 +191,8 @@ begin
   { The initial two-panel layout is etalons first and devices second.  These
     defaults are set only while creating/resetting the configuration; source
     refreshes never overwrite a user's visibility choices. }
-  FPanels[0].ShowTargetLine := False;
-  FPanels[0].ShowToleranceLines := False;
+  FPanels[0].ShowTargetLine := True;
+  FPanels[0].ShowToleranceLines := True;
   FPanels[1].ShowTargetLine := True;
   FPanels[1].ShowToleranceLines := True;
 end;

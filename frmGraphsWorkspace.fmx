@@ -1,4 +1,4 @@
-object FrameGraphsWorkspace: TFrameGraphsWorkspace
+﻿object FrameGraphsWorkspace: TFrameGraphsWorkspace
   Size.Width = 1100.000000000000000000
   Size.Height = 700.000000000000000000
   Size.PlatformDefault = False
@@ -82,47 +82,39 @@ object FrameGraphsWorkspace: TFrameGraphsWorkspace
   object PopupMenuGraph: TPopupMenu
     OnPopup = GraphPopup
     object MenuItemEtalons: TMenuItem
-      Text = #1069#1090#1072#1083#1086#1085#1099
+      Text = 'Эталоны'
     end
     object MenuItemDevices: TMenuItem
-      Text = #1055#1088#1080#1073#1086#1088#1099
+      Text = 'Приборы'
     end
     object MenuItemSettings: TMenuItem
-      Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080
+      Text = 'Настройки'
       object MenuItemSeriesColors: TMenuItem
         Locked = True
-        Text = #1062#1074#1077#1090#1072
+        Text = 'Цвета'
       end
       object MenuItemGraphLength: TMenuItem
         Locked = True
-        Text = #1044#1083#1080#1085#1072' '#1074#1088#1077#1084#1077#1085#1085#1086#1075#1086' '#1086#1082#1085#1072
+        Text = 'Длина временного окна'
       end
       object MenuItemFlowUnits: TMenuItem
         Enabled = False
         Locked = True
-        Text = #1045#1076#1080#1085#1080#1094#1099' '#1088#1072#1089#1093#1086#1076#1072
+        Text = 'Единицы расхода'
       end
       object MenuItemShowLegend: TMenuItem
         Locked = True
-        Text = #1055#1086#1082#1072#1079#1099#1074#1072#1090#1100' '#1083#1077#1075#1077#1085#1076#1091
+        Text = 'Показывать легенду'
         OnClick = ShowLegendClick
       end
       object MenuItemShowTargetLine: TMenuItem
         Locked = True
-        Text = #1055#1086#1082#1072#1079#1099#1074#1072#1090#1100' '#1094#1077#1083#1077#1074#1091#1102' '#1083#1080#1085#1080#1102
+        Text = 'Показывать целевую линию'
         OnClick = ToleranceVisibilityClick
       end
       object MenuItemShowToleranceLines: TMenuItem
         Locked = True
-        Text = #1055#1086#1082#1072#1079#1099#1074#1072#1090#1100' '#1075#1088#1072#1085#1080#1094#1099' '#1076#1086#1087#1091#1089#1082#1072
-        OnClick = ToleranceVisibilityClick
-      end
-      object MenuItemShowToleranceInLegend: TMenuItem
-        Text = 'Показывать служебные линии в легенде'
-        OnClick = ToleranceVisibilityClick
-      end
-      object MenuItemShowToleranceInLegend: TMenuItem
-        Text = 'Показывать служебные линии в легенде'
+        Text = 'Показывать границы допуска'
         OnClick = ToleranceVisibilityClick
       end
       object MenuItemShowToleranceInLegend: TMenuItem
@@ -131,23 +123,23 @@ object FrameGraphsWorkspace: TFrameGraphsWorkspace
       end
       object MenuItemLayout: TMenuItem
         Locked = True
-        Text = #1050#1086#1084#1087#1086#1085#1086#1074#1082#1072
+        Text = 'Компоновка'
       end
     end
     object MenuItemAddGraph: TMenuItem
-      Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1075#1088#1072#1092#1080#1082
+      Text = 'Добавить график'
       OnClick = AddGraphClick
     end
     object MenuItemDeleteGraph: TMenuItem
-      Text = #1059#1076#1072#1083#1080#1090#1100' '#1075#1088#1072#1092#1080#1082
+      Text = 'Удалить график'
       OnClick = DeleteGraphClick
     end
     object MenuItemClearGraphValues: TMenuItem
-      Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1079#1085#1072#1095#1077#1085#1080#1103' '#1075#1088#1072#1092#1080#1082#1072
+      Text = 'Очистить значения графика'
       OnClick = ClearGraphValuesClick
     end
     object MenuItemClearGraph: TMenuItem
-      Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1075#1088#1072#1092#1080#1082
+      Text = 'Очистить график'
       OnClick = ClearGraphClick
     end
   end
