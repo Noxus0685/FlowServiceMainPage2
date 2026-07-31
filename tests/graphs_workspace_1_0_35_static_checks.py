@@ -29,8 +29,11 @@ def test_tolerance_is_point_error_based_not_flow_accuracy_based():
         "function TFrameGraphsWorkspace.ResolvePointTolerance",
         "\nprocedure TFrameGraphsWorkspace.",
     )
-    assert "CurrentPoint.Q" in body
-    assert "CurrentPoint.Error" in body
+    assert "ResolveToleranceSource(SourceInfo, AReason)" in body
+    assert "SourceInfo.TargetQ" in body
+    assert "SourceInfo.ErrorPercent" in body
+    assert "CurrentPoint.Q" not in body
+    assert "CurrentPoint.Error" not in body
     assert "FlowAccuracy" not in routine(
         "procedure TFrameGraphsWorkspace.UpdateToleranceLines"
     )
@@ -55,5 +58,5 @@ def test_default_assignment_is_partitioned_and_deduplicated():
     assert "for Channel in FWorkTable.DeviceChannels" in body
 
 
-def test_application_version_is_1_0_35():
-    assert "APP_VERSION = '1.0.35';" in VERSION
+def test_application_version_is_1_0_36():
+    assert "APP_VERSION = '1.0.36';" in VERSION
