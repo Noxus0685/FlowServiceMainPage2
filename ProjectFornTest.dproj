@@ -322,6 +322,11 @@
         <DCCReference Include="uSyncSetup.pas"/>
         <DCCReference Include="FmxHelper.pas"/>
         <DCCReference Include="..\FMXFP\Components\FP\FMX.SimpleChart.pas"/>
+        <DCCReference Include="frmGraphsWorkspace.pas">
+            <Form>Frame1</Form>
+            <FormType>fmx</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
