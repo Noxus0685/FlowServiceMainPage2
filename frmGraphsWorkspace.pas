@@ -2042,6 +2042,46 @@ var
     ADevice := nil;
   end;
 
+  function FindByUUID(out ADevice: TDevice;
+    out APointIndex: Integer): TDevicePoint;
+  var J: Integer;
+  begin
+    Result := nil; ADevice := nil; APointIndex := -1;
+    if (RunPoint = nil) or (Trim(RunPoint.UUID) = '') or
+       (FWorkTable.DeviceChannels = nil) then Exit;
+    for Channel in FWorkTable.DeviceChannels do
+      if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) then
+      begin
+        ADevice := Channel.FlowMeter.Device;
+        if (ADevice = nil) or (ADevice.Points = nil) then Continue;
+        for J := 0 to ADevice.Points.Count - 1 do
+          if (ADevice.Points[J] <> nil) and SameText(
+             NormalizeUUID(ADevice.Points[J].UUID), NormalizeUUID(RunPoint.UUID)) then
+          begin APointIndex := J; Exit(ADevice.Points[J]) end;
+      end;
+    ADevice := nil;
+  end;
+
+  function FindByQAndName(out ADevice: TDevice;
+    out APointIndex: Integer): TDevicePoint;
+  var J: Integer;
+  begin
+    Result := nil; ADevice := nil; APointIndex := -1;
+    if (RunPoint = nil) or (FWorkTable.DeviceChannels = nil) then Exit;
+    for Channel in FWorkTable.DeviceChannels do
+      if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) then
+      begin
+        ADevice := Channel.FlowMeter.Device;
+        if (ADevice = nil) or (ADevice.Points = nil) then Continue;
+        for J := 0 to ADevice.Points.Count - 1 do
+          if (ADevice.Points[J] <> nil) and SameValue(ADevice.Points[J].Q,
+             RunPoint.Q, Max(1E-9, Abs(RunPoint.Q) * 1E-6)) and
+             SameText(Trim(ADevice.Points[J].Name), Trim(RunPoint.Name)) then
+          begin APointIndex := J; Exit(ADevice.Points[J]) end;
+      end;
+    ADevice := nil;
+  end;
+
 begin
   Result := False;
   AInfo := Default(TGraphToleranceSourceInfo);
