@@ -38,6 +38,7 @@ uses
   frmCalibrCoefs,
   frmChannelProperties,
   frmFlowMeterProperties,
+  frmGraphsWorkspace,
   frmWorkTableProperties,
   frmMeasurementRun,
   frmMRResults,
@@ -757,6 +758,7 @@ type
     FNewInstrumentName: string;
 
     FFlowGraphHistory: TFlowGraphHistory;
+    FGraphsWorkspace: TFrameGraphsWorkspace;
     FLastFlowGraphSampleMs: Int64;
     FFlowGraphWorkTable: TWorkTable;
     FFlowGraphXMin: Int64;
@@ -1414,6 +1416,7 @@ begin
   FreeAndNil(FGraphLayoutContainers);
   FreeAndNil(FGraphViews);
   FreeAndNil(FFlowGraphHistory);
+  FreeAndNil(FGraphsWorkspace);
   FreeAndNil(FGraphsViewConfig);
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
@@ -6548,82 +6551,26 @@ begin
 end;
 
 procedure TFrameMainTable.AttachGraphsTo(AParent: TFmxObject);
-var
-  Splitter: TSplitter;
-  I: Integer;
 begin
   if AParent = nil then
     Exit;
-  if FGraphsViewConfig = nil then
-    FGraphsViewConfig := TGraphsViewConfig.Create;
-  if FGraphViews = nil then
-    FGraphViews := TObjectList<TGraphPanelView>.Create(True);
-  if FGraphSplitters = nil then
-    FGraphSplitters := TObjectList<TSplitter>.Create(False);
-  if FGraphLayoutContainers = nil then
-    FGraphLayoutContainers := TObjectList<TLayout>.Create(False);
-  if FGraphRenderTimer = nil then
+
+  { TFrameGraphsWorkspace is streamed from frmGraphsWorkspace.fmx.  The main
+    table only owns/places one frame and supplies the narrow data dependency. }
+  if FGraphsWorkspace = nil then
   begin
-    FGraphRenderTimer := TTimer.Create(Self);
-    FGraphRenderTimer.Enabled := False;
-    FGraphRenderTimer.Interval := 1;
-    FGraphRenderTimer.OnTimer := GraphRenderTimerTimer;
+    FGraphsWorkspace := TFrameGraphsWorkspace.Create(Self);
+    FGraphsWorkspace.Name := 'FrameGraphsWorkspace';
   end;
-  FInitializingGraphs := True;
-  try
-    FSelectedGraphIndex := 0;
-    if FGraphsRoot = nil then
-    begin
-      FGraphsRoot := TLayout.Create(Self);
-      FGraphsRoot.Name := 'LayoutGraphsRoot';
-      FGraphsRoot.Align := TAlignLayout.Client;
-      FGraphsSettingsWidth := 340;
+  FGraphsWorkspace.Parent := AParent;
+  FGraphsWorkspace.Align := TAlignLayout.Client;
+  FGraphsWorkspace.Initialize(FActiveWorkTable);
 
-      FGraphsSettings := TPanel.Create(FGraphsRoot);
-      FGraphsSettings.Name := 'LayoutGraphsSettings';
-      FGraphsSettings.Parent := FGraphsRoot;
-      FGraphsSettings.Align := TAlignLayout.Right;
-      FGraphsSettings.Width := FGraphsSettingsWidth;
-
-      Splitter := TSplitter.Create(FGraphsRoot);
-      Splitter.Name := 'SplitterGraphsSettings';
-      Splitter.Parent := FGraphsRoot;
-      Splitter.Align := TAlignLayout.Right;
-      Splitter.Width := 6;
-
-      if LayoutGraphsClient <> nil then
-      begin
-        LayoutGraphsClient.Parent := FGraphsRoot;
-        LayoutGraphsClient.Align := TAlignLayout.Client;
-        for I := 0 to LayoutGraphsClient.ChildrenCount - 1 do
-          if LayoutGraphsClient.Children[I] is TControl then
-            TControl(LayoutGraphsClient.Children[I]).Visible := False;
-      end;
-      if LayoutGraphCommands <> nil then
-        LayoutGraphCommands.Visible := False;
-      BuildGraphsSettingsPanel;
-    end;
-    FGraphsRoot.Parent := AParent;
-    FGraphsRoot.Align := TAlignLayout.Client;
-    if TabItemWorkTableGraphs <> nil then
-    begin
-      TabItemWorkTableGraphs.Visible := False;
-      TabItemWorkTableGraphs.Parent := nil;
-    end;
-    if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(
-        pcInfo,
-        psForm,
-        'AttachGraphsTo',
-        'Рабочая область графиков перенесена',
-        Format('TargetParent=%s; ActualParent=%s; Align=%d',
-          [AParent.Name, FGraphsRoot.Parent.Name, Ord(FGraphsRoot.Align)]));
-    ApplyGraphsLayout;
-    RebuildSelectedGraphLegend;
-  finally
-    FInitializingGraphs := False;
-  end;
-  QueueRenderGraphViews;
+  { Keep the established sampling/scaling controller writing into the first
+    two designer charts while it is migrated independently from measurement
+    code.  No visual graph control is created here. }
+  ChartEtalonFlow := FGraphsWorkspace.GraphCharts[0];
+  ChartDeviceFlow := FGraphsWorkspace.GraphCharts[1];
 end;
 
 procedure TFrameMainTable.BuildGraphsSettingsPanel;
@@ -6792,7 +6739,7 @@ end;
 
 procedure TFrameMainTable.ApplyGraphsLayout;
 { Compatibility vocabulary retained for saved schemes: glTwoColumns:
-  glThreePanels: glGrid2x2:.  Version 1.0.11 reports the replacement event
+  glThreePanels: glGrid2x2:.  Version 1.0.12 reports the replacement event
   GraphLayoutConfigurationApplied rather than GraphsLayoutApplied. }
 var
   Area, GraphIndex, RequestedAreas, EffectiveAreas: Integer;
