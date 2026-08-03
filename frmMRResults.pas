@@ -677,27 +677,39 @@ begin
   Result := FormatFloat('0.###', AValue);
 end;
 
+function FormatMRActualErrorValue(const AValue: Double): string;
+begin
+  // Processing renders saved result cells with this production precision.
+  // -MaxDouble is TMeterValue's marker for an unavailable numeric value.
+  if IsNan(AValue) or IsInfinite(AValue) or (AValue <= -MaxDouble) then
+    Exit('-');
+  Result := FormatFloat('0.###', AValue);
+end;
+
 function TFrameMRResults.FormatSpillageErrors(ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): string;
+var
+  DataPoint: TPointSpillage;
 begin
   Result := '';
   if ASpillage = nil then
     Exit;
 
-  SetLength(ErrValues, 0);
-
   if (ADevicePoint <> nil) and (ADevicePoint.ProtocolDataPoints <> nil) and (ADevicePoint.ProtocolDataPoints.Count > 0) then
   begin
-    SetLength(ErrValues, ADevicePoint.ProtocolDataPoints.Count);
-    for I := 0 to ADevicePoint.ProtocolDataPoints.Count - 1 do
-      ErrValues[I] := FormatMRActualErrorValue(ADevicePoint.ProtocolDataPoints[I].Error);
+    if ADevicePoint.ProtocolDataPoints.Count = 1 then
+      Exit(FormatMRActualErrorValue(ADevicePoint.ProtocolDataPoints[0].Error));
+
+    Result := '[';
+    for DataPoint in ADevicePoint.ProtocolDataPoints do
+    begin
+      if Result <> '[' then
+        Result := Result + '; ';
+      Result := Result + FormatMRActualErrorValue(DataPoint.Error);
+    end;
+    Result := Result + ']';
   end
   else
-    ErrValues := [FormatMRActualErrorValue(ASpillage.Error)];
-
-  if Length(ErrValues) = 1 then
-    Result := ErrValues[0]
-  else
-    Result := '[' + string.Join('; ', ErrValues) + ']';
+    Result := FormatMRActualErrorValue(ASpillage.Error);
 end;
 
 function TFrameMRResults.BuildErrorsListText(ADevice: TDevice;

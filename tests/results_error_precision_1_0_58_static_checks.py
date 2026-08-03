@@ -55,6 +55,18 @@ def test_only_actual_results_use_processing_precision():
     assert "ValueError.GetStrNumLimits(AValue)" in tolerance
 
 
+def test_spillage_error_list_avoids_problematic_dynamic_array_expression():
+    body = _method(
+        RESULTS,
+        "function TFrameMRResults.FormatSpillageErrors",
+        "function TFrameMRResults.BuildErrorsListText",
+    )
+    assert "ErrValues" not in body
+    assert "DataPoint: TPointSpillage;" in body
+    assert "for DataPoint in ADevicePoint.ProtocolDataPoints do" in body
+    assert "Result := Result + '; ';" in body
+
+
 def test_previous_results_architecture_is_restored():
     for source in (RESULTS, PROCESSING, DPR, DPROJ):
         assert "uResultPresentation" not in source
