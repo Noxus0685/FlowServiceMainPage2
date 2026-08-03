@@ -109,8 +109,18 @@ function XmlEscape(const AValue: string): string;
 function ExcelColumnName(AColumn: Integer): string;
 function ExcelDateValue(AValue: TDateTime): Double;
 function ValidWorksheetName(const AName: string): Boolean;
+{ Encodes an XML document exactly as UTF-8 bytes without a byte-order mark. }
+function Utf8XmlBytes(const AXml: string): TBytes;
 
 implementation
+
+const
+  XML_DECLARATION = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+
+function Utf8XmlBytes(const AXml: string): TBytes;
+begin
+  Result := TEncoding.UTF8.GetBytes(AXml);
+end;
 
 function XmlEscape(const AValue: string): string;
 begin
@@ -156,7 +166,7 @@ function TOpenXmlSharedStrings.UniqueCount: Integer; begin Result := FValues.Cou
 function TOpenXmlSharedStrings.ToXml: string;
 var S, Space: string;
 begin
-  Result := Format('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="%d" uniqueCount="%d">',[FCount,FValues.Count]);
+  Result := Format(XML_DECLARATION + '<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="%d" uniqueCount="%d">',[FCount,FValues.Count]);
   for S in FValues do begin Space := ''; if (S <> Trim(S)) then Space := ' xml:space="preserve"'; Result := Result + '<si><t' + Space + '>' + XmlEscape(S) + '</t></si>'; end;
   Result := Result + '</sst>';
 end;
@@ -164,7 +174,7 @@ end;
 class function TOpenXmlStyleTable.StyleIndex(AStyle: TXlsxStyle): Integer; begin Result := Ord(AStyle); end;
 class function TOpenXmlStyleTable.ToXml: string;
 begin
-  Result := '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+  Result := XML_DECLARATION + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
     '<numFmts count="3"><numFmt numFmtId="164" formatCode="0.000000"/><numFmt numFmtId="165" formatCode="0.0000%"/><numFmt numFmtId="166" formatCode="yyyy-mm-dd hh:mm:ss"/></numFmts>'+
     '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'+
     '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9EAF7"/><bgColor indexed="64"/></patternFill></fill></fills>'+
@@ -200,9 +210,19 @@ procedure TOpenXmlWorkbook.SaveToFile(const AFileName:string); begin TOpenXmlPac
 function InvFloat(AValue:Double):string;
 var FS:TFormatSettings;
 begin FS:=TFormatSettings.Create; FS.DecimalSeparator:='.'; FS.ThousandSeparator:=#0; Result:=FloatToStr(AValue,FS); end;
-procedure AddText(AZip:TZipFile;const AName,AData:string);
-var M:TMemoryStream; B:TBytes;
-begin M:=TMemoryStream.Create; try B:=TEncoding.UTF8.GetBytes(AData); if Length(B)>0 then M.WriteBuffer(B[0],Length(B)); M.Position:=0; AZip.Add(M,StringReplace(AName,'\','/',[rfReplaceAll])); finally M.Free; end; end;
+procedure AddUtf8XmlEntry(AZip: TZipFile; const AName, AXml: string);
+var
+  Stream: TBytesStream;
+  Bytes: TBytes;
+begin
+  Bytes := Utf8XmlBytes(AXml);
+  Stream := TBytesStream.Create(Bytes);
+  try
+    AZip.Add(Stream, StringReplace(AName, '\', '/', [rfReplaceAll]));
+  finally
+    Stream.Free;
+  end;
+end;
 
 class procedure TOpenXmlPackageWriter.Save(AWorkbook:TOpenXmlWorkbook;const AFileName:string);
 var Z:TZipFile; Temp,Xml,Types,WB,Rels:string; I,R,C,MaxCol:Integer; Sh:TOpenXmlWorksheet; Row:TOpenXmlRow; Cell:TOpenXmlCell; K:Integer;
@@ -211,19 +231,19 @@ begin
   Z:=TZipFile.Create;
   try
     Z.Open(Temp,zmWrite);
-    Types:='<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>';
-    WB:='<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>';
-    Rels:='<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+    Types:=XML_DECLARATION + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>';
+    WB:=XML_DECLARATION + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>';
+    Rels:=XML_DECLARATION + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
     for I:=0 to AWorkbook.Worksheets.Count-1 do begin Sh:=AWorkbook.Worksheets[I]; Types:=Types+Format('<Override PartName="/xl/worksheets/sheet%d.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',[I+1]); WB:=WB+Format('<sheet name="%s" sheetId="%d" r:id="rId%d"/>',[XmlEscape(Sh.Name),I+1,I+1]); Rels:=Rels+Format('<Relationship Id="rId%d" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet%d.xml"/>',[I+1,I+1]); end;
     K:=AWorkbook.Worksheets.Count+1; Rels:=Rels+Format('<Relationship Id="rId%d" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId%d" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>',[K,K+1]);
     Types:=Types+'</Types>'; WB:=WB+'</sheets></workbook>';
-    AddText(Z,'[Content_Types].xml',Types); AddText(Z,'_rels/.rels','<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>');
-    AddText(Z,'docProps/app.xml','<?xml version="1.0" encoding="UTF-8"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>FlowService</Application></Properties>');
-    AddText(Z,'docProps/core.xml','<?xml version="1.0" encoding="UTF-8"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>FlowService</dc:creator></cp:coreProperties>'); AddText(Z,'xl/workbook.xml',WB); AddText(Z,'xl/_rels/workbook.xml.rels',Rels); AddText(Z,'xl/styles.xml',TOpenXmlStyleTable.ToXml);
-    for I:=0 to AWorkbook.Worksheets.Count-1 do begin Sh:=AWorkbook.Worksheets[I]; MaxCol:=1; for Row in Sh.Rows do for Cell in Row.Cells do MaxCol:=Max(MaxCol,Cell.Column); Xml:=Format('<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:%s%d"/><sheetViews><sheetView workbookViewId="0">',[ExcelColumnName(MaxCol),Max(1,Sh.Rows.Count)]); if Sh.IsFirstRowFrozen then Xml:=Xml+'<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'; Xml:=Xml+'</sheetView></sheetViews>';
+    AddUtf8XmlEntry(Z,'[Content_Types].xml',Types); AddUtf8XmlEntry(Z,'_rels/.rels',XML_DECLARATION + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>');
+    AddUtf8XmlEntry(Z,'docProps/app.xml',XML_DECLARATION + '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>FlowService</Application></Properties>');
+    AddUtf8XmlEntry(Z,'docProps/core.xml',XML_DECLARATION + '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>FlowService</dc:creator></cp:coreProperties>'); AddUtf8XmlEntry(Z,'xl/workbook.xml',WB); AddUtf8XmlEntry(Z,'xl/_rels/workbook.xml.rels',Rels); AddUtf8XmlEntry(Z,'xl/styles.xml',TOpenXmlStyleTable.ToXml);
+    for I:=0 to AWorkbook.Worksheets.Count-1 do begin Sh:=AWorkbook.Worksheets[I]; MaxCol:=1; for Row in Sh.Rows do for Cell in Row.Cells do MaxCol:=Max(MaxCol,Cell.Column); Xml:=Format(XML_DECLARATION + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:%s%d"/><sheetViews><sheetView workbookViewId="0">',[ExcelColumnName(MaxCol),Max(1,Sh.Rows.Count)]); if Sh.IsFirstRowFrozen then Xml:=Xml+'<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'; Xml:=Xml+'</sheetView></sheetViews>';
       if Sh.Widths.Count>0 then begin Xml:=Xml+'<cols>'; for C in Sh.Widths.Keys do Xml:=Xml+Format('<col min="%d" max="%d" width="%s" customWidth="1"/>',[C,C,InvFloat(Sh.Widths[C])]); Xml:=Xml+'</cols>'; end; Xml:=Xml+'<sheetData>';
-      for R:=0 to Sh.Rows.Count-1 do begin Row:=Sh.Rows[R]; Xml:=Xml+Format('<row r="%d">',[R+1]); for Cell in Row.Cells do begin Xml:=Xml+Format('<c r="%s%d" s="%d"',[ExcelColumnName(Cell.Column),R+1,Ord(Cell.Style)]); case Cell.Kind of xckString: begin K:=AWorkbook.SharedStrings.Add(Cell.TextValue); Xml:=Xml+Format(' t="s"><v>%d</v></c>',[K]); end; xckBoolean: if Cell.BooleanValue then Xml:=Xml+' t="b"><v>1</v></c>' else Xml:=Xml+' t="b"><v>0</v></c>'; else Xml:=Xml+'><v>'+InvFloat(Cell.NumberValue)+'</v></c>'; end; end; Xml:=Xml+'</row>'; end; Xml:=Xml+'</sheetData>'; if Sh.HasAutoFilter and (Sh.Rows.Count>0) then Xml:=Xml+Format('<autoFilter ref="A1:%s%d"/>',[ExcelColumnName(MaxCol),Sh.Rows.Count]); Xml:=Xml+'</worksheet>'; AddText(Z,Format('xl/worksheets/sheet%d.xml',[I+1]),Xml); end;
-    AddText(Z,'xl/sharedStrings.xml',AWorkbook.SharedStrings.ToXml); Z.Close; Z.Free; Z:=nil;
+      for R:=0 to Sh.Rows.Count-1 do begin Row:=Sh.Rows[R]; Xml:=Xml+Format('<row r="%d">',[R+1]); for Cell in Row.Cells do begin Xml:=Xml+Format('<c r="%s%d" s="%d"',[ExcelColumnName(Cell.Column),R+1,Ord(Cell.Style)]); case Cell.Kind of xckString: begin K:=AWorkbook.SharedStrings.Add(Cell.TextValue); Xml:=Xml+Format(' t="s"><v>%d</v></c>',[K]); end; xckBoolean: if Cell.BooleanValue then Xml:=Xml+' t="b"><v>1</v></c>' else Xml:=Xml+' t="b"><v>0</v></c>'; else Xml:=Xml+'><v>'+InvFloat(Cell.NumberValue)+'</v></c>'; end; end; Xml:=Xml+'</row>'; end; Xml:=Xml+'</sheetData>'; if Sh.HasAutoFilter and (Sh.Rows.Count>0) then Xml:=Xml+Format('<autoFilter ref="A1:%s%d"/>',[ExcelColumnName(MaxCol),Sh.Rows.Count]); Xml:=Xml+'</worksheet>'; AddUtf8XmlEntry(Z,Format('xl/worksheets/sheet%d.xml',[I+1]),Xml); end;
+    AddUtf8XmlEntry(Z,'xl/sharedStrings.xml',AWorkbook.SharedStrings.ToXml); Z.Close; Z.Free; Z:=nil;
     if FileExists(AFileName) and not DeleteFile(AFileName) then raise EInOutError.CreateFmt('Cannot replace %s',[AFileName]); if not RenameFile(Temp,AFileName) then raise EInOutError.CreateFmt('Cannot commit %s',[AFileName]);
   except
     if Assigned(Z) then begin try Z.Close except end; Z.Free; end; if FileExists(Temp) then DeleteFile(Temp); raise;

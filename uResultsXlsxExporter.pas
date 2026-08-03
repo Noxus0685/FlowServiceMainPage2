@@ -1,4 +1,4 @@
-unit uResultsXlsxExporter;
+﻿unit uResultsXlsxExporter;
 
 interface
 
