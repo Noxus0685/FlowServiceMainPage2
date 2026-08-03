@@ -1642,40 +1642,92 @@ begin
 end;
 
 procedure TFrameMainTable.StartMeasurement;
+var
+  Run: TMeasurementRun;
+  CurrentUUID: string;
+  StageValue, PointIndex: Integer;
 begin
-  if FActiveWorkTable = nil then
-    Exit;
-
-  if MeasurementRun = nil then
+  Run := MeasurementRun;
+  CurrentUUID := '';
+  StageValue := -1;
+  PointIndex := -1;
+  if Run <> nil then
   begin
-    ProtocolManager.AddMessage(pcWarning, psForm, 'StartMeasurement',
-      'Невозможно запустить измерение: MeasurementRun не создан', FActiveWorkTable.Name);
+    StageValue := Ord(Run.Stage);
+    PointIndex := Run.CurrentPointIndex;
+    if Run.CurrentPoint <> nil then CurrentUUID := Run.CurrentPoint.UUID;
+  end;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested',
+    'Запрошена команда интерфейса измерения',
+    Format('Command=Start; AutoMode=%s; RunAssigned=%s; Stage=%d; CurrentPointIndex=%d; CurrentPointUUID=%s',
+      [BoolToStr((SwitchAuto <> nil) and SwitchAuto.IsChecked, True),
+       BoolToStr(Run <> nil, True), StageValue, PointIndex, CurrentUUID]));
+
+  if FActiveWorkTable = nil then
+  begin
+    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRejected',
+      'Команда интерфейса измерения отклонена', 'Command=Start; Reason=WorkTableNotAssigned');
+    Exit;
+  end;
+  if Run = nil then
+  begin
+    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRejected',
+      'Команда интерфейса измерения отклонена', 'Command=Start; Reason=MeasurementRunNotAssigned');
     Exit;
   end;
 
-  FActiveWorkTable.MeasurementMode := MeasurementRun.Mode;
-
-  ProtocolManager.AddMessage(pcAction, psForm, 'StartMeasurement', 'Запрос на запуск измерений', FActiveWorkTable.Name);
-
-  FActiveWorkTable.StartMeasurementRun;
+  { Исторический ручной маршрут: непосредственно перед каждым запуском заново
+    снимок CurrentPoint переносится в отдельную runtime-точку MeasurementRun. }
+  if not ((SwitchAuto <> nil) and SwitchAuto.IsChecked) then
+  begin
+    BuildManualMeasurementPoint;
+    if (Run.Points = nil) or (Run.Points.Count <> 1) then
+    begin
+      ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRejected',
+        'Команда интерфейса измерения отклонена', 'Command=Start; Reason=ManualPointBuildFailed');
+      Exit;
+    end;
   end;
+
+  FActiveWorkTable.MeasurementMode := Run.Mode;
+  ProtocolManager.AddMessage(pcAction, psForm, 'StartMeasurement', 'Запрос на запуск измерений', FActiveWorkTable.Name);
+  FActiveWorkTable.StartMeasurementRun;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent',
+    'Команда интерфейса измерения передана', 'Command=Start');
+end;
 
 procedure TFrameMainTable.StopMeasurement;
+var
+  Run: TMeasurementRun;
+  CurrentUUID: string;
+  StageValue, PointIndex: Integer;
 begin
-
-  if FActiveWorkTable = nil then
-    Exit;
-
-  if MeasurementRun = nil then
+  Run := MeasurementRun;
+  CurrentUUID := '';
+  StageValue := -1;
+  PointIndex := -1;
+  if Run <> nil then
   begin
-    ProtocolManager.AddMessage(pcWarning, psForm, 'StopMeasurement',
-      'Невозможно остановить измерение: MeasurementRun не создан', FActiveWorkTable.Name);
+    StageValue := Ord(Run.Stage);
+    PointIndex := Run.CurrentPointIndex;
+    if Run.CurrentPoint <> nil then CurrentUUID := Run.CurrentPoint.UUID;
+  end;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested',
+    'Запрошена команда интерфейса измерения',
+    Format('Command=Stop; AutoMode=%s; RunAssigned=%s; Stage=%d; CurrentPointIndex=%d; CurrentPointUUID=%s',
+      [BoolToStr((SwitchAuto <> nil) and SwitchAuto.IsChecked, True), BoolToStr(Run <> nil, True),
+       StageValue, PointIndex, CurrentUUID]));
+  if (FActiveWorkTable = nil) or (Run = nil) then
+  begin
+    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRejected',
+      'Команда интерфейса измерения отклонена', 'Command=Stop; Reason=RunOrWorkTableNotAssigned');
     Exit;
   end;
-
-   ProtocolManager.AddMessage(pcAction, psForm, 'StopMeasurement', 'Запрос на остановку измерений', FActiveWorkTable.Name);
-     FActiveWorkTable.StopMeasurementRun;
- end;
+  ProtocolManager.AddMessage(pcAction, psForm, 'StopMeasurement', 'Запрос на остановку измерений', FActiveWorkTable.Name);
+  FActiveWorkTable.StopMeasurementRun;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent',
+    'Команда интерфейса измерения передана', 'Command=Stop');
+end;
 
  procedure TFrameMainTable.SwitchAutoSwitch(Sender: TObject);
 begin
@@ -1690,9 +1742,15 @@ end;
 
 procedure TFrameMainTable.BuildManualMeasurementPoint;
 begin
+  ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointBuildBegin',
+    'Начато формирование ручной runtime-точки', 'Source=WorkTable.CurrentPoint');
   if (FActiveWorkTable = nil) or (MeasurementRun = nil) or
      (FActiveWorkTable.CurrentPoint = nil) then
+  begin
+    ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointBuildFailed',
+      'Не удалось сформировать ручную runtime-точку', 'Reason=SourceNotAssigned');
     Exit;
+  end;
 
   { Q is stored in base units.  Use the user's setpoint, never ValueFlow. }
   if (FActiveWorkTable.FlowRate <> nil) and
@@ -1705,7 +1763,19 @@ begin
      (FActiveWorkTable.FluidPress.ValueSet <> nil) then
     FActiveWorkTable.CurrentPoint.Pressure := FActiveWorkTable.FluidPress.ValueSet.Value;
 
+  MeasurementRun.InvalidatePreparedPoints;
   MeasurementRun.RebuildMeasurementPoints;
+  if (MeasurementRun.Points <> nil) and (MeasurementRun.Points.Count = 1) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointBuilt',
+      'Сформирована ручная runtime-точка',
+      Format('PointUUID=%s; Q=%.9g; Temp=%.9g; Pressure=%.9g; LimitTime=%.9g; LimitVolume=%.9g; LimitImp=%d',
+        [MeasurementRun.Points[0].UUID, MeasurementRun.Points[0].Q,
+         MeasurementRun.Points[0].Temp, MeasurementRun.Points[0].Pressure,
+         MeasurementRun.Points[0].LimitTime, MeasurementRun.Points[0].LimitVolume,
+         MeasurementRun.Points[0].LimitImp]))
+  else
+    ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointBuildFailed',
+      'Не удалось сформировать ручную runtime-точку', 'Reason=RuntimePointNotCreated');
 end;
 
 procedure TFrameMainTable.ApplyMeasurementModeFromSwitch;
@@ -1740,11 +1810,14 @@ begin
 
   Run.Mode := NewMode;
   FActiveWorkTable.MeasurementMode := NewMode;
-  if NewMode = mrmManual then
-    BuildManualMeasurementPoint
-  else
+  { Auto=False не подменяет CurrentPoint строкой списка. Ручная runtime-точка
+    строится только перед Start; при возврате в Auto штатно восстанавливается
+    автоматический набор. }
+  if NewMode = mrmAutomatic then
+  begin
+    Run.InvalidatePreparedPoints;
     Run.RebuildMeasurementPoints;
-
+  end;
   RefreshMeasurementRunFrame;
   UpdateTestButton;
   ProtocolManager.AddMessage(pcAction, psMeasurement, 'MeasurementModeChanged',
