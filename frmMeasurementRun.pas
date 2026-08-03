@@ -102,6 +102,7 @@ type
     procedure AttachMeasurementRunEvents;
     procedure EnsureMeasurementRunSubscription;
     procedure DetachMeasurementRunEvents;
+    procedure SyncCurrentPointFromSubscribedRun;
     procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
     procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
     procedure MeasurementRunEvent(ASender: TObject; AEvent: EMeasurementEvent; const AError: TErrorInfo);
@@ -143,6 +144,7 @@ constructor TFrameMeasurementRun.Create(AOwner: TComponent);
 begin
   inherited;
   FInvalidPointIndexes := TList<Integer>.Create;
+  FSubscribedMeasurementRun := nil;
   GridMeasurmentRun.ShowHint := True;
   GridMeasurmentRun.OnCellClick := GridMeasurmentRunCellClick;
   FPointFlowSortDirection := 0;
@@ -166,48 +168,83 @@ end;
 
 procedure TFrameMeasurementRun.SetActiveWorkTable(const Value: TWorkTable);
 begin
-  if FActiveWorkTable = Value then
+  if FActiveWorkTable <> Value then
   begin
-    EnsureMeasurementRunSubscription;
-    UpdateGridMesurmentRun;
-    Exit;
+    DetachMeasurementRunEvents;
+    FActiveWorkTable := Value;
+    FInvalidPointIndexes.Clear;
   end;
-
-  DetachMeasurementRunEvents;
-  FActiveWorkTable := Value;
-  FInvalidPointIndexes.Clear;
-  AttachMeasurementRunEvents;
+  EnsureMeasurementRunSubscription;
   UpdateGridMRHeaders;
-  if MeasurementRun <> nil then
-  begin
-    MeasurementRun.MergePoints := CheckBoxMergePoints.IsChecked;
-    FCurrentPoint := MeasurementRun.CurrentPoint;
-    if FCurrentPoint <> nil then FCurrentPointUUID := FCurrentPoint.UUID
-    else FCurrentPointUUID := '';
-  end;
-  UpdateGridMesurmentRun;
+  UpdateUI;
 end;
 
 procedure TFrameMeasurementRun.AttachMeasurementRunEvents;
 begin
-  FSubscribedMeasurementRun := MeasurementRun;
-  if FSubscribedMeasurementRun <> nil then FSubscribedMeasurementRun.Subscribe(Self);
+  EnsureMeasurementRunSubscription;
 end;
 
 procedure TFrameMeasurementRun.DetachMeasurementRunEvents;
+var OldRun: TMeasurementRun;
 begin
-  if FSubscribedMeasurementRun <> nil then FSubscribedMeasurementRun.Unsubscribe(Self);
-  FSubscribedMeasurementRun := nil;
+  OldRun := FSubscribedMeasurementRun;
+  if OldRun <> nil then
+  begin
+    OldRun.Unsubscribe(Self);
+    FSubscribedMeasurementRun := nil;
+    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementRunSubscriptionDetached',
+      'Frame отписан от MeasurementRun',
+      Format('RunPointer=%p; Reason=WorkTableChangedOrFrameDestroy', [Pointer(OldRun)]));
+  end;
 end;
 
 procedure TFrameMeasurementRun.EnsureMeasurementRunSubscription;
+var
+  LRun, OldRun: TMeasurementRun;
+  StageValue, PointIndex: Integer;
 begin
-  if FSubscribedMeasurementRun = MeasurementRun then Exit;
-  DetachMeasurementRunEvents;
-  AttachMeasurementRunEvents;
+  LRun := GetMeasurementRun;
+  if FSubscribedMeasurementRun = LRun then Exit;
+  OldRun := FSubscribedMeasurementRun;
+  if OldRun <> nil then
+  begin
+    OldRun.Unsubscribe(Self);
+    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementRunSubscriptionDetached',
+      'Frame отписан от заменённого MeasurementRun',
+      Format('RunPointer=%p; Reason=RunReplaced', [Pointer(OldRun)]));
+  end;
+  FSubscribedMeasurementRun := LRun;
   FCurrentPoint := nil;
   FCurrentPointUUID := '';
+  FLastIndicatorUUID := '';
+  FInvalidPointIndexes.Clear;
+  if FSubscribedMeasurementRun <> nil then FSubscribedMeasurementRun.Subscribe(Self);
+  SyncCurrentPointFromSubscribedRun;
+  StageValue := -1; PointIndex := -1;
+  if FSubscribedMeasurementRun <> nil then
+  begin
+    StageValue := Ord(FSubscribedMeasurementRun.Stage);
+    PointIndex := FSubscribedMeasurementRun.CurrentPointIndex;
+  end;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementRunSubscriptionChanged',
+    'Изменена подписка frame на MeasurementRun',
+    Format('OldRunPointer=%p; NewRunPointer=%p; WorkTablePointer=%p; NewRunStage=%d; NewRunCurrentPointIndex=%d; Reason=RunReplaced',
+      [Pointer(OldRun), Pointer(FSubscribedMeasurementRun), Pointer(FActiveWorkTable),
+       StageValue, PointIndex]));
   if Assigned(FOnRunUIChanged) then FOnRunUIChanged(Self);
+end;
+
+procedure TFrameMeasurementRun.SyncCurrentPointFromSubscribedRun;
+begin
+  if FSubscribedMeasurementRun = nil then
+  begin
+    FCurrentPoint := nil;
+    FCurrentPointUUID := '';
+    Exit;
+  end;
+  FCurrentPoint := FSubscribedMeasurementRun.CurrentPoint;
+  if FCurrentPoint <> nil then FCurrentPointUUID := FCurrentPoint.UUID
+  else FCurrentPointUUID := '';
 end;
 
 procedure TFrameMeasurementRun.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
@@ -219,7 +256,14 @@ begin
     Exit;
 
   EnsureMeasurementRunSubscription;
-  if Sender <> FSubscribedMeasurementRun then Exit;
+  if Sender <> FSubscribedMeasurementRun then
+  begin
+    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementRunEventIgnored',
+      'Проигнорировано событие старого MeasurementRun',
+      Format('SenderPointer=%p; SubscribedRunPointer=%p; Event=%d; Reason=OldMeasurementRun',
+        [Pointer(Sender), Pointer(FSubscribedMeasurementRun), Event]));
+    Exit;
+  end;
   LRun := TMeasurementRun(Sender);
 
   if Event = Integer(meStateChanged) then
@@ -246,10 +290,13 @@ end;
 
 procedure TFrameMeasurementRun.MeasurementRunStateChanged(ASender: TObject;
   AState: EMeasurementState);
+var LRun: TMeasurementRun;
 begin
-  if (MeasurementRun <> nil) and (MeasurementRun.CurrentPoint <> nil) then
+  if not (ASender is TMeasurementRun) or (ASender <> FSubscribedMeasurementRun) then Exit;
+  LRun := TMeasurementRun(ASender);
+  if LRun.CurrentPoint <> nil then
   begin
-    FCurrentPoint := MeasurementRun.CurrentPoint;
+    FCurrentPoint := LRun.CurrentPoint;
     FCurrentPointUUID := FCurrentPoint.UUID;
   end
   else if AState in [msNone, msDone] then
@@ -263,13 +310,16 @@ begin
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandObserved',
     'Наблюдается фактическое состояние измерения',
     Format('Command=StateChanged; StageAfter=%d; PointIndexAfter=%d; CurrentPointUUID=%s; IsPausedAfter=%s',
-      [Ord(AState), MeasurementRun.CurrentPointIndex, FCurrentPointUUID,
-       BoolToStr(MeasurementRun.IsPaused, True)]));
+      [Ord(AState), LRun.CurrentPointIndex, FCurrentPointUUID,
+       BoolToStr(LRun.IsPaused, True)]));
 end;
 
 procedure TFrameMeasurementRun.MeasurementRunPointChanged(ASender: TObject;
   APoint: TDevicePoint; APointIndex: Integer);
+var LRun: TMeasurementRun;
 begin
+  if not (ASender is TMeasurementRun) or (ASender <> FSubscribedMeasurementRun) then Exit;
+  LRun := TMeasurementRun(ASender);
   FCurrentPoint := APoint;
   if APoint <> nil then
   begin
@@ -289,8 +339,8 @@ begin
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandObserved',
     'Наблюдается фактическое изменение точки',
     Format('Command=PointChanged; StageAfter=%d; PointIndexAfter=%d; CurrentPointUUID=%s; IsPausedAfter=%s',
-      [Ord(MeasurementRun.Stage), APointIndex, FCurrentPointUUID,
-       BoolToStr(MeasurementRun.IsPaused, True)]));
+      [Ord(LRun.Stage), APointIndex, FCurrentPointUUID,
+       BoolToStr(LRun.IsPaused, True)]));
 end;
 
 procedure TFrameMeasurementRun.MeasurementRunEvent(ASender: TObject;
@@ -596,8 +646,12 @@ end;
 procedure TFrameMeasurementRun.UpdateUI;
 begin
      EnsureMeasurementRunSubscription;
+     SyncCurrentPointFromSubscribedRun;
      UpdateGridMRHeaders;
      UpdateGridMesurmentRun;
+     UpdateMeasurementControls;
+     UpdatePauseButtonState;
+     UpdateCurrentPointIndicator;
 end;
 
 procedure TFrameMeasurementRun.RefreshFromMeasurementRun;
@@ -780,13 +834,17 @@ end;
 procedure TFrameMeasurementRun.SpeedButtonPointPrevClick(Sender: TObject);
 var Run: TMeasurementRun; StageBefore, IndexBefore: Integer; PausedBefore: Boolean;
 begin
-  Run := MeasurementRun;
+  EnsureMeasurementRunSubscription;
+  Run := GetMeasurementRun;
   if Run = nil then
   begin
     ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSkipped',
       'Команда интерфейса не передана', 'Command=PreviousPoint; Reason=MeasurementRunNotAssigned');
     Exit;
   end;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementRunSubscriptionVerified',
+    'Подтверждена подписка перед UI-командой',
+    Format('RunPointer=%p; Reason=Command', [Pointer(Run)]));
   StageBefore := Ord(Run.Stage); IndexBefore := Run.CurrentPointIndex; PausedBefore := Run.IsPaused;
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested',
     'Запрошена команда интерфейса измерения',
@@ -802,13 +860,17 @@ end;
 procedure TFrameMeasurementRun.SpeedButtonPointNextClick(Sender: TObject);
 var Run: TMeasurementRun; StageBefore, IndexBefore: Integer; PausedBefore: Boolean;
 begin
-  Run := MeasurementRun;
+  EnsureMeasurementRunSubscription;
+  Run := GetMeasurementRun;
   if Run = nil then
   begin
     ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSkipped',
       'Команда интерфейса не передана', 'Command=NextPoint; Reason=MeasurementRunNotAssigned');
     Exit;
   end;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementRunSubscriptionVerified',
+    'Подтверждена подписка перед UI-командой',
+    Format('RunPointer=%p; Reason=Command', [Pointer(Run)]));
   StageBefore := Ord(Run.Stage); IndexBefore := Run.CurrentPointIndex; PausedBefore := Run.IsPaused;
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested',
     'Запрошена команда интерфейса измерения',
@@ -846,13 +908,17 @@ end;
 procedure TFrameMeasurementRun.SpeedButtonPauseClick(Sender: TObject);
 var Run: TMeasurementRun; WasPaused: Boolean; CommandName: string;
 begin
-  Run := MeasurementRun;
+  EnsureMeasurementRunSubscription;
+  Run := GetMeasurementRun;
   if Run = nil then
   begin
     ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSkipped',
       'Команда интерфейса не передана', 'Command=Pause; Reason=MeasurementRunNotAssigned');
     Exit;
   end;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementRunSubscriptionVerified',
+    'Подтверждена подписка перед UI-командой',
+    Format('RunPointer=%p; Reason=Command', [Pointer(Run)]));
   WasPaused := Run.IsPaused;
   if WasPaused then CommandName := 'Resume' else CommandName := 'Pause';
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested',

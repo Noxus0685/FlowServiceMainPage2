@@ -810,6 +810,7 @@ type
   FUpdatingChannelEnabled: Boolean;
   FUpdatingAutoSwitch: Boolean;
   FLastAutoStatusText: string;
+  FLastMeasurementMainButtonAction: string;
   FAutoTestTab: TTabItem;
   FAutoTestInfoLabel: TLabel;
   ComboBoxAutoTestScenario: TComboBox;
@@ -1663,6 +1664,7 @@ begin
        Ord(FActiveWorkTable.State), BoolToStr(TestButton.Enabled, True)]));
   FActiveWorkTable.MeasurementMode := Run.Mode;
   FActiveWorkTable.StartMeasurementRun;
+  if FFrameMeasurementRun <> nil then FFrameMeasurementRun.UpdateUI;
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent',
     'Команда интерфейса передана',
     Format('Command=Start; RunObjectPointer=%p; StageBefore=%d; IsPausedBefore=%s; CurrentPointIndexBefore=%d',
@@ -1681,6 +1683,7 @@ begin
       [BoolToStr((SwitchAuto <> nil) and SwitchAuto.IsChecked, True), BoolToStr(Run <> nil, True),
        StageValue, BoolToStr(Paused, True), PointIndex, Ord(FActiveWorkTable.State), BoolToStr(TestButton.Enabled, True)]));
   FActiveWorkTable.StopMeasurementRun;
+  if FFrameMeasurementRun <> nil then FFrameMeasurementRun.UpdateUI;
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent',
     'Команда интерфейса передана',
     Format('Command=Stop; RunObjectPointer=%p; StageBefore=%d; IsPausedBefore=%s; CurrentPointIndexBefore=%d',
@@ -1863,6 +1866,7 @@ begin
 
   OnChangeState(NewState);
   UpdateMeasurementStartStopButton('WorkTableStateChanged');
+  if FFrameMeasurementRun <> nil then FFrameMeasurementRun.UpdateUI;
   {
   if AData is TDevicePoint then
     Point := TDevicePoint(AData)
