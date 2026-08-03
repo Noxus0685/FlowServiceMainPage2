@@ -945,6 +945,7 @@ type
     procedure StopMeasurement;
     procedure ApplyMeasurementModeFromSwitch;
     procedure BuildManualMeasurementPoint;
+    procedure UpdatePreparedManualPoint;
     procedure RefreshMeasurementRunFrame;
     procedure UpdateTestButton;
     procedure UpdateTestButtonByWorkTableState;
@@ -1642,91 +1643,48 @@ begin
 end;
 
 procedure TFrameMainTable.StartMeasurement;
-var
-  Run: TMeasurementRun;
-  CurrentUUID: string;
-  StageValue, PointIndex: Integer;
+var Run: TMeasurementRun; UUID: string; StageBefore, IndexBefore: Integer; PausedBefore: Boolean;
 begin
+  if FActiveWorkTable = nil then Exit;
   Run := MeasurementRun;
-  CurrentUUID := '';
-  StageValue := -1;
-  PointIndex := -1;
-  if Run <> nil then
-  begin
-    StageValue := Ord(Run.Stage);
-    PointIndex := Run.CurrentPointIndex;
-    if Run.CurrentPoint <> nil then CurrentUUID := Run.CurrentPoint.UUID;
-  end;
+  if Run = nil then Exit;
+  UUID := ''; StageBefore := Ord(Run.Stage); IndexBefore := Run.CurrentPointIndex; PausedBefore := Run.IsPaused;
+  if Run.CurrentPoint <> nil then UUID := Run.CurrentPoint.UUID;
+  if (Run.Mode = mrmManual) and (Run.Points <> nil) and (Run.Points.Count = 1) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointReused',
+      'Повторно используется подготовленная ручная точка',
+      Format('UUID=%s; PreparedPointsCount=%d; Reason=StartInManualMode',
+        [Run.Points.First.UUID, Run.Points.Count]));
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested',
     'Запрошена команда интерфейса измерения',
-    Format('Command=Start; AutoMode=%s; RunAssigned=%s; Stage=%d; CurrentPointIndex=%d; CurrentPointUUID=%s',
-      [BoolToStr((SwitchAuto <> nil) and SwitchAuto.IsChecked, True),
-       BoolToStr(Run <> nil, True), StageValue, PointIndex, CurrentUUID]));
-
-  if FActiveWorkTable = nil then
-  begin
-    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRejected',
-      'Команда интерфейса измерения отклонена', 'Command=Start; Reason=WorkTableNotAssigned');
-    Exit;
-  end;
-  if Run = nil then
-  begin
-    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRejected',
-      'Команда интерфейса измерения отклонена', 'Command=Start; Reason=MeasurementRunNotAssigned');
-    Exit;
-  end;
-
-  { Исторический ручной маршрут: непосредственно перед каждым запуском заново
-    снимок CurrentPoint переносится в отдельную runtime-точку MeasurementRun. }
-  if not ((SwitchAuto <> nil) and SwitchAuto.IsChecked) then
-  begin
-    BuildManualMeasurementPoint;
-    if (Run.Points = nil) or (Run.Points.Count <> 1) then
-    begin
-      ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRejected',
-        'Команда интерфейса измерения отклонена', 'Command=Start; Reason=ManualPointBuildFailed');
-      Exit;
-    end;
-  end;
-
+    Format('Command=Start; AutoMode=%s; RunAssigned=True; Stage=%d; IsPaused=%s; CurrentPointIndex=%d; CurrentPointUUID=%s; WorkTableState=%d; ButtonEnabled=%s',
+      [BoolToStr((SwitchAuto <> nil) and SwitchAuto.IsChecked, True), Ord(Run.Stage),
+       BoolToStr(Run.IsPaused, True), Run.CurrentPointIndex, UUID,
+       Ord(FActiveWorkTable.State), BoolToStr(TestButton.Enabled, True)]));
   FActiveWorkTable.MeasurementMode := Run.Mode;
-  ProtocolManager.AddMessage(pcAction, psForm, 'StartMeasurement', 'Запрос на запуск измерений', FActiveWorkTable.Name);
   FActiveWorkTable.StartMeasurementRun;
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent',
-    'Команда интерфейса измерения передана', 'Command=Start');
+    'Команда интерфейса передана',
+    Format('Command=Start; RunObjectPointer=%p; StageBefore=%d; IsPausedBefore=%s; CurrentPointIndexBefore=%d',
+      [Pointer(Run), StageBefore, BoolToStr(PausedBefore, True), IndexBefore]));
 end;
 
 procedure TFrameMainTable.StopMeasurement;
-var
-  Run: TMeasurementRun;
-  CurrentUUID: string;
-  StageValue, PointIndex: Integer;
+var Run: TMeasurementRun; StageValue, PointIndex: Integer; Paused: Boolean;
 begin
-  Run := MeasurementRun;
-  CurrentUUID := '';
-  StageValue := -1;
-  PointIndex := -1;
-  if Run <> nil then
-  begin
-    StageValue := Ord(Run.Stage);
-    PointIndex := Run.CurrentPointIndex;
-    if Run.CurrentPoint <> nil then CurrentUUID := Run.CurrentPoint.UUID;
-  end;
+  if FActiveWorkTable = nil then Exit;
+  Run := MeasurementRun; StageValue := -1; PointIndex := -1; Paused := False;
+  if Run <> nil then begin StageValue := Ord(Run.Stage); PointIndex := Run.CurrentPointIndex; Paused := Run.IsPaused; end;
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested',
     'Запрошена команда интерфейса измерения',
-    Format('Command=Stop; AutoMode=%s; RunAssigned=%s; Stage=%d; CurrentPointIndex=%d; CurrentPointUUID=%s',
+    Format('Command=Stop; AutoMode=%s; RunAssigned=%s; Stage=%d; IsPaused=%s; CurrentPointIndex=%d; CurrentPointUUID=; WorkTableState=%d; ButtonEnabled=%s',
       [BoolToStr((SwitchAuto <> nil) and SwitchAuto.IsChecked, True), BoolToStr(Run <> nil, True),
-       StageValue, PointIndex, CurrentUUID]));
-  if (FActiveWorkTable = nil) or (Run = nil) then
-  begin
-    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRejected',
-      'Команда интерфейса измерения отклонена', 'Command=Stop; Reason=RunOrWorkTableNotAssigned');
-    Exit;
-  end;
-  ProtocolManager.AddMessage(pcAction, psForm, 'StopMeasurement', 'Запрос на остановку измерений', FActiveWorkTable.Name);
+       StageValue, BoolToStr(Paused, True), PointIndex, Ord(FActiveWorkTable.State), BoolToStr(TestButton.Enabled, True)]));
   FActiveWorkTable.StopMeasurementRun;
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent',
-    'Команда интерфейса измерения передана', 'Command=Stop');
+    'Команда интерфейса передана',
+    Format('Command=Stop; RunObjectPointer=%p; StageBefore=%d; IsPausedBefore=%s; CurrentPointIndexBefore=%d',
+      [Pointer(Run), StageValue, BoolToStr(Paused, True), PointIndex]));
 end;
 
  procedure TFrameMainTable.SwitchAutoSwitch(Sender: TObject);
@@ -1741,41 +1699,50 @@ begin
 end;
 
 procedure TFrameMainTable.BuildManualMeasurementPoint;
+var Run: TMeasurementRun; CountBefore: Integer; Point: TDevicePoint;
 begin
-  ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointBuildBegin',
-    'Начато формирование ручной runtime-точки', 'Source=WorkTable.CurrentPoint');
-  if (FActiveWorkTable = nil) or (MeasurementRun = nil) or
-     (FActiveWorkTable.CurrentPoint = nil) then
-  begin
-    ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointBuildFailed',
-      'Не удалось сформировать ручную runtime-точку', 'Reason=SourceNotAssigned');
-    Exit;
-  end;
-
-  { Q is stored in base units.  Use the user's setpoint, never ValueFlow. }
-  if (FActiveWorkTable.FlowRate <> nil) and
-     (FActiveWorkTable.FlowRate.ValueSet <> nil) then
+  Run := MeasurementRun;
+  if (FActiveWorkTable = nil) or (Run = nil) or (FActiveWorkTable.CurrentPoint = nil) then Exit;
+  CountBefore := Run.Points.Count;
+  Run.Points.Clear;
+  ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointSetCleared',
+    'Очищен подготовленный набор точек',
+    Format('CountBefore=%d; CountAfter=%d; Reason=SwitchToManual', [CountBefore, Run.Points.Count]));
+  if (FActiveWorkTable.FlowRate <> nil) and (FActiveWorkTable.FlowRate.ValueSet <> nil) then
     FActiveWorkTable.CurrentPoint.Q := FActiveWorkTable.FlowRate.ValueSet.Value;
-  if (FActiveWorkTable.FluidTemp <> nil) and
-     (FActiveWorkTable.FluidTemp.ValueSet <> nil) then
+  if (FActiveWorkTable.FluidTemp <> nil) and (FActiveWorkTable.FluidTemp.ValueSet <> nil) then
     FActiveWorkTable.CurrentPoint.Temp := FActiveWorkTable.FluidTemp.ValueSet.Value;
-  if (FActiveWorkTable.FluidPress <> nil) and
-     (FActiveWorkTable.FluidPress.ValueSet <> nil) then
+  if (FActiveWorkTable.FluidPress <> nil) and (FActiveWorkTable.FluidPress.ValueSet <> nil) then
     FActiveWorkTable.CurrentPoint.Pressure := FActiveWorkTable.FluidPress.ValueSet.Value;
+  Run.InvalidatePreparedPoints;
+  Run.RebuildMeasurementPoints;
+  if (Run.Points <> nil) and (Run.Points.Count = 1) then
+  begin
+    Point := Run.Points.First;
+    ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointCreated',
+      'Создана подготовленная ручная точка',
+      Format('UUID=%s; Q=%.9g; FlowRate=%.9g; StopCriteria=%d; LimitTime=%.9g; LimitVolume=%.9g; LimitImp=%d; PreparedPointsCount=%d',
+        [Point.UUID, Point.Q, Point.FlowRate, CriteriaToInt(Point.StopCriteria), Point.LimitTime,
+         Point.LimitVolume, Point.LimitImp, Run.Points.Count]));
+  end;
+end;
 
-  MeasurementRun.InvalidatePreparedPoints;
-  MeasurementRun.RebuildMeasurementPoints;
-  if (MeasurementRun.Points <> nil) and (MeasurementRun.Points.Count = 1) then
-    ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointBuilt',
-      'Сформирована ручная runtime-точка',
-      Format('PointUUID=%s; Q=%.9g; Temp=%.9g; Pressure=%.9g; LimitTime=%.9g; LimitVolume=%.9g; LimitImp=%d',
-        [MeasurementRun.Points[0].UUID, MeasurementRun.Points[0].Q,
-         MeasurementRun.Points[0].Temp, MeasurementRun.Points[0].Pressure,
-         MeasurementRun.Points[0].LimitTime, MeasurementRun.Points[0].LimitVolume,
-         MeasurementRun.Points[0].LimitImp]))
-  else
-    ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointBuildFailed',
-      'Не удалось сформировать ручную runtime-точку', 'Reason=RuntimePointNotCreated');
+procedure TFrameMainTable.UpdatePreparedManualPoint;
+var Run: TMeasurementRun; Point: TDevicePoint;
+begin
+  Run := MeasurementRun;
+  if (Run = nil) or (Run.Mode <> mrmManual) or (Run.Points = nil) or
+     (Run.Points.Count <> 1) or (FActiveWorkTable = nil) or
+     (FActiveWorkTable.CurrentPoint = nil) then Exit;
+  if (FActiveWorkTable.FlowRate <> nil) and (FActiveWorkTable.FlowRate.ValueSet <> nil) then
+    FActiveWorkTable.CurrentPoint.Q := FActiveWorkTable.FlowRate.ValueSet.Value;
+  if (FActiveWorkTable.FluidTemp <> nil) and (FActiveWorkTable.FluidTemp.ValueSet <> nil) then
+    FActiveWorkTable.CurrentPoint.Temp := FActiveWorkTable.FluidTemp.ValueSet.Value;
+  if (FActiveWorkTable.FluidPress <> nil) and (FActiveWorkTable.FluidPress.ValueSet <> nil) then
+    FActiveWorkTable.CurrentPoint.Pressure := FActiveWorkTable.FluidPress.ValueSet.Value;
+  Point := Run.Points.First;
+  Point.Assign(FActiveWorkTable.CurrentPoint, False);
+  if FFrameMeasurementRun <> nil then FFrameMeasurementRun.RefreshFromMeasurementRun;
 end;
 
 procedure TFrameMainTable.ApplyMeasurementModeFromSwitch;
@@ -1810,13 +1777,15 @@ begin
 
   Run.Mode := NewMode;
   FActiveWorkTable.MeasurementMode := NewMode;
-  { Auto=False не подменяет CurrentPoint строкой списка. Ручная runtime-точка
-    строится только перед Start; при возврате в Auto штатно восстанавливается
-    автоматический набор. }
-  if NewMode = mrmAutomatic then
+  if NewMode = mrmManual then
+    BuildManualMeasurementPoint
+  else
   begin
     Run.InvalidatePreparedPoints;
     Run.RebuildMeasurementPoints;
+    ProtocolManager.AddMessage(pcProc, psForm, 'AutoPointSetRestored',
+      'Восстановлен автоматический набор точек',
+      Format('PointsCount=%d', [Run.Points.Count]));
   end;
   RefreshMeasurementRunFrame;
   UpdateTestButton;
@@ -2845,6 +2814,7 @@ begin
   ProtocolManager.AddMessage(pcAction, psForm, 'ResetSpillageTimer',
     'Сброшен таймер текущей проливки после задания расхода', FActiveWorkTable.Name);
   UpdateUIFlowRate;
+  UpdatePreparedManualPoint;
 end;
 
 procedure TFrameMainTable.SpeedButtonStartPumpClick(Sender: TObject);
@@ -2886,6 +2856,7 @@ begin
     //if FActiveWorkTable.FlowRate.IsStable(StableStatus) then
     //  FActiveWorkTable.FlowRate.Start;
     UpdateUIFlowRate;
+    UpdatePreparedManualPoint;
   end;
 end;
 
@@ -7678,6 +7649,7 @@ begin
     AValue:= FActiveWorkTable.ValueTemperture.GetDoubleBaseNum(NormalizeFloatInput(EditTemp.text),FActiveWorkTable.ValuePressure.CurrentDimIndex);
     FActiveWorkTable.FluidTemp.DoFluidTempStart(AValue);
     UpdateUIConditions;
+    UpdatePreparedManualPoint;
 
   end;
 
@@ -7702,6 +7674,7 @@ begin
     Exclude(SC, scTime);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
     EditTime.Text:='-';
+    UpdatePreparedManualPoint;
     Exit;
   end;
 
@@ -7711,6 +7684,7 @@ begin
     Include(SC, scTime);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
   end;
+  UpdatePreparedManualPoint;
 end;
 
 procedure TFrameMainTable.EditVolumeExit(Sender: TObject);
@@ -7731,6 +7705,7 @@ begin
     FActiveWorkTable.CurrentPoint.LimitVolume := -1;
     Exclude(SC, scVolume);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
+    UpdatePreparedManualPoint;
     Exit;
   end;
 
@@ -7739,6 +7714,7 @@ begin
     Include(SC, scVolume);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
 
+  UpdatePreparedManualPoint;
 end;
 
 procedure TFrameMainTable.EditImpExit(Sender: TObject);
@@ -7758,6 +7734,7 @@ begin
     Exclude(SC, scImpulse);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
     EditImp.Text := '-';
+    UpdatePreparedManualPoint;
     Exit;
   end;
 
@@ -7767,6 +7744,7 @@ begin
     Include(SC, scImpulse);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
   end;
+  UpdatePreparedManualPoint;
 end;
 
 procedure TFrameMainTable.EditPresCanFocus(Sender: TObject;
@@ -7788,6 +7766,7 @@ begin
     AValue:= FActiveWorkTable.ValuePressure.GetDoubleBaseNum(NormalizeFloatInput(EditPres.text),FActiveWorkTable.ValuePressure.CurrentDimIndex);
     FActiveWorkTable.FluidPress.DoFluidPressStart(AValue);
     UpdateUIConditions;
+    UpdatePreparedManualPoint;
     //EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
   end
   //else

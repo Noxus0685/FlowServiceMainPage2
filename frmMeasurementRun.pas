@@ -105,6 +105,7 @@ type
     procedure UpdateStopCriteriaColumns;
     procedure UpdatePointOrderControls;
     procedure UpdateMeasurementControls;
+    procedure UpdatePauseButtonState;
     procedure UpdateCurrentPointIndicator;
     function CapturePointsGridState: TPointsGridState;
     procedure RestorePointsGridSelectionAndFocus(const AState: TPointsGridState;
@@ -136,14 +137,6 @@ constructor TFrameMeasurementRun.Create(AOwner: TComponent);
 begin
   inherited;
   FInvalidPointIndexes := TList<Integer>.Create;
-  SpeedButtonPointPrev.OnClick := SpeedButtonPointPrevClick;
-  SpeedButtonPointNext.OnClick := SpeedButtonPointNextClick;
-  SpeedButtonPause.OnClick := SpeedButtonPauseClick;
-  SpeedButtonPointDelete.OnClick := SpeedButtonPointDeleteClick;
-  SpeedButtonPointMoveUp.OnClick := SpeedButtonPointMoveUpClick;
-  SpeedButtonPointMoveDown.OnClick := SpeedButtonPointMoveDownClick;
-  CheckBoxMergePoints.OnChange := CheckBoxMergePointsChange;
-  SpeedButtonCreatePoints.OnClick := SpeedButtonCreatePointsClick;
   GridMeasurmentRun.ShowHint := True;
   GridMeasurmentRun.OnCellClick := GridMeasurmentRunCellClick;
   FPointFlowSortDirection := 0;
@@ -656,20 +649,21 @@ end;
 
 procedure TFrameMeasurementRun.UpdateMeasurementControls;
 begin
-  if MeasurementRun = nil then
-  begin
-    SpeedButtonPointPrev.Enabled := False; SpeedButtonPointNext.Enabled := False;
-    SpeedButtonPause.Enabled := False; Exit;
-  end;
-  SpeedButtonPointPrev.Enabled := (MeasurementRun.CurrentPointIndex > 0) and
-    not (MeasurementRun.Stage in [msNone, msDone]);
-  SpeedButtonPointNext.Enabled := (MeasurementRun.Points <> nil) and
-    (MeasurementRun.CurrentPointIndex >= 0) and
-    (MeasurementRun.CurrentPointIndex < MeasurementRun.Points.Count - 1) and
-    not (MeasurementRun.Stage in [msNone, msDone]);
-  SpeedButtonPause.Enabled := not (MeasurementRun.Stage in [msNone, msDone]);
-  if MeasurementRun.IsPaused then SpeedButtonPause.StyleLookup := 'playtoolbuttonbordered'
-  else SpeedButtonPause.StyleLookup := 'pausetoolbuttonbordered';
+  { Исторические командные кнопки не дублируют ограничения FSM формы. }
+  SpeedButtonPointPrev.Enabled := MeasurementRun <> nil;
+  SpeedButtonPointNext.Enabled := MeasurementRun <> nil;
+  SpeedButtonPause.Enabled := MeasurementRun <> nil;
+  UpdatePauseButtonState;
+end;
+
+procedure TFrameMeasurementRun.UpdatePauseButtonState;
+var Run: TMeasurementRun;
+begin
+  Run := MeasurementRun;
+  if (Run <> nil) and Run.IsPaused then
+    SpeedButtonPause.StyleLookup := 'playtoolbuttonbordered'
+  else
+    SpeedButtonPause.StyleLookup := 'pausetoolbuttonbordered';
 end;
 
 function TFrameMeasurementRun.ResolvePointRow(const AUUID: string; APoint: TDevicePoint;
@@ -722,38 +716,47 @@ begin
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointPrevClick(Sender: TObject);
-var Run: TMeasurementRun; UUID: string; StageValue, PointIndex: Integer;
+var Run: TMeasurementRun; StageBefore, IndexBefore: Integer; PausedBefore: Boolean;
 begin
-  Run := MeasurementRun; UUID := ''; StageValue := -1; PointIndex := -1;
-  if Run <> nil then begin StageValue := Ord(Run.Stage); PointIndex := Run.CurrentPointIndex;
-    if Run.CurrentPoint <> nil then UUID := Run.CurrentPoint.UUID; end;
-  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested', 'Запрошена команда интерфейса измерения',
-    Format('Command=PreviousPoint; AutoMode=%s; RunAssigned=%s; Stage=%d; CurrentPointIndex=%d; CurrentPointUUID=%s',
-      [BoolToStr((Run <> nil) and (Run.Mode = mrmAutomatic), True), BoolToStr(Run <> nil, True),
-       StageValue, PointIndex, UUID]));
-  if (Run = nil) or (Run.CurrentPointIndex <= 0) or (Run.Stage in [msNone, msDone]) then
-  begin ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRejected', 'Команда интерфейса измерения отклонена', 'Command=PreviousPoint; Reason=Unavailable'); Exit; end;
+  Run := MeasurementRun;
+  if Run = nil then
+  begin
+    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSkipped',
+      'Команда интерфейса не передана', 'Command=PreviousPoint; Reason=MeasurementRunNotAssigned');
+    Exit;
+  end;
+  StageBefore := Ord(Run.Stage); IndexBefore := Run.CurrentPointIndex; PausedBefore := Run.IsPaused;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested',
+    'Запрошена команда интерфейса измерения',
+    Format('Command=PreviousPoint; AutoMode=%s; RunAssigned=True; Stage=%d; IsPaused=%s; CurrentPointIndex=%d; CurrentPointUUID=%s; WorkTableState=-1; ButtonEnabled=%s',
+      [BoolToStr(Run.Mode = mrmAutomatic, True), Ord(Run.Stage), BoolToStr(Run.IsPaused, True),
+       Run.CurrentPointIndex, FCurrentPointUUID, BoolToStr(SpeedButtonPointPrev.Enabled, True)]));
   Run.Execute(mcPreviousPoint, Unassigned);
-  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent', 'Команда интерфейса измерения передана', 'Command=PreviousPoint');
-  UpdateUI;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent',
+    'Команда интерфейса передана', Format('Command=PreviousPoint; RunObjectPointer=%p; StageBefore=%d; IsPausedBefore=%s; CurrentPointIndexBefore=%d',
+      [Pointer(Run), StageBefore, BoolToStr(PausedBefore, True), IndexBefore]));
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointNextClick(Sender: TObject);
-var Run: TMeasurementRun; UUID: string; StageValue, PointIndex: Integer;
+var Run: TMeasurementRun; StageBefore, IndexBefore: Integer; PausedBefore: Boolean;
 begin
-  Run := MeasurementRun; UUID := ''; StageValue := -1; PointIndex := -1;
-  if Run <> nil then begin StageValue := Ord(Run.Stage); PointIndex := Run.CurrentPointIndex;
-    if Run.CurrentPoint <> nil then UUID := Run.CurrentPoint.UUID; end;
-  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested', 'Запрошена команда интерфейса измерения',
-    Format('Command=NextPoint; AutoMode=%s; RunAssigned=%s; Stage=%d; CurrentPointIndex=%d; CurrentPointUUID=%s',
-      [BoolToStr((Run <> nil) and (Run.Mode = mrmAutomatic), True), BoolToStr(Run <> nil, True),
-       StageValue, PointIndex, UUID]));
-  if (Run = nil) or (Run.Points = nil) or (Run.CurrentPointIndex < 0) or
-     (Run.CurrentPointIndex >= Run.Points.Count - 1) or (Run.Stage in [msNone, msDone]) then
-  begin ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRejected', 'Команда интерфейса измерения отклонена', 'Command=NextPoint; Reason=Unavailable'); Exit; end;
+  Run := MeasurementRun;
+  if Run = nil then
+  begin
+    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSkipped',
+      'Команда интерфейса не передана', 'Command=NextPoint; Reason=MeasurementRunNotAssigned');
+    Exit;
+  end;
+  StageBefore := Ord(Run.Stage); IndexBefore := Run.CurrentPointIndex; PausedBefore := Run.IsPaused;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested',
+    'Запрошена команда интерфейса измерения',
+    Format('Command=NextPoint; AutoMode=%s; RunAssigned=True; Stage=%d; IsPaused=%s; CurrentPointIndex=%d; CurrentPointUUID=%s; WorkTableState=-1; ButtonEnabled=%s',
+      [BoolToStr(Run.Mode = mrmAutomatic, True), Ord(Run.Stage), BoolToStr(Run.IsPaused, True),
+       Run.CurrentPointIndex, FCurrentPointUUID, BoolToStr(SpeedButtonPointNext.Enabled, True)]));
   Run.Execute(mcNextPoint, Null);
-  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent', 'Команда интерфейса измерения передана', 'Command=NextPoint');
-  UpdateUI;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent',
+    'Команда интерфейса передана', Format('Command=NextPoint; RunObjectPointer=%p; StageBefore=%d; IsPausedBefore=%s; CurrentPointIndexBefore=%d',
+      [Pointer(Run), StageBefore, BoolToStr(PausedBefore, True), IndexBefore]));
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointMoveUpClick(Sender: TObject);
@@ -781,28 +784,28 @@ begin
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPauseClick(Sender: TObject);
-var Run: TMeasurementRun; CommandName, UUID: string;
+var Run: TMeasurementRun; WasPaused: Boolean; CommandName: string;
 begin
   Run := MeasurementRun;
   if Run = nil then
   begin
-    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRejected',
-      'Команда интерфейса измерения отклонена', 'Command=Pause; Reason=MeasurementRunNotAssigned');
+    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSkipped',
+      'Команда интерфейса не передана', 'Command=Pause; Reason=MeasurementRunNotAssigned');
     Exit;
   end;
-  UUID := '';
-  if Run.CurrentPoint <> nil then UUID := Run.CurrentPoint.UUID;
-  if Run.IsPaused then CommandName := 'Resume' else CommandName := 'Pause';
+  WasPaused := Run.IsPaused;
+  if WasPaused then CommandName := 'Resume' else CommandName := 'Pause';
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested',
     'Запрошена команда интерфейса измерения',
-    Format('Command=%s; AutoMode=%s; RunAssigned=True; Stage=%d; CurrentPointIndex=%d; CurrentPointUUID=%s',
+    Format('Command=%s; AutoMode=%s; RunAssigned=True; Stage=%d; IsPaused=%s; CurrentPointIndex=%d; CurrentPointUUID=%s; WorkTableState=-1; ButtonEnabled=%s',
       [CommandName, BoolToStr(Run.Mode = mrmAutomatic, True), Ord(Run.Stage),
-       Run.CurrentPointIndex, UUID]));
-  if Run.IsPaused then Run.Execute(mcResume, Null)
+       BoolToStr(WasPaused, True), Run.CurrentPointIndex, FCurrentPointUUID,
+       BoolToStr(SpeedButtonPause.Enabled, True)]));
+  if WasPaused then Run.Execute(mcResume, Null)
   else Run.Execute(mcPause, Null);
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent',
-    'Команда интерфейса измерения передана', 'Command=' + CommandName);
-  UpdateUI;
+    'Команда интерфейса передана', Format('Command=%s; RunObjectPointer=%p; StageBefore=%d; IsPausedBefore=%s; CurrentPointIndexBefore=%d',
+      [CommandName, Pointer(Run), Ord(Run.Stage), BoolToStr(WasPaused, True), Run.CurrentPointIndex]));
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointDeleteClick(Sender: TObject);
@@ -828,10 +831,8 @@ begin
 end;
 
 procedure TFrameMeasurementRun.CheckBoxMergePointsChange(Sender: TObject);
-var State: TPointsGridState;
 begin
   if MeasurementRun = nil then Exit;
-  State := CapturePointsGridState;
   MeasurementRun.MergePoints := CheckBoxMergePoints.IsChecked;
   SaveMergePointsSetting;
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementPointMergeModeChanged', 'Изменён режим объединения точек',
@@ -840,7 +841,6 @@ begin
      (MeasurementRun.Stage in [msNone, msDone]) then begin
     MeasurementRun.InvalidatePreparedPoints; MeasurementRun.RebuildMeasurementPoints;
     FPointFlowSortDirection := 0; FInvalidPointIndexes.Clear; UpdateGridMesurmentRun;
-    RestorePointsGridSelectionAndFocus(State, State.Row, True, 'MergeModeChanged');
   end;
 end;
 
