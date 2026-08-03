@@ -360,6 +360,8 @@ type
     procedure FinalizeMeasurementRun(AResult: TMeasurementRunResult; AReason: TMeasurementRunDoneReason);
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
+    procedure RequestPointNavigation(const ADirection: string; ATargetIndex: Integer);
+    procedure SelectForcedPoint;
     procedure SetStage(const ANewStage: EMeasurementState);
     function CanChangeStage(AOldStage, ANewStage: EMeasurementState): Boolean;
     procedure DoExitStage(AOldStage, ANewStage: EMeasurementState);
@@ -408,6 +410,7 @@ type
 
     function GetCurrentPoint: TDevicePoint;
     function FindNextEnabledPointIndex(AStartIndex: Integer): Integer;
+    function FindPreviousEnabledPointIndex(AStartIndex: Integer): Integer;
     function BuildError(ACode: Integer; const AMsg: string): TErrorInfo;
     function ValidatePoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
     function SetPoint(Index: Integer; out AError: TErrorInfo): Boolean;
@@ -494,6 +497,7 @@ type
     procedure Pause;
     procedure Resume;
     procedure NextPoint;
+    procedure PreviousPoint;
     procedure Execute(Cmd: EMeasurementCommand); overload;
     procedure Execute(Cmd: EMeasurementCommand; Param: Variant); overload;
 
@@ -1240,13 +1244,31 @@ begin
       Exit(I);
 end;
 
+function TMeasurementRun.FindPreviousEnabledPointIndex(AStartIndex: Integer): Integer;
+var
+  I: Integer;
+begin
+  Result := -1;
+  if FPoints = nil then
+    Exit;
+
+  for I := Min(AStartIndex, FPoints.Count - 1) downto 0 do
+    if (FPoints[I] <> nil) and FPoints[I].Enabled and
+       (FPoints[I].State <> osDeleted) then
+      Exit(I);
+end;
+
 procedure TMeasurementRun.EnterSelectPoint;
 var
   // Содержит подробную информацию об ошибке, если SetPoint не сможет
   // выбрать, проверить или применить указанную точку измерения.
   Error: TErrorInfo;
+  PreviousIndex: Integer;
+  ForcedSelection: Boolean;
 begin
   ResetPointSetupState;
+  PreviousIndex := FCurrentPointIndex;
+  ForcedSelection := FForceNextPoint >= 0;
 
   // Начинаем обработку новой точки с нулевого номера попытки.
   //
@@ -1308,6 +1330,13 @@ begin
   // - заполнить Error при невозможности выбора точки.
   if SetPoint(FCurrentPointIndex, Error) then
   begin
+    if ForcedSelection then
+      ProtocolManager.AddMessage(pcAction, psMeasurement,
+        'MeasurementPointNavigationApplied',
+        'Запрошенная точка измерения назначена',
+        Format('PreviousIndex=%d; NewIndex=%d; NewPointUUID=%s; Stage=%s; ForceNextPointAfter=%d',
+          [PreviousIndex, FCurrentPointIndex, GetCurrentPoint.UUID,
+           MeasurementStateToString(FCurrentStage), FForceNextPoint]));
     // Точка успешно выбрана.
     //
     // Устанавливаем ей статус, соответствующий стадии выбора точки.
@@ -4348,10 +4377,126 @@ begin
 end;
 
 procedure TMeasurementRun.NextPoint;
+var
+  TargetIndex: Integer;
 begin
-  FForceNextPoint := FCurrentPointIndex + 1;
-  ProtocolManager.AddMessage(pcAction, psMeasurement, 'NextPoint',
-    'Переход к следующей точке', IntToStr(FForceNextPoint));
+  TargetIndex := FindNextEnabledPointIndex(FCurrentPointIndex + 1);
+  RequestPointNavigation('Next', TargetIndex);
+end;
+
+procedure TMeasurementRun.PreviousPoint;
+var
+  TargetIndex: Integer;
+begin
+  TargetIndex := FindPreviousEnabledPointIndex(FCurrentPointIndex - 1);
+  RequestPointNavigation('Previous', TargetIndex);
+end;
+
+procedure TMeasurementRun.SelectForcedPoint;
+begin
+  // SetStage intentionally ignores a transition to the current stage.
+  // Re-enter the one canonical point-selection routine instead.
+  EnterSelectPoint;
+end;
+
+procedure TMeasurementRun.RequestPointNavigation(const ADirection: string;
+  ATargetIndex: Integer);
+var
+  CurrentUUID, TargetUUID, RejectionReason, Route: string;
+  PhysicalStarted: Boolean;
+begin
+  CurrentUUID := '';
+  TargetUUID := '';
+  if GetCurrentPoint <> nil then
+    CurrentUUID := GetCurrentPoint.UUID;
+  if (FPoints <> nil) and (ATargetIndex >= 0) and (ATargetIndex < FPoints.Count) and
+     (FPoints[ATargetIndex] <> nil) then
+    TargetUUID := FPoints[ATargetIndex].UUID;
+  PhysicalStarted := HasPhysicalMeasurementStarted or WorkTableNeedsPhysicalStop;
+
+  ProtocolManager.AddMessage(pcAction, psMeasurement,
+    'MeasurementPointNavigationRequested', 'Запрошен переход между точками',
+    Format('Direction=%s; CurrentStage=%s; CurrentPointIndex=%d; CurrentPointUUID=%s; TargetIndex=%d; TargetUUID=%s; PhysicalMeasureStarted=%s; StopRequested=%s; ForceNextPointBefore=%d',
+      [ADirection, MeasurementStateToString(FCurrentStage), FCurrentPointIndex,
+       CurrentUUID, ATargetIndex, TargetUUID, BoolToStr(PhysicalStarted, True),
+       BoolToStr(FStopRequested, True), FForceNextPoint]));
+
+  RejectionReason := '';
+  if FCurrentStage in [msNone, msDone] then
+    RejectionReason := 'RunInactive'
+  else if FPoints = nil then
+    RejectionReason := 'PointsNotAssigned'
+  else if GetCurrentPoint = nil then
+    RejectionReason := 'NoCurrentPoint'
+  else if FForceNextPoint >= 0 then
+    RejectionReason := 'NavigationAlreadyPending'
+  else if ATargetIndex < 0 then
+  begin
+    if SameText(ADirection, 'Next') then
+      RejectionReason := 'NoNextEnabledPoint'
+    else
+      RejectionReason := 'NoPreviousEnabledPoint';
+  end
+  else if (ATargetIndex >= FPoints.Count) or (FPoints[ATargetIndex] = nil) or
+          (not FPoints[ATargetIndex].Enabled) or
+          (FPoints[ATargetIndex].State = osDeleted) then
+    RejectionReason := 'InvalidTargetIndex'
+  else if ATargetIndex = FCurrentPointIndex then
+    RejectionReason := 'SameTargetIndex';
+
+  if RejectionReason <> '' then
+  begin
+    ProtocolManager.AddMessage(pcInfo, psMeasurement,
+      'MeasurementPointNavigationRejected', 'Переход между точками отклонён',
+      Format('Direction=%s; Reason=%s; Stage=%s; TargetIndex=%d',
+        [ADirection, RejectionReason, MeasurementStateToString(FCurrentStage), ATargetIndex]));
+    Exit;
+  end;
+
+  FForceNextPoint := ATargetIndex;
+  SetStopReason(msrUserRollback);
+  ResetPointSetupState;
+  FAttempt := 0;
+
+  if FCurrentStage in [msMeasure, msWaitMeasureStop, msResultsRead, msSave] then
+  begin
+    Route := 'StopThenSelect';
+    if FCurrentStage in [msResultsRead, msSave] then
+      Route := 'SaveThenSelect';
+    FNextStageAfterSave := msSelectPoint;
+    ProtocolManager.AddMessage(pcProc, psMeasurement,
+      'MeasurementPointNavigationPrepared', 'Маршрут перехода подготовлен',
+      Format('TargetIndex=%d; ForceNextPointAfter=%d; NextStageAfterSave=%s; Route=%s',
+        [ATargetIndex, FForceNextPoint,
+         MeasurementStateToString(FNextStageAfterSave), Route]));
+    ProtocolManager.AddMessage(pcProc, psMeasurement,
+      'MeasurementPointNavigationStoppingCurrent',
+      'Текущая физическая операция завершается штатно',
+      Format('Stage=%s; TargetIndex=%d',
+        [MeasurementStateToString(FCurrentStage), ATargetIndex]));
+    RequestStop;
+  end
+  else
+  begin
+    Route := 'DirectSelect';
+    FNextStageAfterSave := msNone;
+    ProtocolManager.AddMessage(pcProc, psMeasurement,
+      'MeasurementPointNavigationPrepared', 'Маршрут перехода подготовлен',
+      Format('TargetIndex=%d; ForceNextPointAfter=%d; NextStageAfterSave=%s; Route=%s',
+        [ATargetIndex, FForceNextPoint,
+         MeasurementStateToString(FNextStageAfterSave), Route]));
+    if FWorkTable <> nil then
+      FWorkTable.StopMonitor;
+    if FCurrentStage = msSelectPoint then
+      SelectForcedPoint
+    else
+      SetStage(msSelectPoint);
+  end;
+
+  ProtocolManager.AddMessage(pcState, psMeasurement,
+    'MeasurementPointNavigationStageChanged', 'Стадия перехода обработана',
+    Format('Stage=%s; TargetIndex=%d; Route=%s',
+      [MeasurementStateToString(FCurrentStage), ATargetIndex, Route]));
 end;
 
 procedure TMeasurementRun.Execute(Cmd: EMeasurementCommand);
@@ -4379,8 +4524,7 @@ begin
         Start;
       end;
     mcNextPoint: NextPoint;
-    mcPreviousPoint:
-      FForceNextPoint := Max(FCurrentPointIndex - 1, 0);
+    mcPreviousPoint: PreviousPoint;
     mcRepeatPoint:
       FForceNextPoint := Max(FCurrentPointIndex, 0);
     mcForcePoint:
@@ -4579,6 +4723,7 @@ begin
       // work-table task. CurrentPoint remains owned by TWorkTable.
       FWorkTable.MeasurementRunPointChanged(Self, Point, FCurrentPointIndex);
     end;
+    Notify(Integer(mePointChanged), Point);
     AddDiagnosticEvent('SetPoint success: ' + BuildPointSelectionLog(Point));
 
   end else
@@ -5698,6 +5843,18 @@ begin
   end;
 
   Point := GetCurrentPoint;
+  if (FForceNextPoint >= 0) and (FNextStageAfterSave = msSelectPoint) then
+  begin
+    MarkInterruptedPointIfNeeded;
+    // Navigation uses RequestStop only to finish the current physical
+    // operation. It must not finalize the complete measurement run.
+    FStopRequested := False;
+    FPhysicalStopRequested := False;
+    FRunResult := mrrNone;
+    FDoneReason := mdrNone;
+    SetStage(msSelectPoint);
+    Exit;
+  end;
   if IsStopRequested then
   begin
     MarkInterruptedPointIfNeeded;
