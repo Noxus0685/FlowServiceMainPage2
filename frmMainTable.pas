@@ -945,10 +945,11 @@ type
     procedure StopMeasurement;
     procedure ApplyMeasurementModeFromSwitch;
     procedure BuildManualMeasurementPoint;
+    procedure UpdatePreparedManualPoint;
     procedure RefreshMeasurementRunFrame;
     procedure UpdateTestButton;
-    procedure UpdateTestButtonByWorkTableState;
-    procedure UpdateTestButtonByMeasurementRun;
+    procedure UpdateMeasurementStartStopButton(const AReason: string = 'Refresh');
+    procedure MeasurementRunUiChanged(Sender: TObject);
     procedure MeasurementButtonClickManualMode;
     procedure MeasurementButtonClickAutoMode;
     function IsTestButtonSaveMode: Boolean;
@@ -1642,40 +1643,49 @@ begin
 end;
 
 procedure TFrameMainTable.StartMeasurement;
+var Run: TMeasurementRun; UUID: string; StageBefore, IndexBefore: Integer; PausedBefore: Boolean;
 begin
-  if FActiveWorkTable = nil then
-    Exit;
-
-  if MeasurementRun = nil then
-  begin
-    ProtocolManager.AddMessage(pcWarning, psForm, 'StartMeasurement',
-      'Невозможно запустить измерение: MeasurementRun не создан', FActiveWorkTable.Name);
-    Exit;
-  end;
-
-  FActiveWorkTable.MeasurementMode := MeasurementRun.Mode;
-
-  ProtocolManager.AddMessage(pcAction, psForm, 'StartMeasurement', 'Запрос на запуск измерений', FActiveWorkTable.Name);
-
+  if FActiveWorkTable = nil then Exit;
+  Run := MeasurementRun;
+  if Run = nil then Exit;
+  UUID := ''; StageBefore := Ord(Run.Stage); IndexBefore := Run.CurrentPointIndex; PausedBefore := Run.IsPaused;
+  if Run.CurrentPoint <> nil then UUID := Run.CurrentPoint.UUID;
+  if (Run.Mode = mrmManual) and (Run.Points <> nil) and (Run.Points.Count = 1) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointReused',
+      'Повторно используется подготовленная ручная точка',
+      Format('UUID=%s; PreparedPointsCount=%d; Reason=StartInManualMode',
+        [Run.Points.First.UUID, Run.Points.Count]));
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested',
+    'Запрошена команда интерфейса измерения',
+    Format('Command=Start; AutoMode=%s; RunAssigned=True; Stage=%d; IsPaused=%s; CurrentPointIndex=%d; CurrentPointUUID=%s; WorkTableState=%d; ButtonEnabled=%s',
+      [BoolToStr((SwitchAuto <> nil) and SwitchAuto.IsChecked, True), Ord(Run.Stage),
+       BoolToStr(Run.IsPaused, True), Run.CurrentPointIndex, UUID,
+       Ord(FActiveWorkTable.State), BoolToStr(TestButton.Enabled, True)]));
+  FActiveWorkTable.MeasurementMode := Run.Mode;
   FActiveWorkTable.StartMeasurementRun;
-  end;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent',
+    'Команда интерфейса передана',
+    Format('Command=Start; RunObjectPointer=%p; StageBefore=%d; IsPausedBefore=%s; CurrentPointIndexBefore=%d',
+      [Pointer(Run), StageBefore, BoolToStr(PausedBefore, True), IndexBefore]));
+end;
 
 procedure TFrameMainTable.StopMeasurement;
+var Run: TMeasurementRun; StageValue, PointIndex: Integer; Paused: Boolean;
 begin
-
-  if FActiveWorkTable = nil then
-    Exit;
-
-  if MeasurementRun = nil then
-  begin
-    ProtocolManager.AddMessage(pcWarning, psForm, 'StopMeasurement',
-      'Невозможно остановить измерение: MeasurementRun не создан', FActiveWorkTable.Name);
-    Exit;
-  end;
-
-   ProtocolManager.AddMessage(pcAction, psForm, 'StopMeasurement', 'Запрос на остановку измерений', FActiveWorkTable.Name);
-     FActiveWorkTable.StopMeasurementRun;
- end;
+  if FActiveWorkTable = nil then Exit;
+  Run := MeasurementRun; StageValue := -1; PointIndex := -1; Paused := False;
+  if Run <> nil then begin StageValue := Ord(Run.Stage); PointIndex := Run.CurrentPointIndex; Paused := Run.IsPaused; end;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested',
+    'Запрошена команда интерфейса измерения',
+    Format('Command=Stop; AutoMode=%s; RunAssigned=%s; Stage=%d; IsPaused=%s; CurrentPointIndex=%d; CurrentPointUUID=; WorkTableState=%d; ButtonEnabled=%s',
+      [BoolToStr((SwitchAuto <> nil) and SwitchAuto.IsChecked, True), BoolToStr(Run <> nil, True),
+       StageValue, BoolToStr(Paused, True), PointIndex, Ord(FActiveWorkTable.State), BoolToStr(TestButton.Enabled, True)]));
+  FActiveWorkTable.StopMeasurementRun;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent',
+    'Команда интерфейса передана',
+    Format('Command=Stop; RunObjectPointer=%p; StageBefore=%d; IsPausedBefore=%s; CurrentPointIndexBefore=%d',
+      [Pointer(Run), StageValue, BoolToStr(Paused, True), PointIndex]));
+end;
 
  procedure TFrameMainTable.SwitchAutoSwitch(Sender: TObject);
 begin
@@ -1689,23 +1699,50 @@ begin
 end;
 
 procedure TFrameMainTable.BuildManualMeasurementPoint;
+var Run: TMeasurementRun; CountBefore: Integer; Point: TDevicePoint;
 begin
-  if (FActiveWorkTable = nil) or (MeasurementRun = nil) or
-     (FActiveWorkTable.CurrentPoint = nil) then
-    Exit;
-
-  { Q is stored in base units.  Use the user's setpoint, never ValueFlow. }
-  if (FActiveWorkTable.FlowRate <> nil) and
-     (FActiveWorkTable.FlowRate.ValueSet <> nil) then
+  Run := MeasurementRun;
+  if (FActiveWorkTable = nil) or (Run = nil) or (FActiveWorkTable.CurrentPoint = nil) then Exit;
+  CountBefore := Run.Points.Count;
+  Run.Points.Clear;
+  ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointSetCleared',
+    'Очищен подготовленный набор точек',
+    Format('CountBefore=%d; CountAfter=%d; Reason=SwitchToManual', [CountBefore, Run.Points.Count]));
+  if (FActiveWorkTable.FlowRate <> nil) and (FActiveWorkTable.FlowRate.ValueSet <> nil) then
     FActiveWorkTable.CurrentPoint.Q := FActiveWorkTable.FlowRate.ValueSet.Value;
-  if (FActiveWorkTable.FluidTemp <> nil) and
-     (FActiveWorkTable.FluidTemp.ValueSet <> nil) then
+  if (FActiveWorkTable.FluidTemp <> nil) and (FActiveWorkTable.FluidTemp.ValueSet <> nil) then
     FActiveWorkTable.CurrentPoint.Temp := FActiveWorkTable.FluidTemp.ValueSet.Value;
-  if (FActiveWorkTable.FluidPress <> nil) and
-     (FActiveWorkTable.FluidPress.ValueSet <> nil) then
+  if (FActiveWorkTable.FluidPress <> nil) and (FActiveWorkTable.FluidPress.ValueSet <> nil) then
     FActiveWorkTable.CurrentPoint.Pressure := FActiveWorkTable.FluidPress.ValueSet.Value;
+  Run.InvalidatePreparedPoints;
+  Run.RebuildMeasurementPoints;
+  if (Run.Points <> nil) and (Run.Points.Count = 1) then
+  begin
+    Point := Run.Points.First;
+    ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointCreated',
+      'Создана подготовленная ручная точка',
+      Format('UUID=%s; Q=%.9g; FlowRate=%.9g; StopCriteria=%d; LimitTime=%.9g; LimitVolume=%.9g; LimitImp=%d; PreparedPointsCount=%d',
+        [Point.UUID, Point.Q, Point.FlowRate, CriteriaToInt(Point.StopCriteria), Point.LimitTime,
+         Point.LimitVolume, Point.LimitImp, Run.Points.Count]));
+  end;
+end;
 
-  MeasurementRun.RebuildMeasurementPoints;
+procedure TFrameMainTable.UpdatePreparedManualPoint;
+var Run: TMeasurementRun; Point: TDevicePoint;
+begin
+  Run := MeasurementRun;
+  if (Run = nil) or (Run.Mode <> mrmManual) or (Run.Points = nil) or
+     (Run.Points.Count <> 1) or (FActiveWorkTable = nil) or
+     (FActiveWorkTable.CurrentPoint = nil) then Exit;
+  if (FActiveWorkTable.FlowRate <> nil) and (FActiveWorkTable.FlowRate.ValueSet <> nil) then
+    FActiveWorkTable.CurrentPoint.Q := FActiveWorkTable.FlowRate.ValueSet.Value;
+  if (FActiveWorkTable.FluidTemp <> nil) and (FActiveWorkTable.FluidTemp.ValueSet <> nil) then
+    FActiveWorkTable.CurrentPoint.Temp := FActiveWorkTable.FluidTemp.ValueSet.Value;
+  if (FActiveWorkTable.FluidPress <> nil) and (FActiveWorkTable.FluidPress.ValueSet <> nil) then
+    FActiveWorkTable.CurrentPoint.Pressure := FActiveWorkTable.FluidPress.ValueSet.Value;
+  Point := Run.Points.First;
+  Point.Assign(FActiveWorkTable.CurrentPoint, False);
+  if FFrameMeasurementRun <> nil then FFrameMeasurementRun.RefreshFromMeasurementRun;
 end;
 
 procedure TFrameMainTable.ApplyMeasurementModeFromSwitch;
@@ -1743,8 +1780,13 @@ begin
   if NewMode = mrmManual then
     BuildManualMeasurementPoint
   else
+  begin
+    Run.InvalidatePreparedPoints;
     Run.RebuildMeasurementPoints;
-
+    ProtocolManager.AddMessage(pcProc, psForm, 'AutoPointSetRestored',
+      'Восстановлен автоматический набор точек',
+      Format('PointsCount=%d', [Run.Points.Count]));
+  end;
   RefreshMeasurementRunFrame;
   UpdateTestButton;
   ProtocolManager.AddMessage(pcAction, psMeasurement, 'MeasurementModeChanged',
@@ -1820,6 +1862,7 @@ begin
     Exit;
 
   OnChangeState(NewState);
+  UpdateMeasurementStartStopButton('WorkTableStateChanged');
   {
   if AData is TDevicePoint then
     Point := TDevicePoint(AData)
@@ -2460,6 +2503,7 @@ begin
     FFrameMeasurementRun.Parent := TabItemMeasurmentRun;
     FFrameMeasurementRun.Align := TAlignLayout.Client;
   end;
+  FFrameMeasurementRun.OnRunUIChanged := MeasurementRunUiChanged;
   FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
 
   if FFrameMRResults = nil then
@@ -2772,6 +2816,7 @@ begin
   ProtocolManager.AddMessage(pcAction, psForm, 'ResetSpillageTimer',
     'Сброшен таймер текущей проливки после задания расхода', FActiveWorkTable.Name);
   UpdateUIFlowRate;
+  UpdatePreparedManualPoint;
 end;
 
 procedure TFrameMainTable.SpeedButtonStartPumpClick(Sender: TObject);
@@ -2813,6 +2858,7 @@ begin
     //if FActiveWorkTable.FlowRate.IsStable(StableStatus) then
     //  FActiveWorkTable.FlowRate.Start;
     UpdateUIFlowRate;
+    UpdatePreparedManualPoint;
   end;
 end;
 
@@ -7605,6 +7651,7 @@ begin
     AValue:= FActiveWorkTable.ValueTemperture.GetDoubleBaseNum(NormalizeFloatInput(EditTemp.text),FActiveWorkTable.ValuePressure.CurrentDimIndex);
     FActiveWorkTable.FluidTemp.DoFluidTempStart(AValue);
     UpdateUIConditions;
+    UpdatePreparedManualPoint;
 
   end;
 
@@ -7629,6 +7676,7 @@ begin
     Exclude(SC, scTime);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
     EditTime.Text:='-';
+    UpdatePreparedManualPoint;
     Exit;
   end;
 
@@ -7638,6 +7686,7 @@ begin
     Include(SC, scTime);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
   end;
+  UpdatePreparedManualPoint;
 end;
 
 procedure TFrameMainTable.EditVolumeExit(Sender: TObject);
@@ -7658,6 +7707,7 @@ begin
     FActiveWorkTable.CurrentPoint.LimitVolume := -1;
     Exclude(SC, scVolume);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
+    UpdatePreparedManualPoint;
     Exit;
   end;
 
@@ -7666,6 +7716,7 @@ begin
     Include(SC, scVolume);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
 
+  UpdatePreparedManualPoint;
 end;
 
 procedure TFrameMainTable.EditImpExit(Sender: TObject);
@@ -7685,6 +7736,7 @@ begin
     Exclude(SC, scImpulse);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
     EditImp.Text := '-';
+    UpdatePreparedManualPoint;
     Exit;
   end;
 
@@ -7694,6 +7746,7 @@ begin
     Include(SC, scImpulse);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
   end;
+  UpdatePreparedManualPoint;
 end;
 
 procedure TFrameMainTable.EditPresCanFocus(Sender: TObject;
@@ -7715,6 +7768,7 @@ begin
     AValue:= FActiveWorkTable.ValuePressure.GetDoubleBaseNum(NormalizeFloatInput(EditPres.text),FActiveWorkTable.ValuePressure.CurrentDimIndex);
     FActiveWorkTable.FluidPress.DoFluidPressStart(AValue);
     UpdateUIConditions;
+    UpdatePreparedManualPoint;
     //EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
   end
   //else
@@ -7914,281 +7968,81 @@ end;
 
 procedure TFrameMainTable.UpdateTestButton;
 begin
-  if TestButton = nil then
-    Exit;
-
-  if (SwitchAuto <> nil) and SwitchAuto.IsChecked then
-    UpdateTestButtonByMeasurementRun
-  else
-    UpdateTestButtonByWorkTableState;
+  UpdateMeasurementStartStopButton('UpdateTestButton');
 end;
 
-procedure TFrameMainTable.UpdateTestButtonByWorkTableState;
+procedure TFrameMainTable.MeasurementRunUiChanged(Sender: TObject);
 begin
-  if TestButton = nil then
-    Exit;
-
-  if FActiveWorkTable = nil then
-  begin
-    TestButton.Text := 'Измерение';
-    TestButton.Tag := 0;
-    TestButton.Enabled := False;
-    if ButtonCancel <> nil then
-    begin
-      ButtonCancel.Text := 'Отмена';
-      ButtonCancel.Enabled := False;
-      ButtonCancel.Visible := False;
-    end;
-    Exit;
-  end;
-
-  case FActiveWorkTable.State of
-    swtSTANDBY,
-    swtNONE:
-      begin
-        TestButton.Text := 'Измерение';
-        TestButton.Tag := 0;
-        TestButton.Enabled := False;
-        if ButtonCancel <> nil then
-        begin
-          ButtonCancel.Text := 'Отмена';
-          ButtonCancel.Enabled := False;
-          ButtonCancel.Visible := False;
-        end;
-      end;
-
-    swtCONNECTED:
-      begin
-        TestButton.Text := 'Измерение';
-        TestButton.Tag := 1;
-        TestButton.Enabled := True;
-        if ButtonCancel <> nil then
-        begin
-          ButtonCancel.Text := 'Отмена';
-          ButtonCancel.Enabled := False;
-          ButtonCancel.Visible := False;
-        end;
-      end;
-
-    swtSTARTTEST:
-      begin
-        TestButton.Text := 'Запуск';
-        TestButton.Tag := 2;
-        TestButton.Enabled := False;
-        if ButtonCancel <> nil then
-        begin
-          ButtonCancel.Text := 'Отмена';
-          ButtonCancel.Enabled := False;
-          ButtonCancel.Visible := False;
-        end;
-      end;
-
-    swtSTARTWAIT,
-    swtEXECUTE:
-      begin
-        TestButton.Text := 'Стоп';
-        TestButton.Tag := 3;
-        TestButton.Enabled := True;
-        if ButtonCancel <> nil then
-        begin
-          ButtonCancel.Text := 'Отмена';
-          ButtonCancel.Enabled := False;
-          ButtonCancel.Visible := False;
-        end;
-      end;
-
-    swtSTOPTEST,
-    swtSTOPWAIT:
-      begin
-        TestButton.Text := 'Завершение';
-        TestButton.Tag := 4;
-        TestButton.Enabled := False;
-        if ButtonCancel <> nil then
-        begin
-          ButtonCancel.Text := 'Отмена';
-          ButtonCancel.Enabled := False;
-          ButtonCancel.Visible := False;
-        end;
-      end;
-
-    swtFINALREAD:
-      begin
-        TestButton.Text := 'Сохранение';
-        TestButton.Tag := 5;
-        TestButton.Enabled := False;
-        if ButtonCancel <> nil then
-        begin
-          ButtonCancel.Text := 'Отмена';
-          ButtonCancel.Enabled := False;
-          ButtonCancel.Visible := False;
-        end;
-      end;
-
-    swtCOMPLETE:
-      begin
-        TestButton.Text := 'Сохранение';
-        TestButton.Tag := 5;
-        TestButton.Enabled := False;
-        if ButtonCancel <> nil then
-        begin
-          ButtonCancel.Text := 'Отмена';
-          ButtonCancel.Enabled := False;
-          ButtonCancel.Visible := False;
-        end;
-      end;
-
-    swtSaveConfirmation:
-      begin
-        // Решение запрашивается только во время ожидания в msSave.
-        TestButton.Text := 'Сохранить?';
-        TestButton.Tag := 6;
-        TestButton.Enabled := True;
-        if ButtonCancel <> nil then
-        begin
-          ButtonCancel.Text := 'Отмена';
-          ButtonCancel.Enabled := True;
-          ButtonCancel.Visible := True;
-        end;
-      end;
-
-    swtFAILURE:
-      begin
-        TestButton.Text := 'Ошибка';
-        TestButton.Tag := 0;
-        TestButton.Enabled := True;
-        if ButtonCancel <> nil then
-        begin
-          ButtonCancel.Text := 'Отмена';
-          ButtonCancel.Enabled := True;
-          ButtonCancel.Visible := True;
-        end;
-      end;
-    SwtMonitor:
-      begin
-        TestButton.Text := 'Измерение';
-        TestButton.Tag := 0;
-        TestButton.Enabled := True;
-      end
-  else
-    begin
-      TestButton.Text := 'Измерение';
-      TestButton.Tag := 0;
-      TestButton.Enabled := False;
-      if ButtonCancel <> nil then
-      begin
-        ButtonCancel.Text := 'Отмена';
-        ButtonCancel.Enabled := False;
-        ButtonCancel.Visible := False;
-      end;
-    end;
-  end;
+  UpdateMeasurementStartStopButton('MeasurementRunEvent');
 end;
 
-procedure TFrameMainTable.UpdateTestButtonByMeasurementRun;
+procedure TFrameMainTable.UpdateMeasurementStartStopButton(const AReason: string);
 var
   Run: TMeasurementRun;
-  CanStart: Boolean;
-  ActiveRun: Boolean;
-  DisplayedStatusText: string;
+  Active: Boolean;
+  NewAction, PreviousAction: string;
+  StageValue, PointIndex, WorkTableStateValue: Integer;
+  Paused, SaveMode: Boolean;
 begin
-  if TestButton = nil then
-    Exit;
-
-  if ButtonCancel <> nil then
-  begin
-    ButtonCancel.Text := 'Отмена';
-    ButtonCancel.Enabled := False;
-    ButtonCancel.Visible := False;
-  end;
-
+  if TestButton = nil then Exit;
+  SaveMode := IsTestButtonSaveMode;
   Run := MeasurementRun;
-  CanStart :=
-    (FActiveWorkTable <> nil) and
-    (FActiveWorkTable.State in [
-      swtCONNECTED,
-      swtCOMPLETE,
-      swtSTARTMONITOR,
-      swtSTARTMONITORWAIT,
-      swtMONITOR
-    ]);
+  Active := IsMeasurementActive(FActiveWorkTable);
+  if Active then NewAction := 'Stop' else NewAction := 'Start';
+  PreviousAction := FLastMeasurementMainButtonAction;
 
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.State = swtFAILURE) then
+  if Active then
   begin
-    TestButton.Text := 'Ошибка';
-    TestButton.Tag := 0;
-    TestButton.Enabled := True;
-    Exit;
-  end;
-
-  if Run = nil then
-  begin
-    TestButton.Text := 'Старт';
-    TestButton.Tag := 0;
-    TestButton.Enabled := False;
-    Exit;
-  end;
-
-  ActiveRun := not (Run.Stage in [msNone, msDone]);
-
-  if Run.StopRequested and ActiveRun then
-  begin
-    TestButton.Text := 'Остановка...';
-    TestButton.Tag := 4;
-    TestButton.Enabled := False;
-  end
-  else if ActiveRun then
-  begin
-    TestButton.Text := 'Отмена';
+    TestButton.Text := 'Стоп';
+    TestButton.StyleLookup := 'circlebuttonstyle';
+    TestButton.Hint := 'Остановить измерение';
     TestButton.Tag := 3;
+    TestButton.Enabled := FActiveWorkTable <> nil;
+  end
+  else
+  begin
+    TestButton.Text := 'Измерение';
+    TestButton.StyleLookup := 'circlebuttonstyle';
+    TestButton.Hint := 'Начать измерение';
+    TestButton.Tag := 1;
+    TestButton.Enabled := (FActiveWorkTable <> nil) and
+      not (FActiveWorkTable.State in [swtNONE, swtSTANDBY]);
+  end;
+
+  { Состояние подтверждения сохранения сохраняет специальное назначение. }
+  if SaveMode then
+  begin
+    TestButton.Text := 'Сохранить?';
+    TestButton.Hint := 'Подтвердить сохранение результатов';
+    TestButton.Tag := 6;
     TestButton.Enabled := True;
-  end
-  else if Run.RunCompleted and (Run.RunResult = mrrSuccess) then
-  begin
-    TestButton.Text := 'Старт';
-    TestButton.Tag := 1;
-    TestButton.Enabled := CanStart;
-  end
-  else
-  begin
-    TestButton.Text := 'Старт';
-    TestButton.Tag := 1;
-    TestButton.Enabled := CanStart;
   end;
 
-  case Run.RunResult of
-    mrrCancelled: DisplayedStatusText := 'Отменено';
-    mrrError: DisplayedStatusText := 'Ошибка';
-  else
-    if Run.RunCompleted then
-      DisplayedStatusText := 'Завершено'
-    else if Run.StopRequested then
-      DisplayedStatusText := 'Остановка'
-    else
-      DisplayedStatusText := TMeasurementRun.MeasurementStateToString(Run.Stage);
-  end;
-
-  if DisplayedStatusText <> FLastAutoStatusText then
+  if NewAction <> PreviousAction then
   begin
-    ProtocolManager.AddMessage(pcInfo, psForm, 'AutoStatusChanged',
-      'Изменён отображаемый статус автоматического измерения',
-      Format('Stage=%s; WorkTableState=%s; RunCompleted=%s; RunResult=%d; DoneReason=%d; StopRequested=%s; PreviousStatusText=%s; NewStatusText=%s; Reason=UpdateTestButtonByMeasurementRun',
-        [TMeasurementRun.MeasurementStateToString(Run.Stage),
-         TWorkTable.WorkTableStateToString(FActiveWorkTable.State),
-         BoolToStr(Run.RunCompleted, True), Ord(Run.RunResult), Ord(Run.DoneReason),
-         BoolToStr(Run.StopRequested, True), FLastAutoStatusText, DisplayedStatusText]));
-    FLastAutoStatusText := DisplayedStatusText;
+    StageValue := -1; PointIndex := -1; Paused := False;
+    if FActiveWorkTable <> nil then WorkTableStateValue := Ord(FActiveWorkTable.State)
+    else WorkTableStateValue := -1;
+    if Run <> nil then
+    begin
+      StageValue := Ord(Run.Stage);
+      PointIndex := Run.CurrentPointIndex;
+      Paused := Run.IsPaused;
+    end;
+    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementMainButtonUpdated',
+      'Обновлено фактическое действие центральной кнопки',
+      Format('Action=%s; WorkTableState=%d; RunAssigned=%s; RunStage=%d; IsPaused=%s; CurrentPointIndex=%d; Reason=%s',
+        [NewAction, WorkTableStateValue,
+         BoolToStr(Run <> nil, True), StageValue, BoolToStr(Paused, True),
+         PointIndex, AReason]));
+    if (PreviousAction = 'Stop') and (NewAction = 'Start') then
+      ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementRunUiStateChanged',
+        'Интерфейс отобразил фактическое завершение измерения',
+        Format('PreviousAction=Stop; NewAction=Start; WorkTableState=%d; RunStage=%d',
+          [WorkTableStateValue, StageValue]));
+    FLastMeasurementMainButtonAction := NewAction;
   end;
-
-  ProtocolManager.AddMessage(pcInfo, psForm, 'AutomaticRunUIState',
-    'Обновление UI автоматического измерения',
-    Format('MeasurementRun.Stage=%s; RunCompleted=%s; RunResult=%d; StopRequested=%s; WorkTable.State=%s; DisplayedStatusText=%s; MainActionButtonText=%s; MainActionButtonEnabled=%s; ChannelCheckboxesEnabled=%s; CanCancelActiveRun=%s',
-      [TMeasurementRun.MeasurementStateToString(Run.Stage), BoolToStr(Run.RunCompleted, True),
-       Ord(Run.RunResult), BoolToStr(Run.StopRequested, True),
-       TWorkTable.WorkTableStateToString(FActiveWorkTable.State),
-       DisplayedStatusText, TestButton.Text, BoolToStr(TestButton.Enabled, True),
-       BoolToStr(not ActiveRun, True), BoolToStr(ActiveRun and not Run.StopRequested, True)]));
 end;
-
 
 const
   AUTO_MEASUREMENT_SCENARIO_COUNT = 20;
@@ -8997,12 +8851,11 @@ end;
 
 function TFrameMainTable.IsTestButtonSaveMode: Boolean;
 begin
-  Result :=
-    (FActiveWorkTable <> nil) and
-    (FActiveWorkTable.State = swtSaveConfirmation) and
+  Result := (FActiveWorkTable <> nil) and
     (TestButton <> nil) and
     (TestButton.Tag = 6) and
-    SameText(Trim(TestButton.Text), 'Сохранить?');
+    SameText(Trim(TestButton.Text), 'Сохранить?') and
+    (FActiveWorkTable.State = swtSaveConfirmation);
 end;
 
 function TFrameMainTable.IsMeasurementActive(AWorkTable: TWorkTable): Boolean;
@@ -9068,27 +8921,31 @@ end;
 // - start a new measurement.
 // Business logic must be kept in dedicated helper methods.
 procedure TFrameMainTable.TestButtonClick(Sender: TObject);
-var
-  WorkTable: TWorkTable;
+var Active: Boolean; Run: TMeasurementRun; StageValue, PointIndex: Integer;
 begin
-  WorkTable := FActiveWorkTable;
-  if WorkTable = nil then
-    Exit;
-
-  if (SwitchAuto <> nil) and SwitchAuto.IsChecked then
-  begin
-    MeasurementButtonClickAutoMode;
-    Exit;
-  end;
-
+  if FActiveWorkTable = nil then Exit;
   if IsTestButtonSaveMode then
   begin
     AcceptMeasurementResults;
     Exit;
   end;
-
-  if IsMeasurementActive(WorkTable) then
-    StopMeasurement
+  Run := MeasurementRun;
+  Active := IsMeasurementActive(FActiveWorkTable);
+  StageValue := -1; PointIndex := -1;
+  if Run <> nil then begin StageValue := Ord(Run.Stage); PointIndex := Run.CurrentPointIndex; end;
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementMainButtonClicked',
+    'Нажата центральная кнопка измерения',
+    Format('Action=%s; WorkTableState=%d; RunStage=%d; CurrentPointIndex=%d',
+      [IfThen(Active, 'Stop', 'Start'), Ord(FActiveWorkTable.State), StageValue, PointIndex]));
+  if Active then
+  begin
+    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementStopRequested',
+      'Передан запрос штатной остановки измерения',
+      Format('WorkTableState=%d; RunStage=%d; CurrentPointIndex=%d; SetupInProgress=%s',
+        [Ord(FActiveWorkTable.State), StageValue, PointIndex,
+         BoolToStr((Run <> nil) and (Run.Stage in [msSetupPoint, msWaitPointSetup]), True)]));
+    StopMeasurement;
+  end
   else
     StartMeasurement;
 end;

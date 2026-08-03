@@ -269,6 +269,7 @@ type
     FCriticalSection: TCriticalSection;
     FMode: EMeasurementRunMode;
     FPointsPrepared: Boolean;
+    FMergePoints: Boolean;
     FPreparedPointsMode: EMeasurementRunMode;
 
     FManualFlowRate: Double;
@@ -516,6 +517,8 @@ type
     property WorkTable: TWorkTable read FWorkTable;
     property Points: TObjectList<TDevicePoint> read FPoints;
     property PointsPrepared: Boolean read FPointsPrepared;
+    property MergePoints: Boolean read FMergePoints write FMergePoints;
+    property IsPaused: Boolean read FIsPaused;
     property PreparedPointsMode: EMeasurementRunMode read FPreparedPointsMode;
 
     property Stage: EMeasurementState read FCurrentStage;
@@ -930,6 +933,7 @@ end;
 
 constructor TMeasurementRun.Create(AWorkTable: TWorkTable);
 begin
+  FMergePoints := True;
   inherited Create;
   FWorkTable := AWorkTable;
   FPoints := TObjectList<TDevicePoint>.Create(True);
@@ -3769,6 +3773,7 @@ begin
       ExistingPoint := nil;
       BestIntersectionDeltaQ := -MaxDouble;
       BestDistance := MaxDouble;
+      if FMergePoints then
       for SessionPoint in FPoints do
       begin
         if ParticipantExists(SessionPoint, Participant) then
