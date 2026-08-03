@@ -43,6 +43,7 @@ uses
   uFlowMeter,
   uRepositories,
   uProtocols,
+  uResultPresentation,
   uWorkTable,
   uMKSDebug;
 
@@ -1771,10 +1772,10 @@ end;
 function TFrameProceed.GetStatusColor(const AStatus: Integer): TAlphaColor;
 begin
   case AStatus of
-    2: Result := COLOR_NONE;
-    3: Result := COLOR_INVALID;
-    4: Result := COLOR_INVALID;
-    5: Result := COLOR_COMPLETED;
+    2: Result := GetResultStateColor(prvsPending);
+    3: Result := GetResultStateColor(prvsInvalid);
+    4: Result := GetResultStateColor(prvsWarning);
+    5: Result := GetResultStateColor(prvsValid);
   else
     Result := TAlphaColors.Null;
   end;
@@ -1934,7 +1935,7 @@ begin
   begin
     FoundID := ASpillage.ID;
     FoundDeviceUUID := ASpillage.DeviceUUID;
-    FoundError := FormatFloat('0.###', ASpillage.Error);
+  FoundError := FormatResultError(ASpillage.Error);
   end;
 
   LogMKS('DBG SP 9101', 'SummaryResults CELL',
@@ -2018,8 +2019,14 @@ begin
                 if (not Spillage.Valid) or
                    (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
                   Inc(InvalidCount);
-                Row.PointStatuses[I] := Spillage.Status;
-                Row.PointValues[I] := FormatFloat('0.###', Spillage.Error);
+                case ResolvePointResultVisualState(Device, P, P, Spillage) of
+                  prvsValid: Row.PointStatuses[I] := 5;
+                  prvsInvalid: Row.PointStatuses[I] := 3;
+                  prvsWarning: Row.PointStatuses[I] := 4;
+                else
+                  Row.PointStatuses[I] := 2;
+                end;
+                Row.PointValues[I] := FormatResultError(Spillage.Error);
               end
               else
               begin
@@ -2043,16 +2050,14 @@ begin
           SetLength(Row.PointStatuses, 0);
         end;
 
-        if FoundPointsCount = 0 then
-          Row.ResultStatus := 2
-        else if InvalidCount > 0 then
-          Row.ResultStatus := 3
-        else if FoundPointsCount < RequiredPointsCount then
-          Row.ResultStatus := 2
+        case ResolveDeviceResultVisualState(Device) of
+          prvsValid: Row.ResultStatus := 5;
+          prvsInvalid: Row.ResultStatus := 3;
+          prvsWarning: Row.ResultStatus := 4;
         else
-          Row.ResultStatus := 5;
-
-        Row.ResultText := BuildResultTextByStatus(Row.ResultStatus);
+          Row.ResultStatus := 2;
+        end;
+        Row.ResultText := GetDeviceResultText(Device);
 
         LogMKS('DBG SP 9102', 'SummaryResults RESULT',
           Format('RowDeviceUUID=%s; RowSerial=%s; RequiredPointsCount=%d; FoundPointsCount=%d; InvalidCount=%d; HasAnyData=%s; ResultText=%s',
