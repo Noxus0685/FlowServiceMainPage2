@@ -49,7 +49,6 @@ type
     ButtonClearSession: TButton;
     ButtonCreateSession: TButton;
     ButtonExportExcel: TButton;
-    SaveDialogXlsx: TSaveDialog;
     procedure GridMRResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridMRResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas; const Column: TColumn;
       const Bounds: TRectF; const Row: Integer; const Value: TValue; const State: TGridDrawStates);
@@ -267,23 +266,32 @@ end;
 
 { Exports the selected device, or every device when no result row is selected. }
 procedure TFrameMRResults.ButtonExportExcelClick(Sender: TObject);
-var Data: TResultsExportData; Selected: TChannel; Scope, Sessions: string;
+var Data: TResultsExportData; Selected: TChannel; Scope, Sessions, FileName: string;
+  SaveDialog: TSaveDialog;
   Started: TDateTime; I: Integer;
 begin
   Selected := GetRowChannel(GridMRResults.Row);
   if Selected=nil then Scope:='AllDevices' else Scope:='SelectedDevice';
-  SaveDialogXlsx.FileName := 'Results_'+FormatDateTime('yyyymmdd_hhnnss',Now)+'.xlsx';
-  if not SaveDialogXlsx.Execute then Exit;
+  SaveDialog := TSaveDialog.Create(nil);
+  try
+    SaveDialog.Filter := 'Excel Workbook (*.xlsx)|*.xlsx';
+    SaveDialog.DefaultExt := 'xlsx';
+    SaveDialog.FileName := 'Results_'+FormatDateTime('yyyymmdd_hhnnss',Now)+'.xlsx';
+    if not SaveDialog.Execute then Exit;
+    FileName := SaveDialog.FileName;
+  finally
+    SaveDialog.Free;
+  end;
   Started:=Now; Data:=BuildExportData(Selected);
   try
     Sessions:=''; for I:=0 to Data.Sessions.Count-1 do begin if Sessions<>'' then Sessions:=Sessions+','; Sessions:=Sessions+Data.Sessions[I].ID; end;
-    DebugLog(Format('ResultsXlsxExportRequested Scope=%s File=%s SessionIDs=%s Devices=%d Results=%d',[Scope,SaveDialogXlsx.FileName,Sessions,Data.Devices.Count,Data.Results.Count]));
+    DebugLog(Format('ResultsXlsxExportRequested Scope=%s File=%s SessionIDs=%s Devices=%d Results=%d',[Scope,FileName,Sessions,Data.Devices.Count,Data.Results.Count]));
     try
-      TResultsXlsxExporter.ExportToFile(Data,SaveDialogXlsx.FileName);
-      DebugLog(Format('ResultsXlsxExportCompleted Scope=%s File=%s SessionIDs=%s Devices=%d Results=%d SharedStrings=%d Sheets=3 Size=%d DurationMs=%d',[Scope,SaveDialogXlsx.FileName,Sessions,Data.Devices.Count,Data.Results.Count,0,TFile.GetSize(SaveDialogXlsx.FileName),MilliSecondsBetween(Now,Started)]));
+      TResultsXlsxExporter.ExportToFile(Data,FileName);
+      DebugLog(Format('ResultsXlsxExportCompleted Scope=%s File=%s SessionIDs=%s Devices=%d Results=%d SharedStrings=%d Sheets=3 Size=%d DurationMs=%d',[Scope,FileName,Sessions,Data.Devices.Count,Data.Results.Count,0,TFile.GetSize(FileName),MilliSecondsBetween(Now,Started)]));
     except on E:Exception do begin
-      DebugLog(Format('ResultsXlsxExportFailed Scope=%s File=%s SessionIDs=%s Devices=%d Results=%d DurationMs=%d Error=%s',[Scope,SaveDialogXlsx.FileName,Sessions,Data.Devices.Count,Data.Results.Count,MilliSecondsBetween(Now,Started),E.Message]));
-      ShowMessage(Format('Не удалось сохранить файл "%s".'+#13#10+'%s',[ExpandFileName(SaveDialogXlsx.FileName),E.Message]));
+      DebugLog(Format('ResultsXlsxExportFailed Scope=%s File=%s SessionIDs=%s Devices=%d Results=%d DurationMs=%d Error=%s',[Scope,FileName,Sessions,Data.Devices.Count,Data.Results.Count,MilliSecondsBetween(Now,Started),E.Message]));
+      ShowMessage(Format('Не удалось сохранить файл "%s".'+#13#10+'%s',[ExpandFileName(FileName),E.Message]));
     end; end;
   finally Data.Free; end;
 end;
