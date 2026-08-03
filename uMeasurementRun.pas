@@ -245,6 +245,8 @@ type
     RequiredTimeSec: Double;
     TimeoutSec: Double;
     DiagnosticText: string;
+    // Ограничение частоты прогресса ведётся независимо для каждого канала.
+    LastProgressLogTick: UInt64;
   end;
 
 
@@ -349,6 +351,12 @@ type
     FLastPressureReady: Boolean;
     FLastWaitPointSetupLogState: EStateWorkTable;
     FDeviceStability: TArray<TDeviceStabilityInfo>;
+    // Счётчики описывают настройку этапа, включая каналы, не попавшие в массив ожидания.
+    FStabilityDeviceChannelCount: Integer;
+    FStabilityEnabledDeviceCount: Integer;
+    FStabilityPointResolvedCount: Integer;
+    FStabilitySkippedDeviceCount: Integer;
+    FStabilityErrorDeviceCount: Integer;
     FRunCompleted: Boolean;
     FRunResult: TMeasurementRunResult;
     FDoneReason: TMeasurementRunDoneReason;
@@ -1642,14 +1650,20 @@ procedure TMeasurementRun.EnterWaitStable;
 var
   I, N: Integer;
   Channel: TChannel;
-  DevicePoint: TDevicePoint;
+  Point, DevicePoint: TDevicePoint;
   Settings: TMeterValueStabilitySettings;
-  LogText: string;
+  LogText, ChannelName, ChannelUUID, DeviceName, DeviceUUID,
+    DevicePointName, DevicePointUUID, MeasurementPointName,
+    MeasurementPointUUID, ModeText, ResultText, Reason: string;
+  ChannelEnabled, DeviceAssigned, PointFound, AddedToWaitList: Boolean;
+  RequiredSec, TimeoutSec: Double;
+  MeasurementTargetQ, DevicePointQ: Double;
+  FixedTimeCount, AutoCount, DevicePointIndex, DevicePointID: Integer;
 begin
   SetCurrentPointStatus(mptsWaitStable);
 
   // Начать новый период публикации состояния стабилизации.
-  // Первое промежуточное сообщение появится через 2 секунды.
+  // Первое промежуточное сообщение появится не позднее чем через секунду.
   FLastStableProtocolTick := TMeterValue.GetMonotonicTimeMs;
   FStableSinceMs := 0;
   FDevicesStableSinceMs := 0;
@@ -1659,19 +1673,144 @@ begin
   FLastStableProgressSecond := -1;
   FLastStabilityCheckSecond := -1;
   FWaitStableStartedMs := TMeterValue.GetMonotonicTimeMs;
+  FLastDeviceStabilityLogTick := 0;
   if FStabilityDataStartMs <= 0 then
     FStabilityDataStartMs := FWaitStableStartedMs;
 
-   FWorkTable.DeviceChannels[0].FlowMeter.ValueFlow.ProtocolValueChanges := True;
-
   SetLength(FDeviceStability, 0);
+  FStabilityDeviceChannelCount := 0;
+  FStabilityEnabledDeviceCount := 0;
+  FStabilityPointResolvedCount := 0;
+  FStabilitySkippedDeviceCount := 0;
+  FStabilityErrorDeviceCount := 0;
+  FixedTimeCount := 0;
+  AutoCount := 0;
+  Point := GetCurrentPoint;
+  MeasurementPointName := '';
+  MeasurementPointUUID := '';
+  MeasurementTargetQ := 0;
+  if Point <> nil then
+  begin
+    MeasurementPointName := Point.Name;
+    MeasurementPointUUID := Point.UUID;
+    MeasurementTargetQ := Point.Q;
+  end;
+  if (FWorkTable <> nil) and (FWorkTable.DeviceChannels <> nil) then
+    FStabilityDeviceChannelCount := FWorkTable.DeviceChannels.Count;
+  ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitStable',
+    'Начата настройка стабилизации поверяемых приборов',
+    Format('DeviceStabilitySetupStarted: PointIndex=%d; MeasurementPointUUID=%s; MeasurementPointName=%s; TargetFlowLS=%.6f; DeviceChannelCount=%d; StartTimeMs=%d',
+      [FCurrentPointIndex, MeasurementPointUUID, MeasurementPointName, MeasurementTargetQ,
+       FStabilityDeviceChannelCount, FWaitStableStartedMs]));
   if (FWorkTable <> nil) and (FWorkTable.DeviceChannels <> nil) then
     for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
     begin
       Channel := FWorkTable.DeviceChannels[I];
-      if (Channel = nil) or not Channel.Enabled or (Channel.State = osDeleted) or
-         (Channel.FlowMeter = nil) or (Channel.FlowMeter.ValueFlow = nil) then
+      ChannelEnabled := (Channel <> nil) and Channel.Enabled and (Channel.State <> osDeleted);
+      DeviceAssigned := (Channel <> nil) and (Channel.FlowMeter <> nil) and
+        (Channel.FlowMeter.Device <> nil);
+      PointFound := False;
+      AddedToWaitList := False;
+      RequiredSec := 0;
+      TimeoutSec := 0;
+      DevicePointQ := 0;
+      DevicePointIndex := -1;
+      DevicePointID := 0;
+      ModeText := 'NotConfigured';
+      ResultText := 'Skipped';
+      Reason := '';
+      ChannelName := ''; ChannelUUID := ''; DeviceName := ''; DeviceUUID := '';
+      DevicePointName := ''; DevicePointUUID := '';
+      DevicePoint := nil;
+      if Channel <> nil then
+      begin
+        ChannelName := Channel.Name;
+        ChannelUUID := Channel.UUID;
+      end;
+      if (Channel <> nil) and (Channel.FlowMeter <> nil) then
+      begin
+        DeviceName := Channel.FlowMeter.Name;
+        if Channel.FlowMeter.Device <> nil then
+          DeviceUUID := Channel.FlowMeter.Device.UUID;
+      end;
+      if not ChannelEnabled then
+        Reason := 'ChannelDisabled'
+      else
+      begin
+        Inc(FStabilityEnabledDeviceCount);
+        if not DeviceAssigned then
+          Reason := 'DeviceNotAssigned'
+        else if Channel.FlowMeter.ValueFlow = nil then
+        begin
+          ResultText := 'Error';
+          Reason := 'MeterValueNotAssigned';
+          Inc(FStabilityErrorDeviceCount);
+        end
+        else
+        begin
+          DevicePoint := FindDevicePoint(Channel);
+          PointFound := DevicePoint <> nil;
+          if not PointFound then
+          begin
+            ResultText := 'Error';
+            Reason := 'DevicePointNotFound';
+            Inc(FStabilityErrorDeviceCount);
+          end
+          else
+          begin
+            Inc(FStabilityPointResolvedCount);
+            DevicePointName := DevicePoint.Name;
+            DevicePointUUID := DevicePoint.UUID;
+            DevicePointID := DevicePoint.ID;
+            DevicePointIndex := Channel.FlowMeter.Device.Points.IndexOf(DevicePoint);
+            DevicePointQ := DevicePoint.Q;
+            RequiredSec := DevicePoint.RequiredStabilizationSec;
+            if DevicePoint.RequireAutoStabilization or (DevicePoint.Pause < 0) then
+            begin
+              ModeText := 'Automatic';
+              TimeoutSec := CalcStableTimeoutSec;
+            end
+            else
+            begin
+              ModeText := 'FixedTime';
+              if (RequiredSec = 0) and (DevicePoint.Pause > 0) then
+                RequiredSec := DevicePoint.Pause;
+            end;
+            if (ModeText = 'FixedTime') and (RequiredSec <= 0) then
+            begin
+              if RequiredSec = 0 then Reason := 'RequiredTimeIsZero'
+              else Reason := 'RequiredTimeIsNegative';
+            end
+            else
+            begin
+              AddedToWaitList := True;
+              ResultText := 'Configured';
+              Reason := 'WaitConfigured';
+            end;
+          end;
+        end;
+      end;
+      if not AddedToWaitList then
+      begin
+        // Ошибочно настроенный включённый канал также пропущен (и отражается
+        // одновременно в ErrorDeviceCount), поскольку в ожидание он не попал.
+        if ChannelEnabled then Inc(FStabilitySkippedDeviceCount);
+        LogText := Format('DeviceStabilitySetup: ChannelIndex=%d; ChannelName=%s; ChannelUUID=%s; ChannelEnabled=%s; DeviceAssigned=%s; DeviceName=%s; DeviceUUID=%s; DevicePointFound=%s; DevicePointIndex=%d; DevicePointID=%d; DevicePointUUID=%s; DevicePointName=%s; MeasurementPointName=%s; TargetFlowLS=%.6f; DevicePointQ=%.6f; StabilizationMode=%s; RequiredSec=%.3f; AutoStabilizationEnabled=%s; TimeoutSec=%.3f; AddedToWaitList=False; Result=%s; Reason=%s',
+          [I, ChannelName, ChannelUUID, BoolToStr(ChannelEnabled, True),
+           BoolToStr(DeviceAssigned, True), DeviceName, DeviceUUID,
+           BoolToStr(PointFound, True), DevicePointIndex, DevicePointID,
+           DevicePointUUID, DevicePointName, MeasurementPointName,
+           MeasurementTargetQ, DevicePointQ,
+           ModeText, RequiredSec, BoolToStr(ModeText = 'Automatic', True), TimeoutSec,
+           ResultText, Reason]);
+        if ResultText = 'Error' then
+          ProtocolManager.AddMessage(pcError, psMeasurement, 'EnterWaitStable',
+            'Ошибка настройки ожидания стабилизации канала', LogText)
+        else
+          ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitStable',
+            'Канал не добавлен в ожидание стабилизации', LogText);
         Continue;
+      end;
       N := Length(FDeviceStability);
       SetLength(FDeviceStability, N + 1);
       FDeviceStability[N] := Default(TDeviceStabilityInfo);
@@ -1679,14 +1818,7 @@ begin
       FDeviceStability[N].Value := Channel.FlowMeter.ValueFlow;
       FDeviceStability[N].StartedAtMs := FWaitStableStartedMs;
       FDeviceStability[N].Result := dsrWaiting;
-      DevicePoint := FindDevicePoint(Channel);
       FDeviceStability[N].DevicePoint := DevicePoint;
-      if DevicePoint = nil then
-      begin
-        FDeviceStability[N].Result := dsrError;
-        FDeviceStability[N].DiagnosticText := 'DevicePointNotFound';
-        Continue;
-      end;
       ConfigureStabilityByPoint(FDeviceStability[N].Value, DevicePoint);
       ConfigureTargetRangeByPoint(FDeviceStability[N].Value, DevicePoint, False, False);
 
@@ -1694,14 +1826,9 @@ begin
       // подготовки установки, являются непрерывной историей того же сигнала и
       // позволяют сразу оценить прибор после перехода в msWaitStable. Сброс
       // здесь искусственно добавлял бы полное время заполнения окна к ожиданию.
-      if DevicePoint.RequireAutoStabilization or (DevicePoint.Pause < 0) then
-        FDeviceStability[N].TimeoutSec := CalcStableTimeoutSec
-      else
-      begin
-        FDeviceStability[N].RequiredTimeSec := Max(0, DevicePoint.RequiredStabilizationSec);
-        if (FDeviceStability[N].RequiredTimeSec = 0) and (DevicePoint.Pause > 0) then
-          FDeviceStability[N].RequiredTimeSec := DevicePoint.Pause;
-      end;
+      FDeviceStability[N].RequiredTimeSec := RequiredSec;
+      FDeviceStability[N].TimeoutSec := TimeoutSec;
+      if TimeoutSec > 0 then Inc(AutoCount) else Inc(FixedTimeCount);
       Settings := FDeviceStability[N].Value.StabilitySettings;
       LogText := Format('DeviceStabilityStarted: Channel=%s; Device=%s; Serial=%s; Point=%s; Mode=%s; TargetQ=%.6f; Error=%.6f; MaxVariation=%.9f; MaxStdDeviation=%.9f; MaxTrendRate=%.9f; RequiredSec=%.3f; TimeoutSec=%.3f; StartedMs=%d; StabilityAnalysisUsed=%s; RangeChecksEnabled=False',
         [Channel.Name, Channel.FlowMeter.Name, Channel.FlowMeter.SerialNumber,
@@ -1715,7 +1842,28 @@ begin
       AddDiagnosticEvent(LogText);
       ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitStable',
         'Настроено ожидание стабилизации поверяемого прибора', LogText);
+      ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitStable',
+        'Канал добавлен в ожидание стабилизации',
+        Format('DeviceStabilitySetup: ChannelIndex=%d; ChannelName=%s; ChannelUUID=%s; ChannelEnabled=True; DeviceAssigned=True; DeviceName=%s; DeviceUUID=%s; DevicePointFound=True; DevicePointIndex=%d; DevicePointID=%d; DevicePointUUID=%s; DevicePointName=%s; MeasurementPointName=%s; TargetFlowLS=%.6f; DevicePointQ=%.6f; StabilizationMode=%s; RequiredSec=%.3f; AutoStabilizationEnabled=%s; TimeoutSec=%.3f; AddedToWaitList=True; Result=Configured; Reason=WaitConfigured',
+          [I, ChannelName, ChannelUUID, DeviceName, DeviceUUID,
+           Channel.FlowMeter.Device.Points.IndexOf(DevicePoint), DevicePoint.ID,
+           DevicePointUUID, DevicePointName, MeasurementPointName,
+           MeasurementTargetQ, DevicePoint.Q, ModeText, RequiredSec,
+           BoolToStr(ModeText = 'Automatic', True), TimeoutSec]));
     end;
+
+  ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitStable',
+    'Завершена настройка стабилизации поверяемых приборов',
+    Format('DeviceStabilitySetupCompleted: PointIndex=%d; MeasurementPointName=%s; DeviceChannelCount=%d; EnabledDeviceCount=%d; PointResolvedCount=%d; ConfiguredDeviceCount=%d; SkippedDeviceCount=%d; ErrorDeviceCount=%d; FixedTimeDeviceCount=%d; AutoStabilityDeviceCount=%d; SetupValid=%s; Reason=%s',
+      [FCurrentPointIndex, MeasurementPointName,
+       FStabilityDeviceChannelCount, FStabilityEnabledDeviceCount,
+       FStabilityPointResolvedCount, Length(FDeviceStability),
+       FStabilitySkippedDeviceCount, FStabilityErrorDeviceCount,
+       FixedTimeCount, AutoCount,
+       BoolToStr((FStabilityEnabledDeviceCount = Length(FDeviceStability)), True),
+       IfThen((FStabilityEnabledDeviceCount > 0) and (Length(FDeviceStability) = 0),
+         'NoEnabledDeviceAddedToWaitList', IfThen(FStabilityErrorDeviceCount > 0,
+         'DeviceConfigurationErrors', 'SetupCompleted'))]));
 
   LoadRequiredStabilization(GetCurrentPoint);
   AddDiagnosticEvent(Format('RequiredStabilizationSec=%.3f; RequireAutoStabilization=%s; RequiredStabilizationSource=TDevicePoint runtime', [FRequiredDeviceStabilizationSec, BoolToStr(FRequireAutoStabilization, True)]));
@@ -5449,10 +5597,9 @@ var
   I: Integer;
   CurrentTick, ElapsedMs: UInt64;
   SignalInfo: TMeterValueStabilityInfo;
-  AllCompleted, IsAuto: Boolean;
-  ResultText, LogText: string;
-  PublishProgress: Boolean;
-  FixedCount, StableCount, TimeoutCount: Integer;
+  AllCompleted, IsAuto, PublishProgress: Boolean;
+  LogText, DecisionReason: string;
+  FixedCount, StableCount, TimeoutCount, PendingCount, CompletedCount: Integer;
 begin
   if FMode = mrmManual then
   begin
@@ -5460,7 +5607,6 @@ begin
     Exit;
   end;
   CurrentTick := TMeterValue.GetMonotonicTimeMs;
-  PublishProgress := CurrentTick - FLastDeviceStabilityLogTick >= 2000;
   AllCompleted := True;
   for I := 0 to High(FDeviceStability) do
   begin
@@ -5469,6 +5615,9 @@ begin
     AllCompleted := False;
     ElapsedMs := CurrentTick - FDeviceStability[I].StartedAtMs;
     IsAuto := FDeviceStability[I].TimeoutSec > 0;
+    // Каждый канал имеет собственный секундный ограничитель публикации.
+    PublishProgress := (FDeviceStability[I].LastProgressLogTick = 0) or
+      (CurrentTick - FDeviceStability[I].LastProgressLogTick >= 1000);
     if not IsAuto then
     begin
       if ElapsedMs >= Round(FDeviceStability[I].RequiredTimeSec * 1000) then
@@ -5476,6 +5625,16 @@ begin
         FDeviceStability[I].Result := dsrFixedTimeCompleted;
         FDeviceStability[I].CompletedAtMs := CurrentTick;
         FDeviceStability[I].DiagnosticText := 'Fixed time completed';
+      end;
+      if PublishProgress then
+      begin
+        LogText := Format('DeviceStabilityProgress: ChannelName=%s; DevicePointName=%s; Mode=FixedTime; RequiredSec=%.3f; ElapsedSec=%.3f; RemainingSec=%.3f; Completed=%s',
+          [FDeviceStability[I].Channel.Name, FDeviceStability[I].DevicePoint.Name,
+           FDeviceStability[I].RequiredTimeSec, ElapsedMs / 1000,
+           Max(0.0, FDeviceStability[I].RequiredTimeSec - ElapsedMs / 1000),
+           BoolToStr(FDeviceStability[I].Result = dsrFixedTimeCompleted, True)]);
+        ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitStable',
+          'Ход ожидания фиксированного времени', LogText);
       end;
     end
     else
@@ -5501,45 +5660,50 @@ begin
             [FDeviceStability[I].Channel.Name, FDeviceStability[I].DevicePoint.Name,
              SignalInfo.StatusText]));
       end;
-      LogText := Format('DeviceStabilityProgress: Channel=%s; WaitSec=%.3f; TimeoutSec=%.3f; SampleCount=%d; WindowDurationSec=%.3f; Variation=%.9f; MaxVariation=%.9f; StdDeviation=%.9f; MaxStdDeviation=%.9f; TrendRate=%.9f; MaxTrendRate=%.9f; IsSignalStable=%s; RangeChecksEnabled=False; Reason=%s',
-        [FDeviceStability[I].Channel.Name, ElapsedMs / 1000,
+      LogText := Format('DeviceStabilityProgress: ChannelName=%s; DevicePointName=%s; Mode=Automatic; ElapsedSec=%.3f; TimeoutSec=%.3f; SampleCount=%d; WindowDurationSec=%.3f; IsSignalStable=%s; Variation=%.9f; MaxVariation=%.9f; StdDeviation=%.9f; MaxStdDeviation=%.9f; TrendRate=%.9f; MaxTrendRate=%.9f; OutlierRatio=%.9f; MaxOutlierRatio=%.9f; Completed=%s; Reason=%s',
+        [FDeviceStability[I].Channel.Name, FDeviceStability[I].DevicePoint.Name,
+         ElapsedMs / 1000,
          FDeviceStability[I].TimeoutSec, SignalInfo.UsedSampleCount,
-         SignalInfo.ActualWindowDurationSec, SignalInfo.Variation,
+         SignalInfo.ActualWindowDurationSec, BoolToStr(SignalInfo.IsSignalStable, True),
+         SignalInfo.Variation,
          FDeviceStability[I].Value.StabilitySettings.MaxVariation,
          SignalInfo.StdDeviation, FDeviceStability[I].Value.StabilitySettings.MaxStdDeviation,
          SignalInfo.TrendRate, FDeviceStability[I].Value.StabilitySettings.MaxTrendRate,
-         BoolToStr(SignalInfo.IsSignalStable, True), SignalInfo.StatusText]);
+         SignalInfo.OutlierFraction, FDeviceStability[I].Value.StabilitySettings.MaxOutlierFraction,
+         BoolToStr(FDeviceStability[I].Result <> dsrWaiting, True), SignalInfo.StatusText]);
       AddDiagnosticEvent(LogText);
       if PublishProgress then
         ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitStable',
           'Проверка стабильности поверяемого прибора', LogText);
     end;
+    if PublishProgress then
+      FDeviceStability[I].LastProgressLogTick := CurrentTick;
     if FDeviceStability[I].Result <> dsrWaiting then
     begin
-      ResultText := GetEnumName(TypeInfo(TDeviceStabilityResult),
-        Ord(FDeviceStability[I].Result));
-      LogText := Format('DeviceStabilityCompleted: Channel=%s; Mode=%s; Result=%s; RequiredSec=%.3f; ActualWaitSec=%.3f; TimeoutSec=%.3f; IsSignalStable=%s; MeasurementWillContinue=True; NextAction=WaitOtherDevices; Reason=%s',
-        [FDeviceStability[I].Channel.Name, IfThen(IsAuto, 'Auto', 'FixedTime'),
-         IfThen(FDeviceStability[I].Result = dsrFixedTimeCompleted, 'FixedTimeCompleted',
-           IfThen(FDeviceStability[I].Result = dsrAutoStable, 'AutoStable', 'AutoTimeout')),
+      LogText := Format('DeviceStabilityCompleted: ChannelName=%s; ChannelUUID=%s; DeviceName=%s; DevicePointName=%s; DevicePointUUID=%s; Mode=%s; RequiredSec=%.3f; ActualWaitSec=%.3f; TimeoutSec=%.3f; IsSignalStable=%s; Result=%s; MeasurementWillContinue=True; Reason=%s',
+        [FDeviceStability[I].Channel.Name, FDeviceStability[I].Channel.UUID,
+         FDeviceStability[I].Channel.FlowMeter.Name,
+         FDeviceStability[I].DevicePoint.Name, FDeviceStability[I].DevicePoint.UUID,
+         IfThen(IsAuto, 'Automatic', 'FixedTime'),
          FDeviceStability[I].RequiredTimeSec, ElapsedMs / 1000,
          FDeviceStability[I].TimeoutSec,
          BoolToStr(FDeviceStability[I].Result = dsrAutoStable, True),
+         IfThen(FDeviceStability[I].Result = dsrFixedTimeCompleted, 'FixedTimeCompleted',
+           IfThen(FDeviceStability[I].Result = dsrAutoStable, 'SignalStable', 'AutoStabilityTimeout')),
          FDeviceStability[I].DiagnosticText]);
       AddDiagnosticEvent(LogText);
       ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitStable',
         'Завершено ожидание поверяемого прибора', LogText);
     end;
   end;
-  if PublishProgress then
-    FLastDeviceStabilityLogTick := CurrentTick;
-
   AllCompleted := True;
+  PendingCount := 0;
   for I := 0 to High(FDeviceStability) do
     if FDeviceStability[I].Result = dsrWaiting then
+    begin
       AllCompleted := False;
-  if not AllCompleted then
-    Exit;
+      Inc(PendingCount);
+    end;
   FixedCount := 0; StableCount := 0; TimeoutCount := 0;
   for I := 0 to High(FDeviceStability) do
     case FDeviceStability[I].Result of
@@ -5547,10 +5711,38 @@ begin
       dsrAutoStable: Inc(StableCount);
       dsrAutoTimeout: Inc(TimeoutCount);
     end;
+  CompletedCount := FixedCount + StableCount + TimeoutCount;
+  if not AllCompleted then
+  begin
+    if (FLastDeviceStabilityLogTick = 0) or
+       (CurrentTick - FLastDeviceStabilityLogTick >= 1000) then
+    begin
+      ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitStable',
+        'Итоговое решение ожидания поверяемых приборов',
+        Format('DeviceStabilityDecision: DeviceChannelCount=%d; EnabledDeviceCount=%d; ConfiguredDeviceCount=%d; PendingDeviceCount=%d; CompletedDeviceCount=%d; SkippedDeviceCount=%d; FixedTimeCompletedCount=%d; AutoStableCount=%d; AutoTimeoutCount=%d; AllDevicesConfigured=%s; AllDevicesCompleted=False; MeasurementWillStart=False; NextStage=msWaitStable; Reason=Ожидание стабилизации настроенных приборов продолжается',
+          [FStabilityDeviceChannelCount, FStabilityEnabledDeviceCount,
+           Length(FDeviceStability), PendingCount, CompletedCount,
+           FStabilitySkippedDeviceCount, FixedCount, StableCount, TimeoutCount,
+           BoolToStr(FStabilityEnabledDeviceCount = Length(FDeviceStability), True)]));
+      FLastDeviceStabilityLogTick := CurrentTick;
+    end;
+    Exit;
+  end;
+  if (FStabilityEnabledDeviceCount > 0) and (Length(FDeviceStability) = 0) then
+    DecisionReason := 'Ни один включённый прибор не был добавлен в ожидание стабилизации'
+  else if FStabilityPointResolvedCount < FStabilityEnabledDeviceCount then
+    DecisionReason := 'Не для всех включённых приборов найдены поверочные точки'
+  else
+    DecisionReason := 'Все настроенные приборы завершили ожидание';
   ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitStable',
     'Итог ожидания поверяемых приборов',
-    Format('DeviceStabilityDecision: DeviceCount=%d; FixedTimeCompletedCount=%d; AutoStableCount=%d; AutoTimeoutCount=%d; AllDevicesCompleted=True; MeasurementWillStart=True; NextStage=msWaitMeasureStart; Reason=Все приборы завершили ожидание; автоматический тайм-аут некритичен',
-      [Length(FDeviceStability), FixedCount, StableCount, TimeoutCount]));
+    Format('DeviceStabilityDecision: DeviceChannelCount=%d; EnabledDeviceCount=%d; ConfiguredDeviceCount=%d; PendingDeviceCount=0; CompletedDeviceCount=%d; SkippedDeviceCount=%d; FixedTimeCompletedCount=%d; AutoStableCount=%d; AutoTimeoutCount=%d; AllDevicesConfigured=%s; AllDevicesCompleted=%s; MeasurementWillStart=True; NextStage=msWaitMeasureStart; Reason=%s',
+      [FStabilityDeviceChannelCount, FStabilityEnabledDeviceCount,
+       Length(FDeviceStability), CompletedCount, FStabilitySkippedDeviceCount,
+       FixedCount, StableCount, TimeoutCount,
+       BoolToStr(FStabilityEnabledDeviceCount = Length(FDeviceStability), True),
+       BoolToStr((Length(FDeviceStability) > 0) and
+         (CompletedCount = Length(FDeviceStability)), True), DecisionReason]));
   FireEvent(meStableReached);
   SetStage(msWaitMeasureStart);
 end;
