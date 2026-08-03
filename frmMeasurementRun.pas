@@ -743,12 +743,25 @@ begin
 end;
 
 procedure TFrameMeasurementRun.UpdateMeasurementControls;
+var
+  LRun: TMeasurementRun;
+  LIndex, LCount: Integer;
+  LHasCurrentPoint: Boolean;
 begin
-  { Исторические командные кнопки не дублируют ограничения FSM формы. }
-  SpeedButtonPointPrev.Enabled := MeasurementRun <> nil;
-  SpeedButtonPointNext.Enabled := MeasurementRun <> nil;
-  SpeedButtonPause.Enabled := (MeasurementRun <> nil) and
-    not (MeasurementRun.Stage in [msNone, msDone]);
+  LRun := GetMeasurementRun;
+  LIndex := -1;
+  LCount := 0;
+  LHasCurrentPoint := False;
+  if (LRun <> nil) and (LRun.Points <> nil) then
+  begin
+    LIndex := LRun.CurrentPointIndex;
+    LCount := LRun.Points.Count;
+    LHasCurrentPoint := (LRun.CurrentPoint <> nil) and
+      (LIndex >= 0) and (LIndex < LCount);
+  end;
+  // Navigation follows the executing point, never the selected grid row.
+  SpeedButtonPointPrev.Enabled := LHasCurrentPoint and (LIndex > 0);
+  SpeedButtonPointNext.Enabled := LHasCurrentPoint and (LIndex < LCount - 1);
   UpdatePauseButtonState;
 end;
 
@@ -927,7 +940,7 @@ begin
     LRun.Execute(mcResume, Null)
   else
     LRun.Execute(mcPause, Null);
-  UpdatePauseButtonState;
+  UpdateMeasurementControls;
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointDeleteClick(Sender: TObject);

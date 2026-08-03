@@ -88,3 +88,29 @@ assert "pausetoolbuttonbordered" in pause_state
 assert "SpeedButtonPause.Enabled" in pause_state
 assert "mcPause" not in pause_state and "mcResume" not in pause_state
 assert "stoptoolbutton" not in pause_state
+
+controls = FRAME.split("procedure TFrameMeasurementRun.UpdateMeasurementControls", 1)[1].split(
+    "procedure TFrameMeasurementRun.UpdatePauseButtonState", 1)[0]
+assert "LRun.CurrentPointIndex" in controls
+assert "LRun.Points.Count" in controls
+assert "LRun.CurrentPoint <> nil" in controls
+assert "SpeedButtonPointPrev.Enabled := LHasCurrentPoint and (LIndex > 0)" in controls
+assert "SpeedButtonPointNext.Enabled := LHasCurrentPoint and (LIndex < LCount - 1)" in controls
+assert "GridMeasurmentRun.Row" not in controls
+
+manual = main_before.split("procedure TFrameMainTable.BuildManualMeasurementPoint", 1)[1].split(
+    "procedure TFrameMainTable.UpdatePreparedManualPoint", 1)[0]
+mode_switch = main_before.split("procedure TFrameMainTable.ApplyMeasurementModeFromSwitch", 1)[1].split(
+    "procedure TFrameMainTable.UpdateForm", 1)[0]
+assert "Run.Points.Clear" in manual
+assert "Run.InvalidatePreparedPoints" in manual
+assert "Run.RebuildMeasurementPoints" in manual
+assert "Run.Points.Count = 1" in manual
+assert "Point := Run.CurrentPoint" in manual
+assert "SourceUUID := FActiveWorkTable.CurrentPoint.UUID" in manual
+assert "SameText(Point.UUID, SourceUUID)" in manual
+assert "Point.UUID := TGUID.NewGuid.ToString" in manual
+assert "Points[0]" not in manual and "Run.Points.First" not in manual
+assert "if NewMode = mrmManual then\n    BuildManualMeasurementPoint" in mode_switch
+assert "Run.InvalidatePreparedPoints" in mode_switch
+assert "Run.RebuildMeasurementPoints" in mode_switch
