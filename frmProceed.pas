@@ -297,14 +297,19 @@ type
     FSkipPointDeleteConfirm: Boolean;
     FPointDeleteOwner: TObject;
     FProcessingChangesSaved: Boolean;
+    FOnResultsSynchronized: TNotifyEvent;
   public
     { Public declarations }
     procedure Initialize;
     procedure RefreshResultsTab;
+    function RequestClearActiveSession(ADevice: TDevice): Boolean;
+    function RequestCreateSession(ADevice: TDevice): TSessionSpillage;
     function FindResultSpillageForPoint(ADevice: TDevice; APoint: TDevicePoint): TPointSpillage;
     function GetPointResultError(const ADevice: TDevice; const APoint: TDevicePoint): Double;
     function GetPointResultFlowLS(const ADevice: TDevice; const APoint: TDevicePoint): Double;
     destructor Destroy; override;
+    property OnResultsSynchronized: TNotifyEvent read FOnResultsSynchronized
+      write FOnResultsSynchronized;
   end;
 
 implementation
@@ -1373,8 +1378,83 @@ begin
     UpdateSessionItems;
   end;
 
-
+  if Assigned(FOnResultsSynchronized) then
+    FOnResultsSynchronized(Self);
   end;
+
+function TFrameProceed.RequestClearActiveSession(ADevice: TDevice): Boolean;
+var
+  Session: TSessionSpillage;
+  OldSessionID, SessionCount, SpillageCount: Integer;
+begin
+  Result := False;
+  if ADevice = nil then
+    Exit;
+  Session := GetActiveVisibleSession(ADevice);
+  if Session = nil then
+    Exit;
+  OldSessionID := Session.ID;
+  ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionClearRequested',
+    'Запрошена очистка сессии из вкладки результатов',
+    Format('SourceTab=Results; DeviceUUID=%s; OldSessionID=%d',
+      [ADevice.UUID, OldSessionID]));
+  SelectTreeItemByTagObject(Session);
+  ActionSessionDeleteExecute(ActionSessionDelete);
+  Result := Session.State = osDeleted;
+  if not Result then
+    Exit;
+  SessionCount := 0;
+  if ADevice.Sessions <> nil then
+    for Session in ADevice.Sessions do
+      if (Session <> nil) and (Session.State <> osDeleted) then
+        Inc(SessionCount);
+  SpillageCount := GetDeviceSpillageCount(ADevice);
+  ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionCleared',
+    'Сессия очищена штатным маршрутом вкладки обработки',
+    Format('SourceTab=Results; DeviceUUID=%s; OldSessionID=%d; Sessions=%d; Spillages=%d',
+      [ADevice.UUID, OldSessionID, SessionCount, SpillageCount]));
+  ProtocolManager.AddMessage(pcProc, psForm, 'ResultsViewSynchronized',
+    'Представления обработки и результатов синхронизированы',
+    Format('SourceTab=Results; DeviceUUID=%s; OldSessionID=%d; NewSessionID=%d; Sessions=%d; Spillages=%d',
+      [ADevice.UUID, OldSessionID, 0, SessionCount, SpillageCount]));
+end;
+
+function TFrameProceed.RequestCreateSession(ADevice: TDevice): TSessionSpillage;
+var
+  OldSession, Session: TSessionSpillage;
+  OldSessionID, SessionCount, SpillageCount: Integer;
+begin
+  Result := nil;
+  if ADevice = nil then
+    Exit;
+  OldSession := GetActiveVisibleSession(ADevice);
+  OldSessionID := 0;
+  if OldSession <> nil then
+    OldSessionID := OldSession.ID;
+  ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionCreateRequested',
+    'Запрошено создание сессии из вкладки результатов',
+    Format('SourceTab=Results; DeviceUUID=%s; OldSessionID=%d',
+      [ADevice.UUID, OldSessionID]));
+  SelectTreeItemByTagObject(ADevice);
+  ActionSessionNewExecute(ActionSessionNew);
+  Result := GetActiveVisibleSession(ADevice);
+  if (Result = nil) or (Result = OldSession) then
+    Exit(nil);
+  SessionCount := 0;
+  if ADevice.Sessions <> nil then
+    for Session in ADevice.Sessions do
+      if (Session <> nil) and (Session.State <> osDeleted) then
+        Inc(SessionCount);
+  SpillageCount := GetDeviceSpillageCount(ADevice);
+  ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionCreated',
+    'Сессия создана штатным маршрутом вкладки обработки',
+    Format('SourceTab=Results; DeviceUUID=%s; OldSessionID=%d; NewSessionID=%d; Sessions=%d; Spillages=%d',
+      [ADevice.UUID, OldSessionID, Result.ID, SessionCount, SpillageCount]));
+  ProtocolManager.AddMessage(pcProc, psForm, 'ResultsViewSynchronized',
+    'Представления обработки и результатов синхронизированы',
+    Format('SourceTab=Results; DeviceUUID=%s; OldSessionID=%d; NewSessionID=%d; Sessions=%d; Spillages=%d',
+      [ADevice.UUID, OldSessionID, Result.ID, SessionCount, SpillageCount]));
+end;
 
 procedure TFrameProceed.LoadProcessingDevices;
 var

@@ -652,6 +652,8 @@ begin
   FFrameProceed.Parent := tiResults;
   FFrameProceed.Align := TAlignLayout.Client;
   FFrameProceed.Initialize;
+  FFrameMainTable.ConnectResultsProcessing(FFrameProceed);
+  FFrameProceed.OnResultsSynchronized := FFrameMainTable.RefreshSynchronizedResults;
   if Assigned(AppServices) then
     AppServices.OnBeforeShutdown := FFrameProceed.SavePendingProcessingChanges;
 
