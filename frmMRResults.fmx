@@ -59,6 +59,16 @@ object FrameMRResults: TFrameMRResults
       TextSettings.Trimming = None
       OnClick = ButtonCreateSessionClick
     end
+    object ButtonExportExcel: TButton
+      Align = Left
+      Enabled = False
+      Size.Width = 150.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      Text = #1042#1099#1075#1088#1091#1079#1080#1090#1100' '#1074' Excel
+      TextSettings.Trimming = None
+      OnClick = ButtonExportExcelClick
+    end
     object SpeedButton11: TSpeedButton
       Align = Left
       Size.Width = 57.000000000000000000
@@ -109,5 +119,11 @@ object FrameMRResults: TFrameMRResults
       TextSettings.Trimming = None
       OnClick = SpeedButtonCreatePointsClick
     end
+  end
+  object SaveDialogXlsx: TSaveDialog
+    DefaultExt = 'xlsx'
+    Filter = 'Excel Workbook (*.xlsx)|*.xlsx'
+    Left = 1056.000000000000000000
+    Top = 40.000000000000000000
   end
 end
