@@ -113,6 +113,7 @@ type
     procedure UpdateMeasurementControls;
     procedure UpdatePauseButtonState;
     procedure UpdateCurrentPointIndicator;
+    procedure FocusCurrentMeasurementPoint;
     function CapturePointsGridState: TPointsGridState;
     procedure RestorePointsGridSelectionAndFocus(const AState: TPointsGridState;
       const AFallbackRow: Integer; const AReturnFocus: Boolean; const AReason: string);
@@ -305,6 +306,7 @@ begin
     FCurrentPointUUID := '';
   end;
   UpdateGridMesurmentRun;
+  FocusCurrentMeasurementPoint;
   UpdatePauseButtonState;
   if Assigned(FOnRunUIChanged) then FOnRunUIChanged(Self);
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandObserved',
@@ -333,6 +335,7 @@ begin
       'ResolveKind=NotFound; PointUUID=; PointIndex=-1');
   end;
   UpdateGridMesurmentRun;
+  FocusCurrentMeasurementPoint;
   UpdateCurrentPointIndicator;
   UpdateMeasurementControls;
   if Assigned(FOnRunUIChanged) then FOnRunUIChanged(Self);
@@ -658,6 +661,7 @@ procedure TFrameMeasurementRun.RefreshFromMeasurementRun;
 begin
   FPointFlowSortDirection := 0;
   UpdateUI;
+  FocusCurrentMeasurementPoint;
 end;
 
 
@@ -708,12 +712,15 @@ begin
   SelectedRow := GridMeasurmentRun.Row;
   UpdateStopCriteriaColumns;
 
-  GridMeasurmentRun.BeginUpdate;
-  try
-    GridMeasurmentRun.RowCount := 0;
-    GridMeasurmentRun.RowCount := Rows;
-  finally
-    GridMeasurmentRun.EndUpdate;
+  { Value refresh must not destroy selection. Rebuild only when structure changed. }
+  if GridMeasurmentRun.RowCount <> Rows then
+  begin
+    GridMeasurmentRun.BeginUpdate;
+    try
+      GridMeasurmentRun.RowCount := Rows;
+    finally
+      GridMeasurmentRun.EndUpdate;
+    end;
   end;
 
   if Rows = 0 then
@@ -727,6 +734,18 @@ begin
   UpdateCurrentPointIndicator;
   UpdatePointOrderControls;
   UpdateMeasurementControls;
+end;
+
+procedure TFrameMeasurementRun.FocusCurrentMeasurementPoint;
+var LRun: TMeasurementRun; LIndex: Integer;
+begin
+  LRun := GetMeasurementRun;
+  if (LRun = nil) or (LRun.Points = nil) then Exit;
+  LIndex := LRun.CurrentPointIndex;
+  if (LIndex < 0) or (LIndex >= LRun.Points.Count) then Exit;
+  GridMeasurmentRun.Row := LIndex;
+  GridMeasurmentRun.Selected := LIndex;
+  GridMeasurmentRun.ScrollToSelectedCell;
 end;
 
 procedure TFrameMeasurementRun.UpdatePointOrderControls;
