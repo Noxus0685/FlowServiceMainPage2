@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FMX_PATH = ROOT / "frmMRResults.fmx"
 PASCAL = (ROOT / "frmMRResults.pas").read_text(encoding="utf-8-sig")
 PROJECT = (ROOT / "ProjectFornTest.dproj").read_text(encoding="utf-8-sig")
+DPR = (ROOT / "ProjectFornTest.dpr").read_text(encoding="utf-8-sig")
 
 
 def has_balanced_pascal_quotes(value: str) -> bool:
@@ -40,6 +41,7 @@ def test_results_fmx_structure_and_unique_components():
     )
     assert not [name for name, count in Counter(names).items() if count > 1]
     assert names.count("ButtonExportExcel") == 1
+    assert text.count("object ButtonExportExcel: TButton") == 1
     assert "SaveDialogXlsx" not in names
     assert "TSaveDialog" not in text
     assert "#1042#1099#1075#1088#1091#1079#1080#1090#1100' '#1074' Excel" in text
@@ -73,6 +75,12 @@ def test_save_dialog_is_strictly_local_to_export_handler():
     assert "SaveDialogXlsx" not in PASCAL
     interface_uses = PASCAL.split("interface", 1)[1].split("type", 1)[0]
     assert "FMX.Dialogs" in interface_uses
+    production_sources = [
+        path for pattern in ("*.pas", "*.fmx", "*.dpr", "*.dproj")
+        for path in ROOT.glob(pattern)
+    ]
+    assert not [path.name for path in production_sources
+                if b"SaveDialogXlsx" in path.read_bytes()]
 
 
 def test_fmx_is_not_a_standalone_project_resource():
@@ -84,3 +92,4 @@ def test_fmx_is_not_a_standalone_project_resource():
     assert "<form>framemrresults</form>" in lowered
     assert "<formtype>fmx</formtype>" in lowered
     assert "<designclass>tframe</designclass>" in lowered
+    assert "frmMRResults in 'frmMRResults.pas' {FrameMRResults: TFrame}" in DPR
