@@ -2232,10 +2232,10 @@ begin
   ApplyReset(ValueMassFlow);
   ApplyReset(ValueTime, 0);
   ApplyReset(ValueImpTotal, 0);
-  ApplyReset(ValueCurrent, 0);
-  ApplyReset(ValueImp, 0);
+  ApplyReset(ValueCurrent);
+  ApplyReset(ValueImp);
   ApplyReset(ValueQuantity, 0);
-  ApplyReset(ValueFlow, 0);
+  ApplyReset(ValueFlow);
 
 
 end;

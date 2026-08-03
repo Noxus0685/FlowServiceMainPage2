@@ -498,7 +498,6 @@ begin
     pcInfo: Result := 'INFO';
     pcProc: Result := 'PROC';
     pcHandler: Result := 'HANDLER';
-
     pcWarning: Result := 'Warning!';
     pcError: Result := 'Error!';
   else

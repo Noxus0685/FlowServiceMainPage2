@@ -545,7 +545,7 @@ type
 
   end;
 
-function GetMeasurementStopControlMode(APoint: TDevicePoint): TMeasurementStopControlMode;
+//function GetMeasurementStopControlMode(APoint: TDevicePoint): TMeasurementStopControlMode;
 function AccuracyToRange(const AAccuracy: string; out AMin, AMax: Double): Boolean;
 
 implementation
@@ -637,8 +637,11 @@ begin
 
   Settings.SampleSize := Max(Settings.SampleSize, RequiredSampleCount);
   Settings.MaxSampleAgeSec := Max(Settings.MaxSampleAgeSec,
-    Settings.MinWindowDurationSec + HISTORY_RESERVE_SEC);
+  Settings.MinWindowDurationSec + HISTORY_RESERVE_SEC);
+
+  Settings.Enabled:=True;
   AValue.StabilitySettings := Settings;
+
 end;
 
 procedure TMeasurementRun.ConfigureTargetRangeByPoint(AValue: TMeterValue;
@@ -740,34 +743,6 @@ begin
 end;
 
 
-function GetMeasurementStopControlMode(APoint: TDevicePoint): TMeasurementStopControlMode;
-var
-  ActiveCriteria: TSpillageStopCriteria;
-begin
-  Result := scmNone;
-
-  if not Assigned(APoint) then
-    Exit;
-
-  ActiveCriteria := [];
-
-  if (scTime in APoint.StopCriteria) and (APoint.LimitTime > 0) then
-    Include(ActiveCriteria, scTime);
-
-  if (scImpulse in APoint.StopCriteria) and (APoint.LimitImp > 0) then
-    Include(ActiveCriteria, scImpulse);
-
-  if (scVolume in APoint.StopCriteria) and (APoint.LimitVolume > 0) then
-    Include(ActiveCriteria, scVolume);
-
-  if ActiveCriteria = [scTime] then
-    Exit(scmControllerTime);
-
-  if ActiveCriteria = [scImpulse] then
-    Exit(scmControllerImpulse);
-
-  Result := scmCommand;
-end;
 
 function MeasurementStopControlModeToString(AMode: TMeasurementStopControlMode): string;
 begin
@@ -4691,6 +4666,27 @@ begin
     [FSetupPointIndex, FSetupPointUUID, APoint.Name, FSetupTargetFlowLS, GetSelectedEtalonUUID,
      TWorkTable.WorkTableStateToString(FWorkTable.State), FAttempt, BoolToStr(FPointSetupCommandSent, True), BuildPointSetupIdentityLog]));
 
+    ProtocolManager.AddMessage(
+    pcProc,
+    psMeasurement,
+    'SetupPoint',
+    'Отдана команда установки точки измерения',
+    Format(
+      'PointIndex=%d; MeasurementPointUUID=%s; PointName=%s; ' +
+      'TargetFlowLS=%.6f; SelectedEtalonUUID=%s; WorkTableState=%s; ' +
+      'Attempt=%d; CommandSent=%s; %s',
+      [FSetupPointIndex,
+       FSetupPointUUID,
+       APoint.Name,
+       FSetupTargetFlowLS,
+       GetSelectedEtalonUUID,
+       TWorkTable.WorkTableStateToString(FWorkTable.State),
+       FAttempt,
+       BoolToStr(FPointSetupCommandSent, True),
+       BuildPointSetupIdentityLog])
+  );
+
+
   if (APoint.Q >= 0) and (FWorkTable.FlowRate <> nil) then
   begin
     FWorkTable.FlowRate.DoFlowRateSet(APoint.Q);
@@ -5488,6 +5484,36 @@ procedure TMeasurementRun.ProcessMeasure;
 var
   StopControlMode: TMeasurementStopControlMode;
   StopReason: string;
+
+function GetMeasurementStopControlMode(APoint: TDevicePoint): TMeasurementStopControlMode;
+var
+  ActiveCriteria: TSpillageStopCriteria;
+begin
+  Result := scmNone;
+
+  if not Assigned(APoint) then
+    Exit;
+
+  ActiveCriteria := [];
+
+  if (scTime in APoint.StopCriteria) and (APoint.LimitTime > 0) then
+    Include(ActiveCriteria, scTime);
+
+  if (scImpulse in APoint.StopCriteria) and (APoint.LimitImp > 0) then
+    Include(ActiveCriteria, scImpulse);
+
+  if (scVolume in APoint.StopCriteria) and (APoint.LimitVolume > 0) then
+    Include(ActiveCriteria, scVolume);
+
+  if ActiveCriteria = [scTime] then
+    Exit(scmControllerTime);
+
+  if ActiveCriteria = [scImpulse] then
+    Exit(scmControllerImpulse);
+
+  Result := scmCommand;
+end;
+
 begin
   if FWorkTable = nil then
   begin

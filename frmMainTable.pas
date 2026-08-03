@@ -1667,8 +1667,8 @@ begin
     Exit;
   end;
 
-   ProtocolManager.AddMessage(pcAction, psForm, 'StopMeasurement', 'Запрос на остановку измерений', FActiveWorkTable.Name);
-     FActiveWorkTable.StopMeasurementRun;
+   ProtocolManager.AddMessage(pcInfo, psForm, 'StopMeasurement', 'Запрос на остановку измерения', FActiveWorkTable.Name);
+      FActiveWorkTable.StopMeasurementRun;
  end;
 
  procedure TFrameMainTable.SwitchAutoSwitch(Sender: TObject);
@@ -6242,7 +6242,7 @@ begin
       SetFlowChartYAxis(AChart, AxisMinDisplay, AxisMaxDisplay);
     end;
     if Assigned(ProtocolManager) and (ScaleSeriesCount > 0) then
-      ProtocolManager.AddMessage(pcInfo, psForm, 'GraphScale', ATitle,
+      ProtocolManager.AddMessage(pcMKS, psForm, 'GraphScale', ATitle,
         Format('AutoScaleMode=%d; ScaleMin=%g; ScaleMax=%g; Target=%g; Lower=%g; Upper=%g; SeriesCount=%d',
         [Ord(AutoScaleMode), AChart.YMin, AChart.YMax, Limits.TargetLS,
          Limits.LowerLS, Limits.UpperLS, ScaleSeriesCount]));
@@ -7440,7 +7440,9 @@ begin
 
   if WorkTable.ValueTime <> nil then
   begin
-    LabelTime.Text := IntToStr(Trunc(WorkTable.ValueTime.GetDoubleValue));
+
+    //LabelTime.Text := IntToStr(Trunc(WorkTable.ValueTime.GetDoubleValue));
+     LabelTime.Text := WorkTable.ValueTime.GetStrValue;
   end
   else
     LabelTime.Text := '-';
@@ -9034,6 +9036,7 @@ begin
     msSelectPoint,
     msSelectEtalon,
     msSetupPoint,
+    msWaitPointSetup,
     msWaitStable,
     msWaitMeasureStart,
     msMeasure,
