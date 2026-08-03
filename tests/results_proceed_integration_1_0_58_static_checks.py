@@ -102,6 +102,7 @@ def test_multiple_spillages_are_listed_only_for_their_matched_physical_point():
     assert "MatchedPoint <> ADevicePoint" in listing
     assert "TMeasurementRun.IsPointEquivalent" not in listing
     assert "Items[Cnt] := FormatErrorValue(S.Error)" in listing
+    assert "function BuildErrorsListText(ADevice: TDevice; ADevicePoint: TDevicePoint;" in RESULTS
 
 
 def test_columns_include_matched_active_session_points_after_scenario_points():

@@ -83,7 +83,7 @@ type
     function FormatPointHeader(APoint: TDevicePoint): string;
     function FormatErrorValue(const AValue: Double): string;
     function FormatSpillageErrors(ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): string;
-    function BuildErrorsListText(ADevice: TDevice; ASessionPoint: TDevicePoint;
+    function BuildErrorsListText(ADevice: TDevice; ADevicePoint: TDevicePoint;
       const ACurrentError: Double; const AIncludeCurrent: Boolean): string;
 
     function IsCellRunning(AChannel: TChannel; ASessionPoint: TDevicePoint): Boolean;
