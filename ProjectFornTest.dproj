@@ -293,6 +293,8 @@
         <DCCReference Include="uRepositories.pas"/>
         <DCCReference Include="uAppServices.pas"/>
         <DCCReference Include="uAppVersion.pas"/>
+        <DCCReference Include="uXlsxWriterApi.pas"/>
+        <DCCReference Include="uResultsXlsxExporter.pas"/>
         <DCCReference Include="uTable_Data.pas">
             <Form>TableDM</Form>
             <FormType>dfm</FormType>
@@ -1339,4 +1341,12 @@
     <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>
     <Import Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj" Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj')"/>
     <Import Project="$(MSBuildProjectName).deployproj" Condition="Exists('$(MSBuildProjectName).deployproj')"/>
+    <Target Name="CopyLibxlsxwriterRuntime" AfterTargets="Build"
+            Condition="'$(Platform)'=='Win32' Or '$(Platform)'=='Win64'">
+      <ItemGroup>
+        <LibxlsxwriterRuntime Include="$(MSBuildProjectDirectory)\ThirdParty\libxlsxwriter\$(Platform)\*.dll" />
+      </ItemGroup>
+      <Copy SourceFiles="@(LibxlsxwriterRuntime)" DestinationFolder="$(TargetDir)"
+            SkipUnchangedFiles="true" Condition="Exists('%(FullPath)')" />
+    </Target>
 </Project>

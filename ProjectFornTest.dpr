@@ -20,6 +20,8 @@ uses
   uClasses in 'uClasses.pas',
   uDataManager in 'uDataManager.pas',
   uDebugLog in 'uDebugLog.pas',
+  uXlsxWriterApi in 'uXlsxWriterApi.pas',
+  uResultsXlsxExporter in 'uResultsXlsxExporter.pas',
   uDeviceClass in 'uDeviceClass.pas',
   uMKSDebug in 'uMKSDebug.pas',
   uFlowMeter in 'uFlowMeter.pas',

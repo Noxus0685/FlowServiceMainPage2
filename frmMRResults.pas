@@ -45,12 +45,15 @@ type
     SpeedButtonCreatePoints: TSpeedButton;
     ButtonClearSession: TButton;
     ButtonCreateSession: TButton;
+    ButtonExportExcel: TButton;
+    SaveDialogXlsx: TSaveDialog;
     procedure GridMRResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridMRResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas; const Column: TColumn;
       const Bounds: TRectF; const Row: Integer; const Value: TValue; const State: TGridDrawStates);
     procedure SpeedButtonCreatePointsClick(Sender: TObject);
     procedure ButtonClearSessionClick(Sender: TObject);
     procedure ButtonCreateSessionClick(Sender: TObject);
+    procedure ButtonExportExcelClick(Sender: TObject);
   private
     FActiveWorkTable: TWorkTable;
     FPointColumns: TObjectList<TStringColumn>;
@@ -68,6 +71,9 @@ type
 
     function GetRowChannel(const ARow: Integer): TChannel;
     function GetDisplayDeviceName(AChannel: TChannel): string;
+    function GetSelectedDevice: TDevice;
+    function CollectTargetDevices: TList<TDevice>;
+    procedure UpdateActionAvailability;
 
     function GetPointByColumn(const ACol: Integer): TDevicePoint;
     function FindDevicePoint(ADevice: TDevice; ASessionPoint: TDevicePoint): TDevicePoint;
@@ -105,7 +111,8 @@ procedure SetGridReadOnly(AGrid: TGrid);
 implementation
 
 uses
-  frmProceed;
+  frmProceed, System.Diagnostics, System.IOUtils, uProtocols,
+  uResultsXlsxExporter;
 
 {$R *.fmx}
 
@@ -191,22 +198,110 @@ end;
 
 procedure TFrameMRResults.ButtonClearSessionClick(Sender: TObject);
 var
-  Channel: TChannel;
+  Devices: TList<TDevice>; Device: TDevice; SuccessCount: Integer;
 begin
-  Channel := GetRowChannel(GridMRResults.Row);
-  if (FProceed = nil) or (Channel = nil) or (Channel.FlowMeter = nil) then
-    Exit;
-  TFrameProceed(FProceed).RequestClearActiveSession(Channel.FlowMeter.Device);
+  if FProceed = nil then Exit;
+  Devices := CollectTargetDevices;
+  try
+    ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionsClearRequested',
+      'Запрошена очистка сессий', Format('DeviceCount=%d', [Devices.Count]));
+    SuccessCount := 0;
+    for Device in Devices do
+      if TFrameProceed(FProceed).RequestClearActiveSession(Device) then Inc(SuccessCount);
+    UpdateUI;
+    ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionsClearCompleted',
+      'Групповая очистка сессий завершена', Format('DeviceCount=%d; SuccessCount=%d', [Devices.Count, SuccessCount]));
+  finally Devices.Free end;
 end;
 
 procedure TFrameMRResults.ButtonCreateSessionClick(Sender: TObject);
 var
-  Channel: TChannel;
+  Devices: TList<TDevice>; Device: TDevice; SuccessCount: Integer;
 begin
+  if FProceed = nil then Exit;
+  Devices := CollectTargetDevices;
+  try
+    ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionsCreateRequested',
+      'Запрошено создание сессий', Format('DeviceCount=%d', [Devices.Count]));
+    SuccessCount := 0;
+    for Device in Devices do
+      if TFrameProceed(FProceed).RequestCreateSession(Device) <> nil then Inc(SuccessCount);
+    UpdateUI;
+    ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionsCreateCompleted',
+      'Групповое создание сессий завершено', Format('DeviceCount=%d; SuccessCount=%d', [Devices.Count, SuccessCount]));
+  finally Devices.Free end;
+end;
+
+function TFrameMRResults.GetSelectedDevice: TDevice;
+var Channel: TChannel;
+begin
+  Result := nil;
   Channel := GetRowChannel(GridMRResults.Row);
-  if (FProceed = nil) or (Channel = nil) or (Channel.FlowMeter = nil) then
-    Exit;
-  TFrameProceed(FProceed).RequestCreateSession(Channel.FlowMeter.Device);
+  if (Channel <> nil) and (Channel.FlowMeter <> nil) then Result := Channel.FlowMeter.Device;
+end;
+
+function TFrameMRResults.CollectTargetDevices: TList<TDevice>;
+var Channel: TChannel; Device, SelectedDevice: TDevice;
+begin
+  Result := TList<TDevice>.Create;
+  SelectedDevice := GetSelectedDevice;
+  if SelectedDevice <> nil then begin Result.Add(SelectedDevice); Exit end;
+  if FActiveWorkTable = nil then Exit;
+  for Channel in FActiveWorkTable.DeviceChannels do
+    if (Channel <> nil) and (Channel.FlowMeter <> nil) then
+    begin
+      Device := Channel.FlowMeter.Device;
+      if (Device <> nil) and not Result.Contains(Device) then Result.Add(Device);
+    end;
+end;
+
+procedure TFrameMRResults.UpdateActionAvailability;
+var HasDevices: Boolean;
+begin
+  HasDevices := FRows.Count > 0;
+  ButtonClearSession.Enabled := HasDevices;
+  ButtonCreateSession.Enabled := HasDevices;
+  ButtonExportExcel.Enabled := HasDevices;
+end;
+
+procedure TFrameMRResults.ButtonExportExcelClick(Sender: TObject);
+var Devices: TList<TDevice>; DllPath, Scope, SessionIDs: string;
+  ResultCount, ErrorCode: Integer; Timer: TStopwatch;
+begin
+  Devices := CollectTargetDevices;
+  try
+    if Devices.Count = 0 then Exit;
+    DllPath := TPath.Combine(ExtractFilePath(ParamStr(0)), 'xlsxwriter.dll');
+    if not TFile.Exists(DllPath) then
+    begin
+      if GetSelectedDevice <> nil then Scope := 'SelectedDevice' else Scope := 'AllDevices';
+      ProtocolManager.AddMessage(pcError, psForm, 'ResultsXlsxExportFailed',
+        'Библиотека экспорта не найдена',
+        Format('Scope=%s; FileName=; SessionIDs=; DeviceCount=%d; ResultCount=0; ErrorCode=-1; DurationMs=0; ExpectedDll=%s',
+          [Scope, Devices.Count, DllPath]));
+      ShowMessage('Не найдена библиотека libxlsxwriter: ' + DllPath);
+      Exit;
+    end;
+    SaveDialogXlsx.FileName := 'Results_' + FormatDateTime('yyyymmdd_hhnnss', Now) + '.xlsx';
+    if not SaveDialogXlsx.Execute then Exit;
+    if GetSelectedDevice <> nil then Scope := 'SelectedDevice' else Scope := 'AllDevices';
+    ProtocolManager.AddMessage(pcProc, psForm, 'ResultsXlsxExportRequested', 'Запрошен экспорт результатов',
+      Format('Scope=%s; FileName=%s; DeviceCount=%d', [Scope, SaveDialogXlsx.FileName, Devices.Count]));
+    Timer := TStopwatch.StartNew;
+    ErrorCode := TResultsXlsxExporter.Export(SaveDialogXlsx.FileName, Devices, ResultCount, SessionIDs);
+    Timer.Stop;
+    if ErrorCode = 0 then
+      ProtocolManager.AddMessage(pcProc, psForm, 'ResultsXlsxExportCompleted', 'Экспорт результатов завершён',
+        Format('Scope=%s; FileName=%s; SessionIDs=%s; DeviceCount=%d; ResultCount=%d; ErrorCode=0; DurationMs=%d',
+          [Scope, SaveDialogXlsx.FileName, SessionIDs, Devices.Count, ResultCount, Timer.ElapsedMilliseconds]))
+    else
+    begin
+      ProtocolManager.AddMessage(pcError, psForm, 'ResultsXlsxExportFailed', 'Ошибка экспорта результатов',
+        Format('Scope=%s; FileName=%s; SessionIDs=%s; DeviceCount=%d; ResultCount=%d; ErrorCode=%d; DurationMs=%d',
+          [Scope, SaveDialogXlsx.FileName, SessionIDs, Devices.Count, ResultCount, ErrorCode, Timer.ElapsedMilliseconds]));
+      ShowMessage(Format('Не удалось сохранить Excel-файл. Код ошибки: %d', [ErrorCode]));
+    end;
+  finally Devices.Free end;
 end;
 
 procedure TFrameMRResults.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
@@ -221,6 +316,7 @@ begin
   BuildRows;
   RefreshRows;
   GridMRResults.Repaint;
+  UpdateActionAvailability;
 end;
 
 procedure TFrameMRResults.BuildRows;
