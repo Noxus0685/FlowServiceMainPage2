@@ -2208,23 +2208,36 @@ function TMeasurementRun.FindDevicePoint(AChannel: TChannel): TDevicePoint;
 var
   I: Integer;
   Candidate, Point: TDevicePoint;
-  BestDistance, Distance, Tolerance: Double;
+  Device: TDevice;
+  BestDistance, Distance: Double;
 begin
   Result := nil;
-  Point := GetCurrentPoint;
-  if (AChannel = nil) or (AChannel.FlowMeter = nil) or
-     (AChannel.FlowMeter.Device = nil) or (AChannel.FlowMeter.Device.Points = nil) or
-     (Point = nil) then
+  if (AChannel = nil) or (not AChannel.Enabled) or
+     (AChannel.State = osDeleted) or (AChannel.FlowMeter = nil) or
+     (AChannel.FlowMeter.Device = nil) then
     Exit;
+
+  Device := AChannel.FlowMeter.Device;
+  if (Device.Points = nil) or (FWorkTable = nil) then
+    Exit;
+
+  Point := FWorkTable.CurrentPoint;
+  if Point = nil then
+    Exit;
+
   BestDistance := MaxDouble;
-  Tolerance := Max(1E-6, Abs(Point.Q) * 1E-4);
-  for I := 0 to AChannel.FlowMeter.Device.Points.Count - 1 do
+  for I := 0 to Device.Points.Count - 1 do
   begin
-    Candidate := AChannel.FlowMeter.Device.Points[I];
+    Candidate := Device.Points[I];
     if (Candidate = nil) or not Candidate.Enabled or (Candidate.State = osDeleted) then
       Continue;
+
+    // Сопоставляем по диапазону FlowAccuracy именно общей точки измерения.
+    if not Device.IsFlowInPoint(Candidate.Q, Point) then
+      Continue;
+
     Distance := Abs(Candidate.Q - Point.Q);
-    if (Distance <= Tolerance) and (Distance < BestDistance) then
+    if Distance < BestDistance then
     begin
       Result := Candidate;
       BestDistance := Distance;
