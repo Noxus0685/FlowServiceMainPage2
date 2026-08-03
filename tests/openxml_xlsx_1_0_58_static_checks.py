@@ -47,17 +47,18 @@ def test_every_xml_part_uses_the_common_utf8_writer():
 def test_cyrillic_source_literals_are_compiled_as_unicode():
     expected = {
         "SWorksheetSession": "Сессия", "SWorksheetDevices": "Приборы",
-        "SWorksheetResults": "Результаты", "SHeaderSessionID": "ID сессии",
+        "SHeaderSessionID": "ID сессии",
         "SHeaderDateTime": "Дата и время", "SHeaderWorkTable": "Рабочий стол",
         "SHeaderMode": "Режим измерения", "SHeaderStatus": "Статус",
         "SHeaderName": "Название", "SHeaderSerial": "Серийный номер",
         "SHeaderUuid": "UUID", "SHeaderChannel": "Канал",
         "SHeaderDeviceType": "Тип прибора", "SHeaderActiveSessionID": "ID активной сессии",
-        "SHeaderNumber": "№", "SHeaderDevice": "Прибор",
-        "SHeaderDeviceUuid": "UUID прибора", "SHeaderPointName": "Название точки",
+        "SHeaderResultSheet": "Лист результатов", "SHeaderNumber": "№",
+        "SHeaderPointName": "Название точки",
         "SHeaderReferenceFlow": "Расход эталона", "SHeaderEtalon": "Эталон",
         "SHeaderEtalonUuid": "UUID эталона", "SHeaderDeviceValue": "Значение прибора",
-        "SHeaderError": "Погрешность", "SHeaderValidity": "Валидность",
+        "SHeaderResultError": "Погрешность результата",
+        "SHeaderPointError": "Погрешность точки", "SHeaderValidity": "Валидность",
     }
     for name, value in expected.items():
         encoded = re.search(rf"^\s*{name}\s*=\s*((?:#\$[0-9A-F]{{4}})+);", EXPORTER, re.MULTILINE)
@@ -80,8 +81,10 @@ def test_package_parts_relationships_and_invariant_values():
 
 
 def test_export_layout_and_ui_wiring():
-    for sheet in ("SWorksheetSession", "SWorksheetDevices", "SWorksheetResults"):
+    for sheet in ("SWorksheetSession", "SWorksheetDevices"):
         assert f"AddWorksheet({sheet})" in EXPORTER
+    assert "SWorksheetResults" not in EXPORTER
+    assert "W.AddWorksheet(SheetName)" in EXPORTER
     assert "object ButtonExportExcel: TButton" in FMX
     assert "Выгрузить" not in FMX  # FMX stores Cyrillic as character codes.
     assert "TSaveDialog" not in FMX
