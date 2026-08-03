@@ -120,4 +120,11 @@ object FrameMRResults: TFrameMRResults
       OnClick = SpeedButtonCreatePointsClick
     end
   end
+  object SaveDialogXlsx: TSaveDialog
+    DefaultExt = 'xlsx'
+    FileName = 'Results.xlsx'
+    Filter = 'Excel Workbook (*.xlsx)|*.xlsx'
+    Left = 1072
+    Top = 48
+  end
 end
