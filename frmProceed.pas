@@ -43,7 +43,6 @@ uses
   uFlowMeter,
   uRepositories,
   uProtocols,
-  uResultPresentation,
   uWorkTable,
   uMKSDebug;
 
@@ -215,6 +214,7 @@ type
     procedure PopulateTreeViewDevices;
     function GetStatusColor(const AStatus: Integer): TAlphaColor;
     function BuildResultTextByStatus(const AStatus: Integer): string;
+    function ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
     procedure UpdateResultsPointColumns;
     procedure LogResultCellDebug(const ARow: TResultGridRow; APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
     procedure ShowAllDevicesResults;
@@ -308,6 +308,11 @@ type
     function FindResultSpillageForPoint(ADevice: TDevice; APoint: TDevicePoint): TPointSpillage;
     function GetPointResultError(const ADevice: TDevice; const APoint: TDevicePoint): Double;
     function GetPointResultFlowLS(const ADevice: TDevice; const APoint: TDevicePoint): Double;
+    function FormatResultErrorValue(const AValue: Double): string;
+    function GetPointResultColor(ADevice: TDevice; ADevicePoint: TDevicePoint;
+      ASpillage: TPointSpillage): TAlphaColor;
+    function GetDeviceResultText(ADevice: TDevice): string;
+    function GetDeviceResultColor(ADevice: TDevice): TAlphaColor;
     destructor Destroy; override;
     property OnResultsSynchronized: TNotifyEvent read FOnResultsSynchronized
       write FOnResultsSynchronized;
@@ -1772,13 +1777,79 @@ end;
 function TFrameProceed.GetStatusColor(const AStatus: Integer): TAlphaColor;
 begin
   case AStatus of
-    2: Result := GetResultStateColor(prvsPending);
-    3: Result := GetResultStateColor(prvsInvalid);
-    4: Result := GetResultStateColor(prvsWarning);
-    5: Result := GetResultStateColor(prvsValid);
+    2: Result := COLOR_NONE;
+    3: Result := COLOR_INVALID;
+    4: Result := COLOR_INVALID;
+    5: Result := COLOR_COMPLETED;
   else
     Result := TAlphaColors.Null;
   end;
+end;
+
+function TFrameProceed.FormatResultErrorValue(const AValue: Double): string;
+begin
+  Result := FormatFloat('0.###', AValue);
+end;
+
+function TFrameProceed.GetPointResultColor(ADevice: TDevice;
+  ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): TAlphaColor;
+begin
+  Result := TAlphaColors.Null;
+  if (ADevice = nil) or (ADevicePoint = nil) or (ASpillage = nil) then
+    Exit;
+  Result := GetStatusColor(ASpillage.Status);
+end;
+
+function TFrameProceed.ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
+var
+  Point: TDevicePoint;
+  Spillage: TPointSpillage;
+  FoundPointsCount, RequiredPointsCount, InvalidCount: Integer;
+begin
+  Result := 2;
+  if ADevice = nil then
+    Exit;
+  FoundPointsCount := 0;
+  RequiredPointsCount := 0;
+  InvalidCount := 0;
+  if ADevice.Points <> nil then
+  begin
+    RequiredPointsCount := ADevice.Points.Count;
+    for Point in ADevice.Points do
+    begin
+      if Point = nil then
+        Continue;
+      Spillage := FindResultSpillageForPoint(ADevice, Point);
+      if Spillage = nil then
+        Continue;
+      Inc(FoundPointsCount);
+      if (not Spillage.Valid) or
+         (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
+        Inc(InvalidCount);
+    end;
+  end;
+  if FoundPointsCount = 0 then
+    Result := 2
+  else if InvalidCount > 0 then
+    Result := 3
+  else if FoundPointsCount < RequiredPointsCount then
+    Result := 2
+  else
+    Result := 5;
+end;
+
+function TFrameProceed.GetDeviceResultText(ADevice: TDevice): string;
+begin
+  if ADevice <> nil then
+    ADevice.AnalyseResults;
+  Result := BuildResultTextByStatus(ResolveDeviceSummaryStatus(ADevice));
+end;
+
+function TFrameProceed.GetDeviceResultColor(ADevice: TDevice): TAlphaColor;
+begin
+  if ADevice <> nil then
+    ADevice.AnalyseResults;
+  Result := GetStatusColor(ResolveDeviceSummaryStatus(ADevice));
 end;
 function TFrameProceed.BuildResultTextByStatus(const AStatus: Integer): string;
 begin
@@ -1935,7 +2006,7 @@ begin
   begin
     FoundID := ASpillage.ID;
     FoundDeviceUUID := ASpillage.DeviceUUID;
-  FoundError := FormatResultError(ASpillage.Error);
+    FoundError := FormatFloat('0.###', ASpillage.Error);
   end;
 
   LogMKS('DBG SP 9101', 'SummaryResults CELL',
@@ -2019,14 +2090,8 @@ begin
                 if (not Spillage.Valid) or
                    (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
                   Inc(InvalidCount);
-                case ResolvePointResultVisualState(Device, P, P, Spillage) of
-                  prvsValid: Row.PointStatuses[I] := 5;
-                  prvsInvalid: Row.PointStatuses[I] := 3;
-                  prvsWarning: Row.PointStatuses[I] := 4;
-                else
-                  Row.PointStatuses[I] := 2;
-                end;
-                Row.PointValues[I] := FormatResultError(Spillage.Error);
+                Row.PointStatuses[I] := Spillage.Status;
+                Row.PointValues[I] := FormatResultErrorValue(Spillage.Error);
               end
               else
               begin
@@ -2050,14 +2115,9 @@ begin
           SetLength(Row.PointStatuses, 0);
         end;
 
-        case ResolveDeviceResultVisualState(Device) of
-          prvsValid: Row.ResultStatus := 5;
-          prvsInvalid: Row.ResultStatus := 3;
-          prvsWarning: Row.ResultStatus := 4;
-        else
-          Row.ResultStatus := 2;
-        end;
-        Row.ResultText := GetDeviceResultText(Device);
+        Row.ResultStatus := ResolveDeviceSummaryStatus(Device);
+
+        Row.ResultText := BuildResultTextByStatus(Row.ResultStatus);
 
         LogMKS('DBG SP 9102', 'SummaryResults RESULT',
           Format('RowDeviceUUID=%s; RowSerial=%s; RequiredPointsCount=%d; FoundPointsCount=%d; InvalidCount=%d; HasAnyData=%s; ResultText=%s',

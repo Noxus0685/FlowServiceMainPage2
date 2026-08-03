@@ -36,7 +36,6 @@ uses
   uAppVersion in 'uAppVersion.pas',
   uOpenXmlXlsx in 'uOpenXmlXlsx.pas',
   uResultsXlsxExporter in 'uResultsXlsxExporter.pas',
-  uResultPresentation in 'uResultPresentation.pas',
   uTable_Data in 'uTable_Data.pas' {TableDM: TDataModule},
   uWorkTable in 'uWorkTable.pas',
   frmChannelProperties in 'frmChannelProperties.pas' {FrameChannelProperties: TFrame},
