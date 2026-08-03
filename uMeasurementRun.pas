@@ -4474,16 +4474,6 @@ begin
     Format('Stage=%s; Reason=%s', [MeasurementStateToString(StageSnapshot),
       MeasurementStopReasonToString(ReasonSnapshot)]));
 
-  // Navigation uses the stop machinery only to finish a physical operation;
-  // it has already marked the point as skipped and must never cancel it.
-  if ReasonSnapshot <> msrUserRollback then
-    MarkCurrentPointCancelled(ReasonSnapshot);
-
-  ProtocolManager.AddMessage(pcAction, psMeasurement, 'StopRequested',
-    'Stop принят измерительным запуском',
-    Format('Stage=%s; Reason=%s', [MeasurementStateToString(StageSnapshot),
-      MeasurementStopReasonToString(ReasonSnapshot)]));
-
   AddDiagnosticEvent('RequestStop called');
   if StageSnapshot in [msWaitMeasureStart, msMeasure] then
   begin

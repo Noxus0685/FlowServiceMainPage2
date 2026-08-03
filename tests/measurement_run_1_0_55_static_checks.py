@@ -61,17 +61,16 @@ main_before = (ROOT / "frmMainTable.pas").read_text(encoding="utf-8-sig")
 
 assert "EnsureMeasurementRunSubscription" in pause_click
 assert "LRun := GetMeasurementRun" in pause_click
-assert "mcPause" not in pause_click and "mcResume" not in pause_click
-assert pause_click.count("FActiveWorkTable.StopMeasurementRun") == 1
-assert "MeasurementPauseButtonRawClick" in pause_click
-assert pause_click.index("MeasurementPauseButtonRawClick") < pause_click.index("MeasurementStopRequested")
-assert "RunStage in [msNone, msDone]" in pause_click
-assert "MeasurementStopAccepted" in request_stop
-assert "MeasurementStopRejected" in request_stop
-assert "MeasurementStageExecutionAborted" in request_stop
-assert "MeasurementElapsedTimeFrozen" in cancel
-assert "Point.DateTime := Now" in cancel
-assert "mptsCancelled, mptsSkipped" in setter or "mptsCancelled, mptsSkipped" in RUN
+assert "LWasPaused := LRun.IsPaused" in pause_click
+assert "LRun.Execute(mcPause, Null)" in pause_click
+assert "LRun.Execute(mcResume, Null)" in pause_click
+for forbidden in ["StopMeasurementRun", "mcStop", "RequestStop", "StopTest",
+                  "MarkCurrentPointCancelled", "MarkCurrentPointSkipped",
+                  "SetStage(msDone)", "SetStage(msNone)"]:
+    assert forbidden not in pause_click
 assert FMX.count("OnClick = SpeedButtonPauseClick") == 1
-assert "StyleLookup = 'stoptoolbutton'" in FMX
+assert "StyleLookup = 'pausetoolbuttonbordered'" in FMX
+assert "Hint = 'Пауза/Продолжить'" in FMX
 assert "Action =" not in FMX.split("object SpeedButtonPause:", 1)[1].split("end", 1)[0]
+assert "playtoolbuttonbordered" in FRAME
+assert "pausetoolbuttonbordered" in FRAME

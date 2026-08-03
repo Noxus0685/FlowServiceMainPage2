@@ -753,11 +753,15 @@ begin
 end;
 
 procedure TFrameMeasurementRun.UpdatePauseButtonState;
+var
+  LRun: TMeasurementRun;
 begin
-  // The historical component name is retained for .fmx compatibility.  This
-  // control is now always the Stop command, never Pause/Resume.
-  SpeedButtonPause.StyleLookup := 'stoptoolbutton';
-  SpeedButtonPause.Hint := 'Остановить измерение';
+  LRun := GetMeasurementRun;
+  if (LRun <> nil) and LRun.IsPaused then
+    SpeedButtonPause.StyleLookup := 'playtoolbuttonbordered'
+  else
+    SpeedButtonPause.StyleLookup := 'pausetoolbuttonbordered';
+  SpeedButtonPause.Hint := 'Пауза/Продолжить';
 end;
 
 function TFrameMeasurementRun.ResolvePointRow(const AUUID: string; APoint: TDevicePoint;
@@ -907,67 +911,20 @@ end;
 procedure TFrameMeasurementRun.SpeedButtonPauseClick(Sender: TObject);
 var
   LRun: TMeasurementRun;
-  LPoint: TDevicePoint;
-  SenderName, SenderClass, PointUUID, PointStatus: string;
-  RunStage: EMeasurementState;
-  PointIndex: Integer;
-  RunPaused, RunStopRequested: Boolean;
+  LWasPaused: Boolean;
 begin
   EnsureMeasurementRunSubscription;
   LRun := GetMeasurementRun;
-  LPoint := nil;
-  PointUUID := '';
-  PointStatus := '-';
-  RunStage := msNone;
-  PointIndex := -1;
-  RunPaused := False;
-  RunStopRequested := False;
-  if Sender <> nil then
-    SenderClass := Sender.ClassName
-  else
-    SenderClass := '<nil>';
-  if Sender is TComponent then
-    SenderName := TComponent(Sender).Name
-  else
-    SenderName := '';
-  if LRun <> nil then
-  begin
-    RunStage := LRun.Stage;
-    PointIndex := LRun.CurrentPointIndex;
-    RunPaused := LRun.IsPaused;
-    RunStopRequested := LRun.StopRequested;
-    LPoint := LRun.CurrentPoint;
-    if LPoint <> nil then
-    begin
-      PointUUID := LPoint.UUID;
-      PointStatus := LPoint.GetStatus;
-    end;
-  end;
-  ProtocolManager.AddMessage(pcAction, psForm, 'MeasurementPauseButtonRawClick',
-    'Зафиксировано нажатие кнопки остановки',
-    Format('SenderName=%s; SenderClass=%s; RunAssigned=%s; RunStage=%s; CurrentPointIndex=%d; CurrentPointUUID=%s; CurrentPointStatus=%s; IsPaused=%s; StopRequested=%s; ButtonEnabled=%s',
-      [SenderName, SenderClass, BoolToStr(LRun <> nil, True),
-       TMeasurementRun.MeasurementStateToString(RunStage),
-       PointIndex, PointUUID, PointStatus,
-       BoolToStr(RunPaused, True), BoolToStr(RunStopRequested, True),
-       BoolToStr(SpeedButtonPause.Enabled, True)]));
-  if (LRun = nil) or (RunStage in [msNone, msDone]) or
-     (FActiveWorkTable = nil) then
-  begin
-    ProtocolManager.AddMessage(pcInfo, psForm, 'MeasurementStopRejected',
-      'Stop из кнопки отклонён',
-      Format('Source=SpeedButtonPauseClick; RunAssigned=%s; RunStage=%s',
-        [BoolToStr(LRun <> nil, True), TMeasurementRun.MeasurementStateToString(RunStage)]));
+  if LRun = nil then
     Exit;
-  end;
-  ProtocolManager.AddMessage(pcAction, psForm, 'MeasurementStopRequested',
-    'Stop из кнопки передан активному запуску',
-    Format('Source=SpeedButtonPauseClick; RunStage=%s; CurrentPointIndex=%d; CurrentPointUUID=%s; CurrentPointStatus=%s; PhysicalMeasurementStarted=%s; SetupInProgress=%s',
-      [TMeasurementRun.MeasurementStateToString(RunStage), LRun.CurrentPointIndex,
-       PointUUID, PointStatus, BoolToStr(LRun.PhysicalMeasurementStarted, True),
-       BoolToStr(RunStage in [msSelectPoint, msSelectEtalon, msSetupPoint,
-         msWaitPointSetup, msWaitStable, msWaitMeasureStart], True)]));
-  FActiveWorkTable.StopMeasurementRun;
+
+  LWasPaused := LRun.IsPaused;
+  if LWasPaused then
+    LRun.Execute(mcResume, Null)
+  else
+    LRun.Execute(mcPause, Null);
+
+  UpdatePauseButtonState;
   UpdateMeasurementControls;
   if Assigned(FOnRunUIChanged) then FOnRunUIChanged(Self);
 end;
