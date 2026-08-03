@@ -45,12 +45,14 @@ type
     SpeedButtonCreatePoints: TSpeedButton;
     ButtonClearSession: TButton;
     ButtonCreateSession: TButton;
+    ButtonExportExcel: TButton;
     procedure GridMRResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridMRResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas; const Column: TColumn;
       const Bounds: TRectF; const Row: Integer; const Value: TValue; const State: TGridDrawStates);
     procedure SpeedButtonCreatePointsClick(Sender: TObject);
     procedure ButtonClearSessionClick(Sender: TObject);
     procedure ButtonCreateSessionClick(Sender: TObject);
+    procedure ButtonExportExcelClick(Sender: TObject);
   private
     FActiveWorkTable: TWorkTable;
     FPointColumns: TObjectList<TStringColumn>;
@@ -68,6 +70,7 @@ type
 
     function GetRowChannel(const ARow: Integer): TChannel;
     function GetDisplayDeviceName(AChannel: TChannel): string;
+    function GetSelectedDevice: TDevice;
 
     function GetPointByColumn(const ACol: Integer): TDevicePoint;
     function FindDevicePoint(ADevice: TDevice; ASessionPoint: TDevicePoint): TDevicePoint;
@@ -105,7 +108,8 @@ procedure SetGridReadOnly(AGrid: TGrid);
 implementation
 
 uses
-  frmProceed;
+  frmProceed,
+  uResultsXlsxExporter;
 
 {$R *.fmx}
 
@@ -194,9 +198,15 @@ var
   Channel: TChannel;
 begin
   Channel := GetRowChannel(GridMRResults.Row);
-  if (FProceed = nil) or (Channel = nil) or (Channel.FlowMeter = nil) then
+  if FProceed = nil then
     Exit;
-  TFrameProceed(FProceed).RequestClearActiveSession(Channel.FlowMeter.Device);
+  if (Channel <> nil) and (Channel.FlowMeter <> nil) then
+    TFrameProceed(FProceed).RequestClearActiveSession(Channel.FlowMeter.Device)
+  else if FActiveWorkTable <> nil then
+    for Channel in FActiveWorkTable.DeviceChannels do
+      if (Channel <> nil) and (Channel.FlowMeter <> nil) then
+        TFrameProceed(FProceed).RequestClearActiveSession(Channel.FlowMeter.Device);
+  UpdateUI;
 end;
 
 procedure TFrameMRResults.ButtonCreateSessionClick(Sender: TObject);
@@ -204,9 +214,51 @@ var
   Channel: TChannel;
 begin
   Channel := GetRowChannel(GridMRResults.Row);
-  if (FProceed = nil) or (Channel = nil) or (Channel.FlowMeter = nil) then
+  if FProceed = nil then
     Exit;
-  TFrameProceed(FProceed).RequestCreateSession(Channel.FlowMeter.Device);
+  if (Channel <> nil) and (Channel.FlowMeter <> nil) then
+    TFrameProceed(FProceed).RequestCreateSession(Channel.FlowMeter.Device)
+  else if FActiveWorkTable <> nil then
+    for Channel in FActiveWorkTable.DeviceChannels do
+      if (Channel <> nil) and (Channel.FlowMeter <> nil) then
+        TFrameProceed(FProceed).RequestCreateSession(Channel.FlowMeter.Device);
+  UpdateUI;
+end;
+
+function TFrameMRResults.GetSelectedDevice: TDevice;
+var
+  Channel: TChannel;
+begin
+  Result := nil;
+  Channel := GetRowChannel(GridMRResults.Row);
+  if (Channel <> nil) and (Channel.FlowMeter <> nil) then
+    Result := Channel.FlowMeter.Device;
+end;
+
+/// Opens the standard save dialog and exports the selected device or all devices.
+procedure TFrameMRResults.ButtonExportExcelClick(Sender: TObject);
+var
+  Dialog: TSaveDialog;
+  FileName: string;
+begin
+  Dialog := TSaveDialog.Create(Self);
+  try
+    Dialog.Filter := 'Excel Workbook (*.xlsx)|*.xlsx';
+    Dialog.DefaultExt := 'xlsx';
+    Dialog.FileName := FormatDateTime('"Results_"yyyymmdd_hhnnss".xlsx"', Now);
+    if not Dialog.Execute then
+      Exit;
+    FileName := ExpandFileName(Dialog.FileName);
+    try
+      TResultsXlsxExporter.ExportToFile(FActiveWorkTable, GetSelectedDevice, FileName);
+    except
+      on E: Exception do
+        ShowMessage(Format('Не удалось сохранить файл "%s".' + sLineBreak + '%s',
+          [FileName, E.Message]));
+    end;
+  finally
+    Dialog.Free;
+  end;
 end;
 
 procedure TFrameMRResults.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
@@ -221,6 +273,8 @@ begin
   BuildRows;
   RefreshRows;
   GridMRResults.Repaint;
+  ButtonExportExcel.Enabled := TResultsXlsxExporter.CanExport(
+    FActiveWorkTable, nil);
 end;
 
 procedure TFrameMRResults.BuildRows;

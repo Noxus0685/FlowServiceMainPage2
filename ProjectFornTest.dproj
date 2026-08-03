@@ -293,6 +293,7 @@
         <DCCReference Include="uRepositories.pas"/>
         <DCCReference Include="uAppServices.pas"/>
         <DCCReference Include="uAppVersion.pas"/>
+        <DCCReference Include="uResultsXlsxExporter.pas"/>
         <DCCReference Include="uTable_Data.pas">
             <Form>TableDM</Form>
             <FormType>dfm</FormType>
