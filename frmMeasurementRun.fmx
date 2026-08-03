@@ -107,8 +107,8 @@
       Size.Width = 57.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
-      StyleLookup = 'pausetoolbuttonbordered'
-      Hint = 'Пауза/Продолжить'
+      StyleLookup = 'stoptoolbutton'
+      Hint = 'Остановить измерение'
       ShowHint = True
       Text = 'SpeedButton7'
       TextSettings.Trimming = None

@@ -747,7 +747,8 @@ begin
   { Исторические командные кнопки не дублируют ограничения FSM формы. }
   SpeedButtonPointPrev.Enabled := MeasurementRun <> nil;
   SpeedButtonPointNext.Enabled := MeasurementRun <> nil;
-  SpeedButtonPause.Enabled := MeasurementRun <> nil;
+  SpeedButtonPause.Enabled := (MeasurementRun <> nil) and
+    not (MeasurementRun.Stage in [msNone, msDone]);
   UpdatePauseButtonState;
 end;
 
