@@ -41,7 +41,7 @@ def test_required_proc_events_are_present():
         assert field in PROCEED
 
 
-def test_application_version_is_1_0_57():
-    assert "APP_VERSION = '1.0.57'" in VERSION
+def test_application_version_is_1_0_58():
+    assert "APP_VERSION = '1.0.58'" in VERSION
     assert "'ApplicationVersion'" in PROTOCOL
     assert "Version=%s" in PROTOCOL
