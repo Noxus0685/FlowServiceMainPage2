@@ -2163,10 +2163,11 @@ begin
     mptsSetupError: Result := 'ошибка установки';
     mptsMeasureError: Result := 'ошибка измерения';
     mptsInterrupted: Result := 'прервано';
-    mptsCancelled: Result := 'отменено';
+    mptsCancelled: Result := 'Отменено';
     mptsSaved: Result := 'сохранено';
     mptsStabilityError: Result := 'ошибка стабилизации';
     mptsDevicePointMismatch: Result := 'точка прибора не сопоставлена';
+    mptsSkipped: Result := 'Пропущена';
   else
     Result := 'неизвестный статус';
   end;
@@ -2192,6 +2193,7 @@ begin
     mptsInterrupted: Result := 'Измерение было принудительно прервано';
     mptsCancelled: Result := 'Полученные результаты были отменены пользователем';
     mptsSaved: Result := 'Измерение завершено, результаты успешно сохранены';
+    mptsSkipped: Result := 'Точка пропущена пользователем при ручном переходе';
   else
     Result := 'Неизвестный статус точки';
   end;
@@ -2206,7 +2208,7 @@ begin
     mptsWaitMeasureStart, mptsMeasure, mptsWaitMeasureStop,
     mptsResultsRead, mptsSave:
       Result := COLOR_RUNNING;
-    mptsDone, mptsInterrupted, mptsCancelled:
+    mptsDone, mptsInterrupted, mptsCancelled, mptsSkipped:
       Result := COLOR_WARNING;
     mptsSaved:
       Result := COLOR_COMPLETED;
@@ -3257,5 +3259,3 @@ begin
 end;
 
 end.
-
-
