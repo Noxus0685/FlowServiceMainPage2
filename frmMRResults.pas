@@ -49,7 +49,6 @@ type
     ButtonClearSession: TButton;
     ButtonCreateSession: TButton;
     ButtonExportExcel: TButton;
-    SaveDialogXlsx: TSaveDialog;
     procedure GridMRResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridMRResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas; const Column: TColumn;
       const Bounds: TRectF; const Row: Integer; const Value: TValue; const State: TGridDrawStates);
@@ -268,15 +267,24 @@ end;
 { Exports the selected device, or every device when no result row is selected. }
 procedure TFrameMRResults.ButtonExportExcelClick(Sender: TObject);
 var Data: TResultsExportData; Selected: TChannel; Scope, Sessions, FileName: string;
+  Dialog: TSaveDialog;
   Started: TDateTime; I: Integer;
 begin
   Selected := GetRowChannel(GridMRResults.Row);
   if Selected=nil then Scope:='AllDevices' else Scope:='SelectedDevice';
-  SaveDialogXlsx.Filter := 'Excel Workbook (*.xlsx)|*.xlsx';
-  SaveDialogXlsx.DefaultExt := 'xlsx';
-  SaveDialogXlsx.FileName := 'Results_'+FormatDateTime('yyyymmdd_hhnnss',Now)+'.xlsx';
-  if not SaveDialogXlsx.Execute then Exit;
-  FileName := SaveDialogXlsx.FileName;
+  { Keep the nonvisual dialog out of the FMX resource to avoid RLINK32 serialization errors. }
+  Dialog := TSaveDialog.Create(Self);
+  try
+    Dialog.DefaultExt := 'xlsx';
+    Dialog.Filter := 'Excel Workbook (*.xlsx)|*.xlsx';
+    Dialog.FileName := Format('Results_%s.xlsx',
+      [FormatDateTime('yyyymmdd_hhnnss', Now)]);
+    if not Dialog.Execute then
+      Exit;
+    FileName := Dialog.FileName;
+  finally
+    Dialog.Free;
+  end;
   Started:=Now; Data:=BuildExportData(Selected);
   try
     Sessions:=''; for I:=0 to Data.Sessions.Count-1 do begin if Sessions<>'' then Sessions:=Sessions+','; Sessions:=Sessions+Data.Sessions[I].ID; end;

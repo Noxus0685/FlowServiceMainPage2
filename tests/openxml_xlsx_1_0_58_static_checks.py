@@ -45,8 +45,9 @@ def test_export_layout_and_ui_wiring():
         assert f"AddWorksheet('{sheet}')" in EXPORTER
     assert "object ButtonExportExcel: TButton" in FMX
     assert "Выгрузить" not in FMX  # FMX stores Cyrillic as character codes.
-    assert "object SaveDialogXlsx: TSaveDialog" in FMX
-    assert "Excel Workbook (*.xlsx)|*.xlsx" in FMX
+    assert "TSaveDialog" not in FMX
+    assert "Dialog := TSaveDialog.Create(Self)" in RESULTS
+    assert "Excel Workbook (*.xlsx)|*.xlsx" in RESULTS
     assert "ResultsXlsxExportRequested" in RESULTS
     assert "ResultsXlsxExportCompleted" in RESULTS
     assert "ResultsXlsxExportFailed" in RESULTS
