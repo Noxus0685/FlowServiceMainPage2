@@ -544,6 +544,7 @@ type
     property CurrentPoint: TDevicePoint read GetCurrentPoint;
     property CurrentRepeat: Integer read FCurrentRepeat;
     property StopRequested: Boolean read FStopRequested;
+    property PhysicalMeasurementStarted: Boolean read HasPhysicalMeasurementStarted;
     property NextStageAfterSave: EMeasurementState read FNextStageAfterSave;
     property ForceNextPoint: Integer read FForceNextPoint;
     property Attempt: Integer read FAttempt;
