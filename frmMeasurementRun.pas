@@ -743,22 +743,45 @@ begin
 end;
 
 procedure TFrameMeasurementRun.UpdateMeasurementControls;
+var
+  LRun: TMeasurementRun;
+  LIndex, LCount: Integer;
+  LHasCurrentPoint: Boolean;
 begin
-  { Исторические командные кнопки не дублируют ограничения FSM формы. }
-  SpeedButtonPointPrev.Enabled := MeasurementRun <> nil;
-  SpeedButtonPointNext.Enabled := MeasurementRun <> nil;
-  SpeedButtonPause.Enabled := MeasurementRun <> nil;
+  LRun := GetMeasurementRun;
+  LIndex := -1;
+  LCount := 0;
+  LHasCurrentPoint := False;
+  if (LRun <> nil) and (LRun.Points <> nil) then
+  begin
+    LIndex := LRun.CurrentPointIndex;
+    LCount := LRun.Points.Count;
+    LHasCurrentPoint := (LRun.CurrentPoint <> nil) and
+      (LIndex >= 0) and (LIndex < LCount);
+  end;
+  // Navigation follows the executing point, never the selected grid row.
+  SpeedButtonPointPrev.Enabled := LHasCurrentPoint and (LIndex > 0);
+  SpeedButtonPointNext.Enabled := LHasCurrentPoint and (LIndex < LCount - 1);
   UpdatePauseButtonState;
 end;
 
 procedure TFrameMeasurementRun.UpdatePauseButtonState;
-var Run: TMeasurementRun;
+var
+  LRun: TMeasurementRun;
 begin
-  Run := MeasurementRun;
-  if (Run <> nil) and Run.IsPaused then
-    SpeedButtonPause.StyleLookup := 'playtoolbuttonbordered'
+  LRun := GetMeasurementRun;
+  SpeedButtonPause.Enabled := (LRun <> nil) and
+    not (LRun.Stage in [msNone, msDone]);
+  if (LRun <> nil) and LRun.IsPaused then
+  begin
+    SpeedButtonPause.StyleLookup := 'playtoolbuttonbordered';
+    SpeedButtonPause.Hint := 'Продолжить';
+  end
   else
+  begin
     SpeedButtonPause.StyleLookup := 'pausetoolbuttonbordered';
+    SpeedButtonPause.Hint := 'Пауза';
+  end;
 end;
 
 function TFrameMeasurementRun.ResolvePointRow(const AUUID: string; APoint: TDevicePoint;
@@ -906,40 +929,18 @@ begin
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPauseClick(Sender: TObject);
-var Run: TMeasurementRun; WasPaused: Boolean; CommandName: string;
+var
+  LRun: TMeasurementRun;
 begin
   EnsureMeasurementRunSubscription;
-  Run := GetMeasurementRun;
-  if Run = nil then
-  begin
-    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSkipped',
-      'Команда интерфейса не передана', 'Command=Pause; Reason=MeasurementRunNotAssigned');
+  LRun := GetMeasurementRun;
+  if LRun = nil then
     Exit;
-  end;
-  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementRunSubscriptionVerified',
-    'Подтверждена подписка перед UI-командой',
-    Format('RunPointer=%p; Reason=Command', [Pointer(Run)]));
-  WasPaused := Run.IsPaused;
-  if WasPaused then CommandName := 'Resume' else CommandName := 'Pause';
-  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested',
-    'Запрошена команда интерфейса измерения',
-    Format('Command=%s; AutoMode=%s; RunAssigned=True; Stage=%d; IsPaused=%s; CurrentPointIndex=%d; CurrentPointUUID=%s; WorkTableState=-1; ButtonEnabled=%s',
-      [CommandName, BoolToStr(Run.Mode = mrmAutomatic, True), Ord(Run.Stage),
-       BoolToStr(WasPaused, True), Run.CurrentPointIndex, FCurrentPointUUID,
-       BoolToStr(SpeedButtonPause.Enabled, True)]));
-  if WasPaused then Run.Execute(mcResume, Null)
-  else Run.Execute(mcPause, Null);
-  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent',
-    'Команда интерфейса передана', Format('Command=%s; RunObjectPointer=%p; StageBefore=%d; IsPausedBefore=%s; CurrentPointIndexBefore=%d',
-      [CommandName, Pointer(Run), Ord(Run.Stage), BoolToStr(WasPaused, True), Run.CurrentPointIndex]));
-  UpdatePauseButtonState;
+  if LRun.IsPaused then
+    LRun.Execute(mcResume, Null)
+  else
+    LRun.Execute(mcPause, Null);
   UpdateMeasurementControls;
-  if Assigned(FOnRunUIChanged) then FOnRunUIChanged(Self);
-  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandObserved',
-    'Наблюдается фактическое состояние паузы',
-    Format('Command=%s; StageAfter=%d; PointIndexAfter=%d; CurrentPointUUID=%s; IsPausedAfter=%s',
-      [CommandName, Ord(Run.Stage), Run.CurrentPointIndex, FCurrentPointUUID,
-       BoolToStr(Run.IsPaused, True)]));
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointDeleteClick(Sender: TObject);

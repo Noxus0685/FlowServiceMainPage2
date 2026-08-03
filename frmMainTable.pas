@@ -1702,10 +1702,15 @@ begin
 end;
 
 procedure TFrameMainTable.BuildManualMeasurementPoint;
-var Run: TMeasurementRun; CountBefore: Integer; Point: TDevicePoint;
+var
+  Run: TMeasurementRun;
+  CountBefore: Integer;
+  Point: TDevicePoint;
+  SourceUUID: string;
 begin
   Run := MeasurementRun;
   if (FActiveWorkTable = nil) or (Run = nil) or (FActiveWorkTable.CurrentPoint = nil) then Exit;
+  SourceUUID := FActiveWorkTable.CurrentPoint.UUID;
   CountBefore := Run.Points.Count;
   Run.Points.Clear;
   ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointSetCleared',
@@ -1721,7 +1726,13 @@ begin
   Run.RebuildMeasurementPoints;
   if (Run.Points <> nil) and (Run.Points.Count = 1) then
   begin
-    Point := Run.Points.First;
+    Point := Run.CurrentPoint;
+    if Point = nil then
+      Exit;
+    // RebuildMeasurementPoints creates a runtime object.  Keep its identity
+    // independent even if a future Assign implementation starts copying UUID.
+    if (Point <> nil) and SameText(Point.UUID, SourceUUID) then
+      Point.UUID := TGUID.NewGuid.ToString;
     ProtocolManager.AddMessage(pcProc, psForm, 'ManualPointCreated',
       'Создана подготовленная ручная точка',
       Format('UUID=%s; Q=%.9g; FlowRate=%.9g; StopCriteria=%d; LimitTime=%.9g; LimitVolume=%.9g; LimitImp=%d; PreparedPointsCount=%d',
