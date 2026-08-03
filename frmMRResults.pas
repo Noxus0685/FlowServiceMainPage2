@@ -15,6 +15,8 @@ uses
   FMX.Types,
   System.Classes,
   System.Generics.Collections,
+  System.DateUtils,
+  System.IOUtils,
   System.Math,
   System.Rtti,
   System.SysUtils,
@@ -26,6 +28,7 @@ uses
   uDeviceClass,
   uMeasurementRun,
   uObservable,
+  uResultsXlsxExporter,
   uWorkTable;
 
 type
@@ -45,12 +48,15 @@ type
     SpeedButtonCreatePoints: TSpeedButton;
     ButtonClearSession: TButton;
     ButtonCreateSession: TButton;
+    ButtonExportExcel: TButton;
+    SaveDialogXlsx: TSaveDialog;
     procedure GridMRResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridMRResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas; const Column: TColumn;
       const Bounds: TRectF; const Row: Integer; const Value: TValue; const State: TGridDrawStates);
     procedure SpeedButtonCreatePointsClick(Sender: TObject);
     procedure ButtonClearSessionClick(Sender: TObject);
     procedure ButtonCreateSessionClick(Sender: TObject);
+    procedure ButtonExportExcelClick(Sender: TObject);
   private
     FActiveWorkTable: TWorkTable;
     FPointColumns: TObjectList<TStringColumn>;
@@ -87,6 +93,8 @@ type
 
     function GetResultText(AChannel: TChannel): string;
     function GetResultColor(AChannel: TChannel): TAlphaColor;
+    function HasExportableResults: Boolean;
+    function BuildExportData(ASelected: TChannel): TResultsExportData;
 
   public
     constructor Create(AOwner: TComponent); override;
@@ -105,7 +113,7 @@ procedure SetGridReadOnly(AGrid: TGrid);
 implementation
 
 uses
-  frmProceed;
+  frmProceed, uDebugLog;
 
 {$R *.fmx}
 
@@ -192,21 +200,95 @@ end;
 procedure TFrameMRResults.ButtonClearSessionClick(Sender: TObject);
 var
   Channel: TChannel;
+  Device: TDevice;
 begin
   Channel := GetRowChannel(GridMRResults.Row);
-  if (FProceed = nil) or (Channel = nil) or (Channel.FlowMeter = nil) then
+  if FProceed = nil then
     Exit;
-  TFrameProceed(FProceed).RequestClearActiveSession(Channel.FlowMeter.Device);
+  Device := nil;
+  if (Channel <> nil) and (Channel.FlowMeter <> nil) then Device := Channel.FlowMeter.Device;
+  TFrameProceed(FProceed).RequestClearActiveSession(Device);
 end;
 
 procedure TFrameMRResults.ButtonCreateSessionClick(Sender: TObject);
 var
   Channel: TChannel;
+  Device: TDevice;
 begin
   Channel := GetRowChannel(GridMRResults.Row);
-  if (FProceed = nil) or (Channel = nil) or (Channel.FlowMeter = nil) then
+  if FProceed = nil then
     Exit;
-  TFrameProceed(FProceed).RequestCreateSession(Channel.FlowMeter.Device);
+  Device := nil;
+  if (Channel <> nil) and (Channel.FlowMeter <> nil) then Device := Channel.FlowMeter.Device;
+  TFrameProceed(FProceed).RequestCreateSession(Device);
+end;
+
+function TFrameMRResults.HasExportableResults: Boolean;
+var Ch: TChannel; Dev: TDevice; Session: TSessionSpillage;
+begin
+  Result := False;
+  for Ch in FRows do
+    if (Ch <> nil) and (Ch.FlowMeter <> nil) then begin
+      Dev := Ch.FlowMeter.Device;
+      if Dev <> nil then begin
+        Session := Dev.GetActiveSessionSpillage;
+        if (Session <> nil) and (Session.Spillages.Count > 0) then Exit(True);
+      end;
+    end;
+end;
+
+function TFrameMRResults.BuildExportData(ASelected: TChannel): TResultsExportData;
+var Ch: TChannel; Dev: TDevice; Session: TSessionSpillage; Spill: TPointSpillage;
+  ES: TResultsExportSession; ED: TResultsExportDevice; ER: TResultsExportResult;
+begin
+  Result := TResultsExportData.Create;
+  for Ch in FRows do begin
+    if (ASelected <> nil) and (Ch <> ASelected) then Continue;
+    if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then Continue;
+    Dev := Ch.FlowMeter.Device; Session := Dev.GetActiveSessionSpillage;
+    ED := Default(TResultsExportDevice); ED.Name:=Dev.Name; ED.SerialNumber:=Dev.SerialNumber;
+    ED.UUID:=Dev.UUID; ED.Channel:=Ch.Name; ED.DeviceType:=Dev.DeviceTypeName;
+    ED.Status:=GetResultText(Ch); if Session<>nil then ED.SessionID:=IntToStr(Session.ID);
+    Result.Devices.Add(ED);
+    if Session=nil then Continue;
+    ES := Default(TResultsExportSession); ES.ID:=IntToStr(Session.ID); ES.OpenedAt:=Session.DateTimeOpen;
+    ES.WorkTable:=FActiveWorkTable.Name; ES.Mode:=IntToStr(Ord(FActiveWorkTable.MeasurementMode));
+    ES.Status:=IntToStr(Session.Status); Result.Sessions.Add(ES);
+    for Spill in Session.Spillages do begin
+      if Spill=nil then Continue;
+      ER := Default(TResultsExportResult); ER.DeviceName:=Dev.Name; ER.SerialNumber:=Dev.SerialNumber;
+      ER.DeviceUUID:=Dev.UUID; ER.SessionID:=IntToStr(Session.ID); ER.PointName:=Spill.Name;
+      ER.ReferenceFlow:=Spill.QavgEtalon; ER.EtalonName:=Spill.EtalonName; ER.EtalonUUID:=Spill.EtalonUUID;
+      ER.DeviceValue:=Spill.DeviceVolumeFlow; ER.Error:=Spill.Error; ER.Status:=Spill.StatusStr;
+      ER.Valid:=Spill.Valid; ER.MeasuredAt:=Spill.DateTime; Result.Results.Add(ER);
+    end;
+  end;
+end;
+
+{ Exports the selected device, or every device when no result row is selected. }
+procedure TFrameMRResults.ButtonExportExcelClick(Sender: TObject);
+var Data: TResultsExportData; Selected: TChannel; Scope, Sessions, FileName: string;
+  Started: TDateTime; I: Integer;
+begin
+  Selected := GetRowChannel(GridMRResults.Row);
+  if Selected=nil then Scope:='AllDevices' else Scope:='SelectedDevice';
+  SaveDialogXlsx.Filter := 'Excel Workbook (*.xlsx)|*.xlsx';
+  SaveDialogXlsx.DefaultExt := 'xlsx';
+  SaveDialogXlsx.FileName := 'Results_'+FormatDateTime('yyyymmdd_hhnnss',Now)+'.xlsx';
+  if not SaveDialogXlsx.Execute then Exit;
+  FileName := SaveDialogXlsx.FileName;
+  Started:=Now; Data:=BuildExportData(Selected);
+  try
+    Sessions:=''; for I:=0 to Data.Sessions.Count-1 do begin if Sessions<>'' then Sessions:=Sessions+','; Sessions:=Sessions+Data.Sessions[I].ID; end;
+    DebugLog(Format('ResultsXlsxExportRequested Scope=%s File=%s SessionIDs=%s Devices=%d Results=%d',[Scope,FileName,Sessions,Data.Devices.Count,Data.Results.Count]));
+    try
+      TResultsXlsxExporter.ExportToFile(Data,FileName);
+      DebugLog(Format('ResultsXlsxExportCompleted Scope=%s File=%s SessionIDs=%s Devices=%d Results=%d SharedStrings=%d Sheets=3 Size=%d DurationMs=%d',[Scope,FileName,Sessions,Data.Devices.Count,Data.Results.Count,0,TFile.GetSize(FileName),MilliSecondsBetween(Now,Started)]));
+    except on E:Exception do begin
+      DebugLog(Format('ResultsXlsxExportFailed Scope=%s File=%s SessionIDs=%s Devices=%d Results=%d DurationMs=%d Error=%s',[Scope,FileName,Sessions,Data.Devices.Count,Data.Results.Count,MilliSecondsBetween(Now,Started),E.Message]));
+      ShowMessage(Format('Не удалось сохранить файл "%s".'+#13#10+'%s',[ExpandFileName(FileName),E.Message]));
+    end; end;
+  finally Data.Free; end;
 end;
 
 procedure TFrameMRResults.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
@@ -221,6 +303,7 @@ begin
   BuildRows;
   RefreshRows;
   GridMRResults.Repaint;
+  ButtonExportExcel.Enabled := (FRows.Count > 0) and HasExportableResults;
 end;
 
 procedure TFrameMRResults.BuildRows;

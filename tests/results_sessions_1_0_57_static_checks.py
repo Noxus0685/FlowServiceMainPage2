@@ -14,8 +14,8 @@ PROTOCOL = (ROOT / "frmProtocol.pas").read_text(encoding="utf-8-sig")
 def test_results_buttons_use_processing_routes():
     assert "object ButtonClearSession: TButton" in RESULTS_FMX
     assert "object ButtonCreateSession: TButton" in RESULTS_FMX
-    assert "RequestClearActiveSession(Channel.FlowMeter.Device)" in RESULTS
-    assert "RequestCreateSession(Channel.FlowMeter.Device)" in RESULTS
+    assert "RequestClearActiveSession(Device)" in RESULTS
+    assert "RequestCreateSession(Device)" in RESULTS
     assert "ActionSessionDeleteExecute(ActionSessionDelete);" in PROCEED
     assert "ActionSessionNewExecute(ActionSessionNew);" in PROCEED
     assert "TMeasurementRun.CreateSession" not in RESULTS
@@ -41,7 +41,7 @@ def test_required_proc_events_are_present():
         assert field in PROCEED
 
 
-def test_application_version_is_1_0_57():
-    assert "APP_VERSION = '1.0.57'" in VERSION
+def test_application_version_is_1_0_58():
+    assert "APP_VERSION = '1.0.58'" in VERSION
     assert "'ApplicationVersion'" in PROTOCOL
     assert "Version=%s" in PROTOCOL
