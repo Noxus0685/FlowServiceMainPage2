@@ -214,6 +214,7 @@ type
     procedure PopulateTreeViewDevices;
     function GetStatusColor(const AStatus: Integer): TAlphaColor;
     function BuildResultTextByStatus(const AStatus: Integer): string;
+    function ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
     procedure UpdateResultsPointColumns;
     procedure LogResultCellDebug(const ARow: TResultGridRow; APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
     procedure ShowAllDevicesResults;
@@ -307,6 +308,11 @@ type
     function FindResultSpillageForPoint(ADevice: TDevice; APoint: TDevicePoint): TPointSpillage;
     function GetPointResultError(const ADevice: TDevice; const APoint: TDevicePoint): Double;
     function GetPointResultFlowLS(const ADevice: TDevice; const APoint: TDevicePoint): Double;
+    function FormatResultErrorValue(const AValue: Double): string;
+    function GetPointResultColor(ADevice: TDevice; ADevicePoint: TDevicePoint;
+      ASpillage: TPointSpillage): TAlphaColor;
+    function GetDeviceResultText(ADevice: TDevice): string;
+    function GetDeviceResultColor(ADevice: TDevice): TAlphaColor;
     destructor Destroy; override;
     property OnResultsSynchronized: TNotifyEvent read FOnResultsSynchronized
       write FOnResultsSynchronized;
@@ -1779,6 +1785,72 @@ begin
     Result := TAlphaColors.Null;
   end;
 end;
+
+function TFrameProceed.FormatResultErrorValue(const AValue: Double): string;
+begin
+  Result := FormatFloat('0.###', AValue);
+end;
+
+function TFrameProceed.GetPointResultColor(ADevice: TDevice;
+  ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): TAlphaColor;
+begin
+  Result := TAlphaColors.Null;
+  if (ADevice = nil) or (ADevicePoint = nil) or (ASpillage = nil) then
+    Exit;
+  Result := GetStatusColor(ASpillage.Status);
+end;
+
+function TFrameProceed.ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
+var
+  Point: TDevicePoint;
+  Spillage: TPointSpillage;
+  FoundPointsCount, RequiredPointsCount, InvalidCount: Integer;
+begin
+  Result := 2;
+  if ADevice = nil then
+    Exit;
+  FoundPointsCount := 0;
+  RequiredPointsCount := 0;
+  InvalidCount := 0;
+  if ADevice.Points <> nil then
+  begin
+    RequiredPointsCount := ADevice.Points.Count;
+    for Point in ADevice.Points do
+    begin
+      if Point = nil then
+        Continue;
+      Spillage := FindResultSpillageForPoint(ADevice, Point);
+      if Spillage = nil then
+        Continue;
+      Inc(FoundPointsCount);
+      if (not Spillage.Valid) or
+         (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
+        Inc(InvalidCount);
+    end;
+  end;
+  if FoundPointsCount = 0 then
+    Result := 2
+  else if InvalidCount > 0 then
+    Result := 3
+  else if FoundPointsCount < RequiredPointsCount then
+    Result := 2
+  else
+    Result := 5;
+end;
+
+function TFrameProceed.GetDeviceResultText(ADevice: TDevice): string;
+begin
+  if ADevice <> nil then
+    ADevice.AnalyseResults;
+  Result := BuildResultTextByStatus(ResolveDeviceSummaryStatus(ADevice));
+end;
+
+function TFrameProceed.GetDeviceResultColor(ADevice: TDevice): TAlphaColor;
+begin
+  if ADevice <> nil then
+    ADevice.AnalyseResults;
+  Result := GetStatusColor(ResolveDeviceSummaryStatus(ADevice));
+end;
 function TFrameProceed.BuildResultTextByStatus(const AStatus: Integer): string;
 begin
   case AStatus of
@@ -2019,7 +2091,7 @@ begin
                    (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
                   Inc(InvalidCount);
                 Row.PointStatuses[I] := Spillage.Status;
-                Row.PointValues[I] := FormatFloat('0.###', Spillage.Error);
+                Row.PointValues[I] := FormatResultErrorValue(Spillage.Error);
               end
               else
               begin
@@ -2043,14 +2115,7 @@ begin
           SetLength(Row.PointStatuses, 0);
         end;
 
-        if FoundPointsCount = 0 then
-          Row.ResultStatus := 2
-        else if InvalidCount > 0 then
-          Row.ResultStatus := 3
-        else if FoundPointsCount < RequiredPointsCount then
-          Row.ResultStatus := 2
-        else
-          Row.ResultStatus := 5;
+        Row.ResultStatus := ResolveDeviceSummaryStatus(Device);
 
         Row.ResultText := BuildResultTextByStatus(Row.ResultStatus);
 
