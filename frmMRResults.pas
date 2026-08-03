@@ -58,6 +58,7 @@ type
   private
     FActiveWorkTable: TWorkTable;
     FPointColumns: TObjectList<TStringColumn>;
+    FDisplayPoints: TList<TDevicePoint>;
     FRows: TList<TChannel>;
     FProceed: TObject;
 
@@ -69,6 +70,8 @@ type
     procedure BuildColumns;
     procedure BuildRows;
     procedure RefreshRows;
+    function SameDisplayPoint(ALeft, ARight: TDevicePoint): Boolean;
+    procedure AddDisplayPoint(APoint: TDevicePoint);
 
     function GetRowChannel(const ARow: Integer): TChannel;
     function GetDisplayDeviceName(AChannel: TChannel): string;
@@ -132,6 +135,7 @@ constructor TFrameMRResults.Create(AOwner: TComponent);
 begin
   inherited;
   FPointColumns := TObjectList<TStringColumn>.Create(False);
+  FDisplayPoints := TList<TDevicePoint>.Create;
   FRows := TList<TChannel>.Create;
 
   GridMRResults.OnGetValue := GridMRResultsGetValue;
@@ -144,6 +148,7 @@ destructor TFrameMRResults.Destroy;
 begin
  // DetachMeasurementRun;
   FreeAndNil(FRows);
+  FreeAndNil(FDisplayPoints);
   FreeAndNil(FPointColumns);
   inherited;
 end;
@@ -371,9 +376,61 @@ procedure TFrameMRResults.BuildColumns;
 var
   I: Integer;
   Col: TStringColumn;
-  SessionPoint: TDevicePoint;
+  DisplayPoint, MatchedPoint: TDevicePoint;
+  Ch: TChannel;
+  Device: TDevice;
+  Session: TSessionSpillage;
+  Spill: TPointSpillage;
+  Diagnostic: string;
+  ActiveSessionID: Integer;
+  MatchColumn: Integer;
 begin
   FPointColumns.Clear;
+  FDisplayPoints.Clear;
+
+  // Preserve scenario order first, then append physical device points which
+  // have persisted results in the active session but are absent in scenario.
+  if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) then
+    for I := 0 to MeasurementRun.Points.Count - 1 do
+      AddDisplayPoint(MeasurementRun.Points[I]);
+
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.DeviceChannels <> nil) then
+    for Ch in FActiveWorkTable.DeviceChannels do
+      if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
+      begin
+        Device := Ch.FlowMeter.Device;
+        Session := Device.GetActiveSessionSpillage;
+        ActiveSessionID := 0;
+        if Session <> nil then
+          ActiveSessionID := Session.ID;
+        Diagnostic := '';
+        if (Session <> nil) and (Device.Spillages <> nil) then
+          for Spill in Device.Spillages do
+          begin
+            if (Spill = nil) or (Spill.SessionID <> Session.ID) then
+              Continue;
+            MatchedPoint := Device.FindMatchedDevicePointForSpillage(Spill);
+            if MatchedPoint <> nil then
+            begin
+              AddDisplayPoint(MatchedPoint);
+              MatchColumn := -1;
+              for I := 0 to FDisplayPoints.Count - 1 do
+                if SameDisplayPoint(FDisplayPoints[I], MatchedPoint) then
+                begin
+                  MatchColumn := I + 1;
+                  Break;
+                end;
+              Diagnostic := Diagnostic + Format(' Spill=%s/%s -> Point=%s/%s Column=%d;',
+                [Spill.Name, Spill.UUID, MatchedPoint.Name, MatchedPoint.UUID,
+                 MatchColumn]);
+            end
+            else
+              Diagnostic := Diagnostic + Format(' Spill=%s/%s -> unmatched;',
+                [Spill.Name, Spill.UUID]);
+          end;
+        DebugLog(Format('MRResultsPointBinding DeviceUUID=%s Serial=%s ActiveSessionID=%d%s',
+          [Device.UUID, Device.SerialNumber, ActiveSessionID, Diagnostic]));
+      end;
 
   GridMRResults.BeginUpdate;
   try
@@ -385,17 +442,16 @@ begin
 
     StringColumnName.Index := 0;
 
-    if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) then
-      for I := 0 to MeasurementRun.Points.Count - 1 do
+    for I := 0 to FDisplayPoints.Count - 1 do
       begin
-        SessionPoint := MeasurementRun.Points[I];
+        DisplayPoint := FDisplayPoints[I];
 
         Col := TStringColumn.Create(GridMRResults);
         Col.Parent := GridMRResults;
         Col.HeaderSettings.TextSettings.WordWrap := False;
         Col.Stored := False;
         Col.Width := 130;
-        Col.Header := FormatPointHeader(SessionPoint);
+        Col.Header := FormatPointHeader(DisplayPoint);
         Col.Index := GridMRResults.ColumnCount - 1;
 
         FPointColumns.Add(Col);
@@ -406,6 +462,47 @@ begin
     GridMRResults.EndUpdate;
   end;
   SetGridReadOnly(GridMRResults);
+end;
+
+function TFrameMRResults.SameDisplayPoint(ALeft, ARight: TDevicePoint): Boolean;
+var
+  I, J: Integer;
+begin
+  Result := ALeft = ARight;
+  if Result or (ALeft = nil) or (ARight = nil) then
+    Exit;
+  if (Trim(ALeft.UUID) <> '') and SameText(Trim(ALeft.UUID), Trim(ARight.UUID)) then
+    Exit(True);
+  if (Trim(ALeft.DeviceTypeUUID) <> '') and
+     SameText(Trim(ALeft.DeviceTypeUUID), Trim(ARight.DeviceTypeUUID)) then
+    Exit(True);
+  for I := 0 to High(ALeft.Participants) do
+  begin
+    if (Trim(ALeft.Participants[I].SourcePointUUID) <> '') and
+       SameText(ALeft.Participants[I].SourcePointUUID, ARight.UUID) then
+      Exit(True);
+    for J := 0 to High(ARight.Participants) do
+      if (Trim(ALeft.Participants[I].SourcePointUUID) <> '') and
+         SameText(ALeft.Participants[I].SourcePointUUID,
+           ARight.Participants[J].SourcePointUUID) then
+        Exit(True);
+  end;
+  for J := 0 to High(ARight.Participants) do
+    if (Trim(ARight.Participants[J].SourcePointUUID) <> '') and
+       SameText(ARight.Participants[J].SourcePointUUID, ALeft.UUID) then
+      Exit(True);
+end;
+
+procedure TFrameMRResults.AddDisplayPoint(APoint: TDevicePoint);
+var
+  Existing: TDevicePoint;
+begin
+  if APoint = nil then
+    Exit;
+  for Existing in FDisplayPoints do
+    if SameDisplayPoint(Existing, APoint) then
+      Exit;
+  FDisplayPoints.Add(APoint);
 end;
 
 procedure TFrameMRResults.RefreshRows;
@@ -464,27 +561,36 @@ begin
   Result := nil;
   Idx := ACol - 1;
 
-  if (MeasurementRun = nil) or (MeasurementRun.Points = nil) then
+  if (Idx < 0) or (Idx >= FDisplayPoints.Count) then
     Exit;
 
-  if (Idx < 0) or (Idx >= MeasurementRun.Points.Count) then
-    Exit;
-
-  Result := MeasurementRun.Points[Idx];
+  Result := FDisplayPoints[Idx];
 end;
 
 function TFrameMRResults.FindDevicePoint(ADevice: TDevice;
   ASessionPoint: TDevicePoint): TDevicePoint;
 var
   P: TDevicePoint;
+  I: Integer;
 begin
   Result := nil;
   if (ADevice = nil) or (ADevice.Points = nil) or (ASessionPoint = nil) then
     Exit;
 
   for P in ADevice.Points do
-    if TMeasurementRun.IsPointEquivalent(P, ASessionPoint) then
+  begin
+    if P = ASessionPoint then
       Exit(P);
+    if (Trim(P.UUID) <> '') and SameText(Trim(P.UUID), Trim(ASessionPoint.UUID)) then
+      Exit(P);
+    if (Trim(P.DeviceTypeUUID) <> '') and
+       SameText(Trim(P.DeviceTypeUUID), Trim(ASessionPoint.DeviceTypeUUID)) then
+      Exit(P);
+    for I := 0 to High(ASessionPoint.Participants) do
+      if SameText(Trim(P.UUID), Trim(ASessionPoint.Participants[I].SourcePointUUID)) and
+         SameText(Trim(ADevice.UUID), Trim(ASessionPoint.Participants[I].DeviceUUID)) then
+        Exit(P);
+  end;
 end;
 
 function TFrameMRResults.FindPointSpillage(ADevice: TDevice;
@@ -492,28 +598,27 @@ function TFrameMRResults.FindPointSpillage(ADevice: TDevice;
 var
   S: TPointSpillage;
   Session: TSessionSpillage;
-  Fallback: TPointSpillage;
+  MatchedPoint: TDevicePoint;
 begin
   Result := nil;
   if (ADevice = nil) or (ADevice.Spillages = nil) or (ASessionPoint = nil) then
     Exit;
 
   Session := ADevice.GetActiveSessionSpillage;
-  Fallback := nil;
-
-  for S in ADevice.Spillages do
+  if Session = nil then
   begin
-    if not TMeasurementRun.IsPointEquivalent(ASessionPoint, S) then
-      Continue;
-
-    if (Session <> nil) and (S.SessionID = Session.ID) then
-      Exit(S);
-
-    if (Fallback = nil) or (S.DateTime > Fallback.DateTime) then
-      Fallback := S;
+    if FProceed is TFrameProceed then
+      Result := TFrameProceed(FProceed).FindResultSpillageForPoint(ADevice, ASessionPoint);
+    Exit;
   end;
 
-  Result := Fallback;
+  for S in ADevice.Spillages do
+    if (S <> nil) and (S.SessionID = Session.ID) then
+    begin
+      MatchedPoint := ADevice.FindMatchedDevicePointForSpillage(S);
+      if MatchedPoint = ASessionPoint then
+        Exit(S);
+    end;
 end;
 
 function TFrameMRResults.FormatPointHeader(APoint: TDevicePoint): string;
@@ -554,42 +659,27 @@ begin
 end;
 
 function TFrameMRResults.FormatSpillageErrors(ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): string;
-var
-  ErrValues: TArray<string>;
-  I: Integer;
 begin
   Result := '';
   if ASpillage = nil then
     Exit;
-
-  SetLength(ErrValues, 0);
-
-  if (ADevicePoint <> nil) and (ADevicePoint.ProtocolDataPoints <> nil) and (ADevicePoint.ProtocolDataPoints.Count > 0) then
-  begin
-    SetLength(ErrValues, ADevicePoint.ProtocolDataPoints.Count);
-    for I := 0 to ADevicePoint.ProtocolDataPoints.Count - 1 do
-      ErrValues[I] := FormatErrorValue(ADevicePoint.ProtocolDataPoints[I].Error);
-  end
-  else
-    ErrValues := [FormatErrorValue(ASpillage.Error)];
-
-  if Length(ErrValues) = 1 then
-    Result := ErrValues[0]
-  else
-    Result := '[' + string.Join('; ', ErrValues) + ']';
+  // ProtocolDataPoints is rebuilt by analysis and is not a stable session
+  // binding. Display the persisted spillage selected for this physical point.
+  Result := FormatErrorValue(ASpillage.Error);
 end;
 
 function TFrameMRResults.BuildErrorsListText(ADevice: TDevice;
-  ASessionPoint: TDevicePoint; const ACurrentError: Double;
+  ADevicePoint: TDevicePoint; const ACurrentError: Double;
   const AIncludeCurrent: Boolean): string;
 var
   S: TPointSpillage;
   Session: TSessionSpillage;
   Items: TArray<string>;
   Cnt: Integer;
+  MatchedPoint: TDevicePoint;
 begin
   Result := '';
-  if (ADevice = nil) or (ADevice.Spillages = nil) or (ASessionPoint = nil) then
+  if (ADevice = nil) or (ADevice.Spillages = nil) or (ADevicePoint = nil) then
     Exit;
 
   Session := ADevice.GetActiveSessionSpillage;
@@ -598,9 +688,12 @@ begin
 
   for S in ADevice.Spillages do
   begin
-    if (Session <> nil) and (S.SessionID <> Session.ID) then
+    if (S = nil) or ((Session <> nil) and (S.SessionID <> Session.ID)) then
       Continue;
-    if not TMeasurementRun.IsPointEquivalent(ASessionPoint, S) then
+    // The list contains only spillages which the production device matcher
+    // assigns to this concrete physical device point.
+    MatchedPoint := ADevice.FindMatchedDevicePointForSpillage(S);
+    if MatchedPoint <> ADevicePoint then
       Continue;
 
     SetLength(Items, Cnt + 1);
@@ -713,7 +806,7 @@ begin
         if (AChannel.FlowMeter.ValueError <> nil) then
           CurrentError := AChannel.FlowMeter.ValueError.GetDoubleValue;
 
-        ErrorsText := BuildErrorsListText(Device, ASessionPoint, CurrentError, True);
+        ErrorsText := BuildErrorsListText(Device, DevicePoint, CurrentError, True);
         if ErrorsText = '' then
           ErrorsText := '[' + FormatErrorValue(CurrentError) + ']';
         Result := FormatErrorValue(DevicePoint.Error) + ' / ' + ErrorsText;
@@ -721,7 +814,7 @@ begin
 
     csDone:
       begin
-        ErrorsText := BuildErrorsListText(Device, ASessionPoint, 0.0, False);
+        ErrorsText := BuildErrorsListText(Device, DevicePoint, 0.0, False);
         if ErrorsText <> '' then
           Result := FormatErrorValue(DevicePoint.Error) + ' / ' + ErrorsText
         else
