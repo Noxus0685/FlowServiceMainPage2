@@ -32,8 +32,7 @@ uses
   uWorkTable;
 
 type
-  TMRResultCellState = (csEmpty, csPending, csRunning, csDoneValid, csDoneInvalid, csDoneWarning);
-
+  TMRResultCellState = (csEmpty, csPending, csRunning, csDone);
   TFrameMRResults = class(TFrame, IEventObserver)
     GridMRResults: TGrid;
     StringColumnName: TStringColumn;
@@ -435,14 +434,22 @@ begin
 end;
 
 function TFrameMRResults.GetDisplayDeviceName(AChannel: TChannel): string;
+var
+  Device: TDevice;
 begin
   Result := '';
   if AChannel = nil then
     Exit;
 
-  if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) and
-     (AChannel.FlowMeter.Device.Name <> '') then
-    Exit(AChannel.FlowMeter.Device.Name);
+  if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) then
+  begin
+    Device := AChannel.FlowMeter.Device;
+    Result := Trim(Device.Name);
+    if Trim(Device.SerialNumber) <> '' then
+      Result := Trim(Result + ' ' + Trim(Device.SerialNumber));
+    if Result <> '' then
+      Exit;
+  end;
 
   if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.DeviceName <> '') then
     Exit(AChannel.FlowMeter.DeviceName);
@@ -541,10 +548,9 @@ end;
 
 function TFrameMRResults.FormatErrorValue(const AValue: Double): string;
 begin
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) and
-     (FActiveWorkTable.TableFlow.ValueError <> nil) then
-    Exit(FActiveWorkTable.TableFlow.ValueError.GetStrNumLimits(AValue));
-  Result := FormatDeviceError(AValue) + '%';
+  if FProceed is TFrameProceed then
+    Exit(TFrameProceed(FProceed).FormatResultErrorValue(AValue));
+  Result := FormatDeviceError(AValue);
 end;
 
 function TFrameMRResults.FormatSpillageErrors(ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): string;
@@ -671,29 +677,7 @@ begin
   if ASpillage = nil then
     Exit(csPending);
 
-case ADevicePoint.Status of
-  mptsInvalidPoint:
-    Result := csDoneInvalid;
-
-  mptsInterrupted,
-  mptsCancelled,
-  mptsDone:
-    Result := csDoneWarning;
-
-  mptsSaved:
-    Result := csDoneValid;
-else
-    case ASpillage.Status of
-      TPointSpillage.SPS_OK: Result := csDoneValid;
-      TPointSpillage.SPS_ERROR_EXCEEDED: Result := csDoneInvalid;
-      TPointSpillage.SPS_STOP_CRITERIA_FAILED: Result := csDoneWarning;
-    else
-      if Abs(ASpillage.Error) <= Abs(ADevicePoint.Error) then
-        Result := csDoneValid
-      else
-        Result := csDoneInvalid;
-    end;
-  end;
+  Result := csDone;
 end;
 
 function TFrameMRResults.GetCellText(AChannel: TChannel;
@@ -735,7 +719,7 @@ begin
         Result := FormatErrorValue(DevicePoint.Error) + ' / ' + ErrorsText;
       end;
 
-    csDoneValid, csDoneInvalid, csDoneWarning:
+    csDone:
       begin
         ErrorsText := BuildErrorsListText(Device, ASessionPoint, 0.0, False);
         if ErrorsText <> '' then
@@ -758,17 +742,16 @@ begin
 
   case CellState of
     csRunning: Result := COLOR_RUNNING;
-    csDoneValid: Result := COLOR_COMPLETED;
-    csDoneInvalid: Result := COLOR_INVALID;
-    csDoneWarning: Result := COLOR_WARNING;
+    csDone:
+      if FProceed is TFrameProceed then
+        Result := TFrameProceed(FProceed).GetPointResultColor(
+          AChannel.FlowMeter.Device, DevicePoint, Spillage);
   end;
 end;
 
 function TFrameMRResults.GetResultText(AChannel: TChannel): string;
 var
   Device: TDevice;
-  AllDone: Boolean;
-  DP: TDevicePoint;
 begin
   Result := '';
 
@@ -779,34 +762,13 @@ begin
   if Device = nil then
     Exit;
 
-  Device.AnalyseResults;
-
-  AllDone := (Device.Points <> nil) and (Device.Points.Count > 0);
-  if AllDone then
-    for DP in Device.Points do
-      if (DP = nil) or (DP.Status in [mptsNone, mptsSelectPoint]) then
-      begin
-        AllDone := False;
-        Break;
-      end;
-
-  if not AllDone and (Device.Status in [3, 4]) then
-    Exit('');
-
-  case Device.Status of
-    3: Result := 'не годен';
-    4: Result := '-';
-    5: Result := 'годен';
-  else
-    Result := '';
-  end;
+  if FProceed is TFrameProceed then
+    Result := TFrameProceed(FProceed).GetDeviceResultText(Device);
 end;
 
 function TFrameMRResults.GetResultColor(AChannel: TChannel): TAlphaColor;
 var
   Device: TDevice;
-  AllDone: Boolean;
-  DP: TDevicePoint;
 begin
   Result := TAlphaColors.Null;
 
@@ -817,25 +779,8 @@ begin
   if Device = nil then
     Exit;
 
-  Device.AnalyseResults;
-
-  AllDone := (Device.Points <> nil) and (Device.Points.Count > 0);
-  if AllDone then
-    for DP in Device.Points do
-      if (DP = nil) or (DP.Status in [mptsNone, mptsSelectPoint]) then
-      begin
-        AllDone := False;
-        Break;
-      end;
-
-  if not AllDone and (Device.Status in [3, 4]) then
-    Exit(COLOR_WARNING);
-
-  case Device.Status of
-    3: Result := COLOR_INVALID;
-    4: Result := COLOR_WARNING;
-    5: Result := COLOR_COMPLETED;
-  end;
+  if FProceed is TFrameProceed then
+    Result := TFrameProceed(FProceed).GetDeviceResultColor(Device);
 end;
 
 procedure TFrameMRResults.GridMRResultsGetValue(Sender: TObject; const ACol,
