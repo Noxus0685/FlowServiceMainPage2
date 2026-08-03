@@ -239,8 +239,14 @@ end;
 function TFrameMRResults.BuildExportData(ASelected: TChannel): TResultsExportData;
 var Ch: TChannel; Dev: TDevice; Session: TSessionSpillage; Spill: TPointSpillage;
   ES: TResultsExportSession; ED: TResultsExportDevice; ER: TResultsExportResult;
+  DevicePoint: TDevicePoint;
 begin
   Result := TResultsExportData.Create;
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
+  begin
+    Result.FlowDimensionIndex := FActiveWorkTable.ValueFlowRate.CurrentDimIndex;
+    Result.FlowUnitName := FActiveWorkTable.ValueFlowRate.GetDimName;
+  end;
   for Ch in FRows do begin
     if (ASelected <> nil) and (Ch <> ASelected) then Continue;
     if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then Continue;
@@ -257,8 +263,43 @@ begin
       if Spill=nil then Continue;
       ER := Default(TResultsExportResult); ER.DeviceName:=Dev.Name; ER.SerialNumber:=Dev.SerialNumber;
       ER.DeviceUUID:=Dev.UUID; ER.SessionID:=IntToStr(Session.ID); ER.PointName:=Spill.Name;
-      ER.ReferenceFlow:=Spill.QavgEtalon; ER.EtalonName:=Spill.EtalonName; ER.EtalonUUID:=Spill.EtalonUUID;
-      ER.DeviceValue:=Spill.DeviceVolumeFlow; ER.Error:=Spill.Error; ER.Status:=Spill.StatusStr;
+      { QavgEtalon and DeviceVolumeFlow are stored in the base flow unit (l/s).
+        Prepare display-unit numbers here; the generic XLSX writer must not convert them. }
+      if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
+        ER.ReferenceFlow := FActiveWorkTable.ValueFlowRate.GetDoubleNum(
+          Spill.QavgEtalon, Result.FlowDimensionIndex)
+      else
+        ER.ReferenceFlow := Spill.QavgEtalon;
+      ER.EtalonName:=Spill.EtalonName; ER.EtalonUUID:=Spill.EtalonUUID;
+      if TMeasuredDimension(Dev.MeasuredDimension) = mdVolumeFlow then
+      begin
+        if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
+          ER.DeviceValue := FActiveWorkTable.ValueFlowRate.GetDoubleNum(
+            Spill.DeviceVolumeFlow, Result.FlowDimensionIndex)
+        else
+          ER.DeviceValue := Spill.DeviceVolumeFlow;
+        ER.DeviceUnitName := Result.FlowUnitName;
+      end
+      else
+      begin
+        case TMeasuredDimension(Dev.MeasuredDimension) of
+          mdMassFlow: ER.DeviceValue := Dev.FromBaseUnits(Spill.DeviceMassFlow);
+          mdVolume: ER.DeviceValue := Dev.FromBaseUnits(Spill.DeviceVolume);
+          mdMass: ER.DeviceValue := Dev.FromBaseUnits(Spill.DeviceMass);
+          mdSpeed: ER.DeviceValue := Dev.FromBaseUnits(Spill.Velocity);
+        else
+          ER.DeviceValue := Dev.FromBaseUnits(Spill.DeviceVolumeFlow);
+        end;
+        ER.DeviceUnitName := Dev.GetDimensionName;
+      end;
+      ER.Error:=Spill.Error; ER.Status:=Spill.StatusStr;
+      DevicePoint := Dev.FindMatchedDevicePointForSpillage(Spill);
+      if (DevicePoint <> nil) and (not IsNan(DevicePoint.Error)) and
+         (not IsInfinite(DevicePoint.Error)) and (DevicePoint.Error > 0) then
+      begin
+        ER.PointAllowedError := DevicePoint.Error;
+        ER.PointAllowedErrorSet := True;
+      end;
       ER.Valid:=Spill.Valid; ER.MeasuredAt:=Spill.DateTime; Result.Results.Add(ER);
     end;
   end;
@@ -291,7 +332,7 @@ begin
     DebugLog(Format('ResultsXlsxExportRequested Scope=%s File=%s SessionIDs=%s Devices=%d Results=%d',[Scope,FileName,Sessions,Data.Devices.Count,Data.Results.Count]));
     try
       TResultsXlsxExporter.ExportToFile(Data,FileName);
-      DebugLog(Format('ResultsXlsxExportCompleted Scope=%s File=%s SessionIDs=%s Devices=%d Results=%d SharedStrings=%d Sheets=3 Size=%d DurationMs=%d',[Scope,FileName,Sessions,Data.Devices.Count,Data.Results.Count,0,TFile.GetSize(FileName),MilliSecondsBetween(Now,Started)]));
+      DebugLog(Format('ResultsXlsxExportCompleted Scope=%s File=%s SessionIDs=%s FlowUnit=%s FlowDimensionIndex=%d Devices=%d Results=%d Size=%d DurationMs=%d',[Scope,FileName,Sessions,Data.FlowUnitName,Data.FlowDimensionIndex,Data.Devices.Count,Data.Results.Count,TFile.GetSize(FileName),MilliSecondsBetween(Now,Started)]));
     except on E:Exception do begin
       DebugLog(Format('ResultsXlsxExportFailed Scope=%s File=%s SessionIDs=%s Devices=%d Results=%d DurationMs=%d Error=%s',[Scope,FileName,Sessions,Data.Devices.Count,Data.Results.Count,MilliSecondsBetween(Now,Started),E.Message]));
       ShowMessage(Format('Не удалось сохранить файл "%s".'+#13#10+'%s',[ExpandFileName(FileName),E.Message]));
