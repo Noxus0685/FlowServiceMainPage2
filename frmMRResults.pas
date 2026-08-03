@@ -43,14 +43,19 @@ type
     SpeedButton13: TSpeedButton;
     SpeedButton14: TSpeedButton;
     SpeedButtonCreatePoints: TSpeedButton;
+    ButtonClearSession: TButton;
+    ButtonCreateSession: TButton;
     procedure GridMRResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridMRResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas; const Column: TColumn;
       const Bounds: TRectF; const Row: Integer; const Value: TValue; const State: TGridDrawStates);
     procedure SpeedButtonCreatePointsClick(Sender: TObject);
+    procedure ButtonClearSessionClick(Sender: TObject);
+    procedure ButtonCreateSessionClick(Sender: TObject);
   private
     FActiveWorkTable: TWorkTable;
     FPointColumns: TObjectList<TStringColumn>;
     FRows: TList<TChannel>;
+    FProceed: TObject;
 
     function GetMeasurementRun: TMeasurementRun;
     procedure SetActiveWorkTable(const Value: TWorkTable);
@@ -89,6 +94,7 @@ type
 
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
     procedure UpdateUI;
+    procedure ConnectProcessingFrame(AProceed: TObject);
 
     property MeasurementRun: TMeasurementRun read GetMeasurementRun;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
@@ -97,6 +103,9 @@ type
 procedure SetGridReadOnly(AGrid: TGrid);
 
 implementation
+
+uses
+  frmProceed;
 
 {$R *.fmx}
 
@@ -173,6 +182,31 @@ begin
   MeasurementRun.InvalidatePreparedPoints;
   MeasurementRun.RebuildMeasurementPoints;
   UpdateUI;
+end;
+
+procedure TFrameMRResults.ConnectProcessingFrame(AProceed: TObject);
+begin
+  FProceed := AProceed;
+end;
+
+procedure TFrameMRResults.ButtonClearSessionClick(Sender: TObject);
+var
+  Channel: TChannel;
+begin
+  Channel := GetRowChannel(GridMRResults.Row);
+  if (FProceed = nil) or (Channel = nil) or (Channel.FlowMeter = nil) then
+    Exit;
+  TFrameProceed(FProceed).RequestClearActiveSession(Channel.FlowMeter.Device);
+end;
+
+procedure TFrameMRResults.ButtonCreateSessionClick(Sender: TObject);
+var
+  Channel: TChannel;
+begin
+  Channel := GetRowChannel(GridMRResults.Row);
+  if (FProceed = nil) or (Channel = nil) or (Channel.FlowMeter = nil) then
+    Exit;
+  TFrameProceed(FProceed).RequestCreateSession(Channel.FlowMeter.Device);
 end;
 
 procedure TFrameMRResults.OnNotify(Sender: TObject; Event: Integer; Data: TObject);

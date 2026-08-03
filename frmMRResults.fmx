@@ -41,6 +41,24 @@ object FrameMRResults: TFrameMRResults
     Size.Height = 32.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 1
+    object ButtonClearSession: TButton
+      Align = Left
+      Size.Width = 130.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1089#1077#1089#1089#1080#1102
+      TextSettings.Trimming = None
+      OnClick = ButtonClearSessionClick
+    end
+    object ButtonCreateSession: TButton
+      Align = Left
+      Size.Width = 165.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      Text = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
+      TextSettings.Trimming = None
+      OnClick = ButtonCreateSessionClick
+    end
     object SpeedButton11: TSpeedButton
       Align = Left
       Size.Width = 57.000000000000000000
