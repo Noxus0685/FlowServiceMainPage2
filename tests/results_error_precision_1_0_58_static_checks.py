@@ -22,7 +22,7 @@ def test_actual_errors_match_processing_precision():
     assert processing_cell in PROCESSING
     formatter = _method(
         RESULTS,
-        "function TFrameMRResults.FormatActualErrorValue",
+        "function FormatMRActualErrorValue",
         "function TFrameMRResults.FormatSpillageErrors",
     )
     assert "FormatFloat('0.###', AValue)" in formatter
@@ -34,7 +34,7 @@ def test_actual_errors_match_processing_precision():
 def test_unavailable_double_marker_is_not_rendered_as_an_error():
     formatter = _method(
         RESULTS,
-        "function TFrameMRResults.FormatActualErrorValue",
+        "function FormatMRActualErrorValue",
         "function TFrameMRResults.FormatSpillageErrors",
     )
     assert "AValue <= -MaxDouble" in formatter
@@ -44,13 +44,13 @@ def test_unavailable_double_marker_is_not_rendered_as_an_error():
 
 
 def test_only_actual_results_use_processing_precision():
-    assert "FormatActualErrorValue(S.Error)" in RESULTS
-    assert "FormatActualErrorValue(ASpillage.Error)" in RESULTS
-    assert "FormatActualErrorValue(ACurrentError)" in RESULTS
+    assert "FormatMRActualErrorValue(S.Error)" in RESULTS
+    assert "FormatMRActualErrorValue(ASpillage.Error)" in RESULTS
+    assert "FormatMRActualErrorValue(ACurrentError)" in RESULTS
     tolerance = _method(
         RESULTS,
         "function TFrameMRResults.FormatErrorValue",
-        "function TFrameMRResults.FormatActualErrorValue",
+        "function FormatMRActualErrorValue",
     )
     assert "ValueError.GetStrNumLimits(AValue)" in tolerance
 
