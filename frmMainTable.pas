@@ -6309,7 +6309,7 @@ begin
       SetFlowChartYAxis(AChart, AxisMinDisplay, AxisMaxDisplay);
     end;
     if Assigned(ProtocolManager) and (ScaleSeriesCount > 0) then
-      ProtocolManager.AddMessage(pcInfo, psForm, 'GraphScale', ATitle,
+      ProtocolManager.AddMessage(pcMKS, psForm, 'GraphScale', ATitle,
         Format('AutoScaleMode=%d; ScaleMin=%g; ScaleMax=%g; Target=%g; Lower=%g; Upper=%g; SeriesCount=%d',
         [Ord(AutoScaleMode), AChart.YMin, AChart.YMax, Limits.TargetLS,
          Limits.LowerLS, Limits.UpperLS, ScaleSeriesCount]));
