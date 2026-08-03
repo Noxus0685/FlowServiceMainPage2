@@ -82,6 +82,7 @@ type
 
     function FormatPointHeader(APoint: TDevicePoint): string;
     function FormatErrorValue(const AValue: Double): string;
+    function FormatActualErrorValue(const AValue: Double): string;
     function FormatSpillageErrors(ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): string;
     function BuildErrorsListText(ADevice: TDevice; ADevicePoint: TDevicePoint;
       const ACurrentError: Double; const AIncludeCurrent: Boolean): string;
@@ -658,14 +659,36 @@ begin
   Result := FormatDeviceError(AValue);
 end;
 
+function TFrameMRResults.FormatActualErrorValue(const AValue: Double): string;
+begin
+  // Processing renders saved result cells with this production precision.
+  // -MaxDouble is TMeterValue's marker for an unavailable numeric value.
+  if IsNan(AValue) or IsInfinite(AValue) or (AValue <= -MaxDouble) then
+    Exit('-');
+  Result := FormatFloat('0.###', AValue);
+end;
+
 function TFrameMRResults.FormatSpillageErrors(ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): string;
 begin
   Result := '';
   if ASpillage = nil then
     Exit;
-  // ProtocolDataPoints is rebuilt by analysis and is not a stable session
-  // binding. Display the persisted spillage selected for this physical point.
-  Result := FormatErrorValue(ASpillage.Error);
+
+  SetLength(ErrValues, 0);
+
+  if (ADevicePoint <> nil) and (ADevicePoint.ProtocolDataPoints <> nil) and (ADevicePoint.ProtocolDataPoints.Count > 0) then
+  begin
+    SetLength(ErrValues, ADevicePoint.ProtocolDataPoints.Count);
+    for I := 0 to ADevicePoint.ProtocolDataPoints.Count - 1 do
+      ErrValues[I] := FormatActualErrorValue(ADevicePoint.ProtocolDataPoints[I].Error);
+  end
+  else
+    ErrValues := [FormatActualErrorValue(ASpillage.Error)];
+
+  if Length(ErrValues) = 1 then
+    Result := ErrValues[0]
+  else
+    Result := '[' + string.Join('; ', ErrValues) + ']';
 end;
 
 function TFrameMRResults.BuildErrorsListText(ADevice: TDevice;
@@ -697,14 +720,14 @@ begin
       Continue;
 
     SetLength(Items, Cnt + 1);
-    Items[Cnt] := FormatErrorValue(S.Error);
+    Items[Cnt] := FormatActualErrorValue(S.Error);
     Inc(Cnt);
   end;
 
   if AIncludeCurrent then
   begin
     SetLength(Items, Cnt + 1);
-    Items[Cnt] := FormatErrorValue(ACurrentError);
+    Items[Cnt] := FormatActualErrorValue(ACurrentError);
     Inc(Cnt);
   end;
 
@@ -808,7 +831,7 @@ begin
 
         ErrorsText := BuildErrorsListText(Device, DevicePoint, CurrentError, True);
         if ErrorsText = '' then
-          ErrorsText := '[' + FormatErrorValue(CurrentError) + ']';
+          ErrorsText := '[' + FormatActualErrorValue(CurrentError) + ']';
         Result := FormatErrorValue(DevicePoint.Error) + ' / ' + ErrorsText;
       end;
 
