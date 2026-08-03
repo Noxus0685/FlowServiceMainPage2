@@ -61,18 +61,30 @@ main_before = (ROOT / "frmMainTable.pas").read_text(encoding="utf-8-sig")
 
 assert "EnsureMeasurementRunSubscription" in pause_click
 assert "LRun := GetMeasurementRun" in pause_click
-assert "LWasPaused := LRun.IsPaused" in pause_click
-assert "MeasurementUiCommandRequested" in pause_click
-assert "Command=%s; Stage=%s; CurrentPointIndex=%d; CurrentPointUUID=%s; IsPausedBefore=%s" in pause_click
+assert "if LRun.IsPaused then" in pause_click
 assert "LRun.Execute(mcPause, Null)" in pause_click
 assert "LRun.Execute(mcResume, Null)" in pause_click
-for forbidden in ["MeasurementPauseButtonRawClick", "MeasurementStopRequested", "StopMeasurementRun", "mcStop", "RequestStop", "StopTest",
-                  "MarkCurrentPointCancelled", "MarkCurrentPointSkipped",
-                  "SetStage(msDone)", "SetStage(msNone)"]:
+for forbidden in ["MeasurementPauseButtonRawClick", "MeasurementStopRequested",
+                  "MeasurementStopAccepted", "MeasurementStopRejected",
+                  "MeasurementStopCompleted", "MeasurementStageExecutionAborted",
+                  "MeasurementElapsedTimeFrozen", "StopMeasurementRun", "mcStop",
+                  "RequestStop", "StopTest", "MarkCurrentPointCancelled",
+                  "MarkCurrentPointSkipped", "SetStage(msDone)", "SetStage(msNone)"]:
     assert forbidden not in pause_click
+for forbidden in ["CurrentPoint :=", "CurrentPointIndex :=", "mptsCancelled", "mptsSkipped"]:
+    assert forbidden not in pause_click
+assert "Source=SpeedButtonPauseClick" not in FRAME
 assert FMX.count("OnClick = SpeedButtonPauseClick") == 1
-assert "StyleLookup = 'pausetoolbuttonbordered'" in FMX
-assert "Hint = 'Пауза/Продолжить'" in FMX
-assert "Action =" not in FMX.split("object SpeedButtonPause:", 1)[1].split("end", 1)[0]
-assert "playtoolbuttonbordered" in FRAME
-assert "pausetoolbuttonbordered" in FRAME
+pause_fmx = FMX.split("object SpeedButtonPause:", 1)[1].split("end", 1)[0]
+assert "StyleLookup = 'pausetoolbuttonbordered'" in pause_fmx
+assert "stoptoolbutton" not in pause_fmx.lower()
+assert "cancel" not in pause_fmx.lower()
+assert "Action =" not in pause_fmx and "OnExecute =" not in pause_fmx
+pause_state = FRAME.split("procedure TFrameMeasurementRun.UpdatePauseButtonState", 1)[1].split(
+    "function TFrameMeasurementRun.ResolvePointRow", 1)[0]
+assert "LRun.IsPaused" in pause_state
+assert "playtoolbuttonbordered" in pause_state
+assert "pausetoolbuttonbordered" in pause_state
+assert "SpeedButtonPause.Enabled" in pause_state
+assert "mcPause" not in pause_state and "mcResume" not in pause_state
+assert "stoptoolbutton" not in pause_state

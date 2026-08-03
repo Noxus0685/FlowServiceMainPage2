@@ -757,11 +757,18 @@ var
   LRun: TMeasurementRun;
 begin
   LRun := GetMeasurementRun;
+  SpeedButtonPause.Enabled := (LRun <> nil) and
+    not (LRun.Stage in [msNone, msDone]);
   if (LRun <> nil) and LRun.IsPaused then
-    SpeedButtonPause.StyleLookup := 'playtoolbuttonbordered'
+  begin
+    SpeedButtonPause.StyleLookup := 'playtoolbuttonbordered';
+    SpeedButtonPause.Hint := 'Продолжить';
+  end
   else
+  begin
     SpeedButtonPause.StyleLookup := 'pausetoolbuttonbordered';
-  SpeedButtonPause.Hint := 'Пауза/Продолжить';
+    SpeedButtonPause.Hint := 'Пауза';
+  end;
 end;
 
 function TFrameMeasurementRun.ResolvePointRow(const AUUID: string; APoint: TDevicePoint;
@@ -911,37 +918,16 @@ end;
 procedure TFrameMeasurementRun.SpeedButtonPauseClick(Sender: TObject);
 var
   LRun: TMeasurementRun;
-  LWasPaused: Boolean;
-  LCommand, LPointUUID: string;
 begin
   EnsureMeasurementRunSubscription;
   LRun := GetMeasurementRun;
   if LRun = nil then
     Exit;
-
-  LWasPaused := LRun.IsPaused;
-  if LWasPaused then
-    LCommand := 'Resume'
-  else
-    LCommand := 'Pause';
-  LPointUUID := '';
-  if LRun.CurrentPoint <> nil then
-    LPointUUID := LRun.CurrentPoint.UUID;
-
-  ProtocolManager.AddMessage(pcAction, psMeasurement,
-    'MeasurementUiCommandRequested', 'Запрошена команда управления паузой',
-    Format('Command=%s; Stage=%s; CurrentPointIndex=%d; CurrentPointUUID=%s; IsPausedBefore=%s',
-      [LCommand, TMeasurementRun.MeasurementStateToString(LRun.Stage),
-       LRun.CurrentPointIndex, LPointUUID, BoolToStr(LWasPaused, True)]));
-
-  if LWasPaused then
+  if LRun.IsPaused then
     LRun.Execute(mcResume, Null)
   else
     LRun.Execute(mcPause, Null);
-
   UpdatePauseButtonState;
-  UpdateMeasurementControls;
-  if Assigned(FOnRunUIChanged) then FOnRunUIChanged(Self);
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointDeleteClick(Sender: TObject);
