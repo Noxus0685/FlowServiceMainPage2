@@ -149,10 +149,3 @@ __astcache/
 /Win32/
 /Win64/
 /__history/
-/vcpkg/
-/vcpkg_installed/
-/ThirdParty/libxlsxwriter/build/
-!ThirdParty/libxlsxwriter/Win32/
-!ThirdParty/libxlsxwriter/Win32/.gitkeep
-!ThirdParty/libxlsxwriter/Win64/
-!ThirdParty/libxlsxwriter/Win64/.gitkeep
