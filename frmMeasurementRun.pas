@@ -912,6 +912,7 @@ procedure TFrameMeasurementRun.SpeedButtonPauseClick(Sender: TObject);
 var
   LRun: TMeasurementRun;
   LWasPaused: Boolean;
+  LCommand, LPointUUID: string;
 begin
   EnsureMeasurementRunSubscription;
   LRun := GetMeasurementRun;
@@ -919,6 +920,20 @@ begin
     Exit;
 
   LWasPaused := LRun.IsPaused;
+  if LWasPaused then
+    LCommand := 'Resume'
+  else
+    LCommand := 'Pause';
+  LPointUUID := '';
+  if LRun.CurrentPoint <> nil then
+    LPointUUID := LRun.CurrentPoint.UUID;
+
+  ProtocolManager.AddMessage(pcAction, psMeasurement,
+    'MeasurementUiCommandRequested', 'Запрошена команда управления паузой',
+    Format('Command=%s; Stage=%s; CurrentPointIndex=%d; CurrentPointUUID=%s; IsPausedBefore=%s',
+      [LCommand, TMeasurementRun.MeasurementStateToString(LRun.Stage),
+       LRun.CurrentPointIndex, LPointUUID, BoolToStr(LWasPaused, True)]));
+
   if LWasPaused then
     LRun.Execute(mcResume, Null)
   else
