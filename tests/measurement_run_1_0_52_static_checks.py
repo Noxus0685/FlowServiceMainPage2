@@ -53,7 +53,7 @@ assert "OnClick = SpeedButtonPauseClick" in FMX
 assert "OnClick = SpeedButtonPointMoveUpClick" in FMX
 assert "OnClick = SpeedButtonPointMoveDownClick" in FMX
 assert "OnClick :=" not in FORM
-assert "APP_VERSION = '1.0.52'" in VERSION
+assert "APP_VERSION = '1.0.53'" in VERSION
 for relative in ("frmMeasurementRun.pas", "frmMeasurementRun.fmx", "uMeasurementRun.pas", "uAppVersion.pas"):
     assert (ROOT / relative).read_bytes().startswith(b"\xef\xbb\xbf")
 
