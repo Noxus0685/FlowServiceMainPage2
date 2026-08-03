@@ -544,6 +544,7 @@ type
     property CurrentPoint: TDevicePoint read GetCurrentPoint;
     property CurrentRepeat: Integer read FCurrentRepeat;
     property StopRequested: Boolean read FStopRequested;
+    property PhysicalMeasurementStarted: Boolean read HasPhysicalMeasurementStarted;
     property NextStageAfterSave: EMeasurementState read FNextStageAfterSave;
     property ForceNextPoint: Integer read FForceNextPoint;
     property Attempt: Integer read FAttempt;
@@ -1280,6 +1281,15 @@ begin
   else
     ReasonText := 'UserStop';
   SetPointStatus(Point, mptsCancelled, ReasonText, -1);
+  // DateTime is the model's persisted completion timestamp.  The grid's
+  // "Time" column is LimitTime (planned time), so it must never be advanced
+  // from Now during repaint; this one assignment freezes the actual finish.
+  Point.DateTime := Now;
+  ProtocolManager.AddMessage(pcState, psMeasurement,
+    'MeasurementElapsedTimeFrozen', 'Зафиксировано время отмены точки',
+    Format('PointIndex=%d; PointUUID=%s; FinishedAt=%s; Stage=%s',
+      [FCurrentPointIndex, Point.UUID, DateTimeToStr(Point.DateTime),
+       MeasurementStateToString(FCurrentStage)]));
 end;
 
 
@@ -1535,6 +1545,9 @@ begin
       Exit;
     end;
 
+    if IsStopRequested then
+      Exit;
+
     FireEvent(mePointSet);
     SetStage(msWaitMeasureStart);
     Exit;
@@ -1558,6 +1571,8 @@ begin
       ContinueAfterPointError(mptsSetupError, mePointNotSet, Error);
       Exit;
     end;
+    if IsStopRequested then
+      Exit;
   end
   else
     SetCurrentPointStatus(mptsSetupPoint);
@@ -1567,6 +1582,9 @@ begin
     ContinueAfterPointError(mptsSetupError, mePointNotSet, Error);
     Exit;
   end;
+
+  if IsStopRequested then
+    Exit;
 
   FireEvent(mePointSet);
   if ShouldWaitStable then
@@ -1988,6 +2006,12 @@ begin
   end;
 
   Notify(Integer(meStateChanged), nil);
+  if AResult = mrrCancelled then
+    ProtocolManager.AddMessage(pcState, psMeasurement,
+      'MeasurementStopCompleted', 'Остановка измерительного запуска завершена',
+      Format('PreviousStage=%s; FinalStage=%s; PointIndex=%d',
+        [MeasurementStateToString(PreviousStage),
+         MeasurementStateToString(FCurrentStage), CurrentPointIndexBefore]));
   if FThread <> nil then
     FThread.Terminate;
 end;
@@ -4385,6 +4409,14 @@ var
   ReasonSnapshot: TMeasurementStopReason;
   Duplicate: Boolean;
 begin
+  if FCurrentStage in [msNone, msDone] then
+  begin
+    ProtocolManager.AddMessage(pcInfo, psMeasurement,
+      'MeasurementStopRejected', 'Stop отклонён неактивным запуском',
+      Format('Stage=%s; Reason=RunInactive',
+        [MeasurementStateToString(FCurrentStage)]));
+    Exit;
+  end;
   FCriticalSection.Acquire;
   try
     StageSnapshot := FCurrentStage;
@@ -4419,8 +4451,26 @@ begin
       Exit;
   end;
 
-  ProtocolManager.AddMessage(pcAction, psMeasurement, 'MeasurementStopRequested',
-    'Запрошена принудительная остановка измерения',
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'MeasurementStopAccepted',
+    'Принудительная остановка принята измерительным запуском',
+    Format('Stage=%s; Reason=%s', [MeasurementStateToString(StageSnapshot),
+      MeasurementStopReasonToString(ReasonSnapshot)]));
+
+  // Navigation uses the stop machinery only to finish a physical operation;
+  // it has already marked the point as skipped and must never cancel it.
+  if ReasonSnapshot <> msrUserRollback then
+    MarkCurrentPointCancelled(ReasonSnapshot);
+
+  if not HasPhysicalMeasurementStarted and
+     (StageSnapshot in [msSelectPoint, msSelectEtalon, msSetupPoint,
+       msWaitPointSetup, msWaitStable, msWaitMeasureStart]) then
+    ProtocolManager.AddMessage(pcState, psMeasurement,
+      'MeasurementStageExecutionAborted', 'Выполнение подготовительной стадии прекращено',
+      Format('Stage=%s; PointIndex=%d',
+        [MeasurementStateToString(StageSnapshot), FCurrentPointIndex]));
+
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'StopRequested',
+    'Stop принят измерительным запуском',
     Format('Stage=%s; Reason=%s', [MeasurementStateToString(StageSnapshot),
       MeasurementStopReasonToString(ReasonSnapshot)]));
 
