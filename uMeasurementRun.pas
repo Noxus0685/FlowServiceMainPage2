@@ -383,6 +383,14 @@ type
     /// observers only when the value has actually changed.
     /// </summary>
     procedure SetCurrentPointStatus(const AStatus: EMeasurementPointStatus);
+    procedure SetPointStatus(APoint: TDevicePoint;
+      const AStatus: EMeasurementPointStatus); overload;
+    procedure SetPointStatus(APoint: TDevicePoint;
+      const AStatus: EMeasurementPointStatus; const AReason: string;
+      const ATargetIndex: Integer); overload;
+    procedure MarkCurrentPointSkipped(const ADirection: string;
+      const ATargetIndex: Integer);
+    procedure MarkCurrentPointCancelled(const AReason: TMeasurementStopReason);
     procedure RequestStop;
     procedure StopWorkerThread;
     function IsStopRequested: Boolean;
@@ -394,6 +402,7 @@ type
     procedure RouteStopInWorker;
     procedure MarkInterruptedPointIfNeeded;
     class function MeasurementStopReasonToString(AReason: TMeasurementStopReason): string; static;
+    class function MeasurementPointStatusToString(AStatus: EMeasurementPointStatus): string; static;
     procedure ProcessSelectPoint;
     procedure ProcessSelectEtalon;
     procedure ProcessSetupPoint;
@@ -535,6 +544,7 @@ type
     property CurrentPoint: TDevicePoint read GetCurrentPoint;
     property CurrentRepeat: Integer read FCurrentRepeat;
     property StopRequested: Boolean read FStopRequested;
+    property PhysicalMeasurementStarted: Boolean read HasPhysicalMeasurementStarted;
     property NextStageAfterSave: EMeasurementState read FNextStageAfterSave;
     property ForceNextPoint: Integer read FForceNextPoint;
     property Attempt: Integer read FAttempt;
@@ -1186,19 +1196,100 @@ begin
 end;
 
 procedure TMeasurementRun.SetCurrentPointStatus(const AStatus: EMeasurementPointStatus);
+begin
+  SetPointStatus(GetCurrentPoint, AStatus);
+end;
+
+procedure TMeasurementRun.SetPointStatus(APoint: TDevicePoint;
+  const AStatus: EMeasurementPointStatus);
+var
+  Reason: string;
+begin
+  if AStatus in [mptsInvalidPoint, mptsSetupError, mptsMeasureError,
+    mptsStabilityError, mptsDevicePointMismatch] then
+    Reason := 'Error'
+  else if AStatus in [mptsDone, mptsSaved] then
+    Reason := 'NormalComplete'
+  else
+    Reason := 'StageChange';
+  SetPointStatus(APoint, AStatus, Reason, -1);
+end;
+
+procedure TMeasurementRun.SetPointStatus(APoint: TDevicePoint;
+  const AStatus: EMeasurementPointStatus; const AReason: string;
+  const ATargetIndex: Integer);
+var
+  OldStatus: EMeasurementPointStatus;
+  PointIndex: Integer;
+begin
+  if APoint = nil then
+    Exit;
+  OldStatus := APoint.Status;
+  if OldStatus = AStatus then
+    Exit;
+  // A terminal result belongs to the point object and must survive later FSM
+  // callbacks, refreshes, and row reordering.
+  if OldStatus in [mptsSaved, mptsInvalidPoint, mptsSetupError,
+      mptsMeasureError, mptsStabilityError, mptsDevicePointMismatch,
+      mptsInterrupted, mptsCancelled, mptsSkipped] then
+    Exit;
+  APoint.Status := AStatus;
+  PointIndex := -1;
+  if FPoints <> nil then
+    PointIndex := FPoints.IndexOf(APoint);
+  AddDiagnosticEvent('PointStatus -> ' + GetEnumName(TypeInfo(EMeasurementPointStatus), Ord(AStatus)));
+  ProtocolManager.AddMessage(pcState, psMeasurement,
+    'MeasurementPointStatusChanged', 'Изменён статус точки',
+    Format('PointIndex=%d; PointUUID=%s; PointName=%s; OldStatus=%s; NewStatus=%s; Reason=%s; Stage=%s; TargetIndex=%d; StopReason=%s',
+      [PointIndex, APoint.UUID, APoint.Name,
+       MeasurementPointStatusToString(OldStatus),
+       MeasurementPointStatusToString(AStatus), AReason,
+       MeasurementStateToString(FCurrentStage), ATargetIndex,
+       MeasurementStopReasonToString(GetStopReason)]));
+  // Status updates refresh observers without impersonating a current-point change.
+  Notify(Integer(meStateChanged), APoint);
+end;
+
+procedure TMeasurementRun.MarkCurrentPointSkipped(const ADirection: string;
+  const ATargetIndex: Integer);
 var
   Point: TDevicePoint;
 begin
   Point := GetCurrentPoint;
-  if Point = nil then
+  if (Point = nil) or (Point.Status in [mptsDone, mptsSaved, mptsInvalidPoint,
+    mptsSetupError, mptsMeasureError, mptsStabilityError,
+    mptsDevicePointMismatch, mptsInterrupted, mptsCancelled, mptsSkipped]) then
     Exit;
-  if Point.Status = AStatus then
+  SetPointStatus(Point, mptsSkipped, ADirection + 'Point', ATargetIndex);
+end;
+
+procedure TMeasurementRun.MarkCurrentPointCancelled(
+  const AReason: TMeasurementStopReason);
+var
+  Point: TDevicePoint;
+  ReasonText: string;
+begin
+  if FCurrentStage in [msNone, msDone] then
     Exit;
-  Point.Status := AStatus;
-  AddDiagnosticEvent('PointStatus -> ' + GetEnumName(TypeInfo(EMeasurementPointStatus), Ord(AStatus)));
-  if FWorkTable <> nil then
- //   FWorkTable.MeasurementRunPointChanged(Self, Point, FCurrentPointIndex);
- // Notify(Integer(mePointChanged), Point);
+  Point := GetCurrentPoint;
+  if (Point = nil) or (Point.Status in [mptsDone, mptsSaved, mptsInvalidPoint,
+    mptsSetupError, mptsMeasureError, mptsStabilityError,
+    mptsDevicePointMismatch, mptsInterrupted, mptsSkipped, mptsCancelled]) then
+    Exit;
+  if AReason = msrExternalCommand then
+    ReasonText := 'Cancel'
+  else
+    ReasonText := 'UserStop';
+  SetPointStatus(Point, mptsCancelled, ReasonText, -1);
+  // DateTime is the model's persisted completion timestamp.  The grid's
+  // "Time" column is LimitTime (planned time), so it must never be advanced
+  // from Now during repaint; this one assignment freezes the actual finish.
+  Point.DateTime := Now;
+  ProtocolManager.AddMessage(pcState, psMeasurement,
+    'MeasurementElapsedTimeFrozen', 'Зафиксировано время отмены точки',
+    Format('PointIndex=%d; PointUUID=%s; FinishedAt=%s; Stage=%s',
+      [FCurrentPointIndex, Point.UUID, DateTimeToStr(Point.DateTime),
+       MeasurementStateToString(FCurrentStage)]));
 end;
 
 
@@ -1454,6 +1545,9 @@ begin
       Exit;
     end;
 
+    if IsStopRequested then
+      Exit;
+
     FireEvent(mePointSet);
     SetStage(msWaitMeasureStart);
     Exit;
@@ -1477,6 +1571,8 @@ begin
       ContinueAfterPointError(mptsSetupError, mePointNotSet, Error);
       Exit;
     end;
+    if IsStopRequested then
+      Exit;
   end
   else
     SetCurrentPointStatus(mptsSetupPoint);
@@ -1486,6 +1582,9 @@ begin
     ContinueAfterPointError(mptsSetupError, mePointNotSet, Error);
     Exit;
   end;
+
+  if IsStopRequested then
+    Exit;
 
   FireEvent(mePointSet);
   if ShouldWaitStable then
@@ -1907,6 +2006,12 @@ begin
   end;
 
   Notify(Integer(meStateChanged), nil);
+  if AResult = mrrCancelled then
+    ProtocolManager.AddMessage(pcState, psMeasurement,
+      'MeasurementStopCompleted', 'Остановка измерительного запуска завершена',
+      Format('PreviousStage=%s; FinalStage=%s; PointIndex=%d',
+        [MeasurementStateToString(PreviousStage),
+         MeasurementStateToString(FCurrentStage), CurrentPointIndexBefore]));
   if FThread <> nil then
     FThread.Terminate;
 end;
@@ -4304,6 +4409,14 @@ var
   ReasonSnapshot: TMeasurementStopReason;
   Duplicate: Boolean;
 begin
+  if FCurrentStage in [msNone, msDone] then
+  begin
+    ProtocolManager.AddMessage(pcInfo, psMeasurement,
+      'MeasurementStopRejected', 'Stop отклонён неактивным запуском',
+      Format('Stage=%s; Reason=RunInactive',
+        [MeasurementStateToString(FCurrentStage)]));
+    Exit;
+  end;
   FCriticalSection.Acquire;
   try
     StageSnapshot := FCurrentStage;
@@ -4338,8 +4451,26 @@ begin
       Exit;
   end;
 
-  ProtocolManager.AddMessage(pcAction, psMeasurement, 'RequestStop',
-    'Запрошена принудительная остановка измерения',
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'MeasurementStopAccepted',
+    'Принудительная остановка принята измерительным запуском',
+    Format('Stage=%s; Reason=%s', [MeasurementStateToString(StageSnapshot),
+      MeasurementStopReasonToString(ReasonSnapshot)]));
+
+  // Navigation uses the stop machinery only to finish a physical operation;
+  // it has already marked the point as skipped and must never cancel it.
+  if ReasonSnapshot <> msrUserRollback then
+    MarkCurrentPointCancelled(ReasonSnapshot);
+
+  if not HasPhysicalMeasurementStarted and
+     (StageSnapshot in [msSelectPoint, msSelectEtalon, msSetupPoint,
+       msWaitPointSetup, msWaitStable, msWaitMeasureStart]) then
+    ProtocolManager.AddMessage(pcState, psMeasurement,
+      'MeasurementStageExecutionAborted', 'Выполнение подготовительной стадии прекращено',
+      Format('Stage=%s; PointIndex=%d',
+        [MeasurementStateToString(StageSnapshot), FCurrentPointIndex]));
+
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'StopRequested',
+    'Stop принят измерительным запуском',
     Format('Stage=%s; Reason=%s', [MeasurementStateToString(StageSnapshot),
       MeasurementStopReasonToString(ReasonSnapshot)]));
 
@@ -4469,6 +4600,7 @@ begin
       Format('TargetIndex=%d; ForceNextPointAfter=%d; NextStageAfterSave=%s; Route=%s',
         [ATargetIndex, FForceNextPoint,
          MeasurementStateToString(FNextStageAfterSave), Route]));
+    MarkCurrentPointSkipped(ADirection, ATargetIndex);
     ProtocolManager.AddMessage(pcProc, psMeasurement,
       'MeasurementPointNavigationStoppingCurrent',
       'Текущая физическая операция завершается штатно',
@@ -4485,6 +4617,7 @@ begin
       Format('TargetIndex=%d; ForceNextPointAfter=%d; NextStageAfterSave=%s; Route=%s',
         [ATargetIndex, FForceNextPoint,
          MeasurementStateToString(FNextStageAfterSave), Route]));
+    MarkCurrentPointSkipped(ADirection, ATargetIndex);
     if FWorkTable <> nil then
       FWorkTable.StopMonitor;
     if FCurrentStage = msSelectPoint then
@@ -6160,6 +6293,17 @@ begin
     msrUserRollback: Result := 'отмена результатов пользователем';
   else
     Result := 'неизвестная причина';
+  end;
+end;
+
+class function TMeasurementRun.MeasurementPointStatusToString(
+  AStatus: EMeasurementPointStatus): string;
+begin
+  case AStatus of
+    mptsSkipped: Result := 'Пропущена';
+    mptsCancelled: Result := 'Отменено';
+  else
+    Result := GetEnumName(TypeInfo(EMeasurementPointStatus), Ord(AStatus));
   end;
 end;
 

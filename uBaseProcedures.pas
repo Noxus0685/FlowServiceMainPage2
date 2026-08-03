@@ -146,7 +146,9 @@ type
     mptsCancelled = 15,
     mptsSaved = 16,
     mptsStabilityError = 17,
-    mptsDevicePointMismatch = 18
+    mptsDevicePointMismatch = 18,
+    // Appended to preserve the persisted ordinal values of all existing states.
+    mptsSkipped = 19
   );
 
   /// <summary>One physical-value sample stored by TMeterValue for stability analysis.</summary>
