@@ -122,8 +122,9 @@ object FrameMRResults: TFrameMRResults
   end
   object SaveDialogXlsx: TSaveDialog
     DefaultExt = 'xlsx'
+    FileName = 'Results.xlsx'
     Filter = 'Excel Workbook (*.xlsx)|*.xlsx'
-    Left = 1056.000000000000000000
-    Top = 40.000000000000000000
+    Left = 1072
+    Top = 48
   end
 end
