@@ -75,6 +75,7 @@ type
       ARow: Integer; const Value: TValue);
     procedure GridMeasurmentRunCellClick(const Column: TColumn; const Row: Integer);
     procedure GridMeasurmentRunHeaderClick(Column: TColumn);
+    procedure GridMeasurmentRunSelChanged(Sender: TObject);
     procedure SpeedButtonCreatePointsClick(Sender: TObject);
     procedure SpeedButtonPauseClick(Sender: TObject);
     procedure SpeedButtonPointDeleteClick(Sender: TObject);
@@ -90,12 +91,16 @@ type
     FCurrentPointUUID: string;
     FCurrentPoint: TDevicePoint;
     FLastIndicatorUUID: string;
+    FSubscribedMeasurementRun: TMeasurementRun;
+    FRestoringGridState: Boolean;
+    FOnRunUIChanged: TNotifyEvent;
     function GetMeasurementRun: TMeasurementRun;
     function GetStopCriteriaText(APoint: TDevicePoint): string;
 
 
     procedure SetActiveWorkTable(const Value: TWorkTable);
     procedure AttachMeasurementRunEvents;
+    procedure EnsureMeasurementRunSubscription;
     procedure DetachMeasurementRunEvents;
     procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
     procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
@@ -126,6 +131,7 @@ type
     procedure RefreshFromMeasurementRun;
     property MeasurementRun: TMeasurementRun read GetMeasurementRun;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
+    property OnRunUIChanged: TNotifyEvent read FOnRunUIChanged write FOnRunUIChanged;
 
   end;
 
@@ -145,6 +151,7 @@ end;
 
 destructor TFrameMeasurementRun.Destroy;
 begin
+    DetachMeasurementRunEvents;
     FreeAndNil(FInvalidPointIndexes);
     inherited;
 end;
@@ -160,7 +167,11 @@ end;
 procedure TFrameMeasurementRun.SetActiveWorkTable(const Value: TWorkTable);
 begin
   if FActiveWorkTable = Value then
+  begin
+    EnsureMeasurementRunSubscription;
+    UpdateGridMesurmentRun;
     Exit;
+  end;
 
   DetachMeasurementRunEvents;
   FActiveWorkTable := Value;
@@ -179,17 +190,24 @@ end;
 
 procedure TFrameMeasurementRun.AttachMeasurementRunEvents;
 begin
-  if MeasurementRun = nil then
-    Exit;
-
-  MeasurementRun.Subscribe(Self);
+  FSubscribedMeasurementRun := MeasurementRun;
+  if FSubscribedMeasurementRun <> nil then FSubscribedMeasurementRun.Subscribe(Self);
 end;
 
 procedure TFrameMeasurementRun.DetachMeasurementRunEvents;
 begin
-  if MeasurementRun = nil then
-    Exit;
-  MeasurementRun.Unsubscribe(Self);
+  if FSubscribedMeasurementRun <> nil then FSubscribedMeasurementRun.Unsubscribe(Self);
+  FSubscribedMeasurementRun := nil;
+end;
+
+procedure TFrameMeasurementRun.EnsureMeasurementRunSubscription;
+begin
+  if FSubscribedMeasurementRun = MeasurementRun then Exit;
+  DetachMeasurementRunEvents;
+  AttachMeasurementRunEvents;
+  FCurrentPoint := nil;
+  FCurrentPointUUID := '';
+  if Assigned(FOnRunUIChanged) then FOnRunUIChanged(Self);
 end;
 
 procedure TFrameMeasurementRun.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
@@ -200,6 +218,8 @@ begin
   if not (Sender is TMeasurementRun) then
     Exit;
 
+  EnsureMeasurementRunSubscription;
+  if Sender <> FSubscribedMeasurementRun then Exit;
   LRun := TMeasurementRun(Sender);
 
   if Event = Integer(meStateChanged) then
@@ -238,6 +258,13 @@ begin
     FCurrentPointUUID := '';
   end;
   UpdateGridMesurmentRun;
+  UpdatePauseButtonState;
+  if Assigned(FOnRunUIChanged) then FOnRunUIChanged(Self);
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandObserved',
+    'Наблюдается фактическое состояние измерения',
+    Format('Command=StateChanged; StageAfter=%d; PointIndexAfter=%d; CurrentPointUUID=%s; IsPausedAfter=%s',
+      [Ord(AState), MeasurementRun.CurrentPointIndex, FCurrentPointUUID,
+       BoolToStr(MeasurementRun.IsPaused, True)]));
 end;
 
 procedure TFrameMeasurementRun.MeasurementRunPointChanged(ASender: TObject;
@@ -256,6 +283,14 @@ begin
       'ResolveKind=NotFound; PointUUID=; PointIndex=-1');
   end;
   UpdateGridMesurmentRun;
+  UpdateCurrentPointIndicator;
+  UpdateMeasurementControls;
+  if Assigned(FOnRunUIChanged) then FOnRunUIChanged(Self);
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandObserved',
+    'Наблюдается фактическое изменение точки',
+    Format('Command=PointChanged; StageAfter=%d; PointIndexAfter=%d; CurrentPointUUID=%s; IsPausedAfter=%s',
+      [Ord(MeasurementRun.Stage), APointIndex, FCurrentPointUUID,
+       BoolToStr(MeasurementRun.IsPaused, True)]));
 end;
 
 procedure TFrameMeasurementRun.MeasurementRunEvent(ASender: TObject;
@@ -469,6 +504,11 @@ begin
   SetPointEnabledFromGrid(Point, not Point.Enabled);
 end;
 
+procedure TFrameMeasurementRun.GridMeasurmentRunSelChanged(Sender: TObject);
+begin
+  if not FRestoringGridState then UpdatePointOrderControls;
+end;
+
 procedure TFrameMeasurementRun.GridMeasurmentRunHeaderClick(Column: TColumn);
 var
   I: Integer;
@@ -555,6 +595,7 @@ end;
 
 procedure TFrameMeasurementRun.UpdateUI;
 begin
+     EnsureMeasurementRunSubscription;
      UpdateGridMRHeaders;
      UpdateGridMesurmentRun;
 end;
@@ -610,7 +651,7 @@ begin
   else
     Rows := 0;
 
-  SelectedRow := GridMeasurmentRun.Selected;
+  SelectedRow := GridMeasurmentRun.Row;
   UpdateStopCriteriaColumns;
 
   GridMeasurmentRun.BeginUpdate;
@@ -622,11 +663,11 @@ begin
   end;
 
   if Rows = 0 then
-    GridMeasurmentRun.Selected := -1
+    GridMeasurmentRun.Row := -1
   else if SelectedRow >= Rows then
-    GridMeasurmentRun.Selected := Rows - 1
+    GridMeasurmentRun.Row := Rows - 1
   else if SelectedRow >= 0 then
-    GridMeasurmentRun.Selected := SelectedRow;
+    GridMeasurmentRun.Row := SelectedRow;
 
   GridMeasurmentRun.Repaint;
   UpdateCurrentPointIndicator;
@@ -639,7 +680,7 @@ var
   Row, Count: Integer;
   CanEditOrder: Boolean;
 begin
-  Row := GridMeasurmentRun.Selected;
+  Row := GridMeasurmentRun.Row;
   if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) then Count := MeasurementRun.Points.Count else Count := 0;
   CanEditOrder := (MeasurementRun <> nil) and (MeasurementRun.Stage in [msNone, msDone]);
   SpeedButtonPointMoveUp.Enabled := CanEditOrder and (Row > 0) and (Row < Count);
@@ -681,7 +722,7 @@ end;
 
 function TFrameMeasurementRun.CapturePointsGridState: TPointsGridState;
 begin
-  Result.PointUUID := ''; Result.Point := nil; Result.Row := GridMeasurmentRun.Selected;
+  Result.PointUUID := ''; Result.Point := nil; Result.Row := GridMeasurmentRun.Row;
   Result.ScrollY := GridMeasurmentRun.ViewportPosition.Y;
   Result.HadFocus := GridMeasurmentRun.IsFocused;
   if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) and
@@ -691,18 +732,39 @@ end;
 
 procedure TFrameMeasurementRun.RestorePointsGridSelectionAndFocus(const AState: TPointsGridState;
   const AFallbackRow: Integer; const AReturnFocus: Boolean; const AReason: string);
-var Row: Integer; ScrollRestored, FocusRestored: Boolean;
+var ResolvedRow: Integer;
 begin
-  Row := ResolvePointRow(AState.PointUUID, AState.Point, AFallbackRow);
-  GridMeasurmentRun.Selected := Row;
-  GridMeasurmentRun.ViewportPosition := PointF(GridMeasurmentRun.ViewportPosition.X, AState.ScrollY);
-  ScrollRestored := True; FocusRestored := False;
-  if AReturnFocus or AState.HadFocus then
-    TThread.Queue(nil, procedure begin if GridMeasurmentRun.CanFocus then begin GridMeasurmentRun.SetFocus; GridMeasurmentRun.ScrollToSelectedCell; end; end);
-  FocusRestored := AReturnFocus or AState.HadFocus;
-  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementPointsGridFocusRestored',
-    'Восстановлено состояние таблицы точек', Format('Reason=%s; PointUUID=%s; ResolvedRow=%d; ScrollRestored=%s; FocusRestored=%s',
-    [AReason, AState.PointUUID, Row, BoolToStr(ScrollRestored, True), BoolToStr(FocusRestored, True)]));
+  ResolvedRow := ResolvePointRow(AState.PointUUID, AState.Point, AFallbackRow);
+  TThread.Queue(nil,
+    procedure
+    begin
+      FRestoringGridState := True;
+      try
+        GridMeasurmentRun.Row := ResolvedRow;
+        GridMeasurmentRun.Selected := ResolvedRow;
+        GridMeasurmentRun.ViewportPosition := PointF(
+          GridMeasurmentRun.ViewportPosition.X, AState.ScrollY);
+        if ResolvedRow >= 0 then GridMeasurmentRun.ScrollToSelectedCell;
+        if (AReturnFocus or AState.HadFocus) and GridMeasurmentRun.CanFocus then
+          GridMeasurmentRun.SetFocus;
+      finally
+        FRestoringGridState := False;
+      end;
+      UpdatePointOrderControls;
+      ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementPointsGridFocusRestored',
+        'Восстановлено состояние таблицы точек',
+        Format('Reason=%s; PointUUID=%s; ResolvedRow=%d; ScrollRestored=True; FocusRestored=%s',
+          [AReason, AState.PointUUID, ResolvedRow,
+           BoolToStr(AReturnFocus or AState.HadFocus, True)]));
+      if SameText(AReason, 'MoveUp') or SameText(AReason, 'MoveDown') then
+        ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementPointMoved',
+          'Точка перемещена и состояние таблицы восстановлено',
+          Format('Direction=%s; PointUUID=%s; OldIndex=%d; NewIndex=%d; GridRowAfter=%d; MoveUpEnabledAfter=%s; MoveDownEnabledAfter=%s; FocusRestored=%s',
+            [Copy(AReason, 5, MaxInt), AState.PointUUID, AState.Row, ResolvedRow,
+             GridMeasurmentRun.Row, BoolToStr(SpeedButtonPointMoveUp.Enabled, True),
+             BoolToStr(SpeedButtonPointMoveDown.Enabled, True),
+             BoolToStr(GridMeasurmentRun.IsFocused, True)]));
+    end);
 end;
 
 procedure TFrameMeasurementRun.UpdateCurrentPointIndicator;
@@ -767,7 +829,6 @@ begin
   if (MeasurementRun <> nil) and MeasurementRun.MovePointUp(Row) then begin
     FPointFlowSortDirection := 0; UpdateGridMesurmentRun;
     RestorePointsGridSelectionAndFocus(State, Row - 1, True, 'MoveUp');
-    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementPointMoved', 'Точка перемещена', Format('OldIndex=%d; NewIndex=%d', [Row, Row-1]));
   end else ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementPointMoveRejected', 'Перемещение точки отклонено', Format('Direction=Up; Index=%d', [Row]));
 end;
 
@@ -779,7 +840,6 @@ begin
   if (MeasurementRun <> nil) and MeasurementRun.MovePointDown(Row) then begin
     FPointFlowSortDirection := 0; UpdateGridMesurmentRun;
     RestorePointsGridSelectionAndFocus(State, Row + 1, True, 'MoveDown');
-    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementPointMoved', 'Точка перемещена', Format('OldIndex=%d; NewIndex=%d', [Row, Row+1]));
   end else ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementPointMoveRejected', 'Перемещение точки отклонено', Format('Direction=Down; Index=%d', [Row]));
 end;
 
@@ -806,6 +866,14 @@ begin
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent',
     'Команда интерфейса передана', Format('Command=%s; RunObjectPointer=%p; StageBefore=%d; IsPausedBefore=%s; CurrentPointIndexBefore=%d',
       [CommandName, Pointer(Run), Ord(Run.Stage), BoolToStr(WasPaused, True), Run.CurrentPointIndex]));
+  UpdatePauseButtonState;
+  UpdateMeasurementControls;
+  if Assigned(FOnRunUIChanged) then FOnRunUIChanged(Self);
+  ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandObserved',
+    'Наблюдается фактическое состояние паузы',
+    Format('Command=%s; StageAfter=%d; PointIndexAfter=%d; CurrentPointUUID=%s; IsPausedAfter=%s',
+      [CommandName, Ord(Run.Stage), Run.CurrentPointIndex, FCurrentPointUUID,
+       BoolToStr(Run.IsPaused, True)]));
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointDeleteClick(Sender: TObject);

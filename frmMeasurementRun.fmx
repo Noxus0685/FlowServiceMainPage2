@@ -16,6 +16,7 @@
     OnDrawColumnCell = GridMeasurmentRunDrawColumnCell
     OnGetValue = GridMeasurmentRunGetValue
     OnCellClick = GridMeasurmentRunCellClick
+    OnSelChanged = GridMeasurmentRunSelChanged
     Viewport.Width = 1228.000000000000000000
     Viewport.Height = 676.000000000000000000
     object CheckColumnMREnable: TCheckColumn
