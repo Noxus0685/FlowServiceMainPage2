@@ -451,13 +451,16 @@ begin
 end;
 
 procedure DetectStabilityOutliers(const AValues: TArray<Double>;
-  const AOutlierFactor: Double; out AOutliers: TArray<Boolean>;
+  const AOutlierFactor, AMaxStdDeviation, AMaxVariation: Double;
+  out AOutliers: TArray<Boolean>;
   out AOutlierCount: Integer);
 var
   Deviations: TArray<Double>;
   Median: Double;
   Mad: Double;
-  Threshold: Double;
+  CalculatedOutlierThreshold: Double;
+  MinOutlierThreshold: Double;
+  OutlierThreshold: Double;
   I: Integer;
 begin
   SetLength(AOutliers, Length(AValues));
@@ -471,13 +474,22 @@ begin
     Deviations[I] := Abs(AValues[I] - Median);
 
   Mad := MedianValue(Deviations);
-  if Mad > EPS then
-    Threshold := AOutlierFactor * 1.4826 * Mad
+  CalculatedOutlierThreshold := AOutlierFactor * 1.4826 * Mad;
+  MinOutlierThreshold := Max(AMaxStdDeviation, AMaxVariation / 2.0);
+
+  { Constant and slightly discrete signals can have a zero (or almost zero) MAD.
+    A zero comparison threshold would incorrectly mark every permitted quantization
+    step as an outlier, so retain a floor based on the configured stability limits. }
+  if (Mad <= EPS) or (CalculatedOutlierThreshold <= EPS) then
+    OutlierThreshold := MinOutlierThreshold
   else
-    Threshold := EPS;
+    OutlierThreshold := Max(CalculatedOutlierThreshold, MinOutlierThreshold);
+
+  { Even zero stability limits must not result in a zero floating-point threshold. }
+  OutlierThreshold := Max(OutlierThreshold, EPS);
 
   for I := 0 to High(AValues) do
-    if Deviations[I] > Threshold then
+    if Deviations[I] > OutlierThreshold then
     begin
       AOutliers[I] := True;
       Inc(AOutlierCount);
@@ -2050,6 +2062,7 @@ begin
     for I := 0 to N - 1 do
       OutlierValues[I] := Window[I].Sample.Value;
     DetectStabilityOutliers(OutlierValues, ASettings.OutlierFactor,
+      ASettings.MaxStdDeviation, ASettings.MaxVariation,
       Outliers, AInfo.OutlierCount);
     SetLength(Used, 0);
     for I := 0 to N - 1 do
@@ -2197,22 +2210,19 @@ begin
     Msg := Msg + Format('Недостаточно отсчётов в окне: получено %d, требуется не менее %d. ',
       [AInfo.UsedSampleCount, AInfo.RequiredSampleCount]);
   if mvsfrWindowTooShort in AInfo.FailReasons then
-    Msg := Msg + Format('Недостаточная длительность окна: прошло %.3f с, требуется не менее %.3f с. ',
-      [AInfo.ElapsedWindowSec, AInfo.RequiredWindowDurationSec]);
+    Msg := Msg + Format('Недостаточная длительность окна: набрано %.3f с, требуется не менее %.3f с. ',
+      [AInfo.ActualWindowDurationSec, AInfo.RequiredWindowDurationSec]);
   if mvsfrInsufficientTimeSpread in AInfo.FailReasons then Msg := Msg + 'Недостаточный временной интервал между точками для расчёта тренда. ';
   if mvsfrStaleData in AInfo.FailReasons then Msg := Msg + Format('Данные устарели: последнее значение получено %.1f с назад. ', [AInfo.LastSampleAgeSec]);
-  if mvsfrVariationTooHigh in AInfo.FailReasons then Msg := Msg + Format('В окне %d отсчётов. Размах %.4f превышает допустимые %.4f. ', [AInfo.UsedSampleCount, AInfo.Variation, ASettings.MaxVariation]);
-  if mvsfrDeviationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Стандартное отклонение %.4f превышает допустимые %.4f. ', [AInfo.StdDeviation, ASettings.MaxStdDeviation]);
-  if mvsfrTrendTooHigh in AInfo.FailReasons then Msg := Msg + Format('Тренд %.6f ед./с превышает допустимые %.6f ед./с. ', [AInfo.TrendRate, ASettings.MaxTrendRate]);
-  if mvsfrTooManyOutliers in AInfo.FailReasons then Msg := Msg + Format('Доля выбросов %.2f превышает допустимые %.2f. ', [AInfo.OutlierFraction, ASettings.MaxOutlierFraction]);
+  if mvsfrVariationTooHigh in AInfo.FailReasons then Msg := Msg + Format('В окне %d отсчётов. Размах %.6f превышает допустимые %.6f. ', [AInfo.UsedSampleCount, AInfo.Variation, ASettings.MaxVariation]);
+  if mvsfrDeviationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Стандартное отклонение %.6f превышает допустимые %.6f. ', [AInfo.StdDeviation, ASettings.MaxStdDeviation]);
+  if mvsfrTrendTooHigh in AInfo.FailReasons then Msg := Msg + Format('Скорость тренда %.6f ед./с превышает допустимые %.6f ед./с. ', [Abs(AInfo.TrendRate), ASettings.MaxTrendRate]);
+  if mvsfrTooManyOutliers in AInfo.FailReasons then Msg := Msg + Format('Доля выбросов %.6f превышает допустимые %.6f. ', [AInfo.OutlierFraction, ASettings.MaxOutlierFraction]);
   if AInfo.Status = mvssStable then Msg := Format('Сигнал стабилен: среднее %.4f; размах %.4f; стандартное отклонение %.4f; тренд %.6f ед./с.', [AInfo.MeanValue, AInfo.Variation, AInfo.StdDeviation, AInfo.TrendRate]);
   if AInfo.IsSuitableForMeasurement then AInfo.StatusText := 'Значение пригодно для измерения.'
   else if mvsfrAnalysisDisabled in AInfo.FailReasons then AInfo.StatusText := 'Анализ стабильности отключён.'
   else if mvsfrNoData in AInfo.FailReasons then AInfo.StatusText := 'Нет актуальных данных.'
-  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or
-          (mvsfrWindowTooShort in AInfo.FailReasons) or
-          (mvsfrWindowNotFilled in AInfo.FailReasons) or
-          (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.StatusText := Trim(Msg)
+  else if (not AInfo.IsSignalStable) and (Msg <> '') then AInfo.StatusText := Trim(Msg)
   else if AInfo.IsSignalStable then AInfo.StatusText := 'Сигнал стабилен, но значение вне диапазона.'
   else AInfo.StatusText := 'Сигнал нестабилен.';
 
