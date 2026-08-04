@@ -46,3 +46,10 @@ def test_measurement_grid_keeps_hints_enabled_and_targets_validity_column():
     assert "GridDataPoints.CellByPoint(X, Y, Col, Row)" in mouse_move
     assert "StringColumnSpillageValid" in mouse_move
     assert "GetSpillageResultHint(Device, FCurrentSpillages[Row])" in mouse_move
+
+
+def test_right_click_hint_passes_device_and_measurement():
+    mouse_down = body("procedure TFrameProceed.GridDataPointsMouseDown")
+
+    assert "GetSpillageResultHint(ResolveSelectedDevice," in mouse_down
+    assert "FCurrentSpillages[ARow])" in mouse_down

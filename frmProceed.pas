@@ -4464,7 +4464,8 @@ begin
     GridDataPoints.SetFocus;
     if (ARow >= 0) and (ARow < Length(FCurrentSpillages)) then
     begin
-      GridDataPoints.Hint := GetSpillageResultHint(FCurrentSpillages[ARow]);
+      GridDataPoints.Hint := GetSpillageResultHint(ResolveSelectedDevice,
+        FCurrentSpillages[ARow]);
       GridDataPoints.ShowHint := GridDataPoints.Hint <> '';
     end;
     UpdateActionHints;
