@@ -177,21 +177,10 @@ type
     ButtonSessionClearPoints: TButton;
     ButtonSessionClose: TButton;
     ButtonSessionSynchTable: TButton;
-    Layout19: TLayout;
     Layout20: TLayout;
     ComboBoxUnitsResult: TComboBox;
     Line7: TLine;
-    ToolBarResults: TToolBar;
-    Layout22: TLayout;
-    Label7: TLabel;
-    Line8: TLine;
-    Layout23: TLayout;
-    Button3: TButton;
-    Button4: TButton;
-    Button5: TButton;
-    Button6: TButton;
     ButtonProceedExportExcel: TButton;
-    Line9: TLine;
     lyt1: TLayout;
     ActionListWorkTables: TActionList;
     ActionSessionDelete: TAction;
@@ -319,6 +308,7 @@ type
     procedure InitCalibrCoefsFrame;
     procedure SetGridReadOnly(AGrid: TGrid);
     procedure UpdateActionHints;
+    procedure LogProceedToolbarLayout;
     function ResolveSelectionContext: TProceedSelectionContext;
     procedure ApplySelectionContext(const AContext: TProceedSelectionContext);
     function BuildProceedPointCellInfo(ADevice: TDevice; APoint: TDevicePoint;
@@ -342,6 +332,7 @@ type
     FCurrentSession: TSessionSpillage;
     FSelectionContext: TProceedSelectionContext;
     FExportButtonStateLogged: Boolean;
+    FToolbarLayoutLogged: Boolean;
     FCurrentResultRows: TArray<TResultGridRow>;
     FCurrentSpillages: TArray<TPointSpillage>;
     FActiveWorkTable: TWorkTable;
@@ -379,7 +370,7 @@ implementation
    uses
     uAppServices,
     uMeterValue,
-    uProceedXlsxExporter;
+    uGridXlsxExporter;
 {$R *.fmx}
 
 const
@@ -447,6 +438,8 @@ var
 begin
   FWorkTableManager := WorkTableManager;
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
+  ButtonProceedExportExcel.Visible := True;
+  ButtonProceedExportExcel.Enabled := False;
 
   if FProcessingDevices = nil then
     FProcessingDevices := TObjectList<TDevice>.Create(False);
@@ -498,6 +491,24 @@ begin
   InitCalibrCoefsFrame;
   RefreshResultsTab;
   UpdateActionHints;
+  LogProceedToolbarLayout;
+end;
+
+procedure TFrameProceed.LogProceedToolbarLayout;
+var ParentName: string;
+begin
+  if FToolbarLayoutLogged or (ToolBarDataPoints = nil) or
+     (ButtonProceedExportExcel = nil) or (TreeViewDevices = nil) then Exit;
+  ParentName := '';
+  if ButtonProceedExportExcel.Parent <> nil then
+    ParentName := ButtonProceedExportExcel.Parent.Name;
+  LogMKS('ProceedToolbarLayoutResolved', 'ProceedToolbarLayoutResolved',
+    Format('ToolbarCount=1; ToolbarHeight=%.0f; ButtonCount=%d; ExportButtonVisible=%s; ExportButtonEnabled=%s; ExportButtonParent=%s; TreeTop=%.0f; TreeHeight=%.0f',
+      [ToolBarDataPoints.Height, Layout32.ChildrenCount,
+       BoolToStr(ButtonProceedExportExcel.Visible, True),
+       BoolToStr(ButtonProceedExportExcel.Enabled, True), ParentName,
+       TreeViewDevices.AbsolutePosition.Y, TreeViewDevices.Height]));
+  FToolbarLayoutLogged := True;
 end;
 
 procedure TFrameProceed.SetGridReadOnly(AGrid: TGrid);
@@ -595,16 +606,12 @@ begin
 
   ActionSessionPointDelete.Hint := PointDeleteHint;
   ButtonSessionDeleteDataPoint.Hint := PointDeleteHint;
-  Button3.Hint := PointDeleteHint;
   ActionSessionPointsClear.Hint := PointsClearHint;
   ButtonSessionClearPoints.Hint := PointsClearHint;
-  Button5.Hint := PointsClearHint;
   ActionSessionNew.Hint := NewSessionHint;
   ButtonSessionNew.Hint := NewSessionHint;
-  Button4.Hint := NewSessionHint;
   ActionSessionClose.Hint := CloseSessionHint;
   ButtonSessionClose.Hint := CloseSessionHint;
-  Button6.Hint := CloseSessionHint;
   ActionSessionSynchTable.Hint := SynchTableHint;
   ButtonSessionSynchTable.Hint := SynchTableHint;
   ActionSessionDeviceAdd.Hint := 'Добавить прибор в список обработки';
@@ -2287,8 +2294,8 @@ begin
 end;
 
 procedure TFrameProceed.ButtonProceedExportExcelClick(Sender: TObject);
-var Snapshot: TProceedExportSnapshot; ExportRow: TProceedExportRow;
-  ExportColumn: TProceedExportColumn; ExportCell: TProceedExportCell;
+var Snapshot: TGridExportSnapshot; ExportRow: TGridExportRow;
+  ExportColumn: TGridExportColumn; ExportCell: TGridExportCell;
   Dialog: TSaveDialog; I, J, PointIdx: Integer; V: TValue; S: string;
 begin
   if Length(FCurrentResultRows) = 0 then Exit;
@@ -2299,11 +2306,11 @@ begin
     Dialog.FileName := Format('Proceed_%s.xlsx',
       [FormatDateTime('yyyymmdd_hhnnss', Now)]);
     if not Dialog.Execute then Exit;
-    Snapshot := TProceedExportSnapshot.Create;
+    Snapshot := TGridExportSnapshot.Create;
     try
       for I := 0 to GridResults.ColumnCount - 1 do
         if GridResults.Columns[I].Visible then begin
-          ExportColumn := Default(TProceedExportColumn);
+          ExportColumn := Default(TGridExportColumn);
           ExportColumn.Key := ProceedGridColumnKey(GridResults.Columns[I]);
           ExportColumn.Header := GridResults.Columns[I].Header;
           ExportColumn.Width := Max(8, GridResults.Columns[I].Width / 7);
@@ -2311,12 +2318,12 @@ begin
           Snapshot.Columns.Add(ExportColumn);
         end;
       for J := 0 to High(FCurrentResultRows) do begin
-        ExportRow := TProceedExportRow.Create;
+        ExportRow := TGridExportRow.Create;
         Snapshot.Rows.Add(ExportRow);
         for I := 0 to GridResults.ColumnCount - 1 do
           if GridResults.Columns[I].Visible then begin
             V := TValue.Empty; GridResultsGetValue(GridResults, I, J, V);
-            S := V.ToString; ExportCell := Default(TProceedExportCell);
+            S := V.ToString; ExportCell := Default(TGridExportCell);
             ExportCell.Text := S;
             PointIdx := -1;
             if GridResults.Columns[I] = StringColumnPointNum1 then PointIdx := 0
@@ -2338,7 +2345,7 @@ begin
           end;
       end;
       try
-        TProceedXlsxExporter.ExportToFile(Snapshot, Dialog.FileName);
+        TGridXlsxExporter.ExportToFile(Snapshot, Dialog.FileName);
         LogMKS('ProceedGridExportCompleted', 'ProceedGridExportCompleted',
           Format('Path=%s; RowCount=%d; ColumnCount=%d', [Dialog.FileName,
             Snapshot.Rows.Count, Snapshot.Columns.Count]));

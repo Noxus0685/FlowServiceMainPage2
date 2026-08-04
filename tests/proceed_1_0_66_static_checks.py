@@ -1,16 +1,16 @@
-from pathlib import Path
+﻿from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 proceed = (root / 'frmProceed.pas').read_text(encoding='utf-8-sig')
 fmx = (root / 'frmProceed.fmx').read_text(encoding='utf-8-sig')
-exporter = (root / 'uProceedXlsxExporter.pas').read_text(encoding='utf-8-sig')
+exporter = (root / 'uGridXlsxExporter.pas').read_text(encoding='utf-8-sig')
 version = (root / 'uAppVersion.pas').read_text(encoding='utf-8-sig')
 
 def require(value, message):
     if not value:
         raise AssertionError(message)
 
-require("APP_VERSION = '1.0.68'" in version, 'release version is not 1.0.68')
+require("APP_VERSION = '1.0.70'" in version, 'release version is not 1.0.70')
 require('Spillage.SessionID <> ASession.ID' in proceed,
         'point lookup must reject spillages outside the row session')
 filter_pos = proceed.index('Spillage.SessionID <> ASession.ID')
@@ -38,7 +38,7 @@ require('Редактировать прибор' in proceed and 'TFormDeviceEdi
 require('ButtonProceedExportExcel' in fmx and
         'OnClick = ButtonProceedExportExcelClick' in fmx,
         'Proceed toolbar export button is absent')
-require('TProceedExportSnapshot' in exporter and 'uOpenXmlXlsx' in exporter,
+require('TGridExportSnapshot' in exporter and 'uOpenXmlXlsx' in exporter,
         'FMX-independent Proceed XLSX snapshot/exporter is absent')
 require('GridResults.Columns[I].Visible' in proceed,
         'export must honor visible grid columns')
@@ -49,4 +49,4 @@ require('ProceedGridContextBuilt' in proceed and
         'required aggregate protocol events are absent')
 require('SummaryResults CELL' not in proceed,
         'per-cell SummaryResults logging must be removed')
-print('Proceed 1.0.68 compatibility checks passed')
+print('Proceed 1.0.70 compatibility checks passed')

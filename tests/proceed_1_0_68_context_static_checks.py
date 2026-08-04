@@ -1,9 +1,9 @@
-from pathlib import Path
+﻿from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 pas = (root / 'frmProceed.pas').read_text(encoding='utf-8-sig')
 fmx = (root / 'frmProceed.fmx').read_text(encoding='utf-8-sig')
-xlsx = (root / 'uProceedXlsxExporter.pas').read_text(encoding='utf-8-sig')
+xlsx = (root / 'uGridXlsxExporter.pas').read_text(encoding='utf-8-sig')
 
 def need(fragment, message):
     assert fragment in pas, message
