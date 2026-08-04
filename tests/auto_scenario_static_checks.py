@@ -1,33 +1,33 @@
 from pathlib import Path
+import re
 
 root = Path(__file__).resolve().parents[1]
 frm = (root / 'frmMainTable.pas').read_text(encoding='utf-8-sig')
-work = (root / 'uWorkTable.pas').read_text(encoding='utf-8-sig')
-meter = (root / 'uMeterValue.pas').read_text(encoding='utf-8-sig')
-run = (root / 'uMeasurementRun.pas').read_text(encoding='utf-8-sig')
+start = frm.index('procedure TFrameMainTable.RunAutoMeasurementScenario')
+end = frm.index('procedure TFrameMainTable.MeasurementButtonClickManualMode', start)
+auto = frm[start:end]
 
-checks = {
-    'virtual clock API is available': all(x in meter for x in [
-        'EnableVirtualClock', 'AdvanceVirtualClock', 'DisableVirtualClock',
-        'if FVirtualClockEnabled then', 'Exit(FVirtualClockMs)'
-    ]),
-    'measurement run uses virtual-capable monotonic time': 'TThread.GetTickCount64' not in run and 'TMeterValue.GetMonotonicTimeMs' in run,
-    'scenario writes generated flow to production parameter': 'WT.FlowRate.SetValue(ActualQ)' in frm and 'WT.FlowRate.Value' in frm,
-    'scenario verifies parameter and last sample delivery': all(x in frm for x in [
-        'AppliedQ := WT.FlowRate.Value.Value', 'ReadLastSample(WT.FlowRate.Value',
-        'FAIL — тестовое значение не передано в рабочий параметр'
-    ]),
-    'scenario waits for selected point before injection': 'DeliveryCheck=Skipped; Reason=PointNotSelected' in frm and 'FAIL — штатная FSM не выбрала точку' in frm,
-    'scenario starts virtual time after existing samples': 'MaxExistingSampleTimeMs' in frm and 'VirtualTimeStartMs := Max(TMeterValue.GetMonotonicTimeMs, MaxExistingSampleTimeMs) + 1' in frm,
-    'scenario has early no-progress detection': 'FAIL — отсутствует прогресс FSM' in frm and 'NoProgressSteps >= 20' in frm,
-    'scenario restores simulation mode and virtual clock': 'TMeterValue.DisableVirtualClock' in frm and 'WT.IsSimulationMode := OldSimulation' in frm,
-    'virtual executor blocks real commands with responses': all(x in work for x in [
-        'property IsSimulationMode: Boolean', 'State := swtMONITOR', 'State := swtEXECUTE',
-        'State := swtCOMPLETE', 'рабочее сохранение результатов заблокировано'
-    ]),
+required = {
+    'public automatic start route': 'WT.StartMeasurementRun(Ord(mrmAutomatic))' in auto,
+    'production point preparation': 'Run.RebuildMeasurementPoints' in auto,
+    'real monotonic delta': all(x in auto for x in ['TThread.GetTickCount64', 'DeltaMs := CurrentTick - PreviousTick']),
+    'fractional pulse accumulator': all(x in auto for x in ['FractionRemainder', 'ExpectedIncrement - AddedImpulses']),
+    'raw pulse inputs only': all(x in auto for x in ['Channel.ImpSec :=', 'Channel.ImpResult :=']),
+    'production recalculation route': 'SetValues;' in auto,
+    'normal stop route': 'WT.StopMeasurementRun' in auto,
+    'input lifecycle protocol': all(x in auto for x in ['AutoTestInputSimulationStarted', 'AutoTestPulseAdjusted', 'AutoTestPointObserved', 'AutoTestInputSimulationStopped']),
+    'real stage observations': 'AutoTestStageObserved' in auto and 'PreviousElapsedMs=' in auto,
+    'global simulation remains disabled': 'WT.IsSimulationMode' in auto and 'SimulationMode=False EffectiveSimulationActive=False' in auto,
 }
-
-failed = [name for name, ok in checks.items() if not ok]
+forbidden_patterns = {
+    'virtual clock': r'Virtual(Time|Now|Clock)|AdvanceTime|TimeScale|AddStabilitySampleManual',
+    'internal FSM calls': r'\b(ProcessStage|ProcessSelectPoint|ProcessWaitStable|ProcessMeasure|ProcessSave|SetStage|DoEnterStage)\s*\(',
+    'direct work-table state': r'\bWT\.State\s*:=|\bWorkTable\.State\s*:=',
+    'forced internal events': r'\b(mcNextPoint|mcForcePoint)\b',
+    'derived/result assignments': r'(ValueFlow\.Value|TPointSpillage\.(Error|Status)|\bFCurrentStage\s*:=)',
+}
+failed = [name for name, ok in required.items() if not ok]
+failed += [name for name, pattern in forbidden_patterns.items() if re.search(pattern, auto, re.I)]
 if failed:
-    raise SystemExit('FAILED auto scenario static checks: ' + '; '.join(failed))
-print('OK: auto scenario delivery, virtual-time, executor, progress, and restore checks passed.')
+    raise SystemExit('FAILED real-time auto scenario checks: ' + '; '.join(failed))
+print('OK: auto test observes the production FSM and feeds only real-time pulse inputs.')
