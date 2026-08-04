@@ -1,4 +1,4 @@
-unit uDeviceClass;
+﻿unit uDeviceClass;
 
 interface
 
@@ -37,7 +37,23 @@ type
     dvrNoEnabledPoints, dvrPointsIncomplete, dvrInvalidPointsAndIncomplete,
     dvrInvalidPointsAndComplete, dvrAllPointsValid);
 
-function ValidationStatusToText(const AValue: EValidationStatus): string;
+
+
+
+  TCalibrCoefTableType = (
+    cctMeterValueCoef = 0,            // поправка коэффициента пересчёта TMeterValue.Coef
+    cctMeterValueFlowRate = 2,        // поправка TMeterValue.FlowRate
+    cctMeterValueQuantity = 3,        // поправка TMeterValue.Quantity
+    cctMeterValueDensity = 4,         // поправка TMeterValue.Density
+    cctReference = 10,                // справочная таблица (в расчётах TMeterValue не применяется)
+    cctDeviceCoefCorrection = 11,     // поправка коэффициента преобразования (для записи в прибор)
+    cctDeviceFlowRateCorrection = 12, // поправка расхода (для записи в прибор)
+    cctDeviceQuantityCorrection = 13, // поправка количества (для записи в прибор)
+    cctDeviceDensityCorrection = 14   // поправка плотности (для записи в прибор)
+  );
+
+
+  function ValidationStatusToText(const AValue: EValidationStatus): string;
 function MeasurementSpillageStatusToText(const AValue: EMeasurementSpillageStatus): string;
 function MeasurementPointStatusToText(const AValue: EMeasurementPointStatus): string;
 function MeasurementDeviceStatusToText(const AValue: EMeasurementDeviceStatus): string;
@@ -53,19 +69,6 @@ function GetPointValidationColor(const AValidation: EValidationStatus;
 function GetDeviceValidationColor(const AValidation: EValidationStatus;
   const AReason: EDeviceValidationReason): TAlphaColor;
 function GetPointExecutionStatusColor(const AStatus: EMeasurementPointStatus): TAlphaColor;
-
-
-  TCalibrCoefTableType = (
-    cctMeterValueCoef = 0,            // поправка коэффициента пересчёта TMeterValue.Coef
-    cctMeterValueFlowRate = 2,        // поправка TMeterValue.FlowRate
-    cctMeterValueQuantity = 3,        // поправка TMeterValue.Quantity
-    cctMeterValueDensity = 4,         // поправка TMeterValue.Density
-    cctReference = 10,                // справочная таблица (в расчётах TMeterValue не применяется)
-    cctDeviceCoefCorrection = 11,     // поправка коэффициента преобразования (для записи в прибор)
-    cctDeviceFlowRateCorrection = 12, // поправка расхода (для записи в прибор)
-    cctDeviceQuantityCorrection = 13, // поправка количества (для записи в прибор)
-    cctDeviceDensityCorrection = 14   // поправка плотности (для записи в прибор)
-  );
 
 function TryCalibrCoefTableType(const ARawType: Integer;
   out ATableType: TCalibrCoefTableType): Boolean;
