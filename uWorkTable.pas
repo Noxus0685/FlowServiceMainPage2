@@ -6577,7 +6577,7 @@ begin
         Point
       );
 
-      Point.Valid := Device.AnalyseDataPoint(Point);
+      Device.AnalyseDataPoint(Point);
 
       LogPointData(
         pcProc,
