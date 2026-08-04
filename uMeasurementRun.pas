@@ -248,7 +248,7 @@ type
   end;
 
 
-  TMeasurementRun = class(TObservableObject)
+  TMeasurementRun = class(TMeasurementRunBase)
 
   const
       STABILITY_VARIATION_ERROR_FACTOR = 0.50;
@@ -260,6 +260,7 @@ type
       HISTORY_RESERVE_SEC = 5.0;
 
   private
+    function GetStage: EMeasurementState; override;
 
     FWorkTable: TWorkTable;
     FPoints: TObjectList<TDevicePoint>;
@@ -534,7 +535,6 @@ type
     property IsPaused: Boolean read FIsPaused;
     property PreparedPointsMode: EMeasurementRunMode read FPreparedPointsMode;
 
-    property Stage: EMeasurementState read FCurrentStage;
     property StabilityDataStartMs: Int64 read FStabilityDataStartMs;
     property SaveConfirmationResult: TSaveConfirmationResult
       read FSaveConfirmationResult;
@@ -566,6 +566,11 @@ function GetMeasurementStopControlMode(APoint: TDevicePoint): TMeasurementStopCo
 function AccuracyToRange(const AAccuracy: string; out AMin, AMax: Double): Boolean;
 
 implementation
+
+function TMeasurementRun.GetStage: EMeasurementState;
+begin
+  Result := FCurrentStage;
+end;
 
 function AccuracyToRange(const AAccuracy: string; out AMin, AMax: Double): Boolean;
 var
