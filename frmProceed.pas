@@ -1983,80 +1983,11 @@ end;
 
 function TFrameProceed.GetSpillageResultHint(ADevice: TDevice;
   APoint: TPointSpillage): string;
-var
-  S, Reason, MessageText: string;
-  DevicePoint: TDevicePoint;
-
-  procedure AppendHintLine(const AText: string);
-  begin
-    if Trim(AText) = '' then
-      Exit;
-    if Result <> '' then
-      Result := Result + sLineBreak;
-    Result := Result + Trim(AText);
-  end;
 begin
   Result := '';
   if APoint = nil then
-    Exit('Статус годности не определён.' + sLineBreak +
-      'Недостаточно данных для оценки.');
-
-  // Hint подробно поясняет метрологический статус; StatusStr содержит тексты
-  // ValidationReason и ValidationMessage текущей модели.
-  Reason := Trim(APoint.StatusStr);
-  if Pos('(цвет:', LowerCase(Reason)) > 0 then
-    Reason := Trim(Copy(Reason, 1, Pos('(цвет:', LowerCase(Reason)) - 1));
-  MessageText := '';
-  if APoint.Status = TPointSpillage.SPS_ERROR_EXCEEDED then
-  begin
-    AppendHintLine('Не годен.');
-    AppendHintLine(Reason);
-    DevicePoint := nil;
-    if ADevice <> nil then
-      DevicePoint := ADevice.FindMatchedDevicePointForSpillage(APoint);
-    if DevicePoint <> nil then
-      MessageText := Format('Погрешность %.3f%% превышает допустимое значение %.3f%%.',
-        [APoint.Error, Abs(DevicePoint.Error)])
-    else
-      MessageText := Format('Погрешность %.3f%% превышает допустимое значение.',
-        [APoint.Error]);
-    AppendHintLine(MessageText);
     Exit;
-  end;
-  if APoint.Status = TPointSpillage.SPS_OK then
-  begin
-    AppendHintLine('Годен.');
-    AppendHintLine(Reason);
-    AppendHintLine('Погрешность находится в допустимых пределах.');
-    AppendHintLine(Format('Фактическая погрешность: %.3f%%.', [APoint.Error]));
-    Exit;
-  end;
-  AppendHintLine('Статус годности не определён.');
-  AppendHintLine(Reason);
-  if APoint.Status = TPointSpillage.SPS_FLOW_NOT_MATCHED then
-  begin
-    AppendHintLine('Расход не соответствует поверочной точке прибора.');
-    Exit;
-  end;
-  if APoint.Status in [TPointSpillage.SPS_CREATED,
-     TPointSpillage.SPS_DATA_ASSIGNED] then
-  begin
-    AppendHintLine('Недостаточно данных для оценки.');
-    Exit;
-  end;
-  if APoint.Status <> TPointSpillage.SPS_STOP_CRITERIA_FAILED then
-  begin
-    AppendHintLine('Недостаточно данных для определения годности.');
-    Exit;
-  end;
-  S := LowerCase(APoint.StatusStr);
-  if Pos('врем', S) > 0 then MessageText := 'Не достигнуто время измерения.'
-  else if Pos('импульс', S) > 0 then MessageText := 'Не достигнуто количество импульсов.'
-  else if (Pos('объ', S) > 0) or (Pos('масс', S) > 0) then
-    MessageText := 'Не достигнут объём измерения.'
-  else if Pos('останов', S) > 0 then MessageText := 'Измерение остановлено.'
-  else MessageText := 'Недостаточно данных для определения годности.';
-  AppendHintLine(MessageText);
+  Result := APoint.GetFullStateText;
 end;
 
 function TFrameProceed.GetDeviceResultHint(ADevice: TDevice): string;
@@ -2066,23 +1997,23 @@ begin
     'Недостаточно данных для оценки.';
   if (ADevice = nil) or (ADevice.Points = nil) then Exit;
   SummaryStatus := ResolveDeviceSummaryStatus(ADevice);
-  if SummaryStatus = TPointSpillage.SPS_OK then
+  if SummaryStatus = 5 then
   begin
     for DevicePoint in ADevice.Points do
     begin
       Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
-      if (Spillage <> nil) and (Spillage.Status = TPointSpillage.SPS_OK) then
+      if (Spillage <> nil) and (Spillage.Validation = vsValid) then
         Exit(GetSpillageResultHint(ADevice, Spillage));
     end;
     Exit;
   end;
-  if SummaryStatus <> TPointSpillage.SPS_ERROR_EXCEEDED then
+  if SummaryStatus <> 4 then
   begin
     for DevicePoint in ADevice.Points do
     begin
       Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
       if (Spillage <> nil) and
-         (Spillage.Status = TPointSpillage.SPS_STOP_CRITERIA_FAILED) then
+         (Spillage.ValidationReason = svrStopCriteriaFailed) then
         Exit(GetSpillageResultHint(ADevice, Spillage));
     end;
     Exit;
@@ -2091,7 +2022,7 @@ begin
   begin
     Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
     if (Spillage <> nil) and
-       (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
+       (Spillage.Validation = vsInvalid) then
       Exit(GetSpillageResultHint(ADevice, Spillage));
   end;
 end;
@@ -2146,9 +2077,9 @@ begin
       if Spillage = nil then
         Continue;
       Inc(FoundPointsCount);
-      if Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED then
+      if Spillage.Validation = vsInvalid then
         Inc(InvalidCount);
-      if Spillage.Status = TPointSpillage.SPS_STOP_CRITERIA_FAILED then
+      if Spillage.ValidationReason = svrStopCriteriaFailed then
         Inc(ConditionFailedCount);
     end;
   end;
@@ -4491,14 +4422,7 @@ begin
       Value := FloatToStr(P.Error);
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageValid then
-  begin
-    case P.Status of
-      TPointSpillage.SPS_OK: Value := 'Годен';
-      TPointSpillage.SPS_ERROR_EXCEEDED: Value := 'Не годен';
-    else
-      Value := #$2014;
-    end;
-  end
+    Value := P.GetShortStateText
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQStd then
     Value := FloatToStr(P.QStd)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQCV then
