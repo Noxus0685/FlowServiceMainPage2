@@ -2675,7 +2675,8 @@ end;
 
 procedure TFrameMainTable.TabControl1Change(Sender: TObject);
 begin
-  if (TabControl1.ActiveTab = TabItemMRResults) and (FFrameMRResults <> nil) then
+  if (TabControlDevices.ActiveTab = TabItemMRResults) and
+     Assigned(FFrameMRResults) then
     FFrameMRResults.ReloadAndUpdate;
 end;
 
