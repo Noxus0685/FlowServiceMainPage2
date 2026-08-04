@@ -289,6 +289,8 @@ type
       X, Y: Single);
     procedure GridDataPointsMouseMove(Sender: TObject; Shift: TShiftState;
       X, Y: Single);
+    procedure GridColumnLayoutMouseUp(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure LogProceedGridContext(const AContext: string; ADevice: TDevice;
       ASession: TSessionSpillage; ARows, AColumns: Integer);
 
@@ -314,6 +316,10 @@ type
     FPointDeleteOwner: TObject;
     FProcessingChangesSaved: Boolean;
     FOnResultsSynchronized: TNotifyEvent;
+    FLastResultsHintRow: Integer;
+    FLastResultsHintCol: Integer;
+    FLastDataPointsHintRow: Integer;
+    FLastDataPointsHintCol: Integer;
   public
     { Public declarations }
     procedure Initialize;
@@ -350,6 +356,7 @@ const
   CProcessingDevicesItemKeyPrefix = 'Item';
   CProcessingDevicePointCountsSection = 'ProcessingDevicePointCounts';
   CManualProcessingDevicesSection = 'ManualProcessingDevices';
+  CColumnsMenuTag = -10001;
   CVolumeFlowUnits: array[0..4] of string = ('л/с','л/мин','л/ч','м3/мин','м3/ч');
   CMassFlowUnits: array[0..4] of string = ('кг/с','кг/мин','кг/ч','т/мин','т/ч');
 
@@ -388,6 +395,8 @@ end;
 
 destructor TFrameProceed.Destroy;
 begin
+  // Сохраняем ширину, порядок и видимость столбцов перед закрытием формы.
+  SaveLayoutSettingsToWorkTable;
   if Assigned(AppServices) then
     AppServices.OnBeforeShutdown := nil;
 
@@ -423,9 +432,29 @@ begin
   end;
 
   if GridResults <> nil then
+  begin
     GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
+    // Подключаем существующий обработчик Hint для ячеек таблицы результатов.
+    GridResults.OnMouseMove := GridResultsMouseMove;
+    GridResults.OnMouseUp := GridColumnLayoutMouseUp;
+  end;
   if GridDataPoints <> nil then
+  begin
     GridDataPoints.OnDrawColumnCell := GridDataPointsDrawColumnCell;
+    // Подключаем существующий обработчик Hint для ячеек таблицы измерений.
+    GridDataPoints.OnMouseMove := GridDataPointsMouseMove;
+    GridDataPoints.OnMouseUp := GridColumnLayoutMouseUp;
+  end;
+
+  // Hints remain enabled after the grids are repopulated or their layout changes.
+  if GridDataPoints <> nil then
+    GridDataPoints.ShowHint := True;
+  if GridResults <> nil then
+    GridResults.ShowHint := True;
+  FLastResultsHintRow := -1;
+  FLastResultsHintCol := -1;
+  FLastDataPointsHintRow := -1;
+  FLastDataPointsHintCol := -1;
 
   SetGridReadOnly(GridDataPoints);
   SetGridReadOnly(GridResults);
@@ -1180,6 +1209,8 @@ begin
   CaptureGridColumnsLayout(GridResults, ResultsColumns);
   WorkTable.DataPointsGridColumns := DataPointsColumns;
   WorkTable.ResultsGridColumns := ResultsColumns;
+  if FWorkTableManager <> nil then
+    FWorkTableManager.Save;
 end;
 
 
@@ -1850,61 +1881,115 @@ end;
 
 function TFrameProceed.GetSpillageResultHint(ADevice: TDevice;
   APoint: TPointSpillage): string;
-var S: string; DevicePoint: TDevicePoint;
+var
+  S, Reason, MessageText: string;
+  DevicePoint: TDevicePoint;
+
+  procedure AppendHintLine(const AText: string);
+  begin
+    if Trim(AText) = '' then
+      Exit;
+    if Result <> '' then
+      Result := Result + sLineBreak;
+    Result := Result + Trim(AText);
+  end;
 begin
   Result := '';
   if APoint = nil then
-    Exit('Результат измерения отсутствует');
+    Exit('Статус годности не определён.' + sLineBreak +
+      'Недостаточно данных для оценки.');
+
+  // Hint подробно поясняет метрологический статус; StatusStr содержит тексты
+  // ValidationReason и ValidationMessage текущей модели.
+  Reason := Trim(APoint.StatusStr);
+  if Pos('(цвет:', LowerCase(Reason)) > 0 then
+    Reason := Trim(Copy(Reason, 1, Pos('(цвет:', LowerCase(Reason)) - 1));
+  MessageText := '';
   if APoint.Status = TPointSpillage.SPS_ERROR_EXCEEDED then
   begin
+    AppendHintLine('Не годен.');
+    AppendHintLine(Reason);
     DevicePoint := nil;
     if ADevice <> nil then
       DevicePoint := ADevice.FindMatchedDevicePointForSpillage(APoint);
     if DevicePoint <> nil then
-      Exit(Format('Погрешность %.3f%% превышает допустимое значение %.3f%%',
-        [APoint.Error, Abs(DevicePoint.Error)]));
-    Exit(Format('Погрешность %.3f%% превышает допустимое значение',
-      [APoint.Error]));
+      MessageText := Format('Погрешность %.3f%% превышает допустимое значение %.3f%%.',
+        [APoint.Error, Abs(DevicePoint.Error)])
+    else
+      MessageText := Format('Погрешность %.3f%% превышает допустимое значение.',
+        [APoint.Error]);
+    AppendHintLine(MessageText);
+    Exit;
   end;
-  if APoint.Status = TPointSpillage.SPS_OK then Exit;
+  if APoint.Status = TPointSpillage.SPS_OK then
+  begin
+    AppendHintLine('Годен.');
+    AppendHintLine(Reason);
+    AppendHintLine('Погрешность находится в допустимых пределах.');
+    AppendHintLine(Format('Фактическая погрешность: %.3f%%.', [APoint.Error]));
+    Exit;
+  end;
+  AppendHintLine('Статус годности не определён.');
+  AppendHintLine(Reason);
   if APoint.Status = TPointSpillage.SPS_FLOW_NOT_MATCHED then
-    Exit('Расход не соответствует поверочной точке прибора');
+  begin
+    AppendHintLine('Расход не соответствует поверочной точке прибора.');
+    Exit;
+  end;
   if APoint.Status in [TPointSpillage.SPS_CREATED,
      TPointSpillage.SPS_DATA_ASSIGNED] then
-    Exit('Результат измерения отсутствует');
-  if APoint.Status <> TPointSpillage.SPS_STOP_CRITERIA_FAILED then
-    Exit('Результат измерения отсутствует');
-  S := LowerCase(APoint.StatusStr);
-  if Pos('врем', S) > 0 then Result := 'Не достигнуто время измерения'
-  else if Pos('импульс', S) > 0 then Result := 'Не достигнуто количество импульсов'
-  else if (Pos('объ', S) > 0) or (Pos('масс', S) > 0) then
-    Result := 'Не достигнут объём измерения'
-  else if Pos('останов', S) > 0 then Result := 'Измерение остановлено'
-  else
   begin
-    Result := APoint.StatusStr;
-    if Pos('(цвет:', LowerCase(Result)) > 0 then
-      Result := Trim(Copy(Result, 1, Pos('(цвет:', LowerCase(Result)) - 1));
+    AppendHintLine('Недостаточно данных для оценки.');
+    Exit;
   end;
+  if APoint.Status <> TPointSpillage.SPS_STOP_CRITERIA_FAILED then
+  begin
+    AppendHintLine('Недостаточно данных для определения годности.');
+    Exit;
+  end;
+  S := LowerCase(APoint.StatusStr);
+  if Pos('врем', S) > 0 then MessageText := 'Не достигнуто время измерения.'
+  else if Pos('импульс', S) > 0 then MessageText := 'Не достигнуто количество импульсов.'
+  else if (Pos('объ', S) > 0) or (Pos('масс', S) > 0) then
+    MessageText := 'Не достигнут объём измерения.'
+  else if Pos('останов', S) > 0 then MessageText := 'Измерение остановлено.'
+  else MessageText := 'Недостаточно данных для определения годности.';
+  AppendHintLine(MessageText);
 end;
 
 function TFrameProceed.GetDeviceResultHint(ADevice: TDevice): string;
-var DevicePoint: TDevicePoint; Spillage: TPointSpillage;
+var DevicePoint: TDevicePoint; Spillage: TPointSpillage; SummaryStatus: Integer;
 begin
-  Result := 'Недостаточно данных для определения годности';
+  Result := 'Статус годности не определён.' + sLineBreak +
+    'Недостаточно данных для оценки.';
   if (ADevice = nil) or (ADevice.Points = nil) then Exit;
+  SummaryStatus := ResolveDeviceSummaryStatus(ADevice);
+  if SummaryStatus = TPointSpillage.SPS_OK then
+  begin
+    for DevicePoint in ADevice.Points do
+    begin
+      Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
+      if (Spillage <> nil) and (Spillage.Status = TPointSpillage.SPS_OK) then
+        Exit(GetSpillageResultHint(ADevice, Spillage));
+    end;
+    Exit;
+  end;
+  if SummaryStatus <> TPointSpillage.SPS_ERROR_EXCEEDED then
+  begin
+    for DevicePoint in ADevice.Points do
+    begin
+      Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
+      if (Spillage <> nil) and
+         (Spillage.Status = TPointSpillage.SPS_STOP_CRITERIA_FAILED) then
+        Exit(GetSpillageResultHint(ADevice, Spillage));
+    end;
+    Exit;
+  end;
   for DevicePoint in ADevice.Points do
   begin
     Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
     if (Spillage <> nil) and
        (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
-      Exit(GetSpillageResultHint(ADevice, Spillage));
-  end;
-  for DevicePoint in ADevice.Points do
-  begin
-    Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
-    if (Spillage <> nil) and
-       (Spillage.Status = TPointSpillage.SPS_STOP_CRITERIA_FAILED) then
       Exit(GetSpillageResultHint(ADevice, Spillage));
   end;
 end;
@@ -2713,14 +2798,17 @@ procedure TFrameProceed.PopupMenuGridResultsPopup(Sender: TObject);
 var ColumnsMenu, Item, ResetItem: TMenuItem; Grid: TGrid; I: Integer;
 begin
   if not (Sender is TPopupMenu) then Exit;
+  // Динамический список столбцов пересоздаётся при открытии меню, поэтому
+  // перед добавлением удаляем только его предыдущий экземпляр.
   for I := TPopupMenu(Sender).ChildrenCount - 1 downto 0 do
     if (TPopupMenu(Sender).Children[I] is TMenuItem) and
-       SameText(TMenuItem(TPopupMenu(Sender).Children[I]).Text, 'Столбцы') then
+       (TMenuItem(TPopupMenu(Sender).Children[I]).Tag = CColumnsMenuTag) then
       TPopupMenu(Sender).Children[I].Free;
   Grid := GridResults;
   if Sender = PopupMenuGridDataPoints then Grid := GridDataPoints;
   ColumnsMenu := TMenuItem.Create(TPopupMenu(Sender));
   ColumnsMenu.Text := 'Столбцы';
+  ColumnsMenu.Tag := CColumnsMenuTag;
   TPopupMenu(Sender).AddObject(ColumnsMenu);
   for I := 0 to Grid.ColumnCount - 1 do
   begin
@@ -4034,27 +4122,45 @@ end;
 procedure TFrameProceed.GridResultsMouseMove(Sender: TObject; Shift: TShiftState;
   X, Y: Single);
 var Col, Row, PointIndex: Integer; Device: TDevice;
-  DevicePoint: TDevicePoint; Spillage: TPointSpillage;
+  DevicePoint: TDevicePoint; Spillage: TPointSpillage; HintText: string;
 begin
-  GridResults.Hint := '';
   if not GridResults.CellByPoint(X, Y, Col, Row) or
-     (Row < 0) or (Row >= Length(FCurrentResultRows)) then Exit;
-  Device := FCurrentResultRows[Row].Device;
-  if GridResults.Columns[Col] = StringColumnResult then
+     (Row < 0) or (Row >= Length(FCurrentResultRows)) then
   begin
-    GridResults.Hint := GetDeviceResultHint(Device);
+    FLastResultsHintRow := -1;
+    FLastResultsHintCol := -1;
+    GridResults.ShowHint := False;
     Exit;
   end;
-  PointIndex := -1;
-  if GridResults.Columns[Col] = StringColumnPointNum1 then PointIndex := 0
-  else if GridResults.Columns[Col] = StringColumnPointNum2 then PointIndex := 1
-  else if GridResults.Columns[Col] = StringColumnPointNum3 then PointIndex := 2
-  else if GridResults.Columns[Col] = StringColumnPointNum4 then PointIndex := 3;
-  if (PointIndex < 0) or (Device = nil) or (Device.Points = nil) or
-     (PointIndex >= Device.Points.Count) then Exit;
-  DevicePoint := Device.Points[PointIndex];
-  Spillage := FindResultSpillageForPoint(Device, DevicePoint);
-  GridResults.Hint := GetSpillageResultHint(Device, Spillage);
+  if (Row = FLastResultsHintRow) and (Col = FLastResultsHintCol) then
+    Exit;
+
+  // При смене строки или ячейки переоткрываем Hint с текстом нового результата.
+  FLastResultsHintRow := Row;
+  FLastResultsHintCol := Col;
+  GridResults.ShowHint := False;
+  GridResults.Hint := '';
+  HintText := '';
+  Device := FCurrentResultRows[Row].Device;
+  if GridResults.Columns[Col] = StringColumnResult then
+    HintText := GetDeviceResultHint(Device)
+  else
+  begin
+    PointIndex := -1;
+    if GridResults.Columns[Col] = StringColumnPointNum1 then PointIndex := 0
+    else if GridResults.Columns[Col] = StringColumnPointNum2 then PointIndex := 1
+    else if GridResults.Columns[Col] = StringColumnPointNum3 then PointIndex := 2
+    else if GridResults.Columns[Col] = StringColumnPointNum4 then PointIndex := 3;
+    if (PointIndex >= 0) and (Device <> nil) and (Device.Points <> nil) and
+       (PointIndex < Device.Points.Count) then
+    begin
+      DevicePoint := Device.Points[PointIndex];
+      Spillage := FindResultSpillageForPoint(Device, DevicePoint);
+      HintText := GetSpillageResultHint(Device, Spillage);
+    end;
+  end;
+  GridResults.Hint := HintText;
+  GridResults.ShowHint := HintText <> '';
 end;
 procedure TFrameProceed.GridResultsSelChanged(Sender: TObject);
 var
@@ -4229,9 +4335,7 @@ begin
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageError then
   begin
-    if P.Status = TPointSpillage.SPS_STOP_CRITERIA_FAILED then
-      Value := #$2014
-    else if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
       Value := FActiveWorkTable.TableFlow.ValueError.GetStrNum(P.Error)
     else
       Value := FloatToStr(P.Error);
@@ -4375,6 +4479,14 @@ begin
      SaveLayoutSettingsToWorkTable;
 end;
 
+procedure TFrameProceed.GridColumnLayoutMouseUp(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+begin
+  // После изменения мышью сохраняем ширину, порядок и видимость по Name столбца.
+  if (Sender = GridDataPoints) or (Sender = GridResults) then
+    SaveLayoutSettingsToWorkTable;
+end;
+
 procedure TFrameProceed.GridDataPointsDrawColumnCell(Sender: TObject;
   const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
   const Row: Integer; const Value: TValue; const State: TGridDrawStates);
@@ -4415,7 +4527,8 @@ begin
     GridDataPoints.SetFocus;
     if (ARow >= 0) and (ARow < Length(FCurrentSpillages)) then
     begin
-      GridDataPoints.Hint := GetSpillageResultHint(FCurrentSpillages[ARow]);
+      GridDataPoints.Hint := GetSpillageResultHint(ResolveSelectedDevice,
+        FCurrentSpillages[ARow]);
       GridDataPoints.ShowHint := GridDataPoints.Hint <> '';
     end;
     UpdateActionHints;
@@ -4424,15 +4537,33 @@ end;
 
 procedure TFrameProceed.GridDataPointsMouseMove(Sender: TObject;
   Shift: TShiftState; X, Y: Single);
-var Col, Row: Integer; Device: TDevice;
+var Col, Row: Integer; Device: TDevice; HintText: string;
 begin
-  GridDataPoints.Hint := '';
   if not GridDataPoints.CellByPoint(X, Y, Col, Row) or
-     (Row < 0) or (Row >= Length(FCurrentSpillages)) then Exit;
-  if (GridDataPoints.Columns[Col] <> StringColumnSpillageValid) and
-     (GridDataPoints.Columns[Col] <> StringColumnSpillageError) then Exit;
-  Device := ResolveSelectedDevice;
-  GridDataPoints.Hint := GetSpillageResultHint(Device, FCurrentSpillages[Row]);
+     (Row < 0) or (Row >= Length(FCurrentSpillages)) then
+  begin
+    FLastDataPointsHintRow := -1;
+    FLastDataPointsHintCol := -1;
+    GridDataPoints.ShowHint := False;
+    Exit;
+  end;
+  if (Row = FLastDataPointsHintRow) and (Col = FLastDataPointsHintCol) then
+    Exit;
+
+  // При смене строки или ячейки переоткрываем Hint с текстом нового измерения.
+  FLastDataPointsHintRow := Row;
+  FLastDataPointsHintCol := Col;
+  GridDataPoints.ShowHint := False;
+  GridDataPoints.Hint := '';
+  HintText := '';
+  if (GridDataPoints.Columns[Col] = StringColumnSpillageValid) or
+     (GridDataPoints.Columns[Col] = StringColumnSpillageError) then
+  begin
+    Device := ResolveSelectedDevice;
+    HintText := GetSpillageResultHint(Device, FCurrentSpillages[Row]);
+  end;
+  GridDataPoints.Hint := HintText;
+  GridDataPoints.ShowHint := HintText <> '';
 end;
 procedure TFrameProceed.UpdateGridDataPointsHeaders(QuantityDimName: string; FlowDimName: string);
 var
