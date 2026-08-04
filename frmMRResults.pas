@@ -62,8 +62,8 @@ type
     SpeedButton13: TSpeedButton;
     SpeedButton14: TSpeedButton;
     SpeedButtonCreatePoints: TSpeedButton;
-    ButtonClearSession: TButton;
-    ButtonCreateSession: TButton;
+    ButtonClearSession: TSpeedButton;
+    ButtonCreateSession: TSpeedButton;
     ButtonExportExcel: TButton;
     procedure GridMRResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridMRResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas; const Column: TColumn;
@@ -72,12 +72,14 @@ type
     procedure ButtonClearSessionClick(Sender: TObject);
     procedure ButtonCreateSessionClick(Sender: TObject);
     procedure ButtonExportExcelClick(Sender: TObject);
+    procedure GridMRResultsSelChanged(Sender: TObject);
   private
     FActiveWorkTable: TWorkTable;
     FPointColumns: TObjectList<TStringColumn>;
     FDisplayPoints: TObjectList<TDisplayPointGroup>;
     FRows: TList<TChannel>;
     FProceed: TObject;
+    FRefreshing: Boolean;
 
     function GetMeasurementRun: TMeasurementRun;
     procedure SetActiveWorkTable(const Value: TWorkTable);
@@ -125,6 +127,7 @@ type
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
     procedure UpdateUI;
     procedure ConnectProcessingFrame(AProceed: TObject);
+    procedure ReloadAndUpdate;
 
     property MeasurementRun: TMeasurementRun read GetMeasurementRun;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
@@ -174,6 +177,7 @@ begin
   GridMRResults.OnGetValue := GridMRResultsGetValue;
   GridMRResults.OnDrawColumnCell := GridMRResultsDrawColumnCell;
   GridMRResults.OnSetValue := nil;
+  GridMRResults.OnSelChanged := GridMRResultsSelChanged;
   SetGridReadOnly(GridMRResults);
 end;
 
@@ -237,28 +241,55 @@ procedure TFrameMRResults.ButtonClearSessionClick(Sender: TObject);
 var
   Channel: TChannel;
   Device: TDevice;
+  Scope: string;
 begin
   Channel := GetRowChannel(GridMRResults.Row);
-  if FProceed = nil then
+  if not (FProceed is TFrameProceed) then
+  begin
+    DebugLog('ResultsSessionClearFailed Scope=Unknown Error=ProcessingFrameNotConnected');
+    ShowMessage('Вкладка «Обработка» недоступна. Очистить сессию невозможно.');
     Exit;
-  Device := nil;
-  if (Channel <> nil) and (Channel.FlowMeter <> nil) then Device := Channel.FlowMeter.Device;
-  TFrameProceed(FProceed).RequestClearActiveSession(Device);
-  UpdateUI;
+  end;
+  if (Channel <> nil) and (Channel.FlowMeter <> nil) and
+     (Channel.FlowMeter.Device <> nil) then
+  begin
+    Scope := 'SelectedDevice';
+    Device := Channel.FlowMeter.Device;
+    if TFrameProceed(FProceed).RequestClearActiveSession(Device) then ReloadAndUpdate;
+  end
+  else
+  begin
+    Scope := 'AllDevices';
+    if TFrameProceed(FProceed).RequestClearActiveSessions then ReloadAndUpdate;
+  end;
+  DebugLog('ResultsSessionClearDispatch Scope=' + Scope);
 end;
 
 procedure TFrameMRResults.ButtonCreateSessionClick(Sender: TObject);
 var
   Channel: TChannel;
   Device: TDevice;
+  Scope: string;
 begin
   Channel := GetRowChannel(GridMRResults.Row);
-  if FProceed = nil then
+  if not (FProceed is TFrameProceed) then
+  begin
+    DebugLog('ResultsSessionCreateFailed Scope=Unknown Error=ProcessingFrameNotConnected');
+    ShowMessage('Вкладка «Обработка» недоступна. Создать сессию невозможно.');
     Exit;
-  Device := nil;
-  if (Channel <> nil) and (Channel.FlowMeter <> nil) then Device := Channel.FlowMeter.Device;
-  TFrameProceed(FProceed).RequestCreateSession(Device);
-  UpdateUI;
+  end;
+  if (Channel <> nil) and (Channel.FlowMeter <> nil) and
+     (Channel.FlowMeter.Device <> nil) then
+  begin
+    Scope := 'SelectedDevice'; Device := Channel.FlowMeter.Device;
+    if TFrameProceed(FProceed).RequestCreateSession(Device) <> nil then ReloadAndUpdate;
+  end
+  else
+  begin
+    Scope := 'AllDevices';
+    if TFrameProceed(FProceed).RequestCreateSessions then ReloadAndUpdate;
+  end;
+  DebugLog('ResultsSessionCreateDispatch Scope=' + Scope);
 end;
 
 function TFrameMRResults.HasExportableResults: Boolean;
@@ -278,9 +309,11 @@ end;
 function TFrameMRResults.BuildExportData(ASelected: TChannel): TResultsExportData;
 var Ch: TChannel; Dev: TDevice; Session: TSessionSpillage; Spill: TPointSpillage;
   ES: TResultsExportSession; ED: TResultsExportDevice; ER: TResultsExportResult;
-  DevicePoint: TDevicePoint;
+  DevicePoint: TDevicePoint; PointErrors: TStringList; PointText: string;
 begin
   Result := TResultsExportData.Create;
+  PointErrors := TStringList.Create;
+  try
   if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
   begin
     Result.FlowDimensionIndex := FActiveWorkTable.ValueFlowRate.CurrentDimIndex;
@@ -293,6 +326,20 @@ begin
     ED := Default(TResultsExportDevice); ED.Name:=Dev.Name; ED.SerialNumber:=Dev.SerialNumber;
     ED.UUID:=Dev.UUID; ED.Channel:=Ch.Name; ED.DeviceType:=Dev.DeviceTypeName;
     ED.Status:=GetResultText(Ch); if Session<>nil then ED.SessionID:=IntToStr(Session.ID);
+    PointErrors.Clear;
+    if Session <> nil then
+      for Spill in Session.Spillages do
+        if (Spill <> nil) and (Spill.State <> osDeleted) then
+        begin
+          DevicePoint := Dev.FindMatchedDevicePointForSpillage(Spill);
+          if DevicePoint <> nil then PointText := DevicePoint.Name else PointText := Spill.Name;
+          PointText := PointText + ': ' + FormatFloat('0.###', Spill.Error) + ' %';
+          if (DevicePoint <> nil) and not IsNan(DevicePoint.Error) and
+             not IsInfinite(DevicePoint.Error) and (DevicePoint.Error > 0) then
+            PointText := PointText + ' / ±' + FormatFloat('0.###', DevicePoint.Error) + ' %';
+          PointErrors.Add(PointText);
+        end;
+    ED.PointErrorsText := StringReplace(PointErrors.Text.Trim, sLineBreak, '; ', [rfReplaceAll]);
     Result.Devices.Add(ED);
     if Session=nil then Continue;
     ES := Default(TResultsExportSession); ES.ID:=IntToStr(Session.ID); ES.OpenedAt:=Session.DateTimeOpen;
@@ -342,6 +389,7 @@ begin
       ER.Valid:=Spill.Valid; ER.MeasuredAt:=Spill.DateTime; Result.Results.Add(ER);
     end;
   end;
+  finally PointErrors.Free; end;
 end;
 
 { Exports the selected device, or every device when no result row is selected. }
@@ -392,6 +440,34 @@ begin
   RefreshRows;
   GridMRResults.Repaint;
   ButtonExportExcel.Enabled := (FRows.Count > 0) and HasExportableResults;
+  ButtonClearSession.Enabled := (FProceed is TFrameProceed) and
+    TFrameProceed(FProceed).CanManageResultSessions;
+  ButtonCreateSession.Enabled := ButtonClearSession.Enabled;
+end;
+
+{ Called when the tab opens and after session operations so the UI never
+  depends on stale local session data. }
+procedure TFrameMRResults.ReloadAndUpdate;
+begin
+  if FRefreshing then Exit;
+  FRefreshing := True;
+  try
+    if FProceed is TFrameProceed then TFrameProceed(FProceed).RefreshResultsTab;
+    BuildRows;
+    BuildColumns;
+    RefreshRows;
+    UpdateUI;
+    GridMRResults.Repaint;
+  finally
+    FRefreshing := False;
+  end;
+end;
+
+procedure TFrameMRResults.GridMRResultsSelChanged(Sender: TObject);
+begin
+  ButtonClearSession.Enabled := (FProceed is TFrameProceed) and
+    TFrameProceed(FProceed).CanManageResultSessions;
+  ButtonCreateSession.Enabled := ButtonClearSession.Enabled;
 end;
 
 procedure TFrameMRResults.BuildRows;

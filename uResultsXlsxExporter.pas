@@ -12,6 +12,9 @@ type
   end;
   TResultsExportDevice = record
     Name, SerialNumber, UUID, Channel, DeviceType, Status, SessionID: string;
+    ResultError: Double;
+    ResultErrorSet: Boolean;
+    PointErrorsText: string;
   end;
   TResultsExportResult = record
     DeviceName, SerialNumber, DeviceUUID, SessionID, PointName: string;
@@ -70,6 +73,8 @@ const
   SHeaderDeviceType = #$0422#$0438#$043F#$0020#$043F#$0440#$0438#$0431#$043E#$0440#$0430;
   SHeaderActiveSessionID = #$0049#$0044#$0020#$0430#$043A#$0442#$0438#$0432#$043D#$043E#$0439#$0020#$0441#$0435#$0441#$0441#$0438#$0438;
   SHeaderResultSheet = #$041B#$0438#$0441#$0442#$0020#$0440#$0435#$0437#$0443#$043B#$044C#$0442#$0430#$0442#$043E#$0432;
+  SHeaderDeviceError = #$041F#$043E#$0433#$0440#$0435#$0448#$043D#$043E#$0441#$0442#$044C#$0020#$043F#$0440#$0438#$0431#$043E#$0440#$0430;
+  SHeaderPointErrors = #$041F#$043E#$0433#$0440#$0435#$0448#$043D#$043E#$0441#$0442#$0438#$0020#$0442#$043E#$0447#$0435#$043A;
   SHeaderNumber = #$2116;
   SHeaderPointName = #$041D#$0430#$0437#$0432#$0430#$043D#$0438#$0435#$0020#$0442#$043E#$0447#$043A#$0438;
   SHeaderReferenceFlow = #$0420#$0430#$0441#$0445#$043E#$0434#$0020#$044D#$0442#$0430#$043B#$043E#$043D#$0430;
@@ -118,22 +123,22 @@ class procedure TResultsXlsxExporter.ValidateExportLabels;
 const
   Mojibake: array[0..5] of string = (#$0420#$040E, #$0420#$045F,
     #$0420#$00B5, #$0420#$201D, #$0420#$00B0, #$0421#$0403);
-  Names: array[0..24] of string = ('SWorksheetSession', 'SWorksheetDevices',
+  Names: array[0..25] of string = ('SWorksheetSession', 'SWorksheetDevices',
     'SDeviceFallback', 'SHeaderSessionID', 'SHeaderDateTime', 'SHeaderWorkTable',
     'SHeaderMode', 'SHeaderStatus', 'SHeaderName', 'SHeaderSerial', 'SHeaderUuid',
     'SHeaderChannel', 'SHeaderDeviceType', 'SHeaderActiveSessionID',
     'SHeaderResultSheet', 'SHeaderNumber', 'SHeaderPointName',
     'SHeaderReferenceFlow', 'SHeaderEtalon', 'SHeaderEtalonUuid',
     'SHeaderDeviceValue', 'SHeaderResultError', 'SHeaderPointError',
-    'SHeaderValidity', 'SHeaderDateTime');
-  Values: array[0..24] of string = (SWorksheetSession, SWorksheetDevices,
+    'SHeaderValidity', 'SHeaderDeviceError', 'SHeaderPointErrors');
+  Values: array[0..25] of string = (SWorksheetSession, SWorksheetDevices,
     SDeviceFallback, SHeaderSessionID, SHeaderDateTime, SHeaderWorkTable,
     SHeaderMode, SHeaderStatus, SHeaderName, SHeaderSerial, SHeaderUuid,
     SHeaderChannel, SHeaderDeviceType, SHeaderActiveSessionID,
     SHeaderResultSheet, SHeaderNumber, SHeaderPointName,
     SHeaderReferenceFlow, SHeaderEtalon, SHeaderEtalonUuid,
     SHeaderDeviceValue, SHeaderResultError, SHeaderPointError,
-    SHeaderValidity, SHeaderDateTime);
+    SHeaderValidity, SHeaderDeviceError, SHeaderPointErrors);
 var I, J: Integer;
 begin
   for I := Low(Values) to High(Values) do
@@ -195,10 +200,10 @@ begin
     for C := 0 to High(H) do S.WriteString(1,C+1,H[C],xsHeader);
     for I := 0 to AData.Sessions.Count-1 do begin SS:=AData.Sessions[I]; S.WriteString(I+2,1,SS.ID); if SS.OpenedAt<>0 then S.WriteDateTime(I+2,2,SS.OpenedAt); S.WriteString(I+2,3,SS.WorkTable); S.WriteString(I+2,4,SS.Mode); S.WriteString(I+2,5,SS.Status,xsBooleanStatus); end;
 
-    S := W.AddWorksheet(SWorksheetDevices); PrepareSheet(S, [24,18,40,12,24,18,20,31]);
-    H := TArray<string>.Create(SHeaderName,SHeaderSerial,SHeaderUuid,SHeaderChannel,SHeaderDeviceType,SHeaderStatus,SHeaderActiveSessionID,SHeaderResultSheet);
+    S := W.AddWorksheet(SWorksheetDevices); PrepareSheet(S, [24,18,40,12,24,18,20,31,22,55]);
+    H := TArray<string>.Create(SHeaderName,SHeaderSerial,SHeaderUuid,SHeaderChannel,SHeaderDeviceType,SHeaderStatus,SHeaderActiveSessionID,SHeaderResultSheet,SHeaderDeviceError,SHeaderPointErrors);
     for C:=0 to High(H) do S.WriteString(1,C+1,H[C],xsHeader);
-    for I:=0 to AData.Devices.Count-1 do begin D:=AData.Devices[I]; S.WriteString(I+2,1,D.Name); S.WriteString(I+2,2,D.SerialNumber); S.WriteString(I+2,3,D.UUID,xsUuid); S.WriteString(I+2,4,D.Channel); S.WriteString(I+2,5,D.DeviceType); S.WriteString(I+2,6,D.Status,xsBooleanStatus); S.WriteString(I+2,7,D.SessionID); S.WriteString(I+2,8,DeviceSheets[I]); end;
+    for I:=0 to AData.Devices.Count-1 do begin D:=AData.Devices[I]; S.WriteString(I+2,1,D.Name); S.WriteString(I+2,2,D.SerialNumber); S.WriteString(I+2,3,D.UUID,xsUuid); S.WriteString(I+2,4,D.Channel); S.WriteString(I+2,5,D.DeviceType); S.WriteString(I+2,6,D.Status,xsBooleanStatus); S.WriteString(I+2,7,D.SessionID); S.WriteString(I+2,8,DeviceSheets[I]); if D.ResultErrorSet then S.WriteNumber(I+2,9,PercentPointsToExcelFraction(D.ResultError),xsError); S.WriteString(I+2,10,D.PointErrorsText,xsWrapped); end;
 
     for I := 0 to AData.Devices.Count - 1 do begin
       SheetName := DeviceSheets[I]; if SheetName = '' then Continue;

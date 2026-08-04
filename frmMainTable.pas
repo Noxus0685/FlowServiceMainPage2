@@ -2675,8 +2675,8 @@ end;
 
 procedure TFrameMainTable.TabControl1Change(Sender: TObject);
 begin
-//  if (TabControl1.ActiveTab = TabItemResults) and (FFrameProceed <> nil) then
-//    FFrameProceed.RefreshResultsTab;
+  if (TabControl1.ActiveTab = TabItemMRResults) and (FFrameMRResults <> nil) then
+    FFrameMRResults.ReloadAndUpdate;
 end;
 
 procedure TFrameMainTable.ConnectResultsProcessing(AProceed: TFrameProceed);
@@ -2689,7 +2689,7 @@ end;
 procedure TFrameMainTable.RefreshSynchronizedResults(Sender: TObject);
 begin
   if FFrameMRResults <> nil then
-    FFrameMRResults.UpdateUI;
+    FFrameMRResults.ReloadAndUpdate;
 end;
 
 function TFrameMainTable.GetPointResultError(const ADevice: TDevice;
