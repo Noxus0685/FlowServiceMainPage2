@@ -260,7 +260,7 @@ type
       HISTORY_RESERVE_SEC = 5.0;
 
   private
-    function GetStage: EMeasurementState; override;
+
 
     FWorkTable: TWorkTable;
     FPoints: TObjectList<TDevicePoint>;
@@ -359,7 +359,7 @@ type
     procedure ResetRuntimeContext;
     procedure ResetPointSelectionContext;
     procedure FinalizeMeasurementRun(AResult: TMeasurementRunResult; AReason: TMeasurementRunDoneReason);
-
+    function GetStage: EMeasurementState; override;
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
     procedure RequestPointNavigation(const ADirection: string; ATargetIndex: Integer);
     procedure SelectForcedPoint;

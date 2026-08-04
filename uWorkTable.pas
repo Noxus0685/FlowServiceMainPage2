@@ -479,7 +479,7 @@ type
     FFlowRate: TFlowRate;
 
     FMeasurementRun: TMeasurementRunBase;
-    function GetMeasurementRunStage: EMeasurementState;
+
     FMode:EMeasurementRunMode;
 
     FFluidTemp: TFluidTemp;
@@ -546,7 +546,7 @@ type
     FDataPointsGridColumns: TArray<TGridColumnLayout>;
     FResultsGridColumns: TArray<TGridColumnLayout>;
     FSyncSetup: TSyncSetup;
-
+    function GetMeasurementRunStage: EMeasurementState;
     function GetValueTempertureBefore: TMeterValue;
     function GetValueTempertureAfter: TMeterValue;
     function GetValueTempertureDelta: TMeterValue;
