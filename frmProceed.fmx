@@ -850,6 +850,10 @@ object FrameProceed: TFrameProceed
       Action = ActionSessionClose
       ImageIndex = -1
     end
+    object MenuItemGridDataPointsColumns: TMenuItem
+      Tag = -10001
+      Text = #1057#1090#1086#1083#1073#1094#1099
+    end
   end
   object PopupMenuGridResults: TPopupMenu
     OnPopup = PopupMenuGridResultsPopup
@@ -866,6 +870,10 @@ object FrameProceed: TFrameProceed
     object MenuItemGridResultsClose: TMenuItem
       Action = ActionSessionClose
       ImageIndex = -1
+    end
+    object MenuItemGridResultsColumns: TMenuItem
+      Tag = -10001
+      Text = #1057#1090#1086#1083#1073#1094#1099
     end
   end
   object PopupMenuTreeViewDevices: TPopupMenu

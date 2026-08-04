@@ -173,10 +173,12 @@ type
     MenuItemGridDataPointsDelete: TMenuItem;
     MenuItemGridDataPointsClear: TMenuItem;
     MenuItemGridDataPointsClose: TMenuItem;
+    MenuItemGridDataPointsColumns: TMenuItem;
     PopupMenuGridResults: TPopupMenu;
     MenuItemGridResultsDelete: TMenuItem;
     MenuItemGridResultsClear: TMenuItem;
     MenuItemGridResultsClose: TMenuItem;
+    MenuItemGridResultsColumns: TMenuItem;
     ActionSessionDeviceRemove: TAction;
     ActionSessionDeviceAdd: TAction;
     ActionDeleteWorkTable: TAction;
@@ -295,6 +297,8 @@ type
       ASession: TSessionSpillage; ARows, AColumns: Integer);
 
     procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
+    procedure ApplyGridColumnsLayout(AGrid: TGrid;
+      const AColumns: TArray<TGridColumnLayout>);
     procedure SaveLayoutSettingsToWorkTable;
     procedure GridDataPointsColumnMoved(Column: TColumn; FromIndex,
       ToIndex: Integer);
@@ -356,7 +360,6 @@ const
   CProcessingDevicesItemKeyPrefix = 'Item';
   CProcessingDevicePointCountsSection = 'ProcessingDevicePointCounts';
   CManualProcessingDevicesSection = 'ManualProcessingDevices';
-  CColumnsMenuTag = -10001;
   CVolumeFlowUnits: array[0..4] of string = ('л/с','л/мин','л/ч','м3/мин','м3/ч');
   CMassFlowUnits: array[0..4] of string = ('кг/с','кг/мин','кг/ч','т/мин','т/ч');
 
@@ -1194,6 +1197,56 @@ begin
 end;
 
 
+procedure TFrameProceed.ApplyGridColumnsLayout(AGrid: TGrid;
+  const AColumns: TArray<TGridColumnLayout>);
+var
+  I, J, TargetIndex: Integer;
+  Column: TColumn;
+begin
+  if (AGrid = nil) or (Length(AColumns) = 0) then
+    Exit;
+
+  AGrid.BeginUpdate;
+  try
+    for I := 0 to High(AColumns) do
+    begin
+      Column := nil;
+      // Name is the persistent identity: the current index changes when a user
+      // moves a column and therefore cannot identify it on the next form open.
+      for J := 0 to AGrid.ColumnCount - 1 do
+        if SameText(AGrid.Columns[J].Name, AColumns[I].Name) then
+        begin
+          Column := AGrid.Columns[J];
+          Break;
+        end;
+      if Column = nil then
+        Continue;
+
+      Column.Visible := AColumns[I].Visible;
+      if AColumns[I].Width > 0 then
+        Column.Width := AColumns[I].Width;
+    end;
+
+    // Apply positions only after every named column has received its settings.
+    for TargetIndex := 0 to AGrid.ColumnCount - 1 do
+      for I := 0 to High(AColumns) do
+        if AColumns[I].DisplayIndex = TargetIndex then
+        begin
+          for J := 0 to AGrid.ColumnCount - 1 do
+            if SameText(AGrid.Columns[J].Name, AColumns[I].Name) then
+            begin
+              AGrid.Columns[J].Index := TargetIndex;
+              Break;
+            end;
+          Break;
+        end;
+  finally
+    AGrid.EndUpdate;
+  end;
+  AGrid.Repaint;
+end;
+
+
 procedure TFrameProceed.SaveLayoutSettingsToWorkTable;
 var
   WorkTable: TWorkTable;
@@ -1202,10 +1255,13 @@ var
   DataPointsColumns: TArray<TGridColumnLayout>;
   ResultsColumns: TArray<TGridColumnLayout>;
 begin
-  WorkTable := FActiveWorkTable;
+  // Keep the existing WorkTable/INI storage; resolve the active table at save
+  // time so a tab switch cannot write the layout into the previous table.
+  WorkTable := ResolveManagerWorkTable(FWorkTableManager);
   if WorkTable = nil then
     Exit;
-   CaptureGridColumnsLayout(GridDataPoints, DataPointsColumns);
+  FActiveWorkTable := WorkTable;
+  CaptureGridColumnsLayout(GridDataPoints, DataPointsColumns);
   CaptureGridColumnsLayout(GridResults, ResultsColumns);
   WorkTable.DataPointsGridColumns := DataPointsColumns;
   WorkTable.ResultsGridColumns := ResultsColumns;
@@ -2440,6 +2496,7 @@ begin
 end;
 procedure TFrameProceed.UpdateGridResults;
 begin
+  FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
   GridResults.BeginUpdate;
   try
     if GridDataPoints <> nil then
@@ -2464,6 +2521,10 @@ begin
 
   GridResults.Visible := True;
   GridDataPoints.Visible := False;
+  // Data and all named columns now exist, so no later default population can
+  // overwrite the persisted order, width or visibility.
+  if FActiveWorkTable <> nil then
+    ApplyGridColumnsLayout(GridResults, FActiveWorkTable.ResultsGridColumns);
   SetGridReadOnly(GridResults);
   UpdateActionHints;
   LogProceedGridContext('Summary', nil, nil, GridResults.RowCount,
@@ -2499,6 +2560,7 @@ var
   ColumnWidths: TArray<Single>;
   I, Count: Integer;
 begin
+  FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
 //  UpdateGridDataPointsHeaders(FActiveWorkTable.TableFlow.ValueVolume.GetDimName, FActiveWorkTable.TableFlow.ValueVolumeFlow.GetDimName);
   Count := 0;
   for I := 0 to High(FCurrentSpillages) do
@@ -2522,6 +2584,10 @@ begin
   GridResults.Visible := False;
   GridDataPoints.Visible := True;
   ButtonExportExcel.Enabled := GridDataPoints.RowCount > 0;
+  // Restore through the existing WorkTable layout only after rows and headers
+  // have been populated.
+  if FActiveWorkTable <> nil then
+    ApplyGridColumnsLayout(GridDataPoints, FActiveWorkTable.DataPointsGridColumns);
   SetGridReadOnly(GridDataPoints);
   UpdateActionHints;
   LogProceedGridContext('Measurements', ResolveSelectedDevice, FCurrentSession,
@@ -2795,45 +2861,62 @@ begin
 end;
 
 procedure TFrameProceed.PopupMenuGridResultsPopup(Sender: TObject);
-var ColumnsMenu, Item, ResetItem: TMenuItem; Grid: TGrid; I: Integer;
+var
+  ColumnsMenu, Item, ResetItem: TMenuItem;
+  Grid: TGrid;
+  I: Integer;
 begin
-  if not (Sender is TPopupMenu) then Exit;
-  // Динамический список столбцов пересоздаётся при открытии меню, поэтому
-  // перед добавлением удаляем только его предыдущий экземпляр.
-  for I := TPopupMenu(Sender).ChildrenCount - 1 downto 0 do
-    if (TPopupMenu(Sender).Children[I] is TMenuItem) and
-       (TMenuItem(TPopupMenu(Sender).Children[I]).Tag = CColumnsMenuTag) then
-      TPopupMenu(Sender).Children[I].Free;
-  Grid := GridResults;
-  if Sender = PopupMenuGridDataPoints then Grid := GridDataPoints;
-  ColumnsMenu := TMenuItem.Create(TPopupMenu(Sender));
-  ColumnsMenu.Text := 'Столбцы';
-  ColumnsMenu.Tag := CColumnsMenuTag;
-  TPopupMenu(Sender).AddObject(ColumnsMenu);
+  if Sender = PopupMenuGridDataPoints then
+  begin
+    Grid := GridDataPoints;
+    ColumnsMenu := MenuItemGridDataPointsColumns;
+  end
+  else if Sender = PopupMenuGridResults then
+  begin
+    Grid := GridResults;
+    ColumnsMenu := MenuItemGridResultsColumns;
+  end
+  else
+    Exit;
+
+  // The "Columns" branch is permanent in FMX. Only its dynamic children are
+  // rebuilt, preventing one more root item from being added on every popup.
+  for I := ColumnsMenu.ChildrenCount - 1 downto 0 do
+    ColumnsMenu.Children[I].Free;
   for I := 0 to Grid.ColumnCount - 1 do
   begin
     Item := TMenuItem.Create(ColumnsMenu);
     Item.Text := Grid.Columns[I].Header;
-    Item.Tag := I;
+    Item.TagString := Grid.Columns[I].Name;
     Item.IsChecked := Grid.Columns[I].Visible;
     Item.OnClick := GridColumnMenuClick;
     ColumnsMenu.AddObject(Item);
   end;
   ResetItem := TMenuItem.Create(ColumnsMenu);
   ResetItem.Text := 'Восстановить по умолчанию';
-  ResetItem.Tag := -1;
   ResetItem.OnClick := GridColumnsResetClick;
   ColumnsMenu.AddObject(ResetItem);
 end;
 
 procedure TFrameProceed.GridColumnMenuClick(Sender: TObject);
-var Grid: TGrid; Item: TMenuItem;
+var
+  Grid: TGrid;
+  Item: TMenuItem;
+  I: Integer;
 begin
-  if not (Sender is TMenuItem) then Exit;
+  if not (Sender is TMenuItem) then
+    Exit;
   Item := TMenuItem(Sender);
   if GridResults.Visible then Grid := GridResults else Grid := GridDataPoints;
-  if (Item.Tag >= 0) and (Item.Tag < Grid.ColumnCount) then
-    Grid.Columns[Item.Tag].Visible := not Grid.Columns[Item.Tag].Visible;
+  // Resolve by the stable component name, not by a display index that changes
+  // as soon as columns are reordered.
+  for I := 0 to Grid.ColumnCount - 1 do
+    if SameText(Grid.Columns[I].Name, Item.TagString) then
+    begin
+      Grid.Columns[I].Visible := not Grid.Columns[I].Visible;
+      Item.IsChecked := Grid.Columns[I].Visible;
+      Break;
+    end;
   SaveLayoutSettingsToWorkTable;
 end;
 
@@ -4138,6 +4221,7 @@ begin
   // При смене строки или ячейки переоткрываем Hint с текстом нового результата.
   FLastResultsHintRow := Row;
   FLastResultsHintCol := Col;
+  Application.CancelHint;
   GridResults.ShowHint := False;
   GridResults.Hint := '';
   HintText := '';
@@ -4553,6 +4637,7 @@ begin
   // При смене строки или ячейки переоткрываем Hint с текстом нового измерения.
   FLastDataPointsHintRow := Row;
   FLastDataPointsHintCol := Col;
+  Application.CancelHint;
   GridDataPoints.ShowHint := False;
   GridDataPoints.Hint := '';
   HintText := '';
