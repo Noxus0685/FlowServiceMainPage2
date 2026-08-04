@@ -10,7 +10,7 @@ def require(value, message):
     if not value:
         raise AssertionError(message)
 
-require("APP_VERSION = '1.0.66'" in version, 'release version is not 1.0.66')
+require("APP_VERSION = '1.0.68'" in version, 'release version is not 1.0.68')
 require('Spillage.SessionID <> ASession.ID' in proceed,
         'point lookup must reject spillages outside the row session')
 filter_pos = proceed.index('Spillage.SessionID <> ASession.ID')
@@ -20,7 +20,7 @@ require('Device.GetActiveSessionSpillage' in proceed,
         'production active-session resolver is not used')
 require('(Spillage.Num > Result.Num)' in proceed and '(Spillage.ID > Result.ID)' in proceed,
         'repeat priority must use Num then ID')
-require("AValue := #$2014" in proceed and 'ASpillage.StatusStr' in proceed,
+require("Result.DisplayText := #$2014" in proceed and 'ASpillage.StatusStr' in proceed,
         'unfinished points must render an em dash with a status hint')
 require('Результат отсутствует в текущей сессии' in proceed,
         'missing active-session result hint is absent')
@@ -30,7 +30,8 @@ for suffix in ('.Visible', '.Width', '.Order'):
     require(suffix in proceed, f'missing persisted column property {suffix}')
 require("'Point.' + P.UUID" in proceed,
         'dynamic point column key is not UUID based')
-require('Восстановить столбцы по умолчанию' in proceed,
+require("ColumnsRoot.Text := 'Столбцы'" in proceed and
+        "Item.Text := 'Восстановить по умолчанию'" in proceed,
         'column reset command is absent')
 require('Редактировать прибор' in proceed and 'TFormDeviceEditor.Create' in proceed,
         'tree device editor must reuse the production editor')
@@ -48,4 +49,4 @@ require('ProceedGridContextBuilt' in proceed and
         'required aggregate protocol events are absent')
 require('SummaryResults CELL' not in proceed,
         'per-cell SummaryResults logging must be removed')
-print('Proceed 1.0.66 static checks passed')
+print('Proceed 1.0.68 compatibility checks passed')
