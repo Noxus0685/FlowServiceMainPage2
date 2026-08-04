@@ -25,6 +25,7 @@ uses
   FMX.SimpleChart,
   frmCalibrCoefs,
   fuDeviceSelect,
+  fuDeviceEdit,
   System.Actions,
   System.Classes,
   System.Generics.Collections,
@@ -54,8 +55,11 @@ type
     Serial: string;
     DeviceUUID: string;
     PointNames: TArray<string>;
+    PointKeys: TArray<string>;
     PointValues: TArray<string>;
+    PointHints: TArray<string>;
     PointStatuses: TArray<Integer>;
+    SessionID: Integer;
     ResultText: string;
     ResultStatus: Integer;
   end;
@@ -158,6 +162,7 @@ type
     Button4: TButton;
     Button5: TButton;
     Button6: TButton;
+    ButtonProceedExportExcel: TButton;
     Line9: TLine;
     lyt1: TLayout;
     ActionListWorkTables: TActionList;
@@ -216,7 +221,6 @@ type
     function BuildResultTextByStatus(const AStatus: Integer): string;
     function ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
     procedure UpdateResultsPointColumns;
-    procedure LogResultCellDebug(const ARow: TResultGridRow; APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
     procedure ShowAllDevicesResults;
     procedure ShowDevicesResults(const ADevices: TList<TDevice>);
     procedure ShowWorkTableResults(AWorkTable: TWorkTable);
@@ -235,6 +239,7 @@ type
     procedure ActionSessionSynchTableExecute(Sender: TObject);
     procedure MenuTreeViewDevicesAddClick(Sender: TObject);
     procedure MenuTreeViewDevicesDeleteClick(Sender: TObject);
+    procedure MenuTreeViewDevicesEditClick(Sender: TObject);
     // Проверяет, что выбранный узел дерева является рабочим столом.
     function IsSelectedTreeWorkTable(out AWorkTable: TWorkTable): Boolean;
     procedure ClearCurrentResultsView;
@@ -264,7 +269,15 @@ type
     procedure GridResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF; const Row: Integer; const Value: TValue; const State: TGridDrawStates);
     procedure GridResultsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+    procedure GridResultsMouseMove(Sender: TObject; Shift: TShiftState; X,
+      Y: Single);
+    procedure GridResultsColumnMoved(Column: TColumn; FromIndex,
+      ToIndex: Integer);
     procedure GridResultsSelChanged(Sender: TObject);
+    procedure PopupMenuGridResultsPopup(Sender: TObject);
+    procedure ProceedGridColumnMenuClick(Sender: TObject);
+    procedure ProceedGridResetColumnsClick(Sender: TObject);
+    procedure ButtonProceedExportExcelClick(Sender: TObject);
     procedure GridDataPointsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridDataPointsCellClick(const Column: TColumn; const Row: Integer);
     procedure GridDataPointsDrawColumnCell(Sender: TObject; const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF; const Row: Integer; const Value: TValue; const State: TGridDrawStates);
@@ -276,6 +289,9 @@ type
     procedure InitCalibrCoefsFrame;
     procedure SetGridReadOnly(AGrid: TGrid);
     procedure UpdateActionHints;
+    function ProceedGridColumnKey(AColumn: TColumn): string;
+    procedure SaveProceedGridColumns;
+    procedure LoadProceedGridColumns;
 
     procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
     procedure SaveLayoutSettingsToWorkTable;
@@ -309,6 +325,8 @@ type
     function RequestCreateSessions: Boolean;
     function CanManageResultSessions: Boolean;
     function FindResultSpillageForPoint(ADevice: TDevice; APoint: TDevicePoint): TPointSpillage;
+    function FindSessionResultSpillageForPoint(ADevice: TDevice;
+      ASession: TSessionSpillage; APoint: TDevicePoint): TPointSpillage;
     function GetPointResultError(const ADevice: TDevice; const APoint: TDevicePoint): Double;
     function GetPointResultFlowLS(const ADevice: TDevice; const APoint: TDevicePoint): Double;
     function FormatResultErrorValue(const AValue: Double): string;
@@ -324,7 +342,8 @@ type
 implementation
    uses
     uAppServices,
-    uMeterValue;
+    uMeterValue,
+    uProceedXlsxExporter;
 {$R *.fmx}
 
 const
@@ -333,6 +352,8 @@ const
   CProcessingDevicesItemKeyPrefix = 'Item';
   CProcessingDevicePointCountsSection = 'ProcessingDevicePointCounts';
   CManualProcessingDevicesSection = 'ManualProcessingDevices';
+  CProceedGridColumnsSection = 'ProceedGridColumns';
+  CProceedGridMinWidth = 40;
   CVolumeFlowUnits: array[0..4] of string = ('л/с','л/мин','л/ч','м3/мин','м3/ч');
   CMassFlowUnits: array[0..4] of string = ('кг/с','кг/мин','кг/ч','т/мин','т/ч');
 
@@ -371,6 +392,7 @@ end;
 
 destructor TFrameProceed.Destroy;
 begin
+  SaveProceedGridColumns;
   if Assigned(AppServices) then
     AppServices.OnBeforeShutdown := nil;
 
@@ -406,7 +428,13 @@ begin
   end;
 
   if GridResults <> nil then
+  begin
     GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
+    GridResults.OnMouseMove := GridResultsMouseMove;
+    GridResults.OnColumnMoved := GridResultsColumnMoved;
+    GridResults.ShowHint := True;
+    PopupMenuGridResults.OnPopup := PopupMenuGridResultsPopup;
+  end;
   if GridDataPoints <> nil then
     GridDataPoints.OnDrawColumnCell := GridDataPointsDrawColumnCell;
 
@@ -1965,17 +1993,198 @@ begin
     StringColumnPointNum3.Header := FormatPointHeader('Q3');
     StringColumnPointNum4.Header := FormatPointHeader('Q4');
   end;
+  LoadProceedGridColumns;
+end;
+
+function TFrameProceed.ProceedGridColumnKey(AColumn: TColumn): string;
+var P: Integer;
+begin
+  if AColumn = StringColumnResultName then Exit('Name');
+  if AColumn = StringColumnResultType then Exit('Type');
+  if AColumn = StringColumnResultSerial then Exit('Serial');
+  if AColumn = StringColumnResult then Exit('Result');
+  P := -1;
+  if AColumn = StringColumnPointNum1 then P := 0
+  else if AColumn = StringColumnPointNum2 then P := 1
+  else if AColumn = StringColumnPointNum3 then P := 2
+  else if AColumn = StringColumnPointNum4 then P := 3;
+  if (P >= 0) and (Length(FCurrentResultRows) > 0) and
+     (P < Length(FCurrentResultRows[0].PointKeys)) and
+     (FCurrentResultRows[0].PointKeys[P] <> '') then
+    Exit(FCurrentResultRows[0].PointKeys[P]);
+  Result := AColumn.Name;
+end;
+
+procedure TFrameProceed.SaveProceedGridColumns;
+var Ini: TIniFile; I: Integer; Key: string;
+begin
+  if (FWorkTableManager = nil) or
+     (Trim(FWorkTableManager.IniFileName) = '') then Exit;
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  try
+    for I := 0 to GridResults.ColumnCount - 1 do
+    begin
+      Key := ProceedGridColumnKey(GridResults.Columns[I]);
+      Ini.WriteBool(CProceedGridColumnsSection, Key + '.Visible',
+        GridResults.Columns[I].Visible);
+      Ini.WriteFloat(CProceedGridColumnsSection, Key + '.Width',
+        Max(CProceedGridMinWidth, GridResults.Columns[I].Width));
+      Ini.WriteInteger(CProceedGridColumnsSection, Key + '.Order', I);
+    end;
+  finally Ini.Free; end;
+end;
+
+procedure TFrameProceed.LoadProceedGridColumns;
+var Ini: TIniFile; I, Loaded, Order: Integer; Key: string; W: Double;
+begin
+  if (FWorkTableManager = nil) or
+     (Trim(FWorkTableManager.IniFileName) = '') or
+     not FileExists(FWorkTableManager.IniFileName) then Exit;
+  Loaded := 0;
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  try
+    { Apply visibility, then order, then width. Unknown saved keys remain intact. }
+    for I := 0 to GridResults.ColumnCount - 1 do begin
+      Key := ProceedGridColumnKey(GridResults.Columns[I]);
+      if Ini.ValueExists(CProceedGridColumnsSection, Key + '.Visible') then begin
+        GridResults.Columns[I].Visible := Ini.ReadBool(CProceedGridColumnsSection,
+          Key + '.Visible', True); Inc(Loaded); end;
+    end;
+    for I := 0 to GridResults.ColumnCount - 1 do begin
+      Key := ProceedGridColumnKey(GridResults.Columns[I]);
+      Order := Ini.ReadInteger(CProceedGridColumnsSection, Key + '.Order', I);
+      if (Order >= 0) and (Order < GridResults.ColumnCount) then
+        GridResults.Columns[I].Index := Order;
+    end;
+    for I := 0 to GridResults.ColumnCount - 1 do begin
+      Key := ProceedGridColumnKey(GridResults.Columns[I]);
+      W := Ini.ReadFloat(CProceedGridColumnsSection, Key + '.Width',
+        GridResults.Columns[I].Width);
+      if W >= CProceedGridMinWidth then GridResults.Columns[I].Width := W;
+    end;
+  finally Ini.Free; end;
+  LogMKS('ProceedGridColumnsLoaded', 'ProceedGridColumnsLoaded',
+    Format('RestoredColumnCount=%d', [Loaded]));
+end;
+
+procedure TFrameProceed.PopupMenuGridResultsPopup(Sender: TObject);
+var I: Integer; Item: TMenuItem;
+begin
+  PopupMenuGridResults.Clear;
+  for I := 0 to GridResults.ColumnCount - 1 do begin
+    Item := TMenuItem.Create(PopupMenuGridResults);
+    Item.Text := GridResults.Columns[I].Header;
+    Item.TagString := ProceedGridColumnKey(GridResults.Columns[I]);
+    Item.AutoCheck := True; Item.IsChecked := GridResults.Columns[I].Visible;
+    Item.OnClick := ProceedGridColumnMenuClick;
+    PopupMenuGridResults.AddObject(Item);
+  end;
+  Item := TMenuItem.Create(PopupMenuGridResults); Item.Text := '-';
+  PopupMenuGridResults.AddObject(Item);
+  Item := TMenuItem.Create(PopupMenuGridResults);
+  Item.Text := 'Восстановить столбцы по умолчанию';
+  Item.OnClick := ProceedGridResetColumnsClick;
+  PopupMenuGridResults.AddObject(Item);
+end;
+
+procedure TFrameProceed.ProceedGridColumnMenuClick(Sender: TObject);
+var I: Integer; Item: TMenuItem;
+begin
+  Item := TMenuItem(Sender);
+  for I := 0 to GridResults.ColumnCount - 1 do
+    if SameText(ProceedGridColumnKey(GridResults.Columns[I]), Item.TagString) then
+    begin GridResults.Columns[I].Visible := Item.IsChecked; Break; end;
+  SaveProceedGridColumns;
+end;
+
+procedure TFrameProceed.ProceedGridResetColumnsClick(Sender: TObject);
+var Ini: TIniFile; I: Integer;
+begin
+  if (FWorkTableManager <> nil) and
+     (Trim(FWorkTableManager.IniFileName) <> '') then begin
+    Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+    try Ini.EraseSection(CProceedGridColumnsSection); finally Ini.Free; end;
+  end;
+  for I := 0 to GridResults.ColumnCount - 1 do begin
+    GridResults.Columns[I].Visible := True;
+    GridResults.Columns[I].Width := 100;
+  end;
+  StringColumnResultName.Index := 0; StringColumnResultType.Index := 1;
+  StringColumnResultSerial.Index := 2; StringColumnResult.Index := GridResults.ColumnCount - 1;
+  UpdateResultsPointColumns;
+end;
+
+procedure TFrameProceed.ButtonProceedExportExcelClick(Sender: TObject);
+var Snapshot: TProceedExportSnapshot; ExportRow: TProceedExportRow;
+  ExportColumn: TProceedExportColumn; ExportCell: TProceedExportCell;
+  Dialog: TSaveDialog; I, J: Integer; V: TValue; S: string; N: Double;
+begin
+  if Length(FCurrentResultRows) = 0 then Exit;
+  Dialog := TSaveDialog.Create(Self);
+  try
+    Dialog.DefaultExt := 'xlsx';
+    Dialog.Filter := 'Excel Workbook (*.xlsx)|*.xlsx';
+    Dialog.FileName := Format('Proceed_%s.xlsx',
+      [FormatDateTime('yyyymmdd_hhnnss', Now)]);
+    if not Dialog.Execute then Exit;
+    Snapshot := TProceedExportSnapshot.Create;
+    try
+      for I := 0 to GridResults.ColumnCount - 1 do
+        if GridResults.Columns[I].Visible then begin
+          ExportColumn := Default(TProceedExportColumn);
+          ExportColumn.Key := ProceedGridColumnKey(GridResults.Columns[I]);
+          ExportColumn.Header := GridResults.Columns[I].Header;
+          ExportColumn.Width := Max(8, GridResults.Columns[I].Width / 7);
+          ExportColumn.IsPercent := Pos('Point.', ExportColumn.Key) = 1;
+          Snapshot.Columns.Add(ExportColumn);
+        end;
+      for J := 0 to High(FCurrentResultRows) do begin
+        ExportRow := TProceedExportRow.Create;
+        Snapshot.Rows.Add(ExportRow);
+        for I := 0 to GridResults.ColumnCount - 1 do
+          if GridResults.Columns[I].Visible then begin
+            V := TValue.Empty; GridResultsGetValue(GridResults, I, J, V);
+            S := V.ToString; ExportCell := Default(TProceedExportCell);
+            ExportCell.Text := S;
+            if (Pos('Point.', ProceedGridColumnKey(GridResults.Columns[I])) = 1) and
+               TryStrToFloat(StringReplace(S, '%', '', [rfReplaceAll]), N) then
+            begin ExportCell.Number := N / 100; ExportCell.IsNumber := True; end;
+            ExportRow.Cells.Add(ExportCell);
+          end;
+      end;
+      try
+        TProceedXlsxExporter.ExportToFile(Snapshot, Dialog.FileName);
+        LogMKS('ProceedGridExportCompleted', 'ProceedGridExportCompleted',
+          Format('Path=%s; RowCount=%d; ColumnCount=%d', [Dialog.FileName,
+            Snapshot.Rows.Count, Snapshot.Columns.Count]));
+      except on E: Exception do ShowMessage('Не удалось сохранить Excel: ' + E.Message); end;
+    finally Snapshot.Free; end;
+  finally Dialog.Free; end;
 end;
 
 function TFrameProceed.FindResultSpillageForPoint(ADevice: TDevice;
   APoint: TDevicePoint): TPointSpillage;
+var
+  Session: TSessionSpillage;
+begin
+  Result := nil;
+  if ADevice = nil then
+    Exit;
+  { Use the same production active-session resolver as measurement continuation. }
+  Session := ADevice.GetActiveSessionSpillage;
+  Result := FindSessionResultSpillageForPoint(ADevice, Session, APoint);
+end;
+
+function TFrameProceed.FindSessionResultSpillageForPoint(ADevice: TDevice;
+  ASession: TSessionSpillage; APoint: TDevicePoint): TPointSpillage;
 var
   Spillage: TPointSpillage;
   DeviceUUID: string;
   TypeUUID: string;
 begin
   Result := nil;
-  if (ADevice = nil) or (APoint = nil) or (ADevice.Spillages = nil) then
+  if (ADevice = nil) or (ASession = nil) or (APoint = nil) or
+     (ADevice.Spillages = nil) then
     Exit;
 
   DeviceUUID := Trim(ADevice.UUID);
@@ -1984,6 +2193,11 @@ begin
   for Spillage in ADevice.Spillages do
   begin
     if (Spillage = nil) or (Spillage.State = osDeleted) or (not Spillage.Enabled) then
+      Continue;
+
+    { Session filtering deliberately precedes point matching: historical values
+      must never fill a missing point in the active-session row. }
+    if Spillage.SessionID <> ASession.ID then
       Continue;
 
     if not SameText(Trim(Spillage.DeviceUUID), DeviceUUID) then
@@ -1998,9 +2212,10 @@ begin
             (not ADevice.IsFlowInPoint(Spillage.QavgEtalon, APoint)) then
       Continue;
 
-    Result := Spillage;
-    if Spillage.Valid then
-      Exit;
+    { Production repeats are ordered by Num; ID is the deterministic tie-break. }
+    if (Result = nil) or (Spillage.Num > Result.Num) or
+       ((Spillage.Num = Result.Num) and (Spillage.ID > Result.ID)) then
+      Result := Spillage;
   end;
 end;
 
@@ -2037,29 +2252,6 @@ begin
     Result := APoint.Q / 3.6;
 end;
 
-procedure TFrameProceed.LogResultCellDebug(const ARow: TResultGridRow;
-  APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
-var
-  FoundID: Integer;
-  FoundDeviceUUID: string;
-  FoundError: string;
-begin
-  FoundID := 0;
-  FoundDeviceUUID := '';
-  FoundError := '';
-  if ASpillage <> nil then
-  begin
-    FoundID := ASpillage.ID;
-    FoundDeviceUUID := ASpillage.DeviceUUID;
-    FoundError := FormatFloat('0.###', ASpillage.Error);
-  end;
-
-  LogMKS('DBG SP 9101', 'SummaryResults CELL',
-    Format('RowDeviceUUID=%s; RowSerial=%s; ColumnPointName=%s; ColumnPointDeviceTypeUUID=%s; FoundSpillageID=%d; FoundSpillageDeviceUUID=%s; FoundError=%s; CellValue=%s',
-      [ARow.DeviceUUID, ARow.Serial, APoint.Name, APoint.DeviceTypeUUID,
-       FoundID, FoundDeviceUUID, FoundError, ACellValue]));
-end;
-
 procedure TFrameProceed.ShowAllDevicesResults;
 var
   Devices: TList<TDevice>;
@@ -2092,6 +2284,40 @@ var
   RequiredPointsCount: Integer;
   InvalidCount: Integer;
   HasAnyData: Boolean;
+  ActiveSession: TSessionSpillage;
+  ActiveSpillageCount: Integer;
+
+  { Формирует отображаемое значение и пояснение результата точки с учётом
+    метрологической погрешности и причины незавершения. }
+  procedure BuildSpillageCellDisplay(ASpillage: TPointSpillage;
+    APoint: TDevicePoint; out AValue, AHint: string);
+  begin
+    if ASpillage = nil then
+    begin
+      AValue := '';
+      AHint := 'Результат отсутствует в текущей сессии';
+      Exit;
+    end;
+    if ASpillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED then
+    begin
+      AValue := FormatResultErrorValue(ASpillage.Error);
+      AHint := Format('Фактическая погрешность: %s; допустимая: %s %%',
+        [AValue, FormatFloat('0.###', APoint.Error)]);
+      Exit;
+    end;
+    if ASpillage.Status in [TPointSpillage.SPS_CREATED,
+      TPointSpillage.SPS_DATA_ASSIGNED, TPointSpillage.SPS_FLOW_NOT_MATCHED,
+      TPointSpillage.SPS_STOP_CRITERIA_FAILED] then
+    begin
+      AValue := #$2014;
+      AHint := Trim(ASpillage.StatusStr);
+      if AHint = '' then AHint := 'Точка не завершена: результат недействителен';
+      Exit;
+    end;
+    AValue := FormatResultErrorValue(ASpillage.Error);
+    AHint := Format('Фактическая погрешность: %s; допустимая: %s %%',
+      [AValue, FormatFloat('0.###', APoint.Error)]);
+  end;
 begin
   Rows := TList<TResultGridRow>.Create;
   try
@@ -2102,24 +2328,34 @@ begin
            IsProcessingDevicePendingRemoved(Device) then
           Continue;
 
-        Device.AnalyseResults;
+        ActiveSession := Device.GetActiveSessionSpillage;
 
         Row.Device := Device;
         Row.Name := Device.Name;
         Row.DeviceType := Device.DeviceTypeName;
         Row.Serial := Device.SerialNumber;
         Row.DeviceUUID := Device.UUID;
+        if ActiveSession <> nil then Row.SessionID := ActiveSession.ID
+        else Row.SessionID := 0;
 
         FoundPointsCount := 0;
         RequiredPointsCount := 0;
         InvalidCount := 0;
         HasAnyData := False;
+        ActiveSpillageCount := 0;
+        if (ActiveSession <> nil) and (Device.Spillages <> nil) then
+          for Spillage in Device.Spillages do
+            if (Spillage <> nil) and (Spillage.State <> osDeleted) and
+               Spillage.Enabled and (Spillage.SessionID = ActiveSession.ID) then
+              Inc(ActiveSpillageCount);
 
         if Device.Points <> nil then
         begin
           RequiredPointsCount := Device.Points.Count;
           SetLength(Row.PointNames, Device.Points.Count);
+          SetLength(Row.PointKeys, Device.Points.Count);
           SetLength(Row.PointValues, Device.Points.Count);
+          SetLength(Row.PointHints, Device.Points.Count);
           SetLength(Row.PointStatuses, Device.Points.Count);
           for I := 0 to Device.Points.Count - 1 do
           begin
@@ -2127,7 +2363,9 @@ begin
             if P <> nil then
             begin
               Row.PointNames[I] := P.Name;
-              Spillage := FindResultSpillageForPoint(Device, P);
+              Row.PointKeys[I] := 'Point.' + P.UUID;
+              Spillage := FindSessionResultSpillageForPoint(Device,
+                ActiveSession, P);
               if Spillage <> nil then
               begin
                 Inc(FoundPointsCount);
@@ -2136,31 +2374,38 @@ begin
                    (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
                   Inc(InvalidCount);
                 Row.PointStatuses[I] := Spillage.Status;
-                Row.PointValues[I] := FormatResultErrorValue(Spillage.Error);
+                BuildSpillageCellDisplay(Spillage, P, Row.PointValues[I],
+                  Row.PointHints[I]);
               end
               else
               begin
                 Row.PointStatuses[I] := 1;
-                Row.PointValues[I] := '-';
+                BuildSpillageCellDisplay(nil, P, Row.PointValues[I],
+                  Row.PointHints[I]);
               end;
-              LogResultCellDebug(Row, P, Spillage, Row.PointValues[I]);
             end
             else
             begin
               Row.PointNames[I] := '';
               Row.PointStatuses[I] := 1;
               Row.PointValues[I] := '-';
+              Row.PointHints[I] := 'Результат отсутствует в текущей сессии';
             end;
           end;
         end
         else
         begin
           SetLength(Row.PointNames, 0);
+          SetLength(Row.PointKeys, 0);
           SetLength(Row.PointValues, 0);
+          SetLength(Row.PointHints, 0);
           SetLength(Row.PointStatuses, 0);
         end;
 
-        Row.ResultStatus := ResolveDeviceSummaryStatus(Device);
+        if not HasAnyData then Row.ResultStatus := 2
+        else if InvalidCount > 0 then Row.ResultStatus := 4
+        else if FoundPointsCount < RequiredPointsCount then Row.ResultStatus := 2
+        else Row.ResultStatus := 5;
 
         Row.ResultText := BuildResultTextByStatus(Row.ResultStatus);
 
@@ -2170,6 +2415,10 @@ begin
              InvalidCount, BoolToStr(HasAnyData, True), Row.ResultText]));
 
         Rows.Add(Row);
+        LogMKS('ProceedGridActiveSessionRow', 'ProceedGridActiveSessionRow',
+          Format('DeviceUUID=%s; ActiveSessionID=%d; ActiveSpillageCount=%d; FilledPointCount=%d; ResultText=%s',
+            [Row.DeviceUUID, Row.SessionID, ActiveSpillageCount,
+             FoundPointsCount, Row.ResultText]));
       end;
 
     FCurrentResultRows := Rows.ToArray;
@@ -2187,12 +2436,14 @@ var
   DeviceUUIDs: TStringList;
   Ch: TChannel;
   Device: TDevice;
+  SessionCount: Integer;
 begin
   Devices := TList<TDevice>.Create;
   DeviceUUIDs := TStringList.Create;
   try
     DeviceUUIDs.Sorted := False;
     DeviceUUIDs.Duplicates := dupIgnore;
+    SessionCount := 0;
 
     if (AWorkTable <> nil) and (AWorkTable.DeviceChannels <> nil) then
       for Ch in AWorkTable.DeviceChannels do
@@ -2206,9 +2457,13 @@ begin
 
         DeviceUUIDs.Add(Trim(Device.UUID));
         Devices.Add(Device);
+        if Device.GetActiveSessionSpillage <> nil then Inc(SessionCount);
       end;
 
     ShowDevicesResults(Devices);
+    LogMKS('ProceedGridContextBuilt', 'ProceedGridContextBuilt',
+      Format('ContextKind=WorkTable; WorkTableUUID=%s; DeviceCount=%d; SessionCount=%d; RowCount=%d',
+        [AWorkTable.UUID, Devices.Count, SessionCount, Length(FCurrentResultRows)]));
   finally
     DeviceUUIDs.Free;
     Devices.Free;
@@ -2269,6 +2524,8 @@ begin
   end;
 
   GridResults.RowCount := Length(FCurrentResultRows);
+  if ButtonProceedExportExcel <> nil then
+    ButtonProceedExportExcel.Enabled := Length(FCurrentResultRows) > 0;
   if Length(FCurrentResultRows) = 0 then
     GridResults.Row := -1
   else if (GridResults.Row < 0) or (GridResults.Row >= Length(FCurrentResultRows)) then
@@ -2563,6 +2820,7 @@ begin
 
   if Item.TagObject is TDevice then
   begin
+    AddSimpleMenuItem('Редактировать прибор', MenuTreeViewDevicesEditClick);
     AddSimpleMenuItem('Удалить', MenuTreeViewDevicesDeleteClick);
     AddSimpleMenuItem('Добавить', MenuTreeViewDevicesAddClick);
     DbgProceedTree(1702, 'Popup adds menu item: Добавить; selected=' + TreeViewDevices.Selected.Text);
@@ -2579,6 +2837,32 @@ begin
     AddActionMenuItem(ActionSessionNew);
   end;
   DbgProceedTree(1703, 'PopupMenuTreeViewDevicesPopup EXIT'#13#10 + GetSelectedTreeDebugText);
+end;
+
+procedure TFrameProceed.MenuTreeViewDevicesEditClick(Sender: TObject);
+var
+  Device: TDevice;
+  Editor: TFormDeviceEditor;
+  DeviceUUID: string;
+begin
+  if not CanManageResultSessions or (TreeViewDevices = nil) or
+     (TreeViewDevices.Selected = nil) or
+     not (TreeViewDevices.Selected.TagObject is TDevice) then Exit;
+  Device := TDevice(TreeViewDevices.Selected.TagObject);
+  DeviceUUID := Device.UUID;
+  Editor := TFormDeviceEditor.Create(Self);
+  try
+    Editor.LoadDevice(Device);
+    if Editor.ShowModal = mrOk then
+    begin
+      PopulateTreeViewDevices;
+      Device := FindProcessingDeviceByUUID(DeviceUUID);
+      if Device <> nil then SelectTreeItemByTagObject(Device);
+      RefreshResultsTab;
+    end;
+  finally
+    Editor.Free;
+  end;
 end;
 procedure TFrameProceed.MenuTreeViewDevicesClearClick(Sender: TObject);
 var
@@ -3802,6 +4086,30 @@ begin
     GridResults.Col := Col; // если нужно выбирать и колонку тоже
     GridResults.SetFocus;
   end;
+end;
+
+procedure TFrameProceed.GridResultsMouseMove(Sender: TObject; Shift: TShiftState;
+  X, Y: Single);
+var
+  Col, Row, PointIdx: Integer;
+begin
+  GridResults.Hint := '';
+  if not GridResults.CellByPoint(X, Y, Col, Row) or
+     (Row < 0) or (Row >= Length(FCurrentResultRows)) then Exit;
+  PointIdx := -1;
+  if GridResults.Columns[Col] = StringColumnPointNum1 then PointIdx := 0
+  else if GridResults.Columns[Col] = StringColumnPointNum2 then PointIdx := 1
+  else if GridResults.Columns[Col] = StringColumnPointNum3 then PointIdx := 2
+  else if GridResults.Columns[Col] = StringColumnPointNum4 then PointIdx := 3;
+  if (PointIdx >= 0) and
+     (PointIdx < Length(FCurrentResultRows[Row].PointHints)) then
+    GridResults.Hint := FCurrentResultRows[Row].PointHints[PointIdx];
+end;
+
+procedure TFrameProceed.GridResultsColumnMoved(Column: TColumn; FromIndex,
+  ToIndex: Integer);
+begin
+  SaveProceedGridColumns;
 end;
 procedure TFrameProceed.GridResultsSelChanged(Sender: TObject);
 var
