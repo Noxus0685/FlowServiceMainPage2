@@ -324,7 +324,6 @@ type
 implementation
    uses
     uAppServices,
-    uMeasurementRun,
     uMeterValue;
 {$R *.fmx}
 
@@ -1395,7 +1394,7 @@ begin
 function TFrameProceed.CanManageResultSessions: Boolean;
 begin
   Result := (FActiveWorkTable = nil) or (FActiveWorkTable.MeasurementRun = nil) or
-    (TMeasurementRun(FActiveWorkTable.MeasurementRun).Stage in [msNone, msDone]);
+    (FActiveWorkTable.MeasurementRunStage in [msNone, msDone]);
 end;
 
 function TFrameProceed.RequestClearActiveSession(ADevice: TDevice): Boolean;

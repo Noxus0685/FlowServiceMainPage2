@@ -240,6 +240,7 @@ type
     FListenersLock: TObject;
     FPaused: Boolean;
     FWorkerThread: TThread;
+    FShuttingDown: Boolean;
 
     class function CategoryMarker(ACategory: EProtocolCategory): string; static;
     class function SourceMarker(ASource: TProtocolSource): string; static;
@@ -276,6 +277,15 @@ var
 
 implementation
 
+procedure FinalizeProtocolManager;
+var
+  Manager: TProtocolManager;
+begin
+  Manager := ProtocolManager;
+  ProtocolManager := nil;
+  Manager.Free;
+end;
+
 { TProtocolMessage }
 
 function TProtocolMessage.Clone: TProtocolMessage;
@@ -294,6 +304,7 @@ end;
 constructor TProtocolManager.Create;
 begin
   inherited;
+  FShuttingDown := False;
   FQueue := TThreadedQueue<TProtocolMessage>.Create(CQueueCapacity, 50, 50);
   FListeners := TList<TProtocolListener>.Create;
   FListenersLock := TObject.Create;
@@ -303,6 +314,7 @@ end;
 
 destructor TProtocolManager.Destroy;
 begin
+  FShuttingDown := True;
   StopWorker;
   Clear;
   TMonitor.Enter(FListenersLock);
@@ -360,6 +372,8 @@ begin
       Continue;
     end;
 
+    if FShuttingDown or (FQueue = nil) then
+      Break;
     PopResult := FQueue.PopItem(Msg);
     if PopResult = wrSignaled then
     begin
@@ -384,26 +398,35 @@ var
   PushResult: TWaitResult;
   OldMsg: TProtocolMessage;
 begin
+  if FShuttingDown or (FQueue = nil) then Exit;
   Msg := TProtocolMessage.Create;
-  Msg.TimeStamp := Now;
-  Msg.Category := ACategory;
-  Msg.Source := ASource;
-  Msg.Name := AName;
-  Msg.Description := ADescription;
-  Msg.Params := AParams;
+  try
+    Msg.TimeStamp := Now;
+    Msg.Category := ACategory;
+    Msg.Source := ASource;
+    Msg.Name := AName;
+    Msg.Description := ADescription;
+    Msg.Params := AParams;
 
-  PushResult := FQueue.PushItem(Msg);
-  if PushResult = wrTimeout then
-  begin
-    OldMsg := nil;
-    if FQueue.PopItem(OldMsg) = wrSignaled then
-      FreeMessage(OldMsg);
+    if FShuttingDown or (FQueue = nil) then Exit;
+    PushResult := FQueue.PushItem(Msg);
+    if PushResult = wrSignaled then
+      Msg := nil
+    else if (PushResult = wrTimeout) and not FShuttingDown and (FQueue <> nil) then
+    begin
+      OldMsg := nil;
+      if FQueue.PopItem(OldMsg) = wrSignaled then
+        FreeMessage(OldMsg);
+      if not FShuttingDown and (FQueue <> nil) and
+         (FQueue.PushItem(Msg) = wrSignaled) then
+        Msg := nil;
+    end;
 
-    if FQueue.PushItem(Msg) <> wrSignaled then
-      FreeMessage(Msg);
+    if not FShuttingDown then
+      Notify(Integer(pmeMessageQueued));
+  finally
+    Msg.Free;
   end;
-
-  Notify(Integer(pmeMessageQueued));
 end;
 
 procedure TProtocolManager.NotifyListeners(const Msg: TProtocolMessage);
@@ -412,7 +435,8 @@ var
   L: TProtocolListener;
   CopyMsg: TProtocolMessage;
 begin
-  if Msg = nil then
+  if FShuttingDown or (Msg = nil) or (FListeners = nil) or
+     (FListenersLock = nil) then
     Exit;
 
   TMonitor.Enter(FListenersLock);
@@ -424,6 +448,7 @@ begin
 
   for L in LocalListeners do
   begin
+    if FShuttingDown then Exit;
     CopyMsg := Msg.Clone;
     TThread.Queue(nil,
       procedure
@@ -439,7 +464,8 @@ end;
 
 procedure TProtocolManager.Subscribe(AListener: TProtocolListener);
 begin
-  if not Assigned(AListener) then
+  if FShuttingDown or not Assigned(AListener) or (FListeners = nil) or
+     (FListenersLock = nil) then
     Exit;
 
   TMonitor.Enter(FListenersLock);
@@ -452,7 +478,8 @@ end;
 
 procedure TProtocolManager.Unsubscribe(AListener: TProtocolListener);
 begin
-  if not Assigned(AListener) then
+  if FShuttingDown or not Assigned(AListener) or (FListeners = nil) or
+     (FListenersLock = nil) then
     Exit;
 
   TMonitor.Enter(FListenersLock);
@@ -465,12 +492,14 @@ end;
 
 procedure TProtocolManager.Pause;
 begin
+  if FShuttingDown then Exit;
   FPaused := True;
   Notify(Integer(pmePaused));
 end;
 
 procedure TProtocolManager.Resume;
 begin
+  if FShuttingDown then Exit;
   FPaused := False;
   Notify(Integer(pmeResumed));
 end;
@@ -480,11 +509,13 @@ var
   Msg: TProtocolMessage;
 begin
   Msg := nil;
+  if FQueue = nil then Exit;
   while FQueue.QueueSize > 0 do
     if FQueue.PopItem(Msg) = wrSignaled then
       FreeMessage(Msg);
 
-  Notify(Integer(pmeCleared));
+  if not FShuttingDown then
+    Notify(Integer(pmeCleared));
 end;
 
 class function TProtocolManager.CategoryMarker(
@@ -549,6 +580,6 @@ initialization
   ProtocolManager := nil;
 
 finalization
-  FreeAndNil(ProtocolManager);
+  FinalizeProtocolManager;
 
 end.
