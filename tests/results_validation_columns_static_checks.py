@@ -27,17 +27,38 @@ def test_error_column_always_formats_model_value():
     assert "#$2014" not in error_branch
 
 
-def test_validity_hint_uses_status_reason_and_detailed_message():
+def test_validity_hint_uses_shared_full_state_text():
     hint = body("function TFrameProceed.GetSpillageResultHint")
 
-    assert "Reason := Trim(APoint.StatusStr)" in hint
-    assert "ValidationReason и ValidationMessage" in hint
-    assert "AppendHintLine('Годен.')" in hint
-    assert "AppendHintLine('Не годен.')" in hint
-    assert "Погрешность находится в допустимых пределах." in hint
-    assert "превышает допустимое значение" in hint
-    assert "Статус годности не определён." in hint
-    assert "Фактическая погрешность: %.3f%%." in hint
+    assert "Result := APoint.GetFullStateText" in hint
+    assert "APoint.Status" not in hint
+    assert "APoint.Validation" not in hint
+    assert "SPS_" not in hint
+    assert "AppendHintLine" not in hint
+
+
+def test_proceed_uses_current_validation_model():
+    device_hint = body("function TFrameProceed.GetDeviceResultHint")
+    summary = body("function TFrameProceed.ResolveDeviceSummaryStatus")
+    get_value = body("procedure TFrameProceed.GridDataPointsGetValue")
+
+    assert "SPS_" not in PAS
+    assert "Spillage.Validation = vsValid" in device_hint
+    assert "Spillage.Validation = vsInvalid" in device_hint
+    assert "Spillage.ValidationReason = svrStopCriteriaFailed" in device_hint
+    assert "Spillage.Validation = vsInvalid" in summary
+    assert "Spillage.ValidationReason = svrStopCriteriaFailed" in summary
+    assert "Value := P.GetShortStateText" in get_value
+
+
+def test_result_point_colors_use_validation_model():
+    refresh = body("procedure TFrameProceed.ShowDevicesResults")
+    draw = body("procedure TFrameProceed.GridResultsDrawColumnCell")
+
+    assert "Row.PointColors[I] := GetSpillageValidationColor(" in refresh
+    assert "Spillage.Validation, Spillage.ValidationReason" in refresh
+    assert "Row.PointStatuses" not in refresh
+    assert "Color := GridRow.PointColors[PointIdx]" in draw
 
 
 def test_measurement_grid_keeps_hints_enabled_and_targets_validity_column():
