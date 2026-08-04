@@ -1195,9 +1195,10 @@ begin
   for I := 0 to AGrid.ColumnCount - 1 do
   begin
     AColumns[I].Name := AGrid.Columns[I].Name;
-    // The collection subscript is not a persistent identity.  Name identifies
-    // the column and Index is its actual position after a drag operation.
-    AColumns[I].Position := AGrid.Columns[I].Index;
+    // Columns[] is enumerated in the current display order.  Do not use the
+    // control's inherited Index here: it is the position in the FMX child tree
+    // and is not the persisted display position after a grid drag operation.
+    AColumns[I].Position := I;
     AColumns[I].Width := AGrid.Columns[I].Width;
     AColumns[I].Visible := AGrid.Columns[I].Visible;
   end;
@@ -1235,6 +1236,8 @@ begin
     end;
 
     // Apply positions only after every named column has received its settings.
+    // Moving from left to right and resolving the column again after every move
+    // is important because assigning Index changes all following indices.
     for TargetIndex := 0 to AGrid.ColumnCount - 1 do
       for I := 0 to High(AColumns) do
         if AColumns[I].Position = TargetIndex then
@@ -2889,10 +2892,10 @@ begin
   // Do not destroy or create controls while FMX is opening a native popup:
   // doing so can deadlock its menu service.  The branch is built once and an
   // opening only synchronizes check marks.
-  for I := 0 to ColumnsMenu.ChildrenCount - 1 do
-    if ColumnsMenu.Children[I] is TMenuItem then
+  for I := 0 to ColumnsMenu.ItemsCount - 1 do
+    if ColumnsMenu.Items[I] is TMenuItem then
     begin
-      Item := TMenuItem(ColumnsMenu.Children[I]);
+      Item := TMenuItem(ColumnsMenu.Items[I]);
       if Item.TagString = '' then
         Continue;
       Item.IsChecked := False;
@@ -2912,7 +2915,7 @@ var
   Item, ResetItem: TMenuItem;
 begin
   if (AGrid = nil) or (AColumnsMenu = nil) or
-     (AColumnsMenu.ChildrenCount <> 0) then
+     (AColumnsMenu.ItemsCount <> 0) then
     Exit;
   for I := 0 to AGrid.ColumnCount - 1 do
   begin

@@ -16,7 +16,9 @@ def test_layout_identity_and_position_are_independent():
     capture = body("CaptureGridColumnsLayout")
     apply = body("ApplyGridColumnsLayout")
     assert "Name := AGrid.Columns[I].Name" in capture
-    assert "Position := AGrid.Columns[I].Index" in capture
+    # Columns[] is already enumerated in visual order; the inherited control
+    # Index describes the FMX child tree rather than the dragged display order.
+    assert "Position := I" in capture
     assert "Width := AGrid.Columns[I].Width" in capture
     assert "SameText(AGrid.Columns[J].Name, AColumns[I].Name)" in apply
     assert "AColumns[I].Position = TargetIndex" in apply
