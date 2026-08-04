@@ -309,12 +309,6 @@ type
     procedure SetGridReadOnly(AGrid: TGrid);
     procedure UpdateActionHints;
     procedure LogProceedToolbarLayout;
-    procedure ClearGridContext;
-    procedure BuildWorkTableColumns(AWorkTable: TWorkTable);
-    procedure BuildDeviceColumns(ADevice: TDevice);
-    procedure BuildSessionColumns(ASession: TSessionSpillage; ADevice: TDevice);
-    procedure BuildColumnsByContext(const AContext: TProceedSelectionContext);
-    procedure ReloadGridValues(const AContext: TProceedSelectionContext);
     function ResolveSelectionContext: TProceedSelectionContext;
     procedure ApplySelectionContext(const AContext: TProceedSelectionContext);
     function BuildProceedPointCellInfo(ADevice: TDevice; APoint: TDevicePoint;
@@ -1682,116 +1676,6 @@ begin
   else Result := 'None'; end;
 end;
 
-procedure TFrameProceed.ClearGridContext;
-begin
-  SetLength(FCurrentResultRows, 0);
-  SetLength(FCurrentSpillages, 0);
-  SetLength(FCurrentPointColumnKeys, 0);
-  SetLength(FCurrentPointSourceUUIDs, 0);
-  SetLength(FCurrentPointHeaders, 0);
-  FCurrentSession := nil;
-  GridResults.RowCount := 0;
-  GridResults.Row := -1;
-end;
-
-procedure AddProceedPointColumn(var AKeys, AUUIDs, AHeaders: TArray<string>;
-  const AKey, AUUID, AHeader: string);
-var I, N: Integer;
-begin
-  if (AKey = '') or (AUUID = '') then Exit;
-  for I := 0 to High(AKeys) do
-    if SameText(AKeys[I], AKey) then Exit;
-  N := Length(AKeys);
-  SetLength(AKeys, N + 1); SetLength(AUUIDs, N + 1);
-  SetLength(AHeaders, N + 1);
-  AKeys[N] := AKey; AUUIDs[N] := AUUID; AHeaders[N] := AHeader;
-end;
-
-procedure TFrameProceed.BuildWorkTableColumns(AWorkTable: TWorkTable);
-var Ch: TChannel; Device: TDevice; Point: TDevicePoint;
-begin
-  if (AWorkTable = nil) or (AWorkTable.DeviceChannels = nil) then Exit;
-  for Ch in AWorkTable.DeviceChannels do begin
-    if (Ch = nil) or (Ch.FlowMeter = nil) then Continue;
-    Device := Ch.FlowMeter.Device;
-    if Device = nil then Continue;
-    Device := FindProcessingDeviceByUUID(Device.UUID);
-    if (Device = nil) or (Device.Points = nil) then Continue;
-    for Point in Device.Points do
-      if Point <> nil then
-        AddProceedPointColumn(FCurrentPointColumnKeys,
-          FCurrentPointSourceUUIDs, FCurrentPointHeaders,
-          'WorkPoint.' + Point.UUID, Point.UUID, Point.Name);
-  end;
-end;
-
-procedure TFrameProceed.BuildDeviceColumns(ADevice: TDevice);
-var Point: TDevicePoint;
-begin
-  if (ADevice = nil) or (ADevice.Points = nil) then Exit;
-  for Point in ADevice.Points do
-    if Point <> nil then
-      AddProceedPointColumn(FCurrentPointColumnKeys,
-        FCurrentPointSourceUUIDs, FCurrentPointHeaders,
-        'DevicePoint.' + Point.UUID, Point.UUID, Point.Name);
-end;
-
-procedure TFrameProceed.BuildSessionColumns(ASession: TSessionSpillage;
-  ADevice: TDevice);
-var Spillage: TPointSpillage; Point: TDevicePoint;
-begin
-  if (ASession = nil) or (ADevice = nil) or (ADevice.Spillages = nil) then Exit;
-  for Spillage in ADevice.Spillages do begin
-    if (Spillage = nil) or (Spillage.State = osDeleted) or
-       (Spillage.SessionID <> ASession.ID) then Continue;
-    Point := ADevice.FindMatchedDevicePointForSpillage(Spillage);
-    if Point <> nil then
-      AddProceedPointColumn(FCurrentPointColumnKeys,
-        FCurrentPointSourceUUIDs, FCurrentPointHeaders,
-        'SessionPoint.' + Point.UUID, Point.UUID, Point.Name);
-  end;
-end;
-
-procedure TFrameProceed.BuildColumnsByContext(
-  const AContext: TProceedSelectionContext);
-var I, DisplayCount: Integer; Keys: string;
-begin
-  case AContext.Kind of
-    pscWorkTable: BuildWorkTableColumns(AContext.WorkTable);
-    pscDevice: BuildDeviceColumns(AContext.Device);
-    pscSession: BuildSessionColumns(AContext.Session, AContext.Device);
-  end;
-  DisplayCount := Min(4, Length(FCurrentPointColumnKeys));
-  Keys := '';
-  for I := 0 to DisplayCount - 1 do begin
-    if Keys <> '' then Keys := Keys + ',';
-    Keys := Keys + FCurrentPointColumnKeys[I];
-  end;
-  UpdateResultsPointColumns;
-  LogMKS('ProceedGridContextColumnsBuilt', 'ProceedGridContextColumnsBuilt',
-    Format('ContextKind=%s; ColumnCount=%d; PointKeys=%s; DeviceUUID=%s; SessionID=%d',
-      [ProceedContextKindText(AContext.Kind), DisplayCount, Keys,
-       AContext.DeviceUUID, AContext.SessionID]));
-end;
-
-procedure TFrameProceed.ReloadGridValues(
-  const AContext: TProceedSelectionContext);
-var Devices: TList<TDevice>;
-begin
-  case AContext.Kind of
-    pscWorkTable: ShowWorkTableResults(AContext.WorkTable);
-    pscDevice, pscSession:
-      begin
-        Devices := TList<TDevice>.Create;
-        try
-          if AContext.Device <> nil then Devices.Add(AContext.Device);
-          ShowDevicesResults(Devices, AContext.Session, AContext.Kind);
-        finally Devices.Free; end;
-      end;
-  else UpdateGridResults;
-  end;
-end;
-
 function TFrameProceed.ResolveSelectionContext: TProceedSelectionContext;
 var Item: TTreeViewItem;
 begin
@@ -1837,15 +1721,15 @@ end;
   «Обработка». }
 procedure TFrameProceed.ApplySelectionContext(
   const AContext: TProceedSelectionContext);
-var P: TPointSpillage; RightTarget: string;
+var Devices: TList<TDevice>; P: TPointSpillage; RightTarget: string;
   ParentWidth: Single;
 begin
-  ClearGridContext;
+  SetLength(FCurrentResultRows, 0);
+  SetLength(FCurrentSpillages, 0);
+  FCurrentSession := nil;
   FSelectionContext := AContext;
   RightTarget := 'None';
   if AContext.WorkTable <> nil then FActiveWorkTable := AContext.WorkTable;
-  BuildColumnsByContext(AContext);
-  ReloadGridValues(AContext);
 
   if AContext.Device <> nil then begin
     RightTarget := 'Device';
@@ -1870,6 +1754,18 @@ begin
     if AContext.Kind = pscWorkTable then RightTarget := 'WorkTable';
   end;
 
+  case AContext.Kind of
+    pscWorkTable: ShowWorkTableResults(AContext.WorkTable);
+    pscDevice, pscSession:
+      begin
+        Devices := TList<TDevice>.Create;
+        try
+          if AContext.Device <> nil then Devices.Add(AContext.Device);
+          ShowDevicesResults(Devices, AContext.Session, AContext.Kind);
+        finally Devices.Free; end;
+      end;
+  else begin UpdateGridResults; GridResults.Visible := True; end;
+  end;
   UpdateGridDataPoints;
   GridResults.Visible := True;
   GridDataPoints.Visible := False;
@@ -2351,6 +2247,129 @@ begin
     Ini := TIniFile.Create(FWorkTableManager.IniFileName);
     try Ini.EraseSection(CProceedGridColumnsSection); finally Ini.Free; end;
   end;
+  LoadProceedGridColumns;
+end;
+
+function TFrameProceed.ProceedGridColumnKey(AColumn: TColumn): string;
+var P: Integer;
+begin
+  if AColumn = StringColumnResultName then Exit('Name');
+  if AColumn = StringColumnResultType then Exit('Type');
+  if AColumn = StringColumnResultSerial then Exit('Serial');
+  if AColumn = StringColumnResult then Exit('Result');
+  P := -1;
+  if AColumn = StringColumnPointNum1 then P := 0
+  else if AColumn = StringColumnPointNum2 then P := 1
+  else if AColumn = StringColumnPointNum3 then P := 2
+  else if AColumn = StringColumnPointNum4 then P := 3;
+  if (P >= 0) and (Length(FCurrentResultRows) > 0) and
+     (P < Length(FCurrentResultRows[0].PointKeys)) and
+     (FCurrentResultRows[0].PointKeys[P] <> '') then
+    Exit(FCurrentResultRows[0].PointKeys[P]);
+  Result := AColumn.Name;
+end;
+
+procedure TFrameProceed.SaveProceedGridColumns;
+var Ini: TIniFile; I: Integer; Key: string;
+begin
+  if (FWorkTableManager = nil) or
+     (Trim(FWorkTableManager.IniFileName) = '') then Exit;
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  try
+    for I := 0 to GridResults.ColumnCount - 1 do
+    begin
+      Key := ProceedGridColumnKey(GridResults.Columns[I]);
+      Ini.WriteBool(CProceedGridColumnsSection, Key + '.Visible',
+        GridResults.Columns[I].Visible);
+      Ini.WriteFloat(CProceedGridColumnsSection, Key + '.Width',
+        Max(CProceedGridMinWidth, GridResults.Columns[I].Width));
+      Ini.WriteInteger(CProceedGridColumnsSection, Key + '.Order', I);
+    end;
+  finally Ini.Free; end;
+end;
+
+procedure TFrameProceed.LoadProceedGridColumns;
+var Ini: TIniFile; I, Loaded, Order: Integer; Key: string; W: Double;
+begin
+  if (FWorkTableManager = nil) or
+     (Trim(FWorkTableManager.IniFileName) = '') or
+     not FileExists(FWorkTableManager.IniFileName) then Exit;
+  Loaded := 0;
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  try
+    { Apply visibility, then order, then width. Unknown saved keys remain intact. }
+    for I := 0 to GridResults.ColumnCount - 1 do begin
+      Key := ProceedGridColumnKey(GridResults.Columns[I]);
+      if Ini.ValueExists(CProceedGridColumnsSection, Key + '.Visible') then begin
+        GridResults.Columns[I].Visible := Ini.ReadBool(CProceedGridColumnsSection,
+          Key + '.Visible', True); Inc(Loaded); end;
+    end;
+    for I := 0 to GridResults.ColumnCount - 1 do begin
+      Key := ProceedGridColumnKey(GridResults.Columns[I]);
+      Order := Ini.ReadInteger(CProceedGridColumnsSection, Key + '.Order', I);
+      if (Order >= 0) and (Order < GridResults.ColumnCount) then
+        GridResults.Columns[I].Index := Order;
+    end;
+    for I := 0 to GridResults.ColumnCount - 1 do begin
+      Key := ProceedGridColumnKey(GridResults.Columns[I]);
+      W := Ini.ReadFloat(CProceedGridColumnsSection, Key + '.Width',
+        GridResults.Columns[I].Width);
+      if W >= CProceedGridMinWidth then GridResults.Columns[I].Width := W;
+    end;
+  finally Ini.Free; end;
+  LogMKS('ProceedGridColumnsLoaded', 'ProceedGridColumnsLoaded',
+    Format('RestoredColumnCount=%d', [Loaded]));
+end;
+
+procedure TFrameProceed.PopupMenuGridResultsPopup(Sender: TObject);
+var I: Integer; Item, ColumnsRoot: TMenuItem;
+begin
+  ColumnsRoot := nil;
+  for I := 0 to PopupMenuGridResults.ItemsCount - 1 do
+    if (PopupMenuGridResults.Items[I] is TMenuItem) and
+       SameText(TMenuItem(PopupMenuGridResults.Items[I]).TagString,
+         'ProceedColumnsRoot') then begin
+      ColumnsRoot := TMenuItem(PopupMenuGridResults.Items[I]); Break; end;
+  if ColumnsRoot = nil then begin
+    ColumnsRoot := TMenuItem.Create(PopupMenuGridResults);
+    ColumnsRoot.Text := 'Столбцы';
+    ColumnsRoot.TagString := 'ProceedColumnsRoot';
+    PopupMenuGridResults.AddObject(ColumnsRoot);
+  end else ColumnsRoot.Clear;
+  for I := 0 to GridResults.ColumnCount - 1 do begin
+    Item := TMenuItem.Create(ColumnsRoot);
+    Item.Text := GridResults.Columns[I].Header;
+    Item.TagString := ProceedGridColumnKey(GridResults.Columns[I]);
+    Item.AutoCheck := True; Item.IsChecked := GridResults.Columns[I].Visible;
+    Item.OnClick := ProceedGridColumnMenuClick;
+    ColumnsRoot.AddObject(Item);
+  end;
+  Item := TMenuItem.Create(ColumnsRoot); Item.Text := '-';
+  ColumnsRoot.AddObject(Item);
+  Item := TMenuItem.Create(ColumnsRoot);
+  Item.Text := 'Восстановить по умолчанию';
+  Item.OnClick := ProceedGridResetColumnsClick;
+  ColumnsRoot.AddObject(Item);
+end;
+
+procedure TFrameProceed.ProceedGridColumnMenuClick(Sender: TObject);
+var I: Integer; Item: TMenuItem;
+begin
+  Item := TMenuItem(Sender);
+  for I := 0 to GridResults.ColumnCount - 1 do
+    if SameText(ProceedGridColumnKey(GridResults.Columns[I]), Item.TagString) then
+    begin GridResults.Columns[I].Visible := Item.IsChecked; Break; end;
+  SaveProceedGridColumns;
+end;
+
+procedure TFrameProceed.ProceedGridResetColumnsClick(Sender: TObject);
+var Ini: TIniFile; I: Integer;
+begin
+  if (FWorkTableManager <> nil) and
+     (Trim(FWorkTableManager.IniFileName) <> '') then begin
+    Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+    try Ini.EraseSection(CProceedGridColumnsSection); finally Ini.Free; end;
+  end;
   for I := 0 to GridResults.ColumnCount - 1 do begin
     GridResults.Columns[I].Visible := True;
     GridResults.Columns[I].Width := 100;
@@ -2594,7 +2613,10 @@ var
   HasAnyData: Boolean;
   ActiveSession: TSessionSpillage;
   ActiveSpillageCount: Integer;
-  DisplayPointCount, J: Integer;
+  DisplayPoints: TList<TDevicePoint>;
+  DisplayPointUUIDs: TStringList;
+  PointKeysText, PointKeyPrefix: string;
+  ContextColumnCount: Integer;
 
 begin
   Rows := TList<TResultGridRow>.Create;
@@ -2629,29 +2651,48 @@ begin
                Spillage.Enabled and (Spillage.SessionID = ActiveSession.ID) then
               Inc(ActiveSpillageCount);
 
-        DisplayPointCount := Min(4, Length(FCurrentPointColumnKeys));
-        if (Device.Points <> nil) and (DisplayPointCount > 0) then
-        begin
-          RequiredPointsCount := Device.Points.Count;
-          SetLength(Row.PointNames, DisplayPointCount);
-          SetLength(Row.PointKeys, DisplayPointCount);
-          SetLength(Row.PointValues, DisplayPointCount);
-          SetLength(Row.PointHints, DisplayPointCount);
-          SetLength(Row.PointStatuses, DisplayPointCount);
-          SetLength(Row.PointCells, DisplayPointCount);
-          for I := 0 to DisplayPointCount - 1 do
+        DisplayPoints := TList<TDevicePoint>.Create;
+        DisplayPointUUIDs := TStringList.Create;
+        try
+          DisplayPointUUIDs.CaseSensitive := False;
+          DisplayPointUUIDs.Duplicates := dupIgnore;
+          if AContextKind = pscSession then
           begin
-            P := nil;
-            for J := 0 to Device.Points.Count - 1 do
-              if (Device.Points[J] <> nil) and
-                 SameText(Device.Points[J].UUID,
-                   FCurrentPointSourceUUIDs[I]) then begin
-                P := Device.Points[J]; Break;
-              end;
+            if (ActiveSession <> nil) and (Device.Spillages <> nil) then
+              for Spillage in Device.Spillages do
+                if (Spillage <> nil) and (Spillage.State <> osDeleted) and
+                   (Spillage.SessionID = ActiveSession.ID) then
+                begin
+                  P := Device.FindMatchedDevicePointForSpillage(Spillage);
+                  if (P <> nil) and (DisplayPointUUIDs.IndexOf(P.UUID) < 0) then
+                  begin
+                    DisplayPointUUIDs.Add(P.UUID);
+                    DisplayPoints.Add(P);
+                  end;
+                end;
+          end
+          else if Device.Points <> nil then
+            for P in Device.Points do
+              if P <> nil then DisplayPoints.Add(P);
+
+          RequiredPointsCount := DisplayPoints.Count;
+          SetLength(Row.PointNames, DisplayPoints.Count);
+          SetLength(Row.PointKeys, DisplayPoints.Count);
+          SetLength(Row.PointValues, DisplayPoints.Count);
+          SetLength(Row.PointHints, DisplayPoints.Count);
+          SetLength(Row.PointStatuses, DisplayPoints.Count);
+          SetLength(Row.PointCells, DisplayPoints.Count);
+          case AContextKind of
+            pscDevice: PointKeyPrefix := 'DevicePoint.';
+            pscSession: PointKeyPrefix := 'SessionPoint.';
+          else PointKeyPrefix := 'WorkPoint.'; end;
+          for I := 0 to DisplayPoints.Count - 1 do
+          begin
+            P := DisplayPoints[I];
             if P <> nil then
             begin
               Row.PointNames[I] := P.Name;
-              Row.PointKeys[I] := FCurrentPointColumnKeys[I];
+              Row.PointKeys[I] := PointKeyPrefix + P.UUID;
               Spillage := FindSessionResultSpillageForPoint(Device,
                 ActiveSession, P);
               if Spillage <> nil then
@@ -2684,15 +2725,9 @@ begin
               Row.PointHints[I] := 'Результат отсутствует в текущей сессии';
             end;
           end;
-        end
-        else
-        begin
-          SetLength(Row.PointNames, 0);
-          SetLength(Row.PointKeys, 0);
-          SetLength(Row.PointValues, 0);
-          SetLength(Row.PointHints, 0);
-          SetLength(Row.PointStatuses, 0);
-          SetLength(Row.PointCells, 0);
+        finally
+          DisplayPointUUIDs.Free;
+          DisplayPoints.Free;
         end;
 
         if not HasAnyData then Row.ResultStatus := 2
@@ -2720,6 +2755,21 @@ begin
   end;
 
   UpdateResultsPointColumns;
+  PointKeysText := '';
+  ContextColumnCount := 0;
+  if Length(FCurrentResultRows) > 0 then
+  begin
+    ContextColumnCount := Length(FCurrentResultRows[0].PointKeys);
+    for I := 0 to High(FCurrentResultRows[0].PointKeys) do
+    begin
+      if PointKeysText <> '' then PointKeysText := PointKeysText + ',';
+      PointKeysText := PointKeysText + FCurrentResultRows[0].PointKeys[I];
+    end;
+  end;
+  LogMKS('ProceedGridContextColumnsBuilt', 'ProceedGridContextColumnsBuilt',
+    Format('ContextKind=%s; ColumnCount=%d; PointKeys=%s',
+      [ProceedContextKindText(AContextKind),
+       ContextColumnCount, PointKeysText]));
   UpdateGridResults
 
 end;

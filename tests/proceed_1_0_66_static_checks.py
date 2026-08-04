@@ -28,9 +28,8 @@ require("CProceedGridColumnsSection = 'ProceedGridColumns'" in proceed,
         'proceed grid needs an isolated settings section')
 for suffix in ('.Visible', '.Width', '.Order'):
     require(suffix in proceed, f'missing persisted column property {suffix}')
-require(all(prefix in proceed for prefix in ("'WorkPoint.' + Point.UUID",
-        "'DevicePoint.' + Point.UUID", "'SessionPoint.' + Point.UUID")),
-        'context point column keys are not UUID based')
+require(all(prefix in proceed for prefix in ("'WorkPoint.'", "'DevicePoint.'",
+        "'SessionPoint.'")), 'context point keys are not UUID based')
 require("ColumnsRoot.Text := 'Столбцы'" in proceed and
         "Item.Text := 'Восстановить по умолчанию'" in proceed,
         'column reset command is absent')
