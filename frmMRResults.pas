@@ -462,7 +462,7 @@ begin
         end;
         ER.DeviceUnitName := Dev.GetDimensionName;
       end;
-      ER.Error:=Spill.Error; ER.Status:=Spill.StatusStr;
+      ER.Error:=Spill.Error; ER.Status:=Spill.GetShortStateText;
       if (DevicePoint <> nil) and (not IsNan(DevicePoint.Error)) and
          (not IsInfinite(DevicePoint.Error)) and (DevicePoint.Error > 0) then
       begin
@@ -1053,8 +1053,6 @@ begin
   Device := AChannel.FlowMeter.Device;
   if Device = nil then
     Exit;
-
-  Device.AnalyseDevicePointsResults;
 
   ADevicePoint := FindDevicePoint(Device, AGroup);
   if ADevicePoint = nil then
