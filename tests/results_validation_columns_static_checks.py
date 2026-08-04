@@ -43,7 +43,9 @@ def test_validity_hint_uses_status_reason_and_detailed_message():
 def test_measurement_grid_keeps_hints_enabled_and_targets_validity_column():
     mouse_move = body("procedure TFrameProceed.GridDataPointsMouseMove")
 
-    assert "GridDataPoints.ShowHint := True" in mouse_move
+    assert "FLastDataPointsHintRow" in mouse_move
+    assert "GridDataPoints.ShowHint := False" in mouse_move
+    assert "GridDataPoints.ShowHint := HintText <> ''" in mouse_move
     assert "GridDataPoints.CellByPoint(X, Y, Col, Row)" in mouse_move
     assert "StringColumnSpillageValid" in mouse_move
     assert "GetSpillageResultHint(Device, FCurrentSpillages[Row])" in mouse_move
@@ -70,3 +72,25 @@ def test_initialize_explicitly_connects_existing_hint_handlers():
 
     assert "GridResults.OnMouseMove := GridResultsMouseMove" in initialize
     assert "GridDataPoints.OnMouseMove := GridDataPointsMouseMove" in initialize
+
+
+def test_column_layout_is_keyed_by_name_and_persisted():
+    capture = body("procedure TFrameProceed.CaptureGridColumnsLayout")
+    save = body("procedure TFrameProceed.SaveLayoutSettingsToWorkTable")
+    mouse_up = body("procedure TFrameProceed.GridColumnLayoutMouseUp")
+
+    assert "AColumns[I].Name := AGrid.Columns[I].Name" in capture
+    assert "AColumns[I].DisplayIndex := I" in capture
+    assert "AColumns[I].Width := AGrid.Columns[I].Width" in capture
+    assert "AColumns[I].Visible := AGrid.Columns[I].Visible" in capture
+    assert "FWorkTableManager.Save" in save
+    assert "SaveLayoutSettingsToWorkTable" in mouse_up
+
+
+def test_results_hint_is_rearmed_when_hovered_cell_changes():
+    mouse_move = body("procedure TFrameProceed.GridResultsMouseMove")
+
+    assert "FLastResultsHintRow" in mouse_move
+    assert "FLastResultsHintCol" in mouse_move
+    assert "GridResults.ShowHint := False" in mouse_move
+    assert "GridResults.ShowHint := HintText <> ''" in mouse_move

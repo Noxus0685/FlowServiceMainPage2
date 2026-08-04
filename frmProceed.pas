@@ -289,6 +289,8 @@ type
       X, Y: Single);
     procedure GridDataPointsMouseMove(Sender: TObject; Shift: TShiftState;
       X, Y: Single);
+    procedure GridColumnLayoutMouseUp(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure LogProceedGridContext(const AContext: string; ADevice: TDevice;
       ASession: TSessionSpillage; ARows, AColumns: Integer);
 
@@ -314,6 +316,10 @@ type
     FPointDeleteOwner: TObject;
     FProcessingChangesSaved: Boolean;
     FOnResultsSynchronized: TNotifyEvent;
+    FLastResultsHintRow: Integer;
+    FLastResultsHintCol: Integer;
+    FLastDataPointsHintRow: Integer;
+    FLastDataPointsHintCol: Integer;
   public
     { Public declarations }
     procedure Initialize;
@@ -389,6 +395,8 @@ end;
 
 destructor TFrameProceed.Destroy;
 begin
+  // Сохраняем ширину, порядок и видимость столбцов перед закрытием формы.
+  SaveLayoutSettingsToWorkTable;
   if Assigned(AppServices) then
     AppServices.OnBeforeShutdown := nil;
 
@@ -428,12 +436,14 @@ begin
     GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
     // Подключаем существующий обработчик Hint для ячеек таблицы результатов.
     GridResults.OnMouseMove := GridResultsMouseMove;
+    GridResults.OnMouseUp := GridColumnLayoutMouseUp;
   end;
   if GridDataPoints <> nil then
   begin
     GridDataPoints.OnDrawColumnCell := GridDataPointsDrawColumnCell;
     // Подключаем существующий обработчик Hint для ячеек таблицы измерений.
     GridDataPoints.OnMouseMove := GridDataPointsMouseMove;
+    GridDataPoints.OnMouseUp := GridColumnLayoutMouseUp;
   end;
 
   // Hints remain enabled after the grids are repopulated or their layout changes.
@@ -441,12 +451,10 @@ begin
     GridDataPoints.ShowHint := True;
   if GridResults <> nil then
     GridResults.ShowHint := True;
-
-  // Hints remain enabled after the grids are repopulated or their layout changes.
-  if GridDataPoints <> nil then
-    GridDataPoints.ShowHint := True;
-  if GridResults <> nil then
-    GridResults.ShowHint := True;
+  FLastResultsHintRow := -1;
+  FLastResultsHintCol := -1;
+  FLastDataPointsHintRow := -1;
+  FLastDataPointsHintCol := -1;
 
   SetGridReadOnly(GridDataPoints);
   SetGridReadOnly(GridResults);
@@ -1201,6 +1209,8 @@ begin
   CaptureGridColumnsLayout(GridResults, ResultsColumns);
   WorkTable.DataPointsGridColumns := DataPointsColumns;
   WorkTable.ResultsGridColumns := ResultsColumns;
+  if FWorkTableManager <> nil then
+    FWorkTableManager.Save;
 end;
 
 
@@ -1980,12 +1990,6 @@ begin
     Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
     if (Spillage <> nil) and
        (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
-      Exit(GetSpillageResultHint(ADevice, Spillage));
-  end;
-  for DevicePoint in ADevice.Points do
-  begin
-    Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
-    if (Spillage <> nil) and (Spillage.Status = TPointSpillage.SPS_OK) then
       Exit(GetSpillageResultHint(ADevice, Spillage));
   end;
 end;
@@ -4118,28 +4122,45 @@ end;
 procedure TFrameProceed.GridResultsMouseMove(Sender: TObject; Shift: TShiftState;
   X, Y: Single);
 var Col, Row, PointIndex: Integer; Device: TDevice;
-  DevicePoint: TDevicePoint; Spillage: TPointSpillage;
+  DevicePoint: TDevicePoint; Spillage: TPointSpillage; HintText: string;
 begin
-  GridResults.ShowHint := True;
-  GridResults.Hint := '';
   if not GridResults.CellByPoint(X, Y, Col, Row) or
-     (Row < 0) or (Row >= Length(FCurrentResultRows)) then Exit;
-  Device := FCurrentResultRows[Row].Device;
-  if GridResults.Columns[Col] = StringColumnResult then
+     (Row < 0) or (Row >= Length(FCurrentResultRows)) then
   begin
-    GridResults.Hint := GetDeviceResultHint(Device);
+    FLastResultsHintRow := -1;
+    FLastResultsHintCol := -1;
+    GridResults.ShowHint := False;
     Exit;
   end;
-  PointIndex := -1;
-  if GridResults.Columns[Col] = StringColumnPointNum1 then PointIndex := 0
-  else if GridResults.Columns[Col] = StringColumnPointNum2 then PointIndex := 1
-  else if GridResults.Columns[Col] = StringColumnPointNum3 then PointIndex := 2
-  else if GridResults.Columns[Col] = StringColumnPointNum4 then PointIndex := 3;
-  if (PointIndex < 0) or (Device = nil) or (Device.Points = nil) or
-     (PointIndex >= Device.Points.Count) then Exit;
-  DevicePoint := Device.Points[PointIndex];
-  Spillage := FindResultSpillageForPoint(Device, DevicePoint);
-  GridResults.Hint := GetSpillageResultHint(Device, Spillage);
+  if (Row = FLastResultsHintRow) and (Col = FLastResultsHintCol) then
+    Exit;
+
+  // При смене строки или ячейки переоткрываем Hint с текстом нового результата.
+  FLastResultsHintRow := Row;
+  FLastResultsHintCol := Col;
+  GridResults.ShowHint := False;
+  GridResults.Hint := '';
+  HintText := '';
+  Device := FCurrentResultRows[Row].Device;
+  if GridResults.Columns[Col] = StringColumnResult then
+    HintText := GetDeviceResultHint(Device)
+  else
+  begin
+    PointIndex := -1;
+    if GridResults.Columns[Col] = StringColumnPointNum1 then PointIndex := 0
+    else if GridResults.Columns[Col] = StringColumnPointNum2 then PointIndex := 1
+    else if GridResults.Columns[Col] = StringColumnPointNum3 then PointIndex := 2
+    else if GridResults.Columns[Col] = StringColumnPointNum4 then PointIndex := 3;
+    if (PointIndex >= 0) and (Device <> nil) and (Device.Points <> nil) and
+       (PointIndex < Device.Points.Count) then
+    begin
+      DevicePoint := Device.Points[PointIndex];
+      Spillage := FindResultSpillageForPoint(Device, DevicePoint);
+      HintText := GetSpillageResultHint(Device, Spillage);
+    end;
+  end;
+  GridResults.Hint := HintText;
+  GridResults.ShowHint := HintText <> '';
 end;
 procedure TFrameProceed.GridResultsSelChanged(Sender: TObject);
 var
@@ -4458,6 +4479,14 @@ begin
      SaveLayoutSettingsToWorkTable;
 end;
 
+procedure TFrameProceed.GridColumnLayoutMouseUp(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+begin
+  // После изменения мышью сохраняем ширину, порядок и видимость по Name столбца.
+  if (Sender = GridDataPoints) or (Sender = GridResults) then
+    SaveLayoutSettingsToWorkTable;
+end;
+
 procedure TFrameProceed.GridDataPointsDrawColumnCell(Sender: TObject;
   const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
   const Row: Integer; const Value: TValue; const State: TGridDrawStates);
@@ -4508,16 +4537,33 @@ end;
 
 procedure TFrameProceed.GridDataPointsMouseMove(Sender: TObject;
   Shift: TShiftState; X, Y: Single);
-var Col, Row: Integer; Device: TDevice;
+var Col, Row: Integer; Device: TDevice; HintText: string;
 begin
-  GridDataPoints.ShowHint := True;
-  GridDataPoints.Hint := '';
   if not GridDataPoints.CellByPoint(X, Y, Col, Row) or
-     (Row < 0) or (Row >= Length(FCurrentSpillages)) then Exit;
-  if (GridDataPoints.Columns[Col] <> StringColumnSpillageValid) and
-     (GridDataPoints.Columns[Col] <> StringColumnSpillageError) then Exit;
-  Device := ResolveSelectedDevice;
-  GridDataPoints.Hint := GetSpillageResultHint(Device, FCurrentSpillages[Row]);
+     (Row < 0) or (Row >= Length(FCurrentSpillages)) then
+  begin
+    FLastDataPointsHintRow := -1;
+    FLastDataPointsHintCol := -1;
+    GridDataPoints.ShowHint := False;
+    Exit;
+  end;
+  if (Row = FLastDataPointsHintRow) and (Col = FLastDataPointsHintCol) then
+    Exit;
+
+  // При смене строки или ячейки переоткрываем Hint с текстом нового измерения.
+  FLastDataPointsHintRow := Row;
+  FLastDataPointsHintCol := Col;
+  GridDataPoints.ShowHint := False;
+  GridDataPoints.Hint := '';
+  HintText := '';
+  if (GridDataPoints.Columns[Col] = StringColumnSpillageValid) or
+     (GridDataPoints.Columns[Col] = StringColumnSpillageError) then
+  begin
+    Device := ResolveSelectedDevice;
+    HintText := GetSpillageResultHint(Device, FCurrentSpillages[Row]);
+  end;
+  GridDataPoints.Hint := HintText;
+  GridDataPoints.ShowHint := HintText <> '';
 end;
 procedure TFrameProceed.UpdateGridDataPointsHeaders(QuantityDimName: string; FlowDimName: string);
 var
