@@ -91,5 +91,5 @@ def test_mode_and_session_status_snapshots_are_text_not_numbers():
     assert 'EMeasurementRunMode' not in x and 'TSessionSpillage' not in x
 
 def test_release_version():
-    assert "APP_VERSION = '1.0.62'" in source('uAppVersion.pas')
+    assert "APP_VERSION = '1.0.63'" in source('uAppVersion.pas')
     assert 'ApplicationVersion' in source('frmProtocol.pas')
