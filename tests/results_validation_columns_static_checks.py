@@ -58,13 +58,12 @@ def test_right_click_hint_passes_device_and_measurement():
     assert "FCurrentSpillages[ARow])" in mouse_down
 
 
-def test_dynamic_columns_menu_is_removed_by_its_tag_only():
+def test_columns_menu_is_not_rebuilt_while_popup_is_open():
     popup = body("procedure TFrameProceed.PopupMenuGridResultsPopup")
 
-    assert "Tag = CColumnsMenuTag" in popup
-    assert "ColumnsMenu.Tag := CColumnsMenuTag" in popup
-    assert "SameText" not in popup
-    assert "TPopupMenu(Sender).Clear" not in popup
+    assert "Children[I].Free" not in popup
+    assert "TMenuItem.Create" not in popup
+    assert "SameText(Grid.Columns[J].Name, Item.TagString)" in popup
 
 
 def test_initialize_explicitly_connects_existing_hint_handlers():
@@ -80,7 +79,7 @@ def test_column_layout_is_keyed_by_name_and_persisted():
     mouse_up = body("procedure TFrameProceed.GridColumnLayoutMouseUp")
 
     assert "AColumns[I].Name := AGrid.Columns[I].Name" in capture
-    assert "AColumns[I].DisplayIndex := I" in capture
+    assert "AColumns[I].Position := AGrid.Columns[I].Index" in capture
     assert "AColumns[I].Width := AGrid.Columns[I].Width" in capture
     assert "AColumns[I].Visible := AGrid.Columns[I].Visible" in capture
     assert "FWorkTableManager.Save" in save

@@ -18,7 +18,7 @@ def test_layout_uses_existing_worktable_storage_and_stable_names():
     apply = body('ApplyGridColumnsLayout')
     save = body('SaveLayoutSettingsToWorkTable')
     assert 'AColumns[I].Name := AGrid.Columns[I].Name' in capture
-    assert 'DisplayIndex' in capture and 'Width' in capture and 'Visible' in capture
+    assert 'Position' in capture and 'Width' in capture and 'Visible' in capture
     assert 'SameText(AGrid.Columns[J].Name, AColumns[I].Name)' in apply
     assert 'WorkTable.DataPointsGridColumns :=' in save
     assert 'WorkTable.ResultsGridColumns :=' in save
@@ -37,14 +37,14 @@ def test_layout_is_applied_after_rows_are_populated():
     assert 'if Length(WorkTable.DataPointsGridColumns) = 0 then' in MAIN
 
 
-def test_columns_root_is_permanent_and_only_children_are_rebuilt():
+def test_columns_root_is_permanent_and_popup_only_syncs_children():
     popup = body('PopupMenuGridResultsPopup')
     for name in ('MenuItemGridDataPointsColumns', 'MenuItemGridResultsColumns'):
         assert FMX.count(f'object {name}: TMenuItem') == 1
         assert name in popup
-    assert 'ColumnsMenu.Children[I].Free' in popup
+    assert 'ColumnsMenu.Children[I].Free' not in popup
     assert 'ColumnsMenu := TMenuItem.Create' not in popup
-    assert 'Item.TagString := Grid.Columns[I].Name' in popup
+    assert 'Item.IsChecked := Grid.Columns[J].Visible' in popup
 
 
 def test_open_hint_is_cancelled_when_hovered_row_changes():
