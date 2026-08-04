@@ -309,6 +309,12 @@ type
     procedure SetGridReadOnly(AGrid: TGrid);
     procedure UpdateActionHints;
     procedure LogProceedToolbarLayout;
+    procedure ClearGridContext;
+    procedure BuildWorkTableColumns(AWorkTable: TWorkTable);
+    procedure BuildDeviceColumns(ADevice: TDevice);
+    procedure BuildSessionColumns(ASession: TSessionSpillage; ADevice: TDevice);
+    procedure BuildColumnsByContext(const AContext: TProceedSelectionContext);
+    procedure ReloadGridValues(const AContext: TProceedSelectionContext);
     function ResolveSelectionContext: TProceedSelectionContext;
     procedure ApplySelectionContext(const AContext: TProceedSelectionContext);
     function BuildProceedPointCellInfo(ADevice: TDevice; APoint: TDevicePoint;
@@ -334,6 +340,9 @@ type
     FExportButtonStateLogged: Boolean;
     FToolbarLayoutLogged: Boolean;
     FCurrentResultRows: TArray<TResultGridRow>;
+    FCurrentPointColumnKeys: TArray<string>;
+    FCurrentPointSourceUUIDs: TArray<string>;
+    FCurrentPointHeaders: TArray<string>;
     FCurrentSpillages: TArray<TPointSpillage>;
     FActiveWorkTable: TWorkTable;
     FSessionDevice: TFlowMeter;
@@ -495,19 +504,20 @@ begin
 end;
 
 procedure TFrameProceed.LogProceedToolbarLayout;
-var ParentName: string;
+var ParentName: string; TreeOrigin: TPointF;
 begin
   if FToolbarLayoutLogged or (ToolBarDataPoints = nil) or
      (ButtonProceedExportExcel = nil) or (TreeViewDevices = nil) then Exit;
   ParentName := '';
   if ButtonProceedExportExcel.Parent <> nil then
     ParentName := ButtonProceedExportExcel.Parent.Name;
+  TreeOrigin := TreeViewDevices.LocalToAbsolute(TPointF.Zero);
   LogMKS('ProceedToolbarLayoutResolved', 'ProceedToolbarLayoutResolved',
     Format('ToolbarCount=1; ToolbarHeight=%.0f; ButtonCount=%d; ExportButtonVisible=%s; ExportButtonEnabled=%s; ExportButtonParent=%s; TreeTop=%.0f; TreeHeight=%.0f',
       [ToolBarDataPoints.Height, Layout32.ChildrenCount,
        BoolToStr(ButtonProceedExportExcel.Visible, True),
        BoolToStr(ButtonProceedExportExcel.Enabled, True), ParentName,
-       TreeViewDevices.AbsolutePosition.Y, TreeViewDevices.Height]));
+       TreeOrigin.Y, TreeViewDevices.Height]));
   FToolbarLayoutLogged := True;
 end;
 
@@ -1672,6 +1682,116 @@ begin
   else Result := 'None'; end;
 end;
 
+procedure TFrameProceed.ClearGridContext;
+begin
+  SetLength(FCurrentResultRows, 0);
+  SetLength(FCurrentSpillages, 0);
+  SetLength(FCurrentPointColumnKeys, 0);
+  SetLength(FCurrentPointSourceUUIDs, 0);
+  SetLength(FCurrentPointHeaders, 0);
+  FCurrentSession := nil;
+  GridResults.RowCount := 0;
+  GridResults.Row := -1;
+end;
+
+procedure AddProceedPointColumn(var AKeys, AUUIDs, AHeaders: TArray<string>;
+  const AKey, AUUID, AHeader: string);
+var I, N: Integer;
+begin
+  if (AKey = '') or (AUUID = '') then Exit;
+  for I := 0 to High(AKeys) do
+    if SameText(AKeys[I], AKey) then Exit;
+  N := Length(AKeys);
+  SetLength(AKeys, N + 1); SetLength(AUUIDs, N + 1);
+  SetLength(AHeaders, N + 1);
+  AKeys[N] := AKey; AUUIDs[N] := AUUID; AHeaders[N] := AHeader;
+end;
+
+procedure TFrameProceed.BuildWorkTableColumns(AWorkTable: TWorkTable);
+var Ch: TChannel; Device: TDevice; Point: TDevicePoint;
+begin
+  if (AWorkTable = nil) or (AWorkTable.DeviceChannels = nil) then Exit;
+  for Ch in AWorkTable.DeviceChannels do begin
+    if (Ch = nil) or (Ch.FlowMeter = nil) then Continue;
+    Device := Ch.FlowMeter.Device;
+    if Device = nil then Continue;
+    Device := FindProcessingDeviceByUUID(Device.UUID);
+    if (Device = nil) or (Device.Points = nil) then Continue;
+    for Point in Device.Points do
+      if Point <> nil then
+        AddProceedPointColumn(FCurrentPointColumnKeys,
+          FCurrentPointSourceUUIDs, FCurrentPointHeaders,
+          'WorkPoint.' + Point.UUID, Point.UUID, Point.Name);
+  end;
+end;
+
+procedure TFrameProceed.BuildDeviceColumns(ADevice: TDevice);
+var Point: TDevicePoint;
+begin
+  if (ADevice = nil) or (ADevice.Points = nil) then Exit;
+  for Point in ADevice.Points do
+    if Point <> nil then
+      AddProceedPointColumn(FCurrentPointColumnKeys,
+        FCurrentPointSourceUUIDs, FCurrentPointHeaders,
+        'DevicePoint.' + Point.UUID, Point.UUID, Point.Name);
+end;
+
+procedure TFrameProceed.BuildSessionColumns(ASession: TSessionSpillage;
+  ADevice: TDevice);
+var Spillage: TPointSpillage; Point: TDevicePoint;
+begin
+  if (ASession = nil) or (ADevice = nil) or (ADevice.Spillages = nil) then Exit;
+  for Spillage in ADevice.Spillages do begin
+    if (Spillage = nil) or (Spillage.State = osDeleted) or
+       (Spillage.SessionID <> ASession.ID) then Continue;
+    Point := ADevice.FindMatchedDevicePointForSpillage(Spillage);
+    if Point <> nil then
+      AddProceedPointColumn(FCurrentPointColumnKeys,
+        FCurrentPointSourceUUIDs, FCurrentPointHeaders,
+        'SessionPoint.' + Point.UUID, Point.UUID, Point.Name);
+  end;
+end;
+
+procedure TFrameProceed.BuildColumnsByContext(
+  const AContext: TProceedSelectionContext);
+var I, DisplayCount: Integer; Keys: string;
+begin
+  case AContext.Kind of
+    pscWorkTable: BuildWorkTableColumns(AContext.WorkTable);
+    pscDevice: BuildDeviceColumns(AContext.Device);
+    pscSession: BuildSessionColumns(AContext.Session, AContext.Device);
+  end;
+  DisplayCount := Min(4, Length(FCurrentPointColumnKeys));
+  Keys := '';
+  for I := 0 to DisplayCount - 1 do begin
+    if Keys <> '' then Keys := Keys + ',';
+    Keys := Keys + FCurrentPointColumnKeys[I];
+  end;
+  UpdateResultsPointColumns;
+  LogMKS('ProceedGridContextColumnsBuilt', 'ProceedGridContextColumnsBuilt',
+    Format('ContextKind=%s; ColumnCount=%d; PointKeys=%s; DeviceUUID=%s; SessionID=%d',
+      [ProceedContextKindText(AContext.Kind), DisplayCount, Keys,
+       AContext.DeviceUUID, AContext.SessionID]));
+end;
+
+procedure TFrameProceed.ReloadGridValues(
+  const AContext: TProceedSelectionContext);
+var Devices: TList<TDevice>;
+begin
+  case AContext.Kind of
+    pscWorkTable: ShowWorkTableResults(AContext.WorkTable);
+    pscDevice, pscSession:
+      begin
+        Devices := TList<TDevice>.Create;
+        try
+          if AContext.Device <> nil then Devices.Add(AContext.Device);
+          ShowDevicesResults(Devices, AContext.Session, AContext.Kind);
+        finally Devices.Free; end;
+      end;
+  else UpdateGridResults;
+  end;
+end;
+
 function TFrameProceed.ResolveSelectionContext: TProceedSelectionContext;
 var Item: TTreeViewItem;
 begin
@@ -1717,15 +1837,15 @@ end;
   «Обработка». }
 procedure TFrameProceed.ApplySelectionContext(
   const AContext: TProceedSelectionContext);
-var Devices: TList<TDevice>; P: TPointSpillage; RightTarget: string;
+var P: TPointSpillage; RightTarget: string;
   ParentWidth: Single;
 begin
-  SetLength(FCurrentResultRows, 0);
-  SetLength(FCurrentSpillages, 0);
-  FCurrentSession := nil;
+  ClearGridContext;
   FSelectionContext := AContext;
   RightTarget := 'None';
   if AContext.WorkTable <> nil then FActiveWorkTable := AContext.WorkTable;
+  BuildColumnsByContext(AContext);
+  ReloadGridValues(AContext);
 
   if AContext.Device <> nil then begin
     RightTarget := 'Device';
@@ -1750,18 +1870,6 @@ begin
     if AContext.Kind = pscWorkTable then RightTarget := 'WorkTable';
   end;
 
-  case AContext.Kind of
-    pscWorkTable: ShowWorkTableResults(AContext.WorkTable);
-    pscDevice, pscSession:
-      begin
-        Devices := TList<TDevice>.Create;
-        try
-          if AContext.Device <> nil then Devices.Add(AContext.Device);
-          ShowDevicesResults(Devices, AContext.Session, AContext.Kind);
-        finally Devices.Free; end;
-      end;
-  else begin UpdateGridResults; GridResults.Visible := True; end;
-  end;
   UpdateGridDataPoints;
   GridResults.Visible := True;
   GridDataPoints.Visible := False;
@@ -2106,61 +2214,22 @@ begin
 end;
 procedure TFrameProceed.UpdateResultsPointColumns;
 var
-  MaxPoints, I: Integer;
-  AllSameType: Boolean;
-  FirstTypeName: string;
-  HeaderFromPoints: TArray<string>;
+  PointCount: Integer;
 
   function FormatPointHeader(const APointName: string): string;
   begin
     Result := #948 + '(' + APointName + '), %';
   end;
 begin
-  MaxPoints := 0;
-  for I := 0 to High(FCurrentResultRows) do
-    MaxPoints := Max(MaxPoints, Length(FCurrentResultRows[I].PointValues));
-
-  if MaxPoints > 4 then
-    MaxPoints := 4;
-
-  StringColumnPointNum1.Visible := MaxPoints >= 1;
-  StringColumnPointNum2.Visible := MaxPoints >= 2;
-  StringColumnPointNum3.Visible := MaxPoints >= 3;
-  StringColumnPointNum4.Visible := MaxPoints >= 4;
-
-  AllSameType := Length(FCurrentResultRows) > 0;
-  SetLength(HeaderFromPoints, 0);
-  FirstTypeName := '';
-
-  if Length(FCurrentResultRows) > 0 then
-  begin
-    FirstTypeName := FCurrentResultRows[0].DeviceType;
-    SetLength(HeaderFromPoints, Length(FCurrentResultRows[0].PointNames));
-    for I := 0 to High(HeaderFromPoints) do
-      HeaderFromPoints[I] := FCurrentResultRows[0].PointNames[I];
-  end;
-
-  for I := 1 to High(FCurrentResultRows) do
-    if not SameText(FCurrentResultRows[I].DeviceType, FirstTypeName) then
-    begin
-      AllSameType := False;
-      Break;
-    end;
-
-  if AllSameType and (Length(HeaderFromPoints) > 0) then
-  begin
-    if Length(HeaderFromPoints) > 0 then StringColumnPointNum1.Header := FormatPointHeader(HeaderFromPoints[0]);
-    if Length(HeaderFromPoints) > 1 then StringColumnPointNum2.Header := FormatPointHeader(HeaderFromPoints[1]);
-    if Length(HeaderFromPoints) > 2 then StringColumnPointNum3.Header := FormatPointHeader(HeaderFromPoints[2]);
-    if Length(HeaderFromPoints) > 3 then StringColumnPointNum4.Header := FormatPointHeader(HeaderFromPoints[3]);
-  end
-  else
-  begin
-    StringColumnPointNum1.Header := FormatPointHeader('Q1');
-    StringColumnPointNum2.Header := FormatPointHeader('Q2');
-    StringColumnPointNum3.Header := FormatPointHeader('Q3');
-    StringColumnPointNum4.Header := FormatPointHeader('Q4');
-  end;
+  PointCount := Min(4, Length(FCurrentPointColumnKeys));
+  StringColumnPointNum1.Visible := PointCount >= 1;
+  StringColumnPointNum2.Visible := PointCount >= 2;
+  StringColumnPointNum3.Visible := PointCount >= 3;
+  StringColumnPointNum4.Visible := PointCount >= 4;
+  if PointCount > 0 then StringColumnPointNum1.Header := FormatPointHeader(FCurrentPointHeaders[0]);
+  if PointCount > 1 then StringColumnPointNum2.Header := FormatPointHeader(FCurrentPointHeaders[1]);
+  if PointCount > 2 then StringColumnPointNum3.Header := FormatPointHeader(FCurrentPointHeaders[2]);
+  if PointCount > 3 then StringColumnPointNum4.Header := FormatPointHeader(FCurrentPointHeaders[3]);
   LoadProceedGridColumns;
 end;
 
@@ -2176,10 +2245,8 @@ begin
   else if AColumn = StringColumnPointNum2 then P := 1
   else if AColumn = StringColumnPointNum3 then P := 2
   else if AColumn = StringColumnPointNum4 then P := 3;
-  if (P >= 0) and (Length(FCurrentResultRows) > 0) and
-     (P < Length(FCurrentResultRows[0].PointKeys)) and
-     (FCurrentResultRows[0].PointKeys[P] <> '') then
-    Exit(FCurrentResultRows[0].PointKeys[P]);
+  if (P >= 0) and (P < Length(FCurrentPointColumnKeys)) then
+    Exit(FCurrentPointColumnKeys[P]);
   Result := AColumn.Name;
 end;
 
@@ -2527,6 +2594,7 @@ var
   HasAnyData: Boolean;
   ActiveSession: TSessionSpillage;
   ActiveSpillageCount: Integer;
+  DisplayPointCount, J: Integer;
 
 begin
   Rows := TList<TResultGridRow>.Create;
@@ -2561,22 +2629,29 @@ begin
                Spillage.Enabled and (Spillage.SessionID = ActiveSession.ID) then
               Inc(ActiveSpillageCount);
 
-        if Device.Points <> nil then
+        DisplayPointCount := Min(4, Length(FCurrentPointColumnKeys));
+        if (Device.Points <> nil) and (DisplayPointCount > 0) then
         begin
           RequiredPointsCount := Device.Points.Count;
-          SetLength(Row.PointNames, Device.Points.Count);
-          SetLength(Row.PointKeys, Device.Points.Count);
-          SetLength(Row.PointValues, Device.Points.Count);
-          SetLength(Row.PointHints, Device.Points.Count);
-          SetLength(Row.PointStatuses, Device.Points.Count);
-          SetLength(Row.PointCells, Device.Points.Count);
-          for I := 0 to Device.Points.Count - 1 do
+          SetLength(Row.PointNames, DisplayPointCount);
+          SetLength(Row.PointKeys, DisplayPointCount);
+          SetLength(Row.PointValues, DisplayPointCount);
+          SetLength(Row.PointHints, DisplayPointCount);
+          SetLength(Row.PointStatuses, DisplayPointCount);
+          SetLength(Row.PointCells, DisplayPointCount);
+          for I := 0 to DisplayPointCount - 1 do
           begin
-            P := Device.Points[I];
+            P := nil;
+            for J := 0 to Device.Points.Count - 1 do
+              if (Device.Points[J] <> nil) and
+                 SameText(Device.Points[J].UUID,
+                   FCurrentPointSourceUUIDs[I]) then begin
+                P := Device.Points[J]; Break;
+              end;
             if P <> nil then
             begin
               Row.PointNames[I] := P.Name;
-              Row.PointKeys[I] := 'Point.' + P.UUID;
+              Row.PointKeys[I] := FCurrentPointColumnKeys[I];
               Spillage := FindSessionResultSpillageForPoint(Device,
                 ActiveSession, P);
               if Spillage <> nil then

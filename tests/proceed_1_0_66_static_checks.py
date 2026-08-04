@@ -10,7 +10,7 @@ def require(value, message):
     if not value:
         raise AssertionError(message)
 
-require("APP_VERSION = '1.0.70'" in version, 'release version is not 1.0.70')
+require("APP_VERSION = '1.0.71'" in version, 'release version is not 1.0.71')
 require('Spillage.SessionID <> ASession.ID' in proceed,
         'point lookup must reject spillages outside the row session')
 filter_pos = proceed.index('Spillage.SessionID <> ASession.ID')
@@ -28,8 +28,9 @@ require("CProceedGridColumnsSection = 'ProceedGridColumns'" in proceed,
         'proceed grid needs an isolated settings section')
 for suffix in ('.Visible', '.Width', '.Order'):
     require(suffix in proceed, f'missing persisted column property {suffix}')
-require("'Point.' + P.UUID" in proceed,
-        'dynamic point column key is not UUID based')
+require(all(prefix in proceed for prefix in ("'WorkPoint.' + Point.UUID",
+        "'DevicePoint.' + Point.UUID", "'SessionPoint.' + Point.UUID")),
+        'context point column keys are not UUID based')
 require("ColumnsRoot.Text := 'Столбцы'" in proceed and
         "Item.Text := 'Восстановить по умолчанию'" in proceed,
         'column reset command is absent')
@@ -49,4 +50,4 @@ require('ProceedGridContextBuilt' in proceed and
         'required aggregate protocol events are absent')
 require('SummaryResults CELL' not in proceed,
         'per-cell SummaryResults logging must be removed')
-print('Proceed 1.0.70 compatibility checks passed')
+print('Proceed 1.0.71 compatibility checks passed')

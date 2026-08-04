@@ -6,7 +6,7 @@ fmx = (root / 'frmProceed.fmx').read_text(encoding='utf-8-sig')
 pas = (root / 'frmProceed.pas').read_text(encoding='utf-8-sig')
 version = (root / 'uAppVersion.pas').read_text(encoding='utf-8-sig')
 
-assert "APP_VERSION = '1.0.70'" in version
+assert "APP_VERSION = '1.0.71'" in version
 assert len(re.findall(r'^\s*object\s+\w+:\s*TToolBar\s*$', fmx, re.M)) == 1
 assert fmx.count('object ButtonProceedExportExcel: TButton') == 1
 assert 'object ToolBarResults: TToolBar' not in fmx
@@ -45,4 +45,4 @@ assert 'Align = Client' in tree
 height = re.search(r'Size.Height = ([0-9.]+)', tree)
 assert height and float(height.group(1)) > 0
 
-print('Proceed 1.0.70 toolbar checks passed')
+print('Proceed 1.0.71 toolbar checks passed')
