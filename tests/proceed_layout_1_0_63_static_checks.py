@@ -12,20 +12,29 @@ def body(name: str) -> str:
     return PROCEED[start:] if end < 0 else PROCEED[start:end]
 
 
-def test_display_position_is_captured_from_grid_enumeration():
+def test_display_position_is_captured_from_fmx_column_index():
     capture = body("CaptureGridColumnsLayout")
-    assert "Name := AGrid.Columns[I].Name" in capture
-    assert "Position := I" in capture
-    assert "Position := AGrid.Columns[I].Index" not in capture
-    assert "Width := AGrid.Columns[I].Width" in capture
-    assert "Visible := AGrid.Columns[I].Visible" in capture
+    assert "Column := AGrid.Columns[I]" in capture
+    assert "Position := Column.Index" in capture
+    assert "Position := I" not in capture
+    assert "Width := Column.Width" in capture
+    assert "Visible := Column.Visible" in capture
+    assert "'GridLayoutSaveOrderBegin'" in capture
+    assert "'GridLayoutSaved'" in capture
+    for field in ("GridName", "ColumnName", "ColumnsIndex", "VisualIndex",
+                  "Position", "Width", "Visible"):
+        assert field in capture
 
 
 def test_saved_order_is_applied_by_stable_column_name():
     apply = body("ApplyGridColumnsLayout")
-    assert "AColumns[I].Position = TargetIndex" in apply
-    assert "SameText(AGrid.Columns[J].Name, AColumns[I].Name)" in apply
-    assert "AGrid.Columns[J].Index := TargetIndex" in apply
+    assert "SortedColumns[J].Position > Temp.Position" in apply
+    assert "SameText(AGrid.Columns[J].Name, SortedColumns[I].Name)" in apply
+    assert "Column.Index := TargetIndex" in apply
+    assert "FApplyingGridColumnsLayout := True" in apply
+    assert "FApplyingGridColumnsLayout := False" in apply
+    assert "'GridLayoutLoaded'" in apply
+    assert "SavedPosition=%d; AppliedPosition=%d" in apply
 
 
 def test_columns_menu_uses_logical_items_not_fmx_style_children():
