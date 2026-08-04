@@ -8374,7 +8374,12 @@ procedure TFrameMainTable.RunAutoMeasurementScenario(const AScenarioIndex: Integ
 type
   TPulseState = record
     Channel: TChannel;
+    ChannelUUID: string;
+    DeviceUUID: string;
+    OriginalOverrideActive: Boolean;
+    PulseTotal: Double;
     FractionRemainder: Double;
+    PreviousTick: UInt64;
     LastLogTick: UInt64;
   end;
 var
@@ -8383,7 +8388,7 @@ var
   Point, ObservedPoint: TDevicePoint;
   PulseStates: TArray<TPulseState>;
   Lines: TStringList;
-  StartTick, PreviousTick, CurrentTick, DeltaMs: UInt64;
+  StartTick, PreviousTick, CurrentTick, DeltaMs, ChannelDeltaMs, LastUiLogTick, PointObservedTick: UInt64;
   I, Count, AddedImpulses: Integer;
   TargetFlow, ChannelFlow, Coef, ExpectedIncrement, ActualFlow: Double;
   StopReason, PointName, FinalReason: string;
@@ -8391,6 +8396,8 @@ var
   ObservedStage: EMeasurementState;
   StageStartedTick: UInt64;
   ResultRow: TAutoMeasurementTestResultRow;
+  Samples: TArray<TMeterValueSample>;
+  LastSampleMs: Int64;
 
   procedure AddChannels(AChannels: TObjectList<TChannel>);
   var J: Integer;
@@ -8402,7 +8409,12 @@ var
         Count := Length(PulseStates);
         SetLength(PulseStates, Count + 1);
         PulseStates[Count].Channel := AChannels[J];
+        PulseStates[Count].ChannelUUID := AChannels[J].UUID;
+        PulseStates[Count].DeviceUUID := AChannels[J].DeviceUUID;
+        PulseStates[Count].OriginalOverrideActive := AChannels[J].AutoTestInputOverrideActive;
+        PulseStates[Count].PulseTotal := AChannels[J].ImpResult;
         PulseStates[Count].FractionRemainder := 0;
+        PulseStates[Count].PreviousTick := TThread.GetTickCount64;
         PulseStates[Count].LastLogTick := 0;
       end;
   end;
@@ -8427,8 +8439,11 @@ begin
   ObservedPoint := nil;
   ObservedStage := msNone;
   StageStartedTick := StartTick;
+  LastUiLogTick := 0;
+  PointObservedTick := StartTick;
   try
-    if (WT = nil) or (Run = nil) then
+    try
+      if (WT = nil) or (Run = nil) then
       FinalReason := 'FAIL — активный стол или MeasurementRun отсутствует'
     else if WT.IsSimulationMode then
       FinalReason := 'FAIL — общий SimulationMode запрещён для автотеста входов'
@@ -8447,15 +8462,33 @@ begin
         FAutoTestRealCommandsBlocked := True;
         PreviousTick := TThread.GetTickCount64;
         for I := 0 to High(PulseStates) do
-          PulseStates[I].Channel.ImpResult := 0;
+        begin
+          PulseStates[I].Channel.AutoTestInputOverrideActive := True;
+          PulseStates[I].PreviousTick := PreviousTick;
+        end;
+        Log('SimulationGeneratorSuppressed', Format('Channels=%d Reason=AutoTestInputOverride',
+          [Length(PulseStates)]));
         Run.Mode := mrmAutomatic;
         Run.InvalidatePreparedPoints;
         Run.RebuildMeasurementPoints;
-        Log('AutoTestInputSimulationStarted', Format('Channels=%d SimulationMode=False EffectiveSimulationActive=False', [Length(PulseStates)]));
+        Log('AutoTestInputSimulationStarted', Format('Channels=%d SimulationMode=False EffectiveSimulationActive=%s InputOwner=AutoTestOverride',
+          [Length(PulseStates), BoolToStr(WT.SimulationActive, True)]));
         for I := 0 to High(PulseStates) do
-          Log('AutoTestInputChannel', Format('ChannelUUID=%s CoefImpPerLiter=%.9f InitialImpSec=%.9f InitialImpTotal=%.9f',
-            [PulseStates[I].Channel.DeviceUUID, WorkTableManager.GetChannelFlowCoef(PulseStates[I].Channel),
+          Log('AutoTestInputChannel', Format('ChannelUUID=%s DeviceUUID=%s ChannelPointer=%s FlowMeterPointer=%s ValueFlowPointer=%s DevicePointer=%s CoefImpPerLiter=%.9f InitialImpSec=%.9f InitialImpTotal=%.9f',
+            [PulseStates[I].ChannelUUID, PulseStates[I].DeviceUUID,
+             IntToHex(NativeUInt(Pointer(PulseStates[I].Channel)), SizeOf(Pointer) * 2),
+             IntToHex(NativeUInt(Pointer(PulseStates[I].Channel.FlowMeter)), SizeOf(Pointer) * 2),
+             IntToHex(NativeUInt(Pointer(PulseStates[I].Channel.FlowMeter.ValueFlow)), SizeOf(Pointer) * 2),
+             IntToHex(NativeUInt(Pointer(PulseStates[I].Channel.FlowMeter.Device)), SizeOf(Pointer) * 2),
+             WorkTableManager.GetChannelFlowCoef(PulseStates[I].Channel),
              PulseStates[I].Channel.ImpSec, PulseStates[I].Channel.ImpResult]));
+        for I := 0 to High(PulseStates) do
+          if (WT.EtalonChannels.IndexOf(PulseStates[I].Channel) < 0) and
+             (WT.DeviceChannels.IndexOf(PulseStates[I].Channel) < 0) then
+            raise Exception.CreateFmt('Auto-test channel is not owned by active work table: %s',
+              [PulseStates[I].ChannelUUID]);
+        Log('AutoTestRuntimeBindingVerified', Format('Channels=%d WorkTablePointer=%s',
+          [Length(PulseStates), IntToHex(NativeUInt(Pointer(WT)), SizeOf(Pointer) * 2)]));
         if (Run.Points = nil) or (Run.Points.Count = 0) then
           FinalReason := 'FAIL — RebuildMeasurementPoints не сформировал точки'
         else
@@ -8481,6 +8514,7 @@ begin
             if Point <> ObservedPoint then
             begin
               ObservedPoint := Point;
+              PointObservedTick := CurrentTick;
               if Point <> nil then
               begin
                 PointName := Point.Name;
@@ -8499,27 +8533,58 @@ begin
                 Continue;
               { Production uses Flow=ImpSec/Coef; integrate by the actual elapsed time
                 and retain the fractional pulse so timer jitter cannot bias the mean. }
-              ChannelFlow := TargetFlow;
-              ExpectedIncrement := ChannelFlow * Coef * DeltaMs / 1000.0 +
+              { A short deterministic ramp creates the transition section; after one
+                real second the successful profile is noise-free and stable. }
+              ChannelFlow := TargetFlow * Min(1.0,
+                (CurrentTick - PointObservedTick) / 1000.0);
+              ChannelDeltaMs := CurrentTick - PulseStates[I].PreviousTick;
+              PulseStates[I].PreviousTick := CurrentTick;
+              ExpectedIncrement := ChannelFlow * Coef * ChannelDeltaMs / 1000.0 +
                 PulseStates[I].FractionRemainder;
               AddedImpulses := Trunc(ExpectedIncrement);
               PulseStates[I].FractionRemainder := ExpectedIncrement - AddedImpulses;
-              PulseStates[I].Channel.ImpResult := PulseStates[I].Channel.ImpResult + AddedImpulses;
-              if DeltaMs > 0 then
-                PulseStates[I].Channel.ImpSec := AddedImpulses * 1000.0 / DeltaMs;
-              ActualFlow := PulseStates[I].Channel.ImpSec / Coef;
+              PulseStates[I].PulseTotal := PulseStates[I].PulseTotal + AddedImpulses;
+              if ChannelDeltaMs > 0 then
+                PulseStates[I].Channel.ApplyPulseInput(
+                  ChannelFlow * Coef, PulseStates[I].PulseTotal);
+              if (PulseStates[I].Channel.FlowMeter <> nil) and
+                 (PulseStates[I].Channel.FlowMeter.ValueFlow <> nil) then
+                ActualFlow := PulseStates[I].Channel.FlowMeter.ValueFlow.GetDoubleValue
+              else
+                ActualFlow := 0;
               if (PulseStates[I].LastLogTick = 0) or
                  (CurrentTick - PulseStates[I].LastLogTick >= 1000) then
               begin
                 PulseStates[I].LastLogTick := CurrentTick;
-                Log('AutoTestPulseAdjusted', Format('ChannelUUID=%s PointName=%s TargetFlow=%.9f ActualFlow=%.9f DeltaMs=%d AddedImpulses=%d FractionRemainder=%.9f',
-                  [PulseStates[I].Channel.DeviceUUID, Point.Name, TargetFlow, ActualFlow,
-                   DeltaMs, AddedImpulses, PulseStates[I].FractionRemainder]));
+                Log('AutoTestPulseAdjusted', Format('ChannelUUID=%s DeviceUUID=%s PointName=%s TargetFlow=%.9f ActualFlow=%.9f DeltaMs=%d AddedImpulses=%d FractionRemainder=%.9f',
+                  [PulseStates[I].ChannelUUID, PulseStates[I].DeviceUUID, Point.Name, TargetFlow, ActualFlow,
+                   ChannelDeltaMs, AddedImpulses, PulseStates[I].FractionRemainder]));
               end;
             end;
-            { SetValues is the normal input route: TChannel -> ValueImp/ValueImpTotal ->
-              TFlowMeter -> TMeterValue history/stability -> RecalculateAllMeterValues. }
-            SetValues;
+            { Publish the batch once: aggregate flow and UI observers see the same
+              channel objects and TMeterValue histories as the physical-read route. }
+            WT.PublishPulseInputs;
+            for I := 0 to High(PulseStates) do
+              if (PulseStates[I].LastLogTick = CurrentTick) and
+                 (PulseStates[I].Channel.FlowMeter.ValueFlow <> nil) then
+              begin
+                Samples := PulseStates[I].Channel.FlowMeter.ValueFlow.GetStabilitySamples;
+                if Length(Samples) > 0 then
+                  LastSampleMs := Samples[High(Samples)].TimeStampMs
+                else
+                  LastSampleMs := 0;
+                Log('AutoTestInputApplied', Format('ChannelUUID=%s DeviceUUID=%s ImpSec=%.9f ImpTotal=%.3f ValueFlow=%.9f HistorySampleCount=%d LastSampleMs=%d DeltaMs=%d InputOwner=AutoTestOverride',
+                  [PulseStates[I].ChannelUUID, PulseStates[I].DeviceUUID,
+                   PulseStates[I].Channel.ImpSec, PulseStates[I].Channel.ImpResult,
+                   PulseStates[I].Channel.FlowMeter.ValueFlow.GetDoubleValue,
+                   Length(Samples), LastSampleMs, ChannelDeltaMs]));
+              end;
+            if (LastUiLogTick = 0) or (CurrentTick - LastUiLogTick >= 1000) then
+            begin
+              LastUiLogTick := CurrentTick;
+              Log('AutoTestUiRefreshPublished', Format('ChangedChannels=%d Route=TWorkTable.PublishPulseInputs/ewtRefresh MainThread=%s',
+                [Length(PulseStates), BoolToStr(TThread.CurrentThread.ThreadID = MainThreadID, True)]));
+            end;
             if FAutoTestStopRequested then
             begin
               WT.StopMeasurementRun;
@@ -8542,21 +8607,31 @@ begin
         end;
       end;
     end;
-  except
-    on E: Exception do
-    begin
-      FinalKind := amtrkError;
-      FinalReason := 'ERROR — ' + E.ClassName + ': ' + E.Message;
+    except
+      on E: Exception do
+      begin
+        FinalKind := amtrkError;
+        FinalReason := 'ERROR — ' + E.ClassName + ': ' + E.Message;
+      end;
     end;
+  finally
+    { Restore ownership before resetting transient test inputs. This finally runs
+      for success, user stop, scenario failure and every raised exception. }
+    if FAutoTestRunning then
+    begin
+      for I := 0 to High(PulseStates) do
+      begin
+        PulseStates[I].Channel.AutoTestInputOverrideActive :=
+          PulseStates[I].OriginalOverrideActive;
+        PulseStates[I].Channel.ResetPulseInput;
+      end;
+      if WT <> nil then
+        WT.PublishPulseInputs;
+      Log('AutoTestInputSimulationStopped', 'Reason=' + StopReason);
+    end;
+    FAutoTestRealCommandsBlocked := False;
+    FAutoTestRunning := False;
   end;
-  if FAutoTestRunning then
-  begin
-    for I := 0 to High(PulseStates) do
-      PulseStates[I].Channel.ImpSec := 0;
-    Log('AutoTestInputSimulationStopped', 'Reason=' + StopReason);
-  end;
-  FAutoTestRealCommandsBlocked := False;
-  FAutoTestRunning := False;
   ResultRow.Num := Length(FAutoTestResultRows) + 1;
   ResultRow.Scenario := AutoMeasurementScenarioName(AScenarioIndex);
   ResultRow.ElapsedMs := Cardinal(Min(TThread.GetTickCount64 - StartTick, High(Cardinal)));

@@ -274,6 +274,7 @@ type
     FSimulationRampDurationSec: Double;
     FSimulationRampActive: Boolean;
     FSimulationLastProgressLogMs: Double;
+    FAutoTestInputOverrideActive: Boolean;
     FReadinessBaseFlow: Double;
     FHasReadinessBaseFlow: Boolean;
 
@@ -424,6 +425,7 @@ type
     property SimulationRampDurationSec: Double read FSimulationRampDurationSec write FSimulationRampDurationSec;
     property SimulationRampActive: Boolean read FSimulationRampActive write FSimulationRampActive;
     property SimulationLastProgressLogMs: Double read FSimulationLastProgressLogMs write FSimulationLastProgressLogMs;
+    property AutoTestInputOverrideActive: Boolean read FAutoTestInputOverrideActive write FAutoTestInputOverrideActive;
     property ReadinessBaseFlow: Double read FReadinessBaseFlow write FReadinessBaseFlow;
     property HasReadinessBaseFlow: Boolean read FHasReadinessBaseFlow write FHasReadinessBaseFlow;
 
@@ -439,6 +441,8 @@ type
     procedure AssignFlowMeterFrom(const ASource: TChannel; const AWorkTable: TWorkTable;
       const ACloneDeviceToRepo: Boolean = True);
     procedure SetValues;
+    procedure ApplyPulseInput(const AImpSec, AImpTotal: Double);
+    procedure ResetPulseInput;
     procedure CreateDevice;
     procedure InitWorkRangesFromFlowMeter;
 
@@ -713,6 +717,7 @@ type
 
   procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec: Double;
   const AImpSecValues: TArray<Double>; const AImpResult: Double);
+  procedure PublishPulseInputs;
 
   function FindPumpByUUID(const APumpUUID: string): TPump;
   function FindPumpByName(const APumpName: string): TPump;
@@ -1533,6 +1538,7 @@ begin
   FSimulationRampDurationSec := 0;
   FSimulationRampActive := False;
   FSimulationLastProgressLogMs := 0;
+  FAutoTestInputOverrideActive := False;
   FReadinessBaseFlow := 0;
   FHasReadinessBaseFlow := False;
   FCurResult := 0;
@@ -2078,6 +2084,34 @@ procedure TChannel.SetValues;
 begin
  if FFlowMeter<>nil then
     FFlowMeter.SetValues;
+end;
+
+
+{ Applies a raw pulse-channel reading and runs the same meter-value pipeline used
+  after a physical channel read. Derived flow and quantity remain TFlowMeter work. }
+procedure TChannel.ApplyPulseInput(const AImpSec, AImpTotal: Double);
+begin
+  FImpSec := Max(0.0, AImpSec);
+  FImpResult := Max(FImpResult, AImpTotal);
+  FCurSec := 0;
+  FValueSec := FImpSec;
+  FValueResult := FImpResult;
+
+  if FValueImp <> nil then
+    FValueImp.SetValue(FImpSec);
+  if FValueImpTotal <> nil then
+    FValueImpTotal.SetValue(FImpResult);
+  if FValueCurrent <> nil then
+    FValueCurrent.SetValue(FCurSec);
+  if FValueInterface <> nil then
+    FValueInterface.SetValue(FValueSec);
+  if FFlowMeter <> nil then
+    FFlowMeter.SetValues;
+end;
+
+procedure TChannel.ResetPulseInput;
+begin
+  ApplyPulseInput(0, FImpResult);
 end;
 
 
@@ -6421,6 +6455,15 @@ begin
   end;
 end;
 
+
+{ Publishes a completed raw-input batch through aggregate meter values and the
+  existing work-table refresh notification consumed by the FMX observers. }
+procedure TWorkTable.PublishPulseInputs;
+begin
+  RecalculateAllMeterValues;
+  FireEvent(ewtRefresh, 'Pulse input batch processed');
+end;
+
     {$ENDREGION 'TWorkTable'}
 
   {$REGION 'TWorkTableManager'}
@@ -7165,7 +7208,8 @@ end;
 
 function IsSimulationChannelEnabled(const AChannel: TChannel): Boolean;
 begin
-  Result := (AChannel <> nil) and AChannel.Enabled and (AChannel.State <> osDeleted) and
+  Result := (AChannel <> nil) and (not AChannel.AutoTestInputOverrideActive) and
+    AChannel.Enabled and (AChannel.State <> osDeleted) and
     (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil);
 end;
 
@@ -7225,7 +7269,7 @@ var
   TargetFlowLS: Double;
   FlowDeltaLS: Double;
 begin
-  if AChannel = nil then
+  if (AChannel = nil) or AChannel.AutoTestInputOverrideActive then
     Exit;
 
   if not SameValue(AChannel.SimulationTargetImpSec, ATargetImpSec, TARGET_EPSILON) then
@@ -7307,7 +7351,8 @@ var
   BeforeImpSec: Double;
   AfterImpSec: Double;
 begin
-  if (AChannel = nil) or AChannel.SimulationRampActive then
+  if (AChannel = nil) or AChannel.AutoTestInputOverrideActive or
+     AChannel.SimulationRampActive then
     Exit;
   if (AWorkTable = nil) or (not AWorkTable.SimulationActive) then
   begin
@@ -7729,7 +7774,7 @@ begin
       Channel := AWorkTable.DeviceChannels[I];
       if IsSimulationChannelEnabled(Channel) then
         EnabledDeviceChannels.Add(Channel)
-      else if Channel <> nil then
+      else if (Channel <> nil) and (not Channel.AutoTestInputOverrideActive) then
       begin
         Channel.HasReadinessBaseFlow := False;
         ResetChannelSimulation(Channel, True);
@@ -7779,7 +7824,8 @@ var
 begin
   for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
     if (AWorkTable.EtalonChannels[I] <> nil) and
-       (not IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I])) then
+       (not IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I])) and
+       (not AWorkTable.EtalonChannels[I].AutoTestInputOverrideActive) then
       ResetChannelSimulation(AWorkTable.EtalonChannels[I], True);
 end;
 
@@ -7794,7 +7840,8 @@ begin
   for I := 0 to AChannels.Count - 1 do
   begin
     Channel := AChannels[I];
-    if IsSimulationChannelEnabled(Channel) then
+    if IsSimulationChannelEnabled(Channel) and
+       (not Channel.AutoTestInputOverrideActive) then
       Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec * ADeltaTimeSec, 0.0, 1.0E12);
   end;
 end;
@@ -7931,8 +7978,9 @@ begin
 
   UpdateDeviceChannelSignals(AWorkTable, TargetFlow, OldTargetFlow, CurrentTimeMs);
   GeneratedTableFlow := CalculateActualEtalonFlow(AWorkTable, SourceChannelCount);
-  ApplySimulatedTableFlowValue(AWorkTable, GeneratedTableFlow,
-    SourceChannelCount);
+  if SourceChannelCount > 0 then
+    ApplySimulatedTableFlowValue(AWorkTable, GeneratedTableFlow,
+      SourceChannelCount);
   AWorkTable.SimulationTargetFlowBase := TargetFlow;
   AccumulateSimulationChannelImpResult(AWorkTable.EtalonChannels, DeltaTimeSec);
   AccumulateSimulationChannelImpResult(AWorkTable.DeviceChannels, DeltaTimeSec);
@@ -7945,7 +7993,8 @@ var
 begin
   for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
     if (AWorkTable.EtalonChannels[I] <> nil) and
-       (not IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I])) then
+       (not IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I])) and
+       (not AWorkTable.EtalonChannels[I].AutoTestInputOverrideActive) then
       ResetChannelSimulation(AWorkTable.EtalonChannels[I], True);
 end;
 
@@ -7960,7 +8009,8 @@ begin
   for I := 0 to AChannels.Count - 1 do
   begin
     Channel := AChannels[I];
-    if IsSimulationChannelEnabled(Channel) then
+    if IsSimulationChannelEnabled(Channel) and
+       (not Channel.AutoTestInputOverrideActive) then
       Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec * ADeltaTimeSec, 0.0, 1.0E12);
   end;
 end;
