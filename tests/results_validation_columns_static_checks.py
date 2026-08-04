@@ -27,17 +27,14 @@ def test_error_column_always_formats_model_value():
     assert "#$2014" not in error_branch
 
 
-def test_validity_hint_uses_status_reason_and_detailed_message():
+def test_validity_hint_uses_shared_full_state_text():
     hint = body("function TFrameProceed.GetSpillageResultHint")
 
-    assert "Reason := Trim(APoint.StatusStr)" in hint
-    assert "ValidationReason и ValidationMessage" in hint
-    assert "AppendHintLine('Годен.')" in hint
-    assert "AppendHintLine('Не годен.')" in hint
-    assert "Погрешность находится в допустимых пределах." in hint
-    assert "превышает допустимое значение" in hint
-    assert "Статус годности не определён." in hint
-    assert "Фактическая погрешность: %.3f%%." in hint
+    assert "Result := APoint.GetFullStateText" in hint
+    assert "APoint.Status" not in hint
+    assert "APoint.Validation" not in hint
+    assert "SPS_" not in hint
+    assert "AppendHintLine" not in hint
 
 
 def test_measurement_grid_keeps_hints_enabled_and_targets_validity_column():
