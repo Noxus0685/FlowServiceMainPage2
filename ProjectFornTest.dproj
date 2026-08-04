@@ -290,7 +290,6 @@
         <DCCReference Include="uFlowMeter.pas"/>
         <DCCReference Include="uGraphsViewConfig.pas"/>
         <DCCReference Include="uMeasurementRun.pas"/>
-        <DCCReference Include="uAutoMeasurementTestRunner.pas"/>
         <DCCReference Include="uMeterValue.pas"/>
         <DCCReference Include="uObservable.pas"/>
         <DCCReference Include="uParameter.pas"/>
