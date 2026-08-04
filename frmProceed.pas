@@ -427,6 +427,12 @@ begin
   if GridDataPoints <> nil then
     GridDataPoints.OnDrawColumnCell := GridDataPointsDrawColumnCell;
 
+  // Hints remain enabled after the grids are repopulated or their layout changes.
+  if GridDataPoints <> nil then
+    GridDataPoints.ShowHint := True;
+  if GridResults <> nil then
+    GridResults.ShowHint := True;
+
   SetGridReadOnly(GridDataPoints);
   SetGridReadOnly(GridResults);
   SetGridReadOnly(GridCoefs);
@@ -1850,42 +1856,80 @@ end;
 
 function TFrameProceed.GetSpillageResultHint(ADevice: TDevice;
   APoint: TPointSpillage): string;
-var S: string; DevicePoint: TDevicePoint;
+var
+  S, Reason, MessageText: string;
+  DevicePoint: TDevicePoint;
+
+  procedure AppendHintLine(const AText: string);
+  begin
+    if Trim(AText) = '' then
+      Exit;
+    if Result <> '' then
+      Result := Result + sLineBreak;
+    Result := Result + Trim(AText);
+  end;
 begin
   Result := '';
   if APoint = nil then
-    Exit('Результат измерения отсутствует');
+    Exit(#$2014 + '.' + sLineBreak +
+      'Метрологический результат ещё не определён.' + sLineBreak +
+      'Результат измерения отсутствует.');
+
+  // Hint подробно поясняет метрологический статус; StatusStr содержит тексты
+  // ValidationReason и ValidationMessage текущей модели.
+  Reason := Trim(APoint.StatusStr);
+  if Pos('(цвет:', LowerCase(Reason)) > 0 then
+    Reason := Trim(Copy(Reason, 1, Pos('(цвет:', LowerCase(Reason)) - 1));
+  MessageText := '';
   if APoint.Status = TPointSpillage.SPS_ERROR_EXCEEDED then
   begin
+    AppendHintLine('Не годен.');
+    AppendHintLine(Reason);
     DevicePoint := nil;
     if ADevice <> nil then
       DevicePoint := ADevice.FindMatchedDevicePointForSpillage(APoint);
     if DevicePoint <> nil then
-      Exit(Format('Погрешность %.3f%% превышает допустимое значение %.3f%%',
-        [APoint.Error, Abs(DevicePoint.Error)]));
-    Exit(Format('Погрешность %.3f%% превышает допустимое значение',
-      [APoint.Error]));
+      MessageText := Format('Погрешность %.3f%% превышает допустимое значение %.3f%%.',
+        [APoint.Error, Abs(DevicePoint.Error)])
+    else
+      MessageText := Format('Погрешность %.3f%% превышает допустимое значение.',
+        [APoint.Error]);
+    AppendHintLine(MessageText);
+    Exit;
   end;
-  if APoint.Status = TPointSpillage.SPS_OK then Exit;
+  if APoint.Status = TPointSpillage.SPS_OK then
+  begin
+    AppendHintLine('Годен.');
+    AppendHintLine(Reason);
+    AppendHintLine('Погрешность находится в допустимых пределах.');
+    Exit;
+  end;
+  AppendHintLine(#$2014 + '.');
+  AppendHintLine(Reason);
   if APoint.Status = TPointSpillage.SPS_FLOW_NOT_MATCHED then
-    Exit('Расход не соответствует поверочной точке прибора');
+  begin
+    AppendHintLine('Расход не соответствует поверочной точке прибора.');
+    Exit;
+  end;
   if APoint.Status in [TPointSpillage.SPS_CREATED,
      TPointSpillage.SPS_DATA_ASSIGNED] then
-    Exit('Результат измерения отсутствует');
-  if APoint.Status <> TPointSpillage.SPS_STOP_CRITERIA_FAILED then
-    Exit('Результат измерения отсутствует');
-  S := LowerCase(APoint.StatusStr);
-  if Pos('врем', S) > 0 then Result := 'Не достигнуто время измерения'
-  else if Pos('импульс', S) > 0 then Result := 'Не достигнуто количество импульсов'
-  else if (Pos('объ', S) > 0) or (Pos('масс', S) > 0) then
-    Result := 'Не достигнут объём измерения'
-  else if Pos('останов', S) > 0 then Result := 'Измерение остановлено'
-  else
   begin
-    Result := APoint.StatusStr;
-    if Pos('(цвет:', LowerCase(Result)) > 0 then
-      Result := Trim(Copy(Result, 1, Pos('(цвет:', LowerCase(Result)) - 1));
+    AppendHintLine('Метрологический результат ещё не определён.');
+    Exit;
   end;
+  if APoint.Status <> TPointSpillage.SPS_STOP_CRITERIA_FAILED then
+  begin
+    AppendHintLine('Недостаточно данных для определения годности.');
+    Exit;
+  end;
+  S := LowerCase(APoint.StatusStr);
+  if Pos('врем', S) > 0 then MessageText := 'Не достигнуто время измерения.'
+  else if Pos('импульс', S) > 0 then MessageText := 'Не достигнуто количество импульсов.'
+  else if (Pos('объ', S) > 0) or (Pos('масс', S) > 0) then
+    MessageText := 'Не достигнут объём измерения.'
+  else if Pos('останов', S) > 0 then MessageText := 'Измерение остановлено.'
+  else MessageText := 'Недостаточно данных для определения годности.';
+  AppendHintLine(MessageText);
 end;
 
 function TFrameProceed.GetDeviceResultHint(ADevice: TDevice): string;
@@ -1905,6 +1949,12 @@ begin
     Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
     if (Spillage <> nil) and
        (Spillage.Status = TPointSpillage.SPS_STOP_CRITERIA_FAILED) then
+      Exit(GetSpillageResultHint(ADevice, Spillage));
+  end;
+  for DevicePoint in ADevice.Points do
+  begin
+    Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
+    if (Spillage <> nil) and (Spillage.Status = TPointSpillage.SPS_OK) then
       Exit(GetSpillageResultHint(ADevice, Spillage));
   end;
 end;
@@ -4036,6 +4086,7 @@ procedure TFrameProceed.GridResultsMouseMove(Sender: TObject; Shift: TShiftState
 var Col, Row, PointIndex: Integer; Device: TDevice;
   DevicePoint: TDevicePoint; Spillage: TPointSpillage;
 begin
+  GridResults.ShowHint := True;
   GridResults.Hint := '';
   if not GridResults.CellByPoint(X, Y, Col, Row) or
      (Row < 0) or (Row >= Length(FCurrentResultRows)) then Exit;
@@ -4229,9 +4280,7 @@ begin
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageError then
   begin
-    if P.Status = TPointSpillage.SPS_STOP_CRITERIA_FAILED then
-      Value := #$2014
-    else if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
       Value := FActiveWorkTable.TableFlow.ValueError.GetStrNum(P.Error)
     else
       Value := FloatToStr(P.Error);
@@ -4426,6 +4475,7 @@ procedure TFrameProceed.GridDataPointsMouseMove(Sender: TObject;
   Shift: TShiftState; X, Y: Single);
 var Col, Row: Integer; Device: TDevice;
 begin
+  GridDataPoints.ShowHint := True;
   GridDataPoints.Hint := '';
   if not GridDataPoints.CellByPoint(X, Y, Col, Row) or
      (Row < 0) or (Row >= Length(FCurrentSpillages)) then Exit;
