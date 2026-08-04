@@ -282,8 +282,13 @@ type
     procedure InitCalibrCoefsFrame;
     procedure SetGridReadOnly(AGrid: TGrid);
     procedure UpdateActionHints;
-    function GetSpillageResultText(APoint: TPointSpillage): string;
-    function GetSpillageResultHint(APoint: TPointSpillage): string;
+    function GetSpillageResultHint(ADevice: TDevice;
+      APoint: TPointSpillage): string;
+    function GetDeviceResultHint(ADevice: TDevice): string;
+    procedure GridResultsMouseMove(Sender: TObject; Shift: TShiftState;
+      X, Y: Single);
+    procedure GridDataPointsMouseMove(Sender: TObject; Shift: TShiftState;
+      X, Y: Single);
     procedure LogProceedGridContext(const AContext: string; ADevice: TDevice;
       ASession: TSessionSpillage; ARows, AColumns: Integer);
 
@@ -1843,23 +1848,32 @@ begin
   end;
 end;
 
-function TFrameProceed.GetSpillageResultText(APoint: TPointSpillage): string;
-begin
-  if APoint = nil then Exit(#$2014);
-  case APoint.Status of
-    TPointSpillage.SPS_ERROR_EXCEEDED, TPointSpillage.SPS_OK:
-      Result := FormatResultErrorValue(APoint.Error);
-  else
-    Result := #$2014;
-  end;
-end;
-
-function TFrameProceed.GetSpillageResultHint(APoint: TPointSpillage): string;
-var S: string;
+function TFrameProceed.GetSpillageResultHint(ADevice: TDevice;
+  APoint: TPointSpillage): string;
+var S: string; DevicePoint: TDevicePoint;
 begin
   Result := '';
-  if (APoint = nil) or
-     (APoint.Status <> TPointSpillage.SPS_STOP_CRITERIA_FAILED) then Exit;
+  if APoint = nil then
+    Exit('Результат измерения отсутствует');
+  if APoint.Status = TPointSpillage.SPS_ERROR_EXCEEDED then
+  begin
+    DevicePoint := nil;
+    if ADevice <> nil then
+      DevicePoint := ADevice.FindMatchedDevicePointForSpillage(APoint);
+    if DevicePoint <> nil then
+      Exit(Format('Погрешность %.3f%% превышает допустимое значение %.3f%%',
+        [APoint.Error, Abs(DevicePoint.Error)]));
+    Exit(Format('Погрешность %.3f%% превышает допустимое значение',
+      [APoint.Error]));
+  end;
+  if APoint.Status = TPointSpillage.SPS_OK then Exit;
+  if APoint.Status = TPointSpillage.SPS_FLOW_NOT_MATCHED then
+    Exit('Расход не соответствует поверочной точке прибора');
+  if APoint.Status in [TPointSpillage.SPS_CREATED,
+     TPointSpillage.SPS_DATA_ASSIGNED] then
+    Exit('Результат измерения отсутствует');
+  if APoint.Status <> TPointSpillage.SPS_STOP_CRITERIA_FAILED then
+    Exit('Результат измерения отсутствует');
   S := LowerCase(APoint.StatusStr);
   if Pos('врем', S) > 0 then Result := 'Не достигнуто время измерения'
   else if Pos('импульс', S) > 0 then Result := 'Не достигнуто количество импульсов'
@@ -1871,6 +1885,27 @@ begin
     Result := APoint.StatusStr;
     if Pos('(цвет:', LowerCase(Result)) > 0 then
       Result := Trim(Copy(Result, 1, Pos('(цвет:', LowerCase(Result)) - 1));
+  end;
+end;
+
+function TFrameProceed.GetDeviceResultHint(ADevice: TDevice): string;
+var DevicePoint: TDevicePoint; Spillage: TPointSpillage;
+begin
+  Result := 'Недостаточно данных для определения годности';
+  if (ADevice = nil) or (ADevice.Points = nil) then Exit;
+  for DevicePoint in ADevice.Points do
+  begin
+    Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
+    if (Spillage <> nil) and
+       (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
+      Exit(GetSpillageResultHint(ADevice, Spillage));
+  end;
+  for DevicePoint in ADevice.Points do
+  begin
+    Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
+    if (Spillage <> nil) and
+       (Spillage.Status = TPointSpillage.SPS_STOP_CRITERIA_FAILED) then
+      Exit(GetSpillageResultHint(ADevice, Spillage));
   end;
 end;
 
@@ -2198,7 +2233,9 @@ begin
                    (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
                   Inc(InvalidCount);
                 Row.PointStatuses[I] := Spillage.Status;
-                Row.PointValues[I] := GetSpillageResultText(Spillage);
+                { Point columns always show the measured error.  Only the
+                  aggregate Result column may display an em dash. }
+                Row.PointValues[I] := FormatResultErrorValue(Spillage.Error);
               end
               else
               begin
@@ -3993,6 +4030,32 @@ begin
     GridResults.SetFocus;
   end;
 end;
+
+procedure TFrameProceed.GridResultsMouseMove(Sender: TObject; Shift: TShiftState;
+  X, Y: Single);
+var Col, Row, PointIndex: Integer; Device: TDevice;
+  DevicePoint: TDevicePoint; Spillage: TPointSpillage;
+begin
+  GridResults.Hint := '';
+  if not GridResults.CellByPoint(X, Y, Col, Row) or
+     (Row < 0) or (Row >= Length(FCurrentResultRows)) then Exit;
+  Device := FCurrentResultRows[Row].Device;
+  if GridResults.Columns[Col] = StringColumnResult then
+  begin
+    GridResults.Hint := GetDeviceResultHint(Device);
+    Exit;
+  end;
+  PointIndex := -1;
+  if GridResults.Columns[Col] = StringColumnPointNum1 then PointIndex := 0
+  else if GridResults.Columns[Col] = StringColumnPointNum2 then PointIndex := 1
+  else if GridResults.Columns[Col] = StringColumnPointNum3 then PointIndex := 2
+  else if GridResults.Columns[Col] = StringColumnPointNum4 then PointIndex := 3;
+  if (PointIndex < 0) or (Device = nil) or (Device.Points = nil) or
+     (PointIndex >= Device.Points.Count) then Exit;
+  DevicePoint := Device.Points[PointIndex];
+  Spillage := FindResultSpillageForPoint(Device, DevicePoint);
+  GridResults.Hint := GetSpillageResultHint(Device, Spillage);
+end;
 procedure TFrameProceed.GridResultsSelChanged(Sender: TObject);
 var
   SelectedDevice: TDevice;
@@ -4357,6 +4420,19 @@ begin
     end;
     UpdateActionHints;
   end;
+end;
+
+procedure TFrameProceed.GridDataPointsMouseMove(Sender: TObject;
+  Shift: TShiftState; X, Y: Single);
+var Col, Row: Integer; Device: TDevice;
+begin
+  GridDataPoints.Hint := '';
+  if not GridDataPoints.CellByPoint(X, Y, Col, Row) or
+     (Row < 0) or (Row >= Length(FCurrentSpillages)) then Exit;
+  if (GridDataPoints.Columns[Col] <> StringColumnSpillageValid) and
+     (GridDataPoints.Columns[Col] <> StringColumnSpillageError) then Exit;
+  Device := ResolveSelectedDevice;
+  GridDataPoints.Hint := GetSpillageResultHint(Device, FCurrentSpillages[Row]);
 end;
 procedure TFrameProceed.UpdateGridDataPointsHeaders(QuantityDimName: string; FlowDimName: string);
 var
