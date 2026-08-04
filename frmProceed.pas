@@ -325,6 +325,7 @@ type
     FLastResultsHintCol: Integer;
     FLastDataPointsHintRow: Integer;
     FLastDataPointsHintCol: Integer;
+    FApplyingGridColumnsLayout: Boolean;
   public
     { Public declarations }
     procedure Initialize;
@@ -1186,20 +1187,29 @@ procedure TFrameProceed.CaptureGridColumnsLayout(AGrid: TGrid;
   out AColumns: TArray<TGridColumnLayout>);
 var
   I: Integer;
+  Column: TColumn;
 begin
   SetLength(AColumns, 0);
   if AGrid = nil then
     Exit;
 
   SetLength(AColumns, AGrid.ColumnCount);
+  ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutSaveOrderBegin',
+    'Начато сохранение порядка столбцов', 'GridName=' + AGrid.Name);
   for I := 0 to AGrid.ColumnCount - 1 do
   begin
-    AColumns[I].Name := AGrid.Columns[I].Name;
-    // The collection subscript is not a persistent identity.  Name identifies
-    // the column and Index is its actual position after a drag operation.
-    AColumns[I].Position := AGrid.Columns[I].Index;
-    AColumns[I].Width := AGrid.Columns[I].Width;
-    AColumns[I].Visible := AGrid.Columns[I].Visible;
+    Column := AGrid.Columns[I];
+    AColumns[I].Name := Column.Name;
+    // TColumn.Index is updated by the standard FMX drag operation and is the
+    // visual position. Columns[I] remains the grid's column collection lookup.
+    AColumns[I].Position := Column.Index;
+    AColumns[I].Width := Column.Width;
+    AColumns[I].Visible := Column.Visible;
+    ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutSaved',
+      'Сохранена раскладка столбца',
+      Format('GridName=%s; ColumnName=%s; ColumnsIndex=%d; VisualIndex=%d; Position=%d; Width=%g; Visible=%s',
+        [AGrid.Name, Column.Name, I, Column.Index, AColumns[I].Position,
+         Column.Width, BoolToStr(Column.Visible, True)]));
   end;
 end;
 
@@ -1209,19 +1219,37 @@ procedure TFrameProceed.ApplyGridColumnsLayout(AGrid: TGrid;
 var
   I, J, TargetIndex: Integer;
   Column: TColumn;
+  SortedColumns: TArray<TGridColumnLayout>;
+  Temp: TGridColumnLayout;
 begin
   if (AGrid = nil) or (Length(AColumns) = 0) then
     Exit;
 
+  // Work on a copy: the WorkTable array remains in its persisted form. FMX
+  // receives columns in ascending visual Position order.
+  SortedColumns := Copy(AColumns, 0, Length(AColumns));
+  for I := 1 to High(SortedColumns) do
+  begin
+    Temp := SortedColumns[I];
+    J := I - 1;
+    while (J >= 0) and (SortedColumns[J].Position > Temp.Position) do
+    begin
+      SortedColumns[J + 1] := SortedColumns[J];
+      Dec(J);
+    end;
+    SortedColumns[J + 1] := Temp;
+  end;
+
+  FApplyingGridColumnsLayout := True;
   AGrid.BeginUpdate;
   try
-    for I := 0 to High(AColumns) do
+    for I := 0 to High(SortedColumns) do
     begin
       Column := nil;
       // Name is the persistent identity: the current index changes when a user
       // moves a column and therefore cannot identify it on the next form open.
       for J := 0 to AGrid.ColumnCount - 1 do
-        if SameText(AGrid.Columns[J].Name, AColumns[I].Name) then
+        if SameText(AGrid.Columns[J].Name, SortedColumns[I].Name) then
         begin
           Column := AGrid.Columns[J];
           Break;
@@ -1229,26 +1257,37 @@ begin
       if Column = nil then
         Continue;
 
-      Column.Visible := AColumns[I].Visible;
-      if AColumns[I].Width > 0 then
-        Column.Width := AColumns[I].Width;
+      Column.Visible := SortedColumns[I].Visible;
+      if SortedColumns[I].Width > 0 then
+        Column.Width := SortedColumns[I].Width;
     end;
 
-    // Apply positions only after every named column has received its settings.
-    for TargetIndex := 0 to AGrid.ColumnCount - 1 do
-      for I := 0 to High(AColumns) do
-        if AColumns[I].Position = TargetIndex then
+    for I := 0 to High(SortedColumns) do
+    begin
+      TargetIndex := EnsureRange(SortedColumns[I].Position, 0,
+        AGrid.ColumnCount - 1);
+      Column := nil;
+      for J := 0 to AGrid.ColumnCount - 1 do
+        if SameText(AGrid.Columns[J].Name, SortedColumns[I].Name) then
         begin
-          for J := 0 to AGrid.ColumnCount - 1 do
-            if SameText(AGrid.Columns[J].Name, AColumns[I].Name) then
-            begin
-              AGrid.Columns[J].Index := TargetIndex;
-              Break;
-            end;
+          Column := AGrid.Columns[J];
           Break;
         end;
+      if Column = nil then
+        Continue;
+
+      // Index is the standard FMX column move mechanism and triggers the grid
+      // model's normal reindexing. Suppress the resulting save callback while
+      // the complete saved order is still being restored.
+      Column.Index := TargetIndex;
+      ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutLoaded',
+        'Загружена раскладка столбца',
+        Format('GridName=%s; ColumnName=%s; SavedPosition=%d; AppliedPosition=%d',
+          [AGrid.Name, Column.Name, SortedColumns[I].Position, Column.Index]));
+    end;
   finally
     AGrid.EndUpdate;
+    FApplyingGridColumnsLayout := False;
   end;
   AGrid.Repaint;
 end;
@@ -2889,10 +2928,10 @@ begin
   // Do not destroy or create controls while FMX is opening a native popup:
   // doing so can deadlock its menu service.  The branch is built once and an
   // opening only synchronizes check marks.
-  for I := 0 to ColumnsMenu.ChildrenCount - 1 do
-    if ColumnsMenu.Children[I] is TMenuItem then
+  for I := 0 to ColumnsMenu.ItemsCount - 1 do
+    if ColumnsMenu.Items[I] is TMenuItem then
     begin
-      Item := TMenuItem(ColumnsMenu.Children[I]);
+      Item := TMenuItem(ColumnsMenu.Items[I]);
       if Item.TagString = '' then
         Continue;
       Item.IsChecked := False;
@@ -2912,7 +2951,7 @@ var
   Item, ResetItem: TMenuItem;
 begin
   if (AGrid = nil) or (AColumnsMenu = nil) or
-     (AColumnsMenu.ChildrenCount <> 0) then
+     (AColumnsMenu.ItemsCount <> 0) then
     Exit;
   for I := 0 to AGrid.ColumnCount - 1 do
   begin
@@ -4591,14 +4630,16 @@ end;
 procedure TFrameProceed.GridDataPointsColumnMoved(Column: TColumn; FromIndex,
   ToIndex: Integer);
 begin
-     SaveLayoutSettingsToWorkTable;
+  if not FApplyingGridColumnsLayout then
+    SaveLayoutSettingsToWorkTable;
 end;
 
 procedure TFrameProceed.GridColumnLayoutMouseUp(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 begin
   // После изменения мышью сохраняем ширину, порядок и видимость по Name столбца.
-  if (Sender = GridDataPoints) or (Sender = GridResults) then
+  if (not FApplyingGridColumnsLayout) and
+     ((Sender = GridDataPoints) or (Sender = GridResults)) then
     SaveLayoutSettingsToWorkTable;
 end;
 
