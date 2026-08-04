@@ -670,7 +670,6 @@ object FrameProceed: TFrameProceed
       Size.Height = 40.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 3
-      Visible = False
       object Layout22: TLayout
         Align = Left
         Position.X = 456.000000000000000000
@@ -768,6 +767,18 @@ object FrameProceed: TFrameProceed
           TextSettings.Trimming = None
           ParentShowHint = False
           ShowHint = True
+        end
+        object ButtonProceedExportExcel: TButton
+          Align = Left
+          Enabled = False
+          Hint = #1042#1099#1075#1088#1091#1079#1080#1090#1100' '#1074#1099#1073#1088#1072#1085#1085#1099#1077' '#1076#1072#1085#1085#1099#1077' '#1074' Excel
+          Size.Width = 40.000000000000000000
+          Size.Height = 40.000000000000000000
+          StyleLookup = 'composetoolbutton'
+          TabOrder = 4
+          ParentShowHint = False
+          ShowHint = True
+          OnClick = ButtonProceedExportExcelClick
         end
       end
       object Line9: TLine
