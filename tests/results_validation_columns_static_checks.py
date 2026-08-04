@@ -36,7 +36,8 @@ def test_validity_hint_uses_status_reason_and_detailed_message():
     assert "AppendHintLine('Не годен.')" in hint
     assert "Погрешность находится в допустимых пределах." in hint
     assert "превышает допустимое значение" in hint
-    assert "Метрологический результат ещё не определён." in hint
+    assert "Статус годности не определён." in hint
+    assert "Фактическая погрешность: %.3f%%." in hint
 
 
 def test_measurement_grid_keeps_hints_enabled_and_targets_validity_column():
@@ -53,3 +54,19 @@ def test_right_click_hint_passes_device_and_measurement():
 
     assert "GetSpillageResultHint(ResolveSelectedDevice," in mouse_down
     assert "FCurrentSpillages[ARow])" in mouse_down
+
+
+def test_dynamic_columns_menu_is_removed_by_its_tag_only():
+    popup = body("procedure TFrameProceed.PopupMenuGridResultsPopup")
+
+    assert "Tag = CColumnsMenuTag" in popup
+    assert "ColumnsMenu.Tag := CColumnsMenuTag" in popup
+    assert "SameText" not in popup
+    assert "TPopupMenu(Sender).Clear" not in popup
+
+
+def test_initialize_explicitly_connects_existing_hint_handlers():
+    initialize = body("procedure TFrameProceed.Initialize")
+
+    assert "GridResults.OnMouseMove := GridResultsMouseMove" in initialize
+    assert "GridDataPoints.OnMouseMove := GridDataPointsMouseMove" in initialize

@@ -350,6 +350,7 @@ const
   CProcessingDevicesItemKeyPrefix = 'Item';
   CProcessingDevicePointCountsSection = 'ProcessingDevicePointCounts';
   CManualProcessingDevicesSection = 'ManualProcessingDevices';
+  CColumnsMenuTag = -10001;
   CVolumeFlowUnits: array[0..4] of string = ('л/с','л/мин','л/ч','м3/мин','м3/ч');
   CMassFlowUnits: array[0..4] of string = ('кг/с','кг/мин','кг/ч','т/мин','т/ч');
 
@@ -423,9 +424,23 @@ begin
   end;
 
   if GridResults <> nil then
+  begin
     GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
+    // Подключаем существующий обработчик Hint для ячеек таблицы результатов.
+    GridResults.OnMouseMove := GridResultsMouseMove;
+  end;
   if GridDataPoints <> nil then
+  begin
     GridDataPoints.OnDrawColumnCell := GridDataPointsDrawColumnCell;
+    // Подключаем существующий обработчик Hint для ячеек таблицы измерений.
+    GridDataPoints.OnMouseMove := GridDataPointsMouseMove;
+  end;
+
+  // Hints remain enabled after the grids are repopulated or their layout changes.
+  if GridDataPoints <> nil then
+    GridDataPoints.ShowHint := True;
+  if GridResults <> nil then
+    GridResults.ShowHint := True;
 
   // Hints remain enabled after the grids are repopulated or their layout changes.
   if GridDataPoints <> nil then
@@ -1871,9 +1886,8 @@ var
 begin
   Result := '';
   if APoint = nil then
-    Exit(#$2014 + '.' + sLineBreak +
-      'Метрологический результат ещё не определён.' + sLineBreak +
-      'Результат измерения отсутствует.');
+    Exit('Статус годности не определён.' + sLineBreak +
+      'Недостаточно данных для оценки.');
 
   // Hint подробно поясняет метрологический статус; StatusStr содержит тексты
   // ValidationReason и ValidationMessage текущей модели.
@@ -1902,9 +1916,10 @@ begin
     AppendHintLine('Годен.');
     AppendHintLine(Reason);
     AppendHintLine('Погрешность находится в допустимых пределах.');
+    AppendHintLine(Format('Фактическая погрешность: %.3f%%.', [APoint.Error]));
     Exit;
   end;
-  AppendHintLine(#$2014 + '.');
+  AppendHintLine('Статус годности не определён.');
   AppendHintLine(Reason);
   if APoint.Status = TPointSpillage.SPS_FLOW_NOT_MATCHED then
   begin
@@ -1914,7 +1929,7 @@ begin
   if APoint.Status in [TPointSpillage.SPS_CREATED,
      TPointSpillage.SPS_DATA_ASSIGNED] then
   begin
-    AppendHintLine('Метрологический результат ещё не определён.');
+    AppendHintLine('Недостаточно данных для оценки.');
     Exit;
   end;
   if APoint.Status <> TPointSpillage.SPS_STOP_CRITERIA_FAILED then
@@ -1933,22 +1948,38 @@ begin
 end;
 
 function TFrameProceed.GetDeviceResultHint(ADevice: TDevice): string;
-var DevicePoint: TDevicePoint; Spillage: TPointSpillage;
+var DevicePoint: TDevicePoint; Spillage: TPointSpillage; SummaryStatus: Integer;
 begin
-  Result := 'Недостаточно данных для определения годности';
+  Result := 'Статус годности не определён.' + sLineBreak +
+    'Недостаточно данных для оценки.';
   if (ADevice = nil) or (ADevice.Points = nil) then Exit;
-  for DevicePoint in ADevice.Points do
+  SummaryStatus := ResolveDeviceSummaryStatus(ADevice);
+  if SummaryStatus = TPointSpillage.SPS_OK then
   begin
-    Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
-    if (Spillage <> nil) and
-       (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
-      Exit(GetSpillageResultHint(ADevice, Spillage));
+    for DevicePoint in ADevice.Points do
+    begin
+      Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
+      if (Spillage <> nil) and (Spillage.Status = TPointSpillage.SPS_OK) then
+        Exit(GetSpillageResultHint(ADevice, Spillage));
+    end;
+    Exit;
+  end;
+  if SummaryStatus <> TPointSpillage.SPS_ERROR_EXCEEDED then
+  begin
+    for DevicePoint in ADevice.Points do
+    begin
+      Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
+      if (Spillage <> nil) and
+         (Spillage.Status = TPointSpillage.SPS_STOP_CRITERIA_FAILED) then
+        Exit(GetSpillageResultHint(ADevice, Spillage));
+    end;
+    Exit;
   end;
   for DevicePoint in ADevice.Points do
   begin
     Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
     if (Spillage <> nil) and
-       (Spillage.Status = TPointSpillage.SPS_STOP_CRITERIA_FAILED) then
+       (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
       Exit(GetSpillageResultHint(ADevice, Spillage));
   end;
   for DevicePoint in ADevice.Points do
@@ -2763,14 +2794,17 @@ procedure TFrameProceed.PopupMenuGridResultsPopup(Sender: TObject);
 var ColumnsMenu, Item, ResetItem: TMenuItem; Grid: TGrid; I: Integer;
 begin
   if not (Sender is TPopupMenu) then Exit;
+  // Динамический список столбцов пересоздаётся при открытии меню, поэтому
+  // перед добавлением удаляем только его предыдущий экземпляр.
   for I := TPopupMenu(Sender).ChildrenCount - 1 downto 0 do
     if (TPopupMenu(Sender).Children[I] is TMenuItem) and
-       SameText(TMenuItem(TPopupMenu(Sender).Children[I]).Text, 'Столбцы') then
+       (TMenuItem(TPopupMenu(Sender).Children[I]).Tag = CColumnsMenuTag) then
       TPopupMenu(Sender).Children[I].Free;
   Grid := GridResults;
   if Sender = PopupMenuGridDataPoints then Grid := GridDataPoints;
   ColumnsMenu := TMenuItem.Create(TPopupMenu(Sender));
   ColumnsMenu.Text := 'Столбцы';
+  ColumnsMenu.Tag := CColumnsMenuTag;
   TPopupMenu(Sender).AddObject(ColumnsMenu);
   for I := 0 to Grid.ColumnCount - 1 do
   begin
