@@ -510,6 +510,7 @@ function StrToSyncChannelMode(const AValue: string): ESyncChannelMode;
 function IntToSyncChannelMode(const AValue: Integer): ESyncChannelMode;
 function NoiseFilterToStr(AValue: Integer): string;
 function StrToNoiseFilter(const AValue: string): Integer;
+function BoolText(const AValue: Boolean): string;
 
 implementation
 
@@ -1341,5 +1342,17 @@ begin
   else
     AStatus := mptsNone;
 end;
+
+
+
+  function BoolText(const AValue: Boolean): string;
+  begin
+    if AValue then
+      Result := 'True'
+    else
+      Result := 'False';
+  end;
+
+
 
 end.
