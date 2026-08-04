@@ -3547,7 +3547,7 @@ begin
   for I := 0 to AGrid.ColumnCount - 1 do
   begin
     AColumns[I].Name := AGrid.Columns[I].Name;
-    AColumns[I].DisplayIndex := I;
+    AColumns[I].Position := AGrid.Columns[I].Index;
     AColumns[I].Width := AGrid.Columns[I].Width;
     AColumns[I].Visible := AGrid.Columns[I].Visible;
   end;
@@ -3585,8 +3585,8 @@ begin
       Column.Visible := AColumns[I].Visible;
       if AColumns[I].Width > 0 then
         Column.Width := AColumns[I].Width;
-      if (AColumns[I].DisplayIndex >= 0) and (AColumns[I].DisplayIndex < AGrid.ColumnCount) then
-        Column.Index := AColumns[I].DisplayIndex;
+      if (AColumns[I].Position >= 0) and (AColumns[I].Position < AGrid.ColumnCount) then
+        Column.Index := AColumns[I].Position;
     end;
   finally
     AGrid.EndUpdate;
@@ -3694,7 +3694,8 @@ begin
     RefreshGridColumns(FFrameProceed.GridResults);
   end;
 
-  EnforceDataPointsColumnsLayout;
+  if Length(WorkTable.DataPointsGridColumns) = 0 then
+    EnforceDataPointsColumnsLayout;
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
 end;
 

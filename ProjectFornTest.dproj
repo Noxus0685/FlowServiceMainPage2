@@ -300,6 +300,7 @@
         <DCCReference Include="uAppVersion.pas"/>
         <DCCReference Include="uOpenXmlXlsx.pas"/>
         <DCCReference Include="uResultsXlsxExporter.pas"/>
+        <DCCReference Include="uGridXlsxExporter.pas"/>
         <DCCReference Include="uTable_Data.pas">
             <Form>TableDM</Form>
             <FormType>dfm</FormType>
