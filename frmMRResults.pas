@@ -87,6 +87,7 @@ type
     procedure DetachMeasurementRun;
 
     procedure BuildColumns;
+    function HasCurrentMeasurementPoints: Boolean;
     procedure BuildRows;
     procedure RefreshRows;
     function PointBelongsToDisplayGroup(ADevice: TDevice; APoint: TDevicePoint;
@@ -488,31 +489,10 @@ var
   I: Integer;
   Col: TStringColumn;
   Group: TDisplayPointGroup;
-  Ch: TChannel;
-  Device: TDevice;
-  Point: TDevicePoint;
 begin
   FPointColumns.Clear;
   FDisplayPoints.Clear;
 
-  // The display groups mirror the actual MeasurementRun point groups and only
-  // append device-owned points which did not participate in those groups.
-  if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) then
-    for I := 0 to MeasurementRun.Points.Count - 1 do
-      AddScenarioDisplayPoint(MeasurementRun.Points[I]);
-
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.DeviceChannels <> nil) then
-    for Ch in FActiveWorkTable.DeviceChannels do
-      if (Ch <> nil) and Ch.Enabled and (Ch.FlowMeter <> nil) and
-         (Ch.FlowMeter.Device <> nil) and (Ch.FlowMeter.Device.Points <> nil) then
-      begin
-        Device := Ch.FlowMeter.Device;
-        for Point in Device.Points do
-          if (Point <> nil) and Point.Enabled then
-            AddStandaloneDisplayPoint(Device, Point);
-      end;
-
-  MakeDisplayHeadersUnique;
   GridMRResults.BeginUpdate;
   try
     while GridMRResults.ColumnCount > 2 do
@@ -522,6 +502,13 @@ begin
         Break;
 
     StringColumnName.Index := 0;
+    StringColumnResult.Index := GridMRResults.ColumnCount - 1;
+    if not HasCurrentMeasurementPoints then Exit;
+
+    for I := 0 to MeasurementRun.Points.Count - 1 do
+      if (MeasurementRun.Points[I] <> nil) and MeasurementRun.Points[I].Enabled then
+        AddScenarioDisplayPoint(MeasurementRun.Points[I]);
+    MakeDisplayHeadersUnique;
     for Group in FDisplayPoints do
     begin
       Col := TStringColumn.Create(GridMRResults);
@@ -538,6 +525,17 @@ begin
     GridMRResults.EndUpdate;
   end;
   SetGridReadOnly(GridMRResults);
+end;
+
+function TFrameMRResults.HasCurrentMeasurementPoints: Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  if (MeasurementRun = nil) or (MeasurementRun.Points = nil) then Exit;
+  for I := 0 to MeasurementRun.Points.Count - 1 do
+    if (MeasurementRun.Points[I] <> nil) and MeasurementRun.Points[I].Enabled then
+      Exit(True);
 end;
 
 function TFrameMRResults.PointBelongsToDisplayGroup(ADevice: TDevice;

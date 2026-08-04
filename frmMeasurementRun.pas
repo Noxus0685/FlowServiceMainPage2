@@ -188,13 +188,14 @@ procedure TFrameMeasurementRun.DetachMeasurementRunEvents;
 var OldRun: TMeasurementRun;
 begin
   OldRun := FSubscribedMeasurementRun;
+  FSubscribedMeasurementRun := nil;
   if OldRun <> nil then
   begin
     OldRun.Unsubscribe(Self);
-    FSubscribedMeasurementRun := nil;
-    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementRunSubscriptionDetached',
-      'Frame отписан от MeasurementRun',
-      Format('RunPointer=%p; Reason=WorkTableChangedOrFrameDestroy', [Pointer(OldRun)]));
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementRunSubscriptionDetached',
+        'Frame отписан от MeasurementRun',
+        Format('RunPointer=%p; Reason=WorkTableChangedOrFrameDestroy', [Pointer(OldRun)]));
   end;
 end;
 

@@ -471,6 +471,7 @@ type
     FFlowRate: TFlowRate;
 
     FMeasurementRun: TObject;
+    function GetMeasurementRunStage: EMeasurementState;
     FMode:EMeasurementRunMode;
 
     FFluidTemp: TFluidTemp;
@@ -721,6 +722,7 @@ type
   property Weights: TObjectList<TWeight> read FScales;
 
   property MeasurementRun: TObject read FMeasurementRun;
+  property MeasurementRunStage: EMeasurementState read GetMeasurementRunStage;
   property MeasurementMode: EMeasurementRunMode read FMode write FMode;
 
   property FluidTemp: TFluidTemp read FFluidTemp;
@@ -950,6 +952,13 @@ uses
 const
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
   DEVICE_FLOW_RATE_DIM_INDEX = 4;
+
+function TWorkTable.GetMeasurementRunStage: EMeasurementState;
+begin
+  if FMeasurementRun = nil then
+    Exit(msNone);
+  Result := TMeasurementRun(FMeasurementRun).Stage;
+end;
 
   {$REGION 'HELPERS'}
 
