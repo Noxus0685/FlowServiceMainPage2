@@ -4229,7 +4229,9 @@ begin
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageError then
   begin
-    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+    if P.Status = TPointSpillage.SPS_STOP_CRITERIA_FAILED then
+      Value := #$2014
+    else if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
       Value := FActiveWorkTable.TableFlow.ValueError.GetStrNum(P.Error)
     else
       Value := FloatToStr(P.Error);
@@ -4411,6 +4413,11 @@ begin
     GridDataPoints.Col := ACol;
     GridDataPoints.Row := ARow;
     GridDataPoints.SetFocus;
+    if (ARow >= 0) and (ARow < Length(FCurrentSpillages)) then
+    begin
+      GridDataPoints.Hint := GetSpillageResultHint(FCurrentSpillages[ARow]);
+      GridDataPoints.ShowHint := GridDataPoints.Hint <> '';
+    end;
     UpdateActionHints;
   end;
 end;
