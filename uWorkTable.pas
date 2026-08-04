@@ -207,7 +207,7 @@ type
 
   TGridColumnLayout = record
     Name: string;
-    DisplayIndex: Integer;
+    Position: Integer;
     Width: Single;
     Visible: Boolean;
   end;
@@ -4677,7 +4677,7 @@ begin
   begin
     Section := ASectionPrefix + '.' + IntToStr(I);
     AIni.WriteString(Section, 'Name', AColumns[I].Name);
-    AIni.WriteInteger(Section, 'DisplayIndex', AColumns[I].DisplayIndex);
+    AIni.WriteInteger(Section, 'Position', AColumns[I].Position);
     AIni.WriteFloat(Section, 'Width', AColumns[I].Width);
     AIni.WriteBool(Section, 'Visible', AColumns[I].Visible);
   end;
@@ -4702,7 +4702,10 @@ begin
   begin
     Section := ASectionPrefix + '.' + IntToStr(I);
     AColumns[I].Name := AIni.ReadString(Section, 'Name', '');
-    AColumns[I].DisplayIndex := AIni.ReadInteger(Section, 'DisplayIndex', I);
+    // DisplayIndex was used by 1.0.59.  Read it as a migration fallback, but
+    // persist the unambiguous Position key from now on.
+    AColumns[I].Position := AIni.ReadInteger(Section, 'Position',
+      AIni.ReadInteger(Section, 'DisplayIndex', I));
     AColumns[I].Width := S2F(AIni.ReadString(Section, 'Width', '80'));
     AColumns[I].Visible := AIni.ReadBool(Section, 'Visible', True);
   end;

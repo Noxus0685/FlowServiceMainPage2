@@ -233,6 +233,7 @@ type
     procedure PopupMenuTreeViewDevicesPopup(Sender: TObject);
     procedure MenuTreeViewDevicesEditClick(Sender: TObject);
     procedure PopupMenuGridResultsPopup(Sender: TObject);
+    procedure BuildGridColumnsMenu(AGrid: TGrid; AColumnsMenu: TMenuItem);
     procedure GridColumnMenuClick(Sender: TObject);
     procedure GridColumnsResetClick(Sender: TObject);
     procedure ButtonExportExcelClick(Sender: TObject);
@@ -448,6 +449,10 @@ begin
     GridDataPoints.OnMouseMove := GridDataPointsMouseMove;
     GridDataPoints.OnMouseUp := GridColumnLayoutMouseUp;
   end;
+
+  // FMX popup contents must be stable while the native menu is open.
+  BuildGridColumnsMenu(GridDataPoints, MenuItemGridDataPointsColumns);
+  BuildGridColumnsMenu(GridResults, MenuItemGridResultsColumns);
 
   // Hints remain enabled after the grids are repopulated or their layout changes.
   if GridDataPoints <> nil then
@@ -1190,7 +1195,9 @@ begin
   for I := 0 to AGrid.ColumnCount - 1 do
   begin
     AColumns[I].Name := AGrid.Columns[I].Name;
-    AColumns[I].DisplayIndex := I;
+    // The collection subscript is not a persistent identity.  Name identifies
+    // the column and Index is its actual position after a drag operation.
+    AColumns[I].Position := AGrid.Columns[I].Index;
     AColumns[I].Width := AGrid.Columns[I].Width;
     AColumns[I].Visible := AGrid.Columns[I].Visible;
   end;
@@ -1230,7 +1237,7 @@ begin
     // Apply positions only after every named column has received its settings.
     for TargetIndex := 0 to AGrid.ColumnCount - 1 do
       for I := 0 to High(AColumns) do
-        if AColumns[I].DisplayIndex = TargetIndex then
+        if AColumns[I].Position = TargetIndex then
         begin
           for J := 0 to AGrid.ColumnCount - 1 do
             if SameText(AGrid.Columns[J].Name, AColumns[I].Name) then
@@ -2862,9 +2869,9 @@ end;
 
 procedure TFrameProceed.PopupMenuGridResultsPopup(Sender: TObject);
 var
-  ColumnsMenu, Item, ResetItem: TMenuItem;
+  ColumnsMenu, Item: TMenuItem;
   Grid: TGrid;
-  I: Integer;
+  I, J: Integer;
 begin
   if Sender = PopupMenuGridDataPoints then
   begin
@@ -2879,23 +2886,47 @@ begin
   else
     Exit;
 
-  // The "Columns" branch is permanent in FMX. Only its dynamic children are
-  // rebuilt, preventing one more root item from being added on every popup.
-  for I := ColumnsMenu.ChildrenCount - 1 downto 0 do
-    ColumnsMenu.Children[I].Free;
-  for I := 0 to Grid.ColumnCount - 1 do
+  // Do not destroy or create controls while FMX is opening a native popup:
+  // doing so can deadlock its menu service.  The branch is built once and an
+  // opening only synchronizes check marks.
+  for I := 0 to ColumnsMenu.ChildrenCount - 1 do
+    if ColumnsMenu.Children[I] is TMenuItem then
+    begin
+      Item := TMenuItem(ColumnsMenu.Children[I]);
+      if Item.TagString = '' then
+        Continue;
+      Item.IsChecked := False;
+      for J := 0 to Grid.ColumnCount - 1 do
+        if SameText(Grid.Columns[J].Name, Item.TagString) then
+        begin
+          Item.IsChecked := Grid.Columns[J].Visible;
+          Break;
+        end;
+    end;
+end;
+
+procedure TFrameProceed.BuildGridColumnsMenu(AGrid: TGrid;
+  AColumnsMenu: TMenuItem);
+var
+  I: Integer;
+  Item, ResetItem: TMenuItem;
+begin
+  if (AGrid = nil) or (AColumnsMenu = nil) or
+     (AColumnsMenu.ChildrenCount <> 0) then
+    Exit;
+  for I := 0 to AGrid.ColumnCount - 1 do
   begin
-    Item := TMenuItem.Create(ColumnsMenu);
-    Item.Text := Grid.Columns[I].Header;
-    Item.TagString := Grid.Columns[I].Name;
-    Item.IsChecked := Grid.Columns[I].Visible;
+    Item := TMenuItem.Create(AColumnsMenu);
+    Item.Text := AGrid.Columns[I].Header;
+    Item.TagString := AGrid.Columns[I].Name;
+    Item.IsChecked := AGrid.Columns[I].Visible;
     Item.OnClick := GridColumnMenuClick;
-    ColumnsMenu.AddObject(Item);
+    AColumnsMenu.AddObject(Item);
   end;
-  ResetItem := TMenuItem.Create(ColumnsMenu);
+  ResetItem := TMenuItem.Create(AColumnsMenu);
   ResetItem.Text := 'Восстановить по умолчанию';
   ResetItem.OnClick := GridColumnsResetClick;
-  ColumnsMenu.AddObject(ResetItem);
+  AColumnsMenu.AddObject(ResetItem);
 end;
 
 procedure TFrameProceed.GridColumnMenuClick(Sender: TObject);
