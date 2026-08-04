@@ -135,6 +135,8 @@ type
   end;
 
 procedure SetGridReadOnly(AGrid: TGrid);
+function MeasurementModeToDisplayText(const AMode: EMeasurementRunMode): string;
+function SessionStatusToDisplayText(const AStatus: Integer): string;
 
 implementation
 
@@ -142,6 +144,30 @@ uses
   frmProceed, uDebugLog;
 
 {$R *.fmx}
+
+{ Converts the production measurement mode to its user-facing snapshot text. }
+function MeasurementModeToDisplayText(const AMode: EMeasurementRunMode): string;
+begin
+  case AMode of
+    mrmManual: Result := 'Ручной';
+    mrmHalfAutomatic: Result := 'Полуавтоматический';
+    mrmAutomatic: Result := 'Автоматический';
+  else
+    Result := 'Не определён';
+  end;
+end;
+
+{ Session.Status is the persisted lifecycle code: new, running, or closed. }
+function SessionStatusToDisplayText(const AStatus: Integer): string;
+begin
+  case AStatus of
+    0: Result := 'Открыта';
+    1: Result := 'Выполняется';
+    2: Result := 'Завершена';
+  else
+    Result := 'Не определён';
+  end;
+end;
 
 constructor TDisplayPointGroup.Create;
 begin
@@ -310,16 +336,48 @@ end;
 function TFrameMRResults.BuildExportData(ASelected: TChannel): TResultsExportData;
 var Ch: TChannel; Dev: TDevice; Session: TSessionSpillage; Spill: TPointSpillage;
   ES: TResultsExportSession; ED: TResultsExportDevice; ER: TResultsExportResult;
-  DevicePoint: TDevicePoint; PointErrors: TStringList; PointText: string;
+  DevicePoint, ScenarioPoint: TDevicePoint;
+  PointColumn: TResultsExportPointColumn;
+  Participant: TResultsExportPointParticipant;
+  Cell: TResultsExportPointCell;
+  I, J, DuplicateCount: Integer;
+  HeaderExists: Boolean;
+  BaseHeader, CandidateHeader, Key: string;
+
 begin
   Result := TResultsExportData.Create;
-  PointErrors := TStringList.Create;
   try
   if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
   begin
     Result.FlowDimensionIndex := FActiveWorkTable.ValueFlowRate.CurrentDimIndex;
     Result.FlowUnitName := FActiveWorkTable.ValueFlowRate.GetDimName;
   end;
+
+  { Prefer the current run schema. Its participants preserve merged-point identity. }
+  if HasCurrentMeasurementPoints then
+    for I := 0 to MeasurementRun.Points.Count - 1 do
+    begin
+      ScenarioPoint := MeasurementRun.Points[I];
+      if (ScenarioPoint = nil) or not ScenarioPoint.Enabled then Continue;
+      PointColumn := TResultsExportPointColumn.Create;
+      if Length(ScenarioPoint.Participants) > 1 then
+        PointColumn.Key := ScenarioPoint.UUID
+      else if Length(ScenarioPoint.Participants) = 1 then
+        PointColumn.Key := ScenarioPoint.Participants[0].DeviceUUID + '|' +
+          ScenarioPoint.Participants[0].SourcePointUUID
+      else
+        PointColumn.Key := ScenarioPoint.UUID;
+      PointColumn.Header := Trim(ScenarioPoint.Name);
+      if PointColumn.Header = '' then PointColumn.Header := FormatPointHeader(ScenarioPoint);
+      for J := 0 to High(ScenarioPoint.Participants) do
+      begin
+        Participant.DeviceUUID := ScenarioPoint.Participants[J].DeviceUUID;
+        Participant.SourcePointUUID := ScenarioPoint.Participants[J].SourcePointUUID;
+        PointColumn.Participants.Add(Participant);
+      end;
+      Result.PointColumns.Add(PointColumn);
+    end;
+
   for Ch in FRows do begin
     if (ASelected <> nil) and (Ch <> ASelected) then Continue;
     if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then Continue;
@@ -327,27 +385,52 @@ begin
     ED := Default(TResultsExportDevice); ED.Name:=Dev.Name; ED.SerialNumber:=Dev.SerialNumber;
     ED.UUID:=Dev.UUID; ED.Channel:=Ch.Name; ED.DeviceType:=Dev.DeviceTypeName;
     ED.Status:=GetResultText(Ch); if Session<>nil then ED.SessionID:=IntToStr(Session.ID);
-    PointErrors.Clear;
-    if Session <> nil then
-      for Spill in Session.Spillages do
-        if (Spill <> nil) and (Spill.State <> osDeleted) then
-        begin
-          DevicePoint := Dev.FindMatchedDevicePointForSpillage(Spill);
-          if DevicePoint <> nil then PointText := DevicePoint.Name else PointText := Spill.Name;
-          PointText := PointText + ': ' + FormatFloat('0.###', Spill.Error) + ' %';
-          if (DevicePoint <> nil) and not IsNan(DevicePoint.Error) and
-             not IsInfinite(DevicePoint.Error) and (DevicePoint.Error > 0) then
-            PointText := PointText + ' / ±' + FormatFloat('0.###', DevicePoint.Error) + ' %';
-          PointErrors.Add(PointText);
-        end;
-    ED.PointErrorsText := StringReplace(PointErrors.Text.Trim, sLineBreak, '; ', [rfReplaceAll]);
     Result.Devices.Add(ED);
     if Session=nil then Continue;
     ES := Default(TResultsExportSession); ES.ID:=IntToStr(Session.ID); ES.OpenedAt:=Session.DateTimeOpen;
-    ES.WorkTable:=FActiveWorkTable.Name; ES.Mode:=IntToStr(Ord(FActiveWorkTable.MeasurementMode));
-    ES.Status:=IntToStr(Session.Status); Result.Sessions.Add(ES);
+    ES.WorkTable:=FActiveWorkTable.Name;
+    ES.Mode:=MeasurementModeToDisplayText(FActiveWorkTable.MeasurementMode);
+    ES.Status:=SessionStatusToDisplayText(Session.Status); Result.Sessions.Add(ES);
     for Spill in Session.Spillages do begin
-      if Spill=nil then Continue;
+      if (Spill=nil) or (Spill.State=osDeleted) then Continue;
+      DevicePoint := Dev.FindMatchedDevicePointForSpillage(Spill);
+      PointColumn := nil;
+      if DevicePoint <> nil then
+        for I := 0 to Result.PointColumns.Count - 1 do
+          for J := 0 to Result.PointColumns[I].Participants.Count - 1 do
+            if SameText(Result.PointColumns[I].Participants[J].DeviceUUID, Dev.UUID) and
+               SameText(Result.PointColumns[I].Participants[J].SourcePointUUID, DevicePoint.UUID) then
+            begin
+              PointColumn := Result.PointColumns[I];
+              Break;
+            end;
+      { After restart the run schema may be unavailable. Build only from this active session. }
+      if (PointColumn = nil) and not HasCurrentMeasurementPoints and (DevicePoint <> nil) then
+      begin
+        Key := Dev.UUID + '|' + DevicePoint.UUID;
+        for I := 0 to Result.PointColumns.Count - 1 do
+          if SameText(Result.PointColumns[I].Key, Key) then PointColumn := Result.PointColumns[I];
+        if PointColumn = nil then
+        begin
+          PointColumn := TResultsExportPointColumn.Create;
+          PointColumn.Key := Key;
+          PointColumn.Header := Trim(DevicePoint.Name);
+          if PointColumn.Header = '' then PointColumn.Header := Trim(Spill.Name);
+          Participant.DeviceUUID := Dev.UUID;
+          Participant.SourcePointUUID := DevicePoint.UUID;
+          PointColumn.Participants.Add(Participant);
+          Result.PointColumns.Add(PointColumn);
+        end;
+      end;
+      if PointColumn <> nil then
+      begin
+        Cell := Default(TResultsExportPointCell);
+        Cell.DeviceUUID := Dev.UUID;
+        Cell.PointColumnKey := PointColumn.Key;
+        Cell.Error := Spill.Error;
+        Cell.ErrorSet := not IsNan(Spill.Error) and not IsInfinite(Spill.Error);
+        Result.PointCells.Add(Cell);
+      end;
       ER := Default(TResultsExportResult); ER.DeviceName:=Dev.Name; ER.SerialNumber:=Dev.SerialNumber;
       ER.DeviceUUID:=Dev.UUID; ER.SessionID:=IntToStr(Session.ID); ER.PointName:=Spill.Name;
       { QavgEtalon and DeviceVolumeFlow are stored in the base flow unit (l/s).
@@ -380,7 +463,6 @@ begin
         ER.DeviceUnitName := Dev.GetDimensionName;
       end;
       ER.Error:=Spill.Error; ER.Status:=Spill.StatusStr;
-      DevicePoint := Dev.FindMatchedDevicePointForSpillage(Spill);
       if (DevicePoint <> nil) and (not IsNan(DevicePoint.Error)) and
          (not IsInfinite(DevicePoint.Error)) and (DevicePoint.Error > 0) then
       begin
@@ -390,7 +472,34 @@ begin
       ER.Valid:=Spill.Valid; ER.MeasuredAt:=Spill.DateTime; Result.Results.Add(ER);
     end;
   end;
-  finally PointErrors.Free; end;
+  { Headers are presentation labels only; stable keys remain unchanged. }
+  for I := 0 to Result.PointColumns.Count - 1 do
+  begin
+    BaseHeader := Result.PointColumns[I].Header;
+    DuplicateCount := 1;
+    CandidateHeader := BaseHeader;
+    repeat
+      HeaderExists := False;
+      for J := 0 to I - 1 do
+        if SameText(Result.PointColumns[J].Header, CandidateHeader) then
+        begin
+          HeaderExists := True;
+          Break;
+        end;
+      if not HeaderExists then Break;
+      Inc(DuplicateCount);
+      CandidateHeader := Format('%s (%d)', [BaseHeader, DuplicateCount]);
+    until False;
+    Result.PointColumns[I].Header := CandidateHeader;
+  end;
+  finally
+    if Result.Sessions.Count > 0 then
+      DebugLog(Format('ResultsXlsxSnapshot PointColumns=%d SessionModeText=%s SessionStatusText=%s',
+        [Result.PointColumns.Count, Result.Sessions[0].Mode, Result.Sessions[0].Status]))
+    else
+      DebugLog(Format('ResultsXlsxSnapshot PointColumns=%d SessionModeText= SessionStatusText=',
+        [Result.PointColumns.Count]));
+  end;
 end;
 
 { Exports the selected device, or every device when no result row is selected. }

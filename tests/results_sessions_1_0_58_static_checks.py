@@ -10,7 +10,7 @@ EXPORTER = (ROOT / 'uResultsXlsxExporter.pas').read_text(encoding='utf-8-sig')
 OPENXML = (ROOT / 'uOpenXmlXlsx.pas').read_text(encoding='utf-8-sig')
 
 def test_results_tab_activation_uses_one_reload_route():
-    assert 'TabControl1.ActiveTab = TabItemMRResults' in MAIN
+    assert 'TabControlDevices.ActiveTab = TabItemMRResults' in MAIN
     assert 'FFrameMRResults.ReloadAndUpdate' in MAIN
     assert 'procedure TFrameMRResults.ReloadAndUpdate' in RESULTS
     assert 'if FRefreshing then Exit' in RESULTS
@@ -43,7 +43,7 @@ def test_selected_and_all_device_routes_are_explicit():
 
 def test_production_guards_and_protocol_outcomes_exist():
     implementation_uses = PROCEED.split('implementation', 1)[1].split('{$R *.fmx}', 1)[0]
-    assert 'uMeasurementRun' in implementation_uses
+    assert 'uMeasurementRun' not in implementation_uses
     assert 'CanManageResultSessions' in PROCEED
     assert 'Stage in [msNone, msDone]' in PROCEED
     for event in ('ResultsSessionClearRequested', 'ResultsSessionClearCompleted', 'ResultsSessionClearFailed',
@@ -60,15 +60,15 @@ def test_clear_uses_active_session_points_route_not_session_deletion():
 
 def test_devices_sheet_has_error_columns_and_percent_scale():
     for field in ('ResultError: Double', 'ResultErrorSet: Boolean', 'PointErrorsText: string'):
-        assert field in EXPORTER
-    assert 'SHeaderDeviceError' in EXPORTER and 'SHeaderPointErrors' in EXPORTER
-    assert 'PercentPointsToExcelFraction(D.ResultError)' in EXPORTER
-    assert 'D.PointErrorsText,xsWrapped' in EXPORTER
+        assert field not in EXPORTER
+    assert 'SHeaderDeviceError' not in EXPORTER and 'SHeaderPointErrors' not in EXPORTER
+    assert 'PointColumns: TObjectList<TResultsExportPointColumn>' in EXPORTER
+    assert 'PercentPointsToExcelFraction(Cell.Error)' in EXPORTER
     assert 'wrapText="1"' in OPENXML
 
 def test_point_error_snapshot_uses_active_session_matcher_and_format():
     assert 'for Spill in Session.Spillages' in RESULTS
     assert 'Dev.FindMatchedDevicePointForSpillage(Spill)' in RESULTS
-    assert "FormatFloat('0.###', Spill.Error)" in RESULTS
-    assert "FormatFloat('0.###', DevicePoint.Error)" in RESULTS
-    assert "PointText := PointText + ' / ±'" in RESULTS
+    assert 'Cell.Error := Spill.Error' in RESULTS
+    assert 'Cell.PointColumnKey := PointColumn.Key' in RESULTS
+    assert "PointText := PointText + ' / ±'" not in RESULTS

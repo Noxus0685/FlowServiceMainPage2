@@ -16,7 +16,7 @@ def test_proceed_has_no_concrete_measurement_run_dependency_or_cast():
                   'function TFrameProceed.RequestClearActiveSession')
     assert 'uMeasurementRun' not in implementation_uses
     assert 'TMeasurementRun(' not in method
-    assert 'FActiveWorkTable.MeasurementRunStage in [msNone, msDone]' in method
+    assert 'FActiveWorkTable.MeasurementRun.Stage in [msNone, msDone]' in method
 
 def test_protocol_shutdown_guards_and_message_ownership():
     source = text('uProtocols.pas')
@@ -57,5 +57,5 @@ def test_results_columns_are_rebuilt_only_from_enabled_current_points():
     assert 'MeasurementRun.Points[I].Enabled' in build
     assert 'MeasurementRun.Points = nil' in has and '.Enabled' in has
 
-def test_version_is_1_0_60():
-    assert "APP_VERSION = '1.0.60'" in text('uAppVersion.pas')
+def test_version_is_1_0_62():
+    assert "APP_VERSION = '1.0.62'" in text('uAppVersion.pas')
