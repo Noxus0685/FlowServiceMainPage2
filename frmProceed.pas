@@ -1997,23 +1997,23 @@ begin
     'Недостаточно данных для оценки.';
   if (ADevice = nil) or (ADevice.Points = nil) then Exit;
   SummaryStatus := ResolveDeviceSummaryStatus(ADevice);
-  if SummaryStatus = TPointSpillage.SPS_OK then
+  if SummaryStatus = 5 then
   begin
     for DevicePoint in ADevice.Points do
     begin
       Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
-      if (Spillage <> nil) and (Spillage.Status = TPointSpillage.SPS_OK) then
+      if (Spillage <> nil) and (Spillage.Validation = vsValid) then
         Exit(GetSpillageResultHint(ADevice, Spillage));
     end;
     Exit;
   end;
-  if SummaryStatus <> TPointSpillage.SPS_ERROR_EXCEEDED then
+  if SummaryStatus <> 4 then
   begin
     for DevicePoint in ADevice.Points do
     begin
       Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
       if (Spillage <> nil) and
-         (Spillage.Status = TPointSpillage.SPS_STOP_CRITERIA_FAILED) then
+         (Spillage.ValidationReason = svrStopCriteriaFailed) then
         Exit(GetSpillageResultHint(ADevice, Spillage));
     end;
     Exit;
@@ -2022,7 +2022,7 @@ begin
   begin
     Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
     if (Spillage <> nil) and
-       (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
+       (Spillage.Validation = vsInvalid) then
       Exit(GetSpillageResultHint(ADevice, Spillage));
   end;
 end;
@@ -2077,9 +2077,9 @@ begin
       if Spillage = nil then
         Continue;
       Inc(FoundPointsCount);
-      if Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED then
+      if Spillage.Validation = vsInvalid then
         Inc(InvalidCount);
-      if Spillage.Status = TPointSpillage.SPS_STOP_CRITERIA_FAILED then
+      if Spillage.ValidationReason = svrStopCriteriaFailed then
         Inc(ConditionFailedCount);
     end;
   end;
@@ -4422,14 +4422,7 @@ begin
       Value := FloatToStr(P.Error);
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageValid then
-  begin
-    case P.Status of
-      TPointSpillage.SPS_OK: Value := 'Годен';
-      TPointSpillage.SPS_ERROR_EXCEEDED: Value := 'Не годен';
-    else
-      Value := #$2014;
-    end;
-  end
+    Value := P.GetShortStateText
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQStd then
     Value := FloatToStr(P.QStd)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQCV then

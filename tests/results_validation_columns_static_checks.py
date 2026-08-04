@@ -37,6 +37,20 @@ def test_validity_hint_uses_shared_full_state_text():
     assert "AppendHintLine" not in hint
 
 
+def test_proceed_uses_current_validation_model():
+    device_hint = body("function TFrameProceed.GetDeviceResultHint")
+    summary = body("function TFrameProceed.ResolveDeviceSummaryStatus")
+    get_value = body("procedure TFrameProceed.GridDataPointsGetValue")
+
+    assert "SPS_" not in PAS
+    assert "Spillage.Validation = vsValid" in device_hint
+    assert "Spillage.Validation = vsInvalid" in device_hint
+    assert "Spillage.ValidationReason = svrStopCriteriaFailed" in device_hint
+    assert "Spillage.Validation = vsInvalid" in summary
+    assert "Spillage.ValidationReason = svrStopCriteriaFailed" in summary
+    assert "Value := P.GetShortStateText" in get_value
+
+
 def test_measurement_grid_keeps_hints_enabled_and_targets_validity_column():
     mouse_move = body("procedure TFrameProceed.GridDataPointsMouseMove")
 
