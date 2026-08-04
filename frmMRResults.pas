@@ -15,6 +15,8 @@ uses
   FMX.Types,
   System.Classes,
   System.Generics.Collections,
+  System.DateUtils,
+  System.IOUtils,
   System.Math,
   System.Rtti,
   System.SysUtils,
@@ -26,10 +28,27 @@ uses
   uDeviceClass,
   uMeasurementRun,
   uObservable,
+  uResultsXlsxExporter,
   uWorkTable;
 
 type
-  TMRResultCellState = (csEmpty, csPending, csRunning, csDoneValid, csDoneInvalid, csDoneWarning);
+  TMRResultCellState = (csEmpty, csPending, csRunning, csDone);
+
+  TDisplayPointParticipant = record
+    DeviceUUID: string;
+    DeviceChannelUUID: string;
+    SourcePointUUID: string;
+    DevicePoint: TDevicePoint;
+  end;
+
+  TDisplayPointGroup = class
+  public
+    ScenarioPoint: TDevicePoint;
+    Participants: TList<TDisplayPointParticipant>;
+    Header: string;
+    constructor Create;
+    destructor Destroy; override;
+  end;
 
   TFrameMRResults = class(TFrame, IEventObserver)
     GridMRResults: TGrid;
@@ -43,14 +62,24 @@ type
     SpeedButton13: TSpeedButton;
     SpeedButton14: TSpeedButton;
     SpeedButtonCreatePoints: TSpeedButton;
+    ButtonClearSession: TSpeedButton;
+    ButtonCreateSession: TSpeedButton;
+    ButtonExportExcel: TButton;
     procedure GridMRResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridMRResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas; const Column: TColumn;
       const Bounds: TRectF; const Row: Integer; const Value: TValue; const State: TGridDrawStates);
     procedure SpeedButtonCreatePointsClick(Sender: TObject);
+    procedure ButtonClearSessionClick(Sender: TObject);
+    procedure ButtonCreateSessionClick(Sender: TObject);
+    procedure ButtonExportExcelClick(Sender: TObject);
+    procedure GridMRResultsSelChanged(Sender: TObject);
   private
     FActiveWorkTable: TWorkTable;
     FPointColumns: TObjectList<TStringColumn>;
+    FDisplayPoints: TObjectList<TDisplayPointGroup>;
     FRows: TList<TChannel>;
+    FProceed: TObject;
+    FRefreshing: Boolean;
 
     function GetMeasurementRun: TMeasurementRun;
     procedure SetActiveWorkTable(const Value: TWorkTable);
@@ -58,30 +87,39 @@ type
     procedure DetachMeasurementRun;
 
     procedure BuildColumns;
+    function HasCurrentMeasurementPoints: Boolean;
     procedure BuildRows;
     procedure RefreshRows;
+    function PointBelongsToDisplayGroup(ADevice: TDevice; APoint: TDevicePoint;
+      AGroup: TDisplayPointGroup): Boolean;
+    procedure AddScenarioDisplayPoint(APoint: TDevicePoint);
+    procedure AddStandaloneDisplayPoint(ADevice: TDevice; APoint: TDevicePoint);
+    procedure MakeDisplayHeadersUnique;
 
     function GetRowChannel(const ARow: Integer): TChannel;
     function GetDisplayDeviceName(AChannel: TChannel): string;
 
-    function GetPointByColumn(const ACol: Integer): TDevicePoint;
-    function FindDevicePoint(ADevice: TDevice; ASessionPoint: TDevicePoint): TDevicePoint;
-    function FindPointSpillage(ADevice: TDevice; ASessionPoint: TDevicePoint): TPointSpillage;
+    function GetDisplayPointByColumn(const ACol: Integer): TDisplayPointGroup;
+    function FindDevicePoint(ADevice: TDevice; AGroup: TDisplayPointGroup): TDevicePoint;
+    function FindPointSpillage(ADevice: TDevice; ADevicePoint: TDevicePoint): TPointSpillage;
 
     function FormatPointHeader(APoint: TDevicePoint): string;
     function FormatErrorValue(const AValue: Double): string;
+    function FormatActualErrorValue(const AValue: Double): string;
     function FormatSpillageErrors(ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): string;
-    function BuildErrorsListText(ADevice: TDevice; ASessionPoint: TDevicePoint;
+    function BuildErrorsListText(ADevice: TDevice; ADevicePoint: TDevicePoint;
       const ACurrentError: Double; const AIncludeCurrent: Boolean): string;
 
-    function IsCellRunning(AChannel: TChannel; ASessionPoint: TDevicePoint): Boolean;
-    function GetCellState(AChannel: TChannel; ASessionPoint: TDevicePoint; out ADevicePoint: TDevicePoint;
+    function IsCellRunning(AChannel: TChannel; AGroup: TDisplayPointGroup): Boolean;
+    function GetCellState(AChannel: TChannel; AGroup: TDisplayPointGroup; out ADevicePoint: TDevicePoint;
       out ASpillage: TPointSpillage): TMRResultCellState;
-    function GetCellText(AChannel: TChannel; ASessionPoint: TDevicePoint): string;
-    function GetCellColor(AChannel: TChannel; ASessionPoint: TDevicePoint): TAlphaColor;
+    function GetCellText(AChannel: TChannel; AGroup: TDisplayPointGroup): string;
+    function GetCellColor(AChannel: TChannel; AGroup: TDisplayPointGroup): TAlphaColor;
 
     function GetResultText(AChannel: TChannel): string;
     function GetResultColor(AChannel: TChannel): TAlphaColor;
+    function HasExportableResults: Boolean;
+    function BuildExportData(ASelected: TChannel): TResultsExportData;
 
   public
     constructor Create(AOwner: TComponent); override;
@@ -89,16 +127,59 @@ type
 
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
     procedure UpdateUI;
+    procedure ConnectProcessingFrame(AProceed: TObject);
+    procedure ReloadAndUpdate;
 
     property MeasurementRun: TMeasurementRun read GetMeasurementRun;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
   end;
 
 procedure SetGridReadOnly(AGrid: TGrid);
+function MeasurementModeToDisplayText(const AMode: EMeasurementRunMode): string;
+function SessionStatusToDisplayText(const AStatus: Integer): string;
 
 implementation
 
+uses
+  frmProceed, uDebugLog;
+
 {$R *.fmx}
+
+{ Converts the production measurement mode to its user-facing snapshot text. }
+function MeasurementModeToDisplayText(const AMode: EMeasurementRunMode): string;
+begin
+  case AMode of
+    mrmManual: Result := 'Ручной';
+    mrmHalfAutomatic: Result := 'Полуавтоматический';
+    mrmAutomatic: Result := 'Автоматический';
+  else
+    Result := 'Не определён';
+  end;
+end;
+
+{ Session.Status is the persisted lifecycle code: new, running, or closed. }
+function SessionStatusToDisplayText(const AStatus: Integer): string;
+begin
+  case AStatus of
+    0: Result := 'Открыта';
+    1: Result := 'Выполняется';
+    2: Result := 'Завершена';
+  else
+    Result := 'Не определён';
+  end;
+end;
+
+constructor TDisplayPointGroup.Create;
+begin
+  inherited Create;
+  Participants := TList<TDisplayPointParticipant>.Create;
+end;
+
+destructor TDisplayPointGroup.Destroy;
+begin
+  Participants.Free;
+  inherited;
+end;
 
 procedure SetGridReadOnly(AGrid: TGrid);
 var
@@ -117,11 +198,13 @@ constructor TFrameMRResults.Create(AOwner: TComponent);
 begin
   inherited;
   FPointColumns := TObjectList<TStringColumn>.Create(False);
+  FDisplayPoints := TObjectList<TDisplayPointGroup>.Create(True);
   FRows := TList<TChannel>.Create;
 
   GridMRResults.OnGetValue := GridMRResultsGetValue;
   GridMRResults.OnDrawColumnCell := GridMRResultsDrawColumnCell;
   GridMRResults.OnSetValue := nil;
+  GridMRResults.OnSelChanged := GridMRResultsSelChanged;
   SetGridReadOnly(GridMRResults);
 end;
 
@@ -129,6 +212,7 @@ destructor TFrameMRResults.Destroy;
 begin
  // DetachMeasurementRun;
   FreeAndNil(FRows);
+  FreeAndNil(FDisplayPoints);
   FreeAndNil(FPointColumns);
   inherited;
 end;
@@ -175,6 +259,284 @@ begin
   UpdateUI;
 end;
 
+procedure TFrameMRResults.ConnectProcessingFrame(AProceed: TObject);
+begin
+  FProceed := AProceed;
+end;
+
+procedure TFrameMRResults.ButtonClearSessionClick(Sender: TObject);
+var
+  Channel: TChannel;
+  Device: TDevice;
+  Scope: string;
+begin
+  Channel := GetRowChannel(GridMRResults.Row);
+  if not (FProceed is TFrameProceed) then
+  begin
+    DebugLog('ResultsSessionClearFailed Scope=Unknown Error=ProcessingFrameNotConnected');
+    ShowMessage('Вкладка «Обработка» недоступна. Очистить сессию невозможно.');
+    Exit;
+  end;
+  if (Channel <> nil) and (Channel.FlowMeter <> nil) and
+     (Channel.FlowMeter.Device <> nil) then
+  begin
+    Scope := 'SelectedDevice';
+    Device := Channel.FlowMeter.Device;
+    if TFrameProceed(FProceed).RequestClearActiveSession(Device) then ReloadAndUpdate;
+  end
+  else
+  begin
+    Scope := 'AllDevices';
+    if TFrameProceed(FProceed).RequestClearActiveSessions then ReloadAndUpdate;
+  end;
+  DebugLog('ResultsSessionClearDispatch Scope=' + Scope);
+end;
+
+procedure TFrameMRResults.ButtonCreateSessionClick(Sender: TObject);
+var
+  Channel: TChannel;
+  Device: TDevice;
+  Scope: string;
+begin
+  Channel := GetRowChannel(GridMRResults.Row);
+  if not (FProceed is TFrameProceed) then
+  begin
+    DebugLog('ResultsSessionCreateFailed Scope=Unknown Error=ProcessingFrameNotConnected');
+    ShowMessage('Вкладка «Обработка» недоступна. Создать сессию невозможно.');
+    Exit;
+  end;
+  if (Channel <> nil) and (Channel.FlowMeter <> nil) and
+     (Channel.FlowMeter.Device <> nil) then
+  begin
+    Scope := 'SelectedDevice'; Device := Channel.FlowMeter.Device;
+    if TFrameProceed(FProceed).RequestCreateSession(Device) <> nil then ReloadAndUpdate;
+  end
+  else
+  begin
+    Scope := 'AllDevices';
+    if TFrameProceed(FProceed).RequestCreateSessions then ReloadAndUpdate;
+  end;
+  DebugLog('ResultsSessionCreateDispatch Scope=' + Scope);
+end;
+
+function TFrameMRResults.HasExportableResults: Boolean;
+var Ch: TChannel; Dev: TDevice; Session: TSessionSpillage;
+begin
+  Result := False;
+  for Ch in FRows do
+    if (Ch <> nil) and (Ch.FlowMeter <> nil) then begin
+      Dev := Ch.FlowMeter.Device;
+      if Dev <> nil then begin
+        Session := Dev.GetActiveSessionSpillage;
+        if (Session <> nil) and (Session.Spillages.Count > 0) then Exit(True);
+      end;
+    end;
+end;
+
+function TFrameMRResults.BuildExportData(ASelected: TChannel): TResultsExportData;
+var Ch: TChannel; Dev: TDevice; Session: TSessionSpillage; Spill: TPointSpillage;
+  ES: TResultsExportSession; ED: TResultsExportDevice; ER: TResultsExportResult;
+  DevicePoint, ScenarioPoint: TDevicePoint;
+  PointColumn: TResultsExportPointColumn;
+  Participant: TResultsExportPointParticipant;
+  Cell: TResultsExportPointCell;
+  I, J, DuplicateCount: Integer;
+  HeaderExists: Boolean;
+  BaseHeader, CandidateHeader, Key: string;
+
+begin
+  Result := TResultsExportData.Create;
+  try
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
+  begin
+    Result.FlowDimensionIndex := FActiveWorkTable.ValueFlowRate.CurrentDimIndex;
+    Result.FlowUnitName := FActiveWorkTable.ValueFlowRate.GetDimName;
+  end;
+
+  { Prefer the current run schema. Its participants preserve merged-point identity. }
+  if HasCurrentMeasurementPoints then
+    for I := 0 to MeasurementRun.Points.Count - 1 do
+    begin
+      ScenarioPoint := MeasurementRun.Points[I];
+      if (ScenarioPoint = nil) or not ScenarioPoint.Enabled then Continue;
+      PointColumn := TResultsExportPointColumn.Create;
+      if Length(ScenarioPoint.Participants) > 1 then
+        PointColumn.Key := ScenarioPoint.UUID
+      else if Length(ScenarioPoint.Participants) = 1 then
+        PointColumn.Key := ScenarioPoint.Participants[0].DeviceUUID + '|' +
+          ScenarioPoint.Participants[0].SourcePointUUID
+      else
+        PointColumn.Key := ScenarioPoint.UUID;
+      PointColumn.Header := Trim(ScenarioPoint.Name);
+      if PointColumn.Header = '' then PointColumn.Header := FormatPointHeader(ScenarioPoint);
+      for J := 0 to High(ScenarioPoint.Participants) do
+      begin
+        Participant.DeviceUUID := ScenarioPoint.Participants[J].DeviceUUID;
+        Participant.SourcePointUUID := ScenarioPoint.Participants[J].SourcePointUUID;
+        PointColumn.Participants.Add(Participant);
+      end;
+      Result.PointColumns.Add(PointColumn);
+    end;
+
+  for Ch in FRows do begin
+    if (ASelected <> nil) and (Ch <> ASelected) then Continue;
+    if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then Continue;
+    Dev := Ch.FlowMeter.Device; Session := Dev.GetActiveSessionSpillage;
+    ED := Default(TResultsExportDevice); ED.Name:=Dev.Name; ED.SerialNumber:=Dev.SerialNumber;
+    ED.UUID:=Dev.UUID; ED.Channel:=Ch.Name; ED.DeviceType:=Dev.DeviceTypeName;
+    ED.Status:=GetResultText(Ch); if Session<>nil then ED.SessionID:=IntToStr(Session.ID);
+    Result.Devices.Add(ED);
+    if Session=nil then Continue;
+    ES := Default(TResultsExportSession); ES.ID:=IntToStr(Session.ID); ES.OpenedAt:=Session.DateTimeOpen;
+    ES.WorkTable:=FActiveWorkTable.Name;
+    ES.Mode:=MeasurementModeToDisplayText(FActiveWorkTable.MeasurementMode);
+    ES.Status:=SessionStatusToDisplayText(Session.Status); Result.Sessions.Add(ES);
+    for Spill in Session.Spillages do begin
+      if (Spill=nil) or (Spill.State=osDeleted) then Continue;
+      DevicePoint := Dev.FindMatchedDevicePointForSpillage(Spill);
+      PointColumn := nil;
+      if DevicePoint <> nil then
+        for I := 0 to Result.PointColumns.Count - 1 do
+          for J := 0 to Result.PointColumns[I].Participants.Count - 1 do
+            if SameText(Result.PointColumns[I].Participants[J].DeviceUUID, Dev.UUID) and
+               SameText(Result.PointColumns[I].Participants[J].SourcePointUUID, DevicePoint.UUID) then
+            begin
+              PointColumn := Result.PointColumns[I];
+              Break;
+            end;
+      { After restart the run schema may be unavailable. Build only from this active session. }
+      if (PointColumn = nil) and not HasCurrentMeasurementPoints and (DevicePoint <> nil) then
+      begin
+        Key := Dev.UUID + '|' + DevicePoint.UUID;
+        for I := 0 to Result.PointColumns.Count - 1 do
+          if SameText(Result.PointColumns[I].Key, Key) then PointColumn := Result.PointColumns[I];
+        if PointColumn = nil then
+        begin
+          PointColumn := TResultsExportPointColumn.Create;
+          PointColumn.Key := Key;
+          PointColumn.Header := Trim(DevicePoint.Name);
+          if PointColumn.Header = '' then PointColumn.Header := Trim(Spill.Name);
+          Participant.DeviceUUID := Dev.UUID;
+          Participant.SourcePointUUID := DevicePoint.UUID;
+          PointColumn.Participants.Add(Participant);
+          Result.PointColumns.Add(PointColumn);
+        end;
+      end;
+      if PointColumn <> nil then
+      begin
+        Cell := Default(TResultsExportPointCell);
+        Cell.DeviceUUID := Dev.UUID;
+        Cell.PointColumnKey := PointColumn.Key;
+        Cell.Error := Spill.Error;
+        Cell.ErrorSet := not IsNan(Spill.Error) and not IsInfinite(Spill.Error);
+        Result.PointCells.Add(Cell);
+      end;
+      ER := Default(TResultsExportResult); ER.DeviceName:=Dev.Name; ER.SerialNumber:=Dev.SerialNumber;
+      ER.DeviceUUID:=Dev.UUID; ER.SessionID:=IntToStr(Session.ID); ER.PointName:=Spill.Name;
+      { QavgEtalon and DeviceVolumeFlow are stored in the base flow unit (l/s).
+        Prepare display-unit numbers here; the generic XLSX writer must not convert them. }
+      if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
+        ER.ReferenceFlow := FActiveWorkTable.ValueFlowRate.GetDoubleNum(
+          Spill.QavgEtalon, Result.FlowDimensionIndex)
+      else
+        ER.ReferenceFlow := Spill.QavgEtalon;
+      ER.EtalonName:=Spill.EtalonName; ER.EtalonUUID:=Spill.EtalonUUID;
+      if TMeasuredDimension(Dev.MeasuredDimension) = mdVolumeFlow then
+      begin
+        if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
+          ER.DeviceValue := FActiveWorkTable.ValueFlowRate.GetDoubleNum(
+            Spill.DeviceVolumeFlow, Result.FlowDimensionIndex)
+        else
+          ER.DeviceValue := Spill.DeviceVolumeFlow;
+        ER.DeviceUnitName := Result.FlowUnitName;
+      end
+      else
+      begin
+        case TMeasuredDimension(Dev.MeasuredDimension) of
+          mdMassFlow: ER.DeviceValue := Dev.FromBaseUnits(Spill.DeviceMassFlow);
+          mdVolume: ER.DeviceValue := Dev.FromBaseUnits(Spill.DeviceVolume);
+          mdMass: ER.DeviceValue := Dev.FromBaseUnits(Spill.DeviceMass);
+          mdSpeed: ER.DeviceValue := Dev.FromBaseUnits(Spill.Velocity);
+        else
+          ER.DeviceValue := Dev.FromBaseUnits(Spill.DeviceVolumeFlow);
+        end;
+        ER.DeviceUnitName := Dev.GetDimensionName;
+      end;
+      ER.Error:=Spill.Error; ER.Status:=Spill.StatusStr;
+      if (DevicePoint <> nil) and (not IsNan(DevicePoint.Error)) and
+         (not IsInfinite(DevicePoint.Error)) and (DevicePoint.Error > 0) then
+      begin
+        ER.PointAllowedError := DevicePoint.Error;
+        ER.PointAllowedErrorSet := True;
+      end;
+      ER.Valid:=Spill.Valid; ER.MeasuredAt:=Spill.DateTime; Result.Results.Add(ER);
+    end;
+  end;
+  { Headers are presentation labels only; stable keys remain unchanged. }
+  for I := 0 to Result.PointColumns.Count - 1 do
+  begin
+    BaseHeader := Result.PointColumns[I].Header;
+    DuplicateCount := 1;
+    CandidateHeader := BaseHeader;
+    repeat
+      HeaderExists := False;
+      for J := 0 to I - 1 do
+        if SameText(Result.PointColumns[J].Header, CandidateHeader) then
+        begin
+          HeaderExists := True;
+          Break;
+        end;
+      if not HeaderExists then Break;
+      Inc(DuplicateCount);
+      CandidateHeader := Format('%s (%d)', [BaseHeader, DuplicateCount]);
+    until False;
+    Result.PointColumns[I].Header := CandidateHeader;
+  end;
+  finally
+    if Result.Sessions.Count > 0 then
+      DebugLog(Format('ResultsXlsxSnapshot PointColumns=%d SessionModeText=%s SessionStatusText=%s',
+        [Result.PointColumns.Count, Result.Sessions[0].Mode, Result.Sessions[0].Status]))
+    else
+      DebugLog(Format('ResultsXlsxSnapshot PointColumns=%d SessionModeText= SessionStatusText=',
+        [Result.PointColumns.Count]));
+  end;
+end;
+
+{ Exports the selected device, or every device when no result row is selected. }
+procedure TFrameMRResults.ButtonExportExcelClick(Sender: TObject);
+var Data: TResultsExportData; Selected: TChannel; Scope, Sessions, FileName: string;
+  Dialog: TSaveDialog;
+  Started: TDateTime; I: Integer;
+begin
+  Selected := GetRowChannel(GridMRResults.Row);
+  if Selected=nil then Scope:='AllDevices' else Scope:='SelectedDevice';
+  { Keep the nonvisual dialog out of the FMX resource to avoid RLINK32 serialization errors. }
+  Dialog := TSaveDialog.Create(Self);
+  try
+    Dialog.DefaultExt := 'xlsx';
+    Dialog.Filter := 'Excel Workbook (*.xlsx)|*.xlsx';
+    Dialog.FileName := Format('Results_%s.xlsx',
+      [FormatDateTime('yyyymmdd_hhnnss', Now)]);
+    if not Dialog.Execute then
+      Exit;
+    FileName := Dialog.FileName;
+  finally
+    Dialog.Free;
+  end;
+  Started:=Now; Data:=BuildExportData(Selected);
+  try
+    Sessions:=''; for I:=0 to Data.Sessions.Count-1 do begin if Sessions<>'' then Sessions:=Sessions+','; Sessions:=Sessions+Data.Sessions[I].ID; end;
+    DebugLog(Format('ResultsXlsxExportRequested Scope=%s File=%s SessionIDs=%s Devices=%d Results=%d',[Scope,FileName,Sessions,Data.Devices.Count,Data.Results.Count]));
+    try
+      TResultsXlsxExporter.ExportToFile(Data,FileName);
+      DebugLog(Format('ResultsXlsxExportCompleted Scope=%s File=%s SessionIDs=%s FlowUnit=%s FlowDimensionIndex=%d Devices=%d Results=%d Size=%d DurationMs=%d',[Scope,FileName,Sessions,Data.FlowUnitName,Data.FlowDimensionIndex,Data.Devices.Count,Data.Results.Count,TFile.GetSize(FileName),MilliSecondsBetween(Now,Started)]));
+    except on E:Exception do begin
+      DebugLog(Format('ResultsXlsxExportFailed Scope=%s File=%s SessionIDs=%s Devices=%d Results=%d DurationMs=%d Error=%s',[Scope,FileName,Sessions,Data.Devices.Count,Data.Results.Count,MilliSecondsBetween(Now,Started),E.Message]));
+      ShowMessage(Format('Не удалось сохранить файл "%s".'+#13#10+'%s',[ExpandFileName(FileName),E.Message]));
+    end; end;
+  finally Data.Free; end;
+end;
+
 procedure TFrameMRResults.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
 begin
   if Sender is TMeasurementRun then
@@ -187,6 +549,35 @@ begin
   BuildRows;
   RefreshRows;
   GridMRResults.Repaint;
+  ButtonExportExcel.Enabled := (FRows.Count > 0) and HasExportableResults;
+  ButtonClearSession.Enabled := (FProceed is TFrameProceed) and
+    TFrameProceed(FProceed).CanManageResultSessions;
+  ButtonCreateSession.Enabled := ButtonClearSession.Enabled;
+end;
+
+{ Called when the tab opens and after session operations so the UI never
+  depends on stale local session data. }
+procedure TFrameMRResults.ReloadAndUpdate;
+begin
+  if FRefreshing then Exit;
+  FRefreshing := True;
+  try
+    if FProceed is TFrameProceed then TFrameProceed(FProceed).RefreshResultsTab;
+    BuildRows;
+    BuildColumns;
+    RefreshRows;
+    UpdateUI;
+    GridMRResults.Repaint;
+  finally
+    FRefreshing := False;
+  end;
+end;
+
+procedure TFrameMRResults.GridMRResultsSelChanged(Sender: TObject);
+begin
+  ButtonClearSession.Enabled := (FProceed is TFrameProceed) and
+    TFrameProceed(FProceed).CanManageResultSessions;
+  ButtonCreateSession.Enabled := ButtonClearSession.Enabled;
 end;
 
 procedure TFrameMRResults.BuildRows;
@@ -206,9 +597,10 @@ procedure TFrameMRResults.BuildColumns;
 var
   I: Integer;
   Col: TStringColumn;
-  SessionPoint: TDevicePoint;
+  Group: TDisplayPointGroup;
 begin
   FPointColumns.Clear;
+  FDisplayPoints.Clear;
 
   GridMRResults.BeginUpdate;
   try
@@ -219,28 +611,152 @@ begin
         Break;
 
     StringColumnName.Index := 0;
+    StringColumnResult.Index := GridMRResults.ColumnCount - 1;
+    if not HasCurrentMeasurementPoints then Exit;
 
-    if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) then
-      for I := 0 to MeasurementRun.Points.Count - 1 do
-      begin
-        SessionPoint := MeasurementRun.Points[I];
-
-        Col := TStringColumn.Create(GridMRResults);
-        Col.Parent := GridMRResults;
-        Col.HeaderSettings.TextSettings.WordWrap := False;
-        Col.Stored := False;
-        Col.Width := 130;
-        Col.Header := FormatPointHeader(SessionPoint);
-        Col.Index := GridMRResults.ColumnCount - 1;
-
-        FPointColumns.Add(Col);
-      end;
-
+    for I := 0 to MeasurementRun.Points.Count - 1 do
+      if (MeasurementRun.Points[I] <> nil) and MeasurementRun.Points[I].Enabled then
+        AddScenarioDisplayPoint(MeasurementRun.Points[I]);
+    MakeDisplayHeadersUnique;
+    for Group in FDisplayPoints do
+    begin
+      Col := TStringColumn.Create(GridMRResults);
+      Col.Parent := GridMRResults;
+      Col.HeaderSettings.TextSettings.WordWrap := False;
+      Col.Stored := False;
+      Col.Width := 130;
+      Col.Header := Group.Header;
+      Col.Index := GridMRResults.ColumnCount - 1;
+      FPointColumns.Add(Col);
+    end;
     StringColumnResult.Index := GridMRResults.ColumnCount - 1;
   finally
     GridMRResults.EndUpdate;
   end;
   SetGridReadOnly(GridMRResults);
+end;
+
+function TFrameMRResults.HasCurrentMeasurementPoints: Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  if (MeasurementRun = nil) or (MeasurementRun.Points = nil) then Exit;
+  for I := 0 to MeasurementRun.Points.Count - 1 do
+    if (MeasurementRun.Points[I] <> nil) and MeasurementRun.Points[I].Enabled then
+      Exit(True);
+end;
+
+function TFrameMRResults.PointBelongsToDisplayGroup(ADevice: TDevice;
+  APoint: TDevicePoint; AGroup: TDisplayPointGroup): Boolean;
+var
+  Participant: TDisplayPointParticipant;
+begin
+  Result := False;
+  if (ADevice = nil) or (APoint = nil) or (AGroup = nil) then
+    Exit;
+
+  for Participant in AGroup.Participants do
+  begin
+    if (Participant.DevicePoint = APoint) or
+       ((Trim(Participant.DeviceUUID) <> '') and
+        SameText(Participant.DeviceUUID, ADevice.UUID) and
+        (Trim(Participant.SourcePointUUID) <> '') and
+        SameText(Participant.SourcePointUUID, APoint.UUID)) then
+      Exit(True);
+  end;
+
+  if (AGroup.Participants.Count = 0) and (AGroup.ScenarioPoint <> nil) then
+    Result := TMeasurementRun.IsPointEquivalent(APoint, AGroup.ScenarioPoint);
+end;
+
+procedure TFrameMRResults.AddScenarioDisplayPoint(APoint: TDevicePoint);
+var
+  Group: TDisplayPointGroup;
+  Item: TDisplayPointParticipant;
+  I: Integer;
+begin
+  if APoint = nil then
+    Exit;
+  Group := TDisplayPointGroup.Create;
+  Group.ScenarioPoint := APoint;
+  Group.Header := FormatPointHeader(APoint);
+  for I := 0 to High(APoint.Participants) do
+  begin
+    Item.DeviceUUID := APoint.Participants[I].DeviceUUID;
+    Item.DeviceChannelUUID := APoint.Participants[I].DeviceChannelUUID;
+    Item.SourcePointUUID := APoint.Participants[I].SourcePointUUID;
+    Item.DevicePoint := nil;
+    Group.Participants.Add(Item);
+  end;
+  FDisplayPoints.Add(Group);
+end;
+
+procedure TFrameMRResults.AddStandaloneDisplayPoint(ADevice: TDevice;
+  APoint: TDevicePoint);
+var
+  Group: TDisplayPointGroup;
+  Item: TDisplayPointParticipant;
+begin
+  for Group in FDisplayPoints do
+    if PointBelongsToDisplayGroup(ADevice, APoint, Group) then
+      Exit;
+
+  Group := TDisplayPointGroup.Create;
+  Group.ScenarioPoint := nil;
+  Group.Header := FormatPointHeader(APoint);
+  Item.DeviceUUID := ADevice.UUID;
+  Item.DeviceChannelUUID := '';
+  Item.SourcePointUUID := APoint.UUID;
+  Item.DevicePoint := APoint;
+  Group.Participants.Add(Item);
+  FDisplayPoints.Add(Group);
+end;
+
+procedure TFrameMRResults.MakeDisplayHeadersUnique;
+var
+  I, J: Integer;
+  DevicePoint: TDevicePoint;
+  Device: TDevice;
+  Ch: TChannel;
+  Suffix: string;
+begin
+  for I := 0 to FDisplayPoints.Count - 1 do
+    for J := 0 to I - 1 do
+      if SameText(FDisplayPoints[I].Header, FDisplayPoints[J].Header) then
+      begin
+        Device := nil;
+        DevicePoint := nil;
+        if FDisplayPoints[I].Participants.Count > 0 then
+          DevicePoint := FDisplayPoints[I].Participants[0].DevicePoint;
+        if (DevicePoint <> nil) and (FActiveWorkTable <> nil) and
+           (FActiveWorkTable.DeviceChannels <> nil) then
+          for Ch in FActiveWorkTable.DeviceChannels do
+            if (Ch <> nil) and (Ch.FlowMeter <> nil) and
+               (Ch.FlowMeter.Device <> nil) and
+               SameText(Ch.FlowMeter.Device.UUID,
+                 FDisplayPoints[I].Participants[0].DeviceUUID) then
+            begin
+              Device := Ch.FlowMeter.Device;
+              Break;
+            end;
+        Suffix := '';
+        if FDisplayPoints[I].ScenarioPoint <> nil then
+          Suffix := Copy(FDisplayPoints[I].ScenarioPoint.UUID, 1, 8)
+        else if FDisplayPoints[I].Participants.Count > 0 then
+          Suffix := FDisplayPoints[I].Participants[0].DeviceUUID;
+        if Device <> nil then
+          if Trim(Device.SerialNumber) <> '' then
+            Suffix := Device.SerialNumber
+          else
+            Suffix := Device.Name;
+        if (DevicePoint <> nil) and (Trim(DevicePoint.UUID) <> '') then
+          Suffix := Trim(Suffix + ' ' + Copy(DevicePoint.UUID, 1, 8));
+        if Suffix = '' then
+          Suffix := IntToStr(I + 1);
+        FDisplayPoints[I].Header := FDisplayPoints[I].Header + ' (' + Suffix + ')';
+        Break;
+      end;
 end;
 
 procedure TFrameMRResults.RefreshRows;
@@ -269,14 +785,22 @@ begin
 end;
 
 function TFrameMRResults.GetDisplayDeviceName(AChannel: TChannel): string;
+var
+  Device: TDevice;
 begin
   Result := '';
   if AChannel = nil then
     Exit;
 
-  if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) and
-     (AChannel.FlowMeter.Device.Name <> '') then
-    Exit(AChannel.FlowMeter.Device.Name);
+  if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) then
+  begin
+    Device := AChannel.FlowMeter.Device;
+    Result := Trim(Device.Name);
+    if Trim(Device.SerialNumber) <> '' then
+      Result := Trim(Result + ' ' + Trim(Device.SerialNumber));
+    if Result <> '' then
+      Exit;
+  end;
 
   if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.DeviceName <> '') then
     Exit(AChannel.FlowMeter.DeviceName);
@@ -284,63 +808,78 @@ begin
   Result := AChannel.Name;
 end;
 
-function TFrameMRResults.GetPointByColumn(const ACol: Integer): TDevicePoint;
+function TFrameMRResults.GetDisplayPointByColumn(
+  const ACol: Integer): TDisplayPointGroup;
 var
   Idx: Integer;
 begin
   Result := nil;
   Idx := ACol - 1;
-
-  if (MeasurementRun = nil) or (MeasurementRun.Points = nil) then
-    Exit;
-
-  if (Idx < 0) or (Idx >= MeasurementRun.Points.Count) then
-    Exit;
-
-  Result := MeasurementRun.Points[Idx];
+  if (Idx >= 0) and (Idx < FDisplayPoints.Count) then
+    Result := FDisplayPoints[Idx];
 end;
 
 function TFrameMRResults.FindDevicePoint(ADevice: TDevice;
-  ASessionPoint: TDevicePoint): TDevicePoint;
+  AGroup: TDisplayPointGroup): TDevicePoint;
 var
   P: TDevicePoint;
+  Participant: TDisplayPointParticipant;
+  HasLegacyParticipant: Boolean;
 begin
   Result := nil;
-  if (ADevice = nil) or (ADevice.Points = nil) or (ASessionPoint = nil) then
+  if (ADevice = nil) or (ADevice.Points = nil) or (AGroup = nil) then
     Exit;
 
-  for P in ADevice.Points do
-    if TMeasurementRun.IsPointEquivalent(P, ASessionPoint) then
-      Exit(P);
+  HasLegacyParticipant := AGroup.Participants.Count = 0;
+  for Participant in AGroup.Participants do
+  begin
+    if (Trim(Participant.DeviceUUID) <> '') and
+       not SameText(Participant.DeviceUUID, ADevice.UUID) then
+      Continue;
+    if Participant.DevicePoint <> nil then
+      Exit(Participant.DevicePoint);
+    if Trim(Participant.SourcePointUUID) <> '' then
+      for P in ADevice.Points do
+        if SameText(P.UUID, Participant.SourcePointUUID) then
+          Exit(P)
+    else
+      HasLegacyParticipant := True;
+  end;
+
+  // Old persisted scenarios may lack participant UUIDs.  Equivalence is only
+  // allowed for a participant already assigned to this device/group.
+  if HasLegacyParticipant and (AGroup.ScenarioPoint <> nil) then
+    for P in ADevice.Points do
+      if TMeasurementRun.IsPointEquivalent(P, AGroup.ScenarioPoint) then
+        Exit(P);
 end;
 
 function TFrameMRResults.FindPointSpillage(ADevice: TDevice;
-  ASessionPoint: TDevicePoint): TPointSpillage;
+  ADevicePoint: TDevicePoint): TPointSpillage;
 var
   S: TPointSpillage;
   Session: TSessionSpillage;
-  Fallback: TPointSpillage;
+  MatchedPoint: TDevicePoint;
 begin
   Result := nil;
-  if (ADevice = nil) or (ADevice.Spillages = nil) or (ASessionPoint = nil) then
+  if (ADevice = nil) or (ADevice.Spillages = nil) or (ADevicePoint = nil) then
     Exit;
 
   Session := ADevice.GetActiveSessionSpillage;
-  Fallback := nil;
-
-  for S in ADevice.Spillages do
+  if Session = nil then
   begin
-    if not TMeasurementRun.IsPointEquivalent(ASessionPoint, S) then
-      Continue;
-
-    if (Session <> nil) and (S.SessionID = Session.ID) then
-      Exit(S);
-
-    if (Fallback = nil) or (S.DateTime > Fallback.DateTime) then
-      Fallback := S;
+    if FProceed is TFrameProceed then
+      Result := TFrameProceed(FProceed).FindResultSpillageForPoint(ADevice, ADevicePoint);
+    Exit;
   end;
 
-  Result := Fallback;
+  for S in ADevice.Spillages do
+    if (S <> nil) and (S.SessionID = Session.ID) then
+    begin
+      MatchedPoint := ADevice.FindMatchedDevicePointForSpillage(S);
+      if MatchedPoint = ADevicePoint then
+        Exit(S);
+    end;
 end;
 
 function TFrameMRResults.FormatPointHeader(APoint: TDevicePoint): string;
@@ -375,49 +914,69 @@ end;
 
 function TFrameMRResults.FormatErrorValue(const AValue: Double): string;
 begin
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) and
-     (FActiveWorkTable.TableFlow.ValueError <> nil) then
-    Exit(FActiveWorkTable.TableFlow.ValueError.GetStrNumLimits(AValue));
-  Result := FormatDeviceError(AValue) + '%';
+  if FProceed is TFrameProceed then
+    Exit(TFrameProceed(FProceed).FormatResultErrorValue(AValue));
+  Result := FormatDeviceError(AValue);
 end;
+
+function TFrameMRResults.FormatActualErrorValue(const AValue: Double): string;
+begin
+  // Processing renders saved result cells with this production precision.
+  // -MaxDouble is TMeterValue's marker for an unavailable numeric value.
+  if IsNan(AValue) or IsInfinite(AValue) or (AValue <= -MaxDouble) then
+    Exit('-');
+  Result := FormatFloat('0.###', AValue);
+end;
+
+function FormatMRActualErrorValue(const AValue: Double): string;
+begin
+  // Processing renders saved result cells with this production precision.
+  // -MaxDouble is TMeterValue's marker for an unavailable numeric value.
+  if IsNan(AValue) or IsInfinite(AValue) or (AValue <= -MaxDouble) then
+    Exit('-');
+  Result := FormatFloat('0.###', AValue);
+end;
+
+
 
 function TFrameMRResults.FormatSpillageErrors(ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): string;
 var
-  ErrValues: TArray<string>;
-  I: Integer;
+  DataPoint: TPointSpillage;
 begin
   Result := '';
   if ASpillage = nil then
     Exit;
 
-  SetLength(ErrValues, 0);
-
   if (ADevicePoint <> nil) and (ADevicePoint.ProtocolDataPoints <> nil) and (ADevicePoint.ProtocolDataPoints.Count > 0) then
   begin
-    SetLength(ErrValues, ADevicePoint.ProtocolDataPoints.Count);
-    for I := 0 to ADevicePoint.ProtocolDataPoints.Count - 1 do
-      ErrValues[I] := FormatErrorValue(ADevicePoint.ProtocolDataPoints[I].Error);
+    if ADevicePoint.ProtocolDataPoints.Count = 1 then
+      Exit(FormatMRActualErrorValue(ADevicePoint.ProtocolDataPoints[0].Error));
+
+    Result := '[';
+    for DataPoint in ADevicePoint.ProtocolDataPoints do
+    begin
+      if Result <> '[' then
+        Result := Result + '; ';
+      Result := Result + FormatMRActualErrorValue(DataPoint.Error);
+    end;
+    Result := Result + ']';
   end
   else
-    ErrValues := [FormatErrorValue(ASpillage.Error)];
-
-  if Length(ErrValues) = 1 then
-    Result := ErrValues[0]
-  else
-    Result := '[' + string.Join('; ', ErrValues) + ']';
+    Result := FormatMRActualErrorValue(ASpillage.Error);
 end;
 
 function TFrameMRResults.BuildErrorsListText(ADevice: TDevice;
-  ASessionPoint: TDevicePoint; const ACurrentError: Double;
+  ADevicePoint: TDevicePoint; const ACurrentError: Double;
   const AIncludeCurrent: Boolean): string;
 var
   S: TPointSpillage;
   Session: TSessionSpillage;
   Items: TArray<string>;
   Cnt: Integer;
+  MatchedPoint: TDevicePoint;
 begin
   Result := '';
-  if (ADevice = nil) or (ADevice.Spillages = nil) or (ASessionPoint = nil) then
+  if (ADevice = nil) or (ADevice.Spillages = nil) or (ADevicePoint = nil) then
     Exit;
 
   Session := ADevice.GetActiveSessionSpillage;
@@ -426,20 +985,23 @@ begin
 
   for S in ADevice.Spillages do
   begin
-    if (Session <> nil) and (S.SessionID <> Session.ID) then
+    if (S = nil) or ((Session <> nil) and (S.SessionID <> Session.ID)) then
       Continue;
-    if not TMeasurementRun.IsPointEquivalent(ASessionPoint, S) then
+    // The list contains only spillages which the production device matcher
+    // assigns to this concrete physical device point.
+    MatchedPoint := ADevice.FindMatchedDevicePointForSpillage(S);
+    if MatchedPoint <> ADevicePoint then
       Continue;
 
     SetLength(Items, Cnt + 1);
-    Items[Cnt] := FormatErrorValue(S.Error);
+    Items[Cnt] := FormatMRActualErrorValue(S.Error);
     Inc(Cnt);
   end;
 
   if AIncludeCurrent then
   begin
     SetLength(Items, Cnt + 1);
-    Items[Cnt] := FormatErrorValue(ACurrentError);
+    Items[Cnt] := FormatMRActualErrorValue(ACurrentError);
     Inc(Cnt);
   end;
 
@@ -450,7 +1012,7 @@ begin
 end;
 
 function TFrameMRResults.IsCellRunning(AChannel: TChannel;
-  ASessionPoint: TDevicePoint): Boolean;
+  AGroup: TDisplayPointGroup): Boolean;
 var
   Device: TDevice;
   CurrentPoint: TDevicePoint;
@@ -470,13 +1032,14 @@ begin
   if CurrentPoint = nil then
     Exit;
 
-  if not TMeasurementRun.IsPointEquivalent(CurrentPoint, ASessionPoint) then
+  if (AGroup = nil) or (AGroup.ScenarioPoint = nil) or
+     not TMeasurementRun.IsPointEquivalent(CurrentPoint, AGroup.ScenarioPoint) then
     Exit;
 
-  Result := (FindDevicePoint(Device, ASessionPoint) <> nil);
+  Result := (FindDevicePoint(Device, AGroup) <> nil);
 end;
 
-function TFrameMRResults.GetCellState(AChannel: TChannel; ASessionPoint: TDevicePoint;
+function TFrameMRResults.GetCellState(AChannel: TChannel; AGroup: TDisplayPointGroup;
   out ADevicePoint: TDevicePoint; out ASpillage: TPointSpillage): TMRResultCellState;
 var
   Device: TDevice;
@@ -493,45 +1056,23 @@ begin
 
   Device.AnalyseDevicePointsResults;
 
-  ADevicePoint := FindDevicePoint(Device, ASessionPoint);
+  ADevicePoint := FindDevicePoint(Device, AGroup);
   if ADevicePoint = nil then
     Exit(csEmpty);
 
-  ASpillage := FindPointSpillage(Device, ASessionPoint);
+  ASpillage := FindPointSpillage(Device, ADevicePoint);
 
-  if (ASpillage = nil) and IsCellRunning(AChannel, ASessionPoint) then
+  if (ASpillage = nil) and IsCellRunning(AChannel, AGroup) then
     Exit(csRunning);
 
   if ASpillage = nil then
     Exit(csPending);
 
-case ADevicePoint.Status of
-  mptsInvalidPoint:
-    Result := csDoneInvalid;
-
-  mptsInterrupted,
-  mptsCancelled,
-  mptsDone:
-    Result := csDoneWarning;
-
-  mptsSaved:
-    Result := csDoneValid;
-else
-    case ASpillage.Status of
-      TPointSpillage.SPS_OK: Result := csDoneValid;
-      TPointSpillage.SPS_ERROR_EXCEEDED: Result := csDoneInvalid;
-      TPointSpillage.SPS_STOP_CRITERIA_FAILED: Result := csDoneWarning;
-    else
-      if Abs(ASpillage.Error) <= Abs(ADevicePoint.Error) then
-        Result := csDoneValid
-      else
-        Result := csDoneInvalid;
-    end;
-  end;
+  Result := csDone;
 end;
 
 function TFrameMRResults.GetCellText(AChannel: TChannel;
-  ASessionPoint: TDevicePoint): string;
+  AGroup: TDisplayPointGroup): string;
 var
   Device: TDevice;
   DevicePoint: TDevicePoint;
@@ -548,7 +1089,7 @@ begin
   if Device = nil then
     Exit;
 
-  CellState := GetCellState(AChannel, ASessionPoint, DevicePoint, Spillage);
+  CellState := GetCellState(AChannel, AGroup, DevicePoint, Spillage);
 
   case CellState of
     csEmpty:
@@ -563,15 +1104,15 @@ begin
         if (AChannel.FlowMeter.ValueError <> nil) then
           CurrentError := AChannel.FlowMeter.ValueError.GetDoubleValue;
 
-        ErrorsText := BuildErrorsListText(Device, ASessionPoint, CurrentError, True);
+        ErrorsText := BuildErrorsListText(Device, DevicePoint, CurrentError, True);
         if ErrorsText = '' then
-          ErrorsText := '[' + FormatErrorValue(CurrentError) + ']';
+          ErrorsText := '[' + FormatMRActualErrorValue(CurrentError) + ']';
         Result := FormatErrorValue(DevicePoint.Error) + ' / ' + ErrorsText;
       end;
 
-    csDoneValid, csDoneInvalid, csDoneWarning:
+    csDone:
       begin
-        ErrorsText := BuildErrorsListText(Device, ASessionPoint, 0.0, False);
+        ErrorsText := BuildErrorsListText(Device, DevicePoint, 0.0, False);
         if ErrorsText <> '' then
           Result := FormatErrorValue(DevicePoint.Error) + ' / ' + ErrorsText
         else
@@ -581,28 +1122,27 @@ begin
 end;
 
 function TFrameMRResults.GetCellColor(AChannel: TChannel;
-  ASessionPoint: TDevicePoint): TAlphaColor;
+  AGroup: TDisplayPointGroup): TAlphaColor;
 var
   DevicePoint: TDevicePoint;
   Spillage: TPointSpillage;
   CellState: TMRResultCellState;
 begin
   Result := TAlphaColors.Null;
-  CellState := GetCellState(AChannel, ASessionPoint, DevicePoint, Spillage);
+  CellState := GetCellState(AChannel, AGroup, DevicePoint, Spillage);
 
   case CellState of
     csRunning: Result := COLOR_RUNNING;
-    csDoneValid: Result := COLOR_COMPLETED;
-    csDoneInvalid: Result := COLOR_INVALID;
-    csDoneWarning: Result := COLOR_WARNING;
+    csDone:
+      if FProceed is TFrameProceed then
+        Result := TFrameProceed(FProceed).GetPointResultColor(
+          AChannel.FlowMeter.Device, DevicePoint, Spillage);
   end;
 end;
 
 function TFrameMRResults.GetResultText(AChannel: TChannel): string;
 var
   Device: TDevice;
-  AllDone: Boolean;
-  DP: TDevicePoint;
 begin
   Result := '';
 
@@ -613,34 +1153,13 @@ begin
   if Device = nil then
     Exit;
 
-  Device.AnalyseResults;
-
-  AllDone := (Device.Points <> nil) and (Device.Points.Count > 0);
-  if AllDone then
-    for DP in Device.Points do
-      if (DP = nil) or (DP.Status in [mptsNone, mptsSelectPoint]) then
-      begin
-        AllDone := False;
-        Break;
-      end;
-
-  if not AllDone and (Device.Status in [3, 4]) then
-    Exit('');
-
-  case Device.Status of
-    3: Result := 'не годен';
-    4: Result := '-';
-    5: Result := 'годен';
-  else
-    Result := '';
-  end;
+  if FProceed is TFrameProceed then
+    Result := TFrameProceed(FProceed).GetDeviceResultText(Device);
 end;
 
 function TFrameMRResults.GetResultColor(AChannel: TChannel): TAlphaColor;
 var
   Device: TDevice;
-  AllDone: Boolean;
-  DP: TDevicePoint;
 begin
   Result := TAlphaColors.Null;
 
@@ -651,32 +1170,15 @@ begin
   if Device = nil then
     Exit;
 
-  Device.AnalyseResults;
-
-  AllDone := (Device.Points <> nil) and (Device.Points.Count > 0);
-  if AllDone then
-    for DP in Device.Points do
-      if (DP = nil) or (DP.Status in [mptsNone, mptsSelectPoint]) then
-      begin
-        AllDone := False;
-        Break;
-      end;
-
-  if not AllDone and (Device.Status in [3, 4]) then
-    Exit(COLOR_WARNING);
-
-  case Device.Status of
-    3: Result := COLOR_INVALID;
-    4: Result := COLOR_WARNING;
-    5: Result := COLOR_COMPLETED;
-  end;
+  if FProceed is TFrameProceed then
+    Result := TFrameProceed(FProceed).GetDeviceResultColor(Device);
 end;
 
 procedure TFrameMRResults.GridMRResultsGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
   Channel: TChannel;
-  SessionPoint: TDevicePoint;
+  DisplayPoint: TDisplayPointGroup;
 begin
   Channel := GetRowChannel(ARow);
   if Channel = nil then
@@ -694,8 +1196,8 @@ begin
     Exit;
   end;
 
-  SessionPoint := GetPointByColumn(ACol);   // Точка сессии (из MR)
-  Value := GetCellText(Channel, SessionPoint);
+  DisplayPoint := GetDisplayPointByColumn(ACol);
+  Value := GetCellText(Channel, DisplayPoint);
 end;
 
 procedure TFrameMRResults.GridMRResultsDrawColumnCell(Sender: TObject;
@@ -703,7 +1205,7 @@ procedure TFrameMRResults.GridMRResultsDrawColumnCell(Sender: TObject;
   const Row: Integer; const Value: TValue; const State: TGridDrawStates);
 var
   Channel: TChannel;
-  SessionPoint: TDevicePoint;
+  DisplayPoint: TDisplayPointGroup;
   C: TAlphaColor;
   SavedState: TCanvasSaveState;
 begin
@@ -716,8 +1218,8 @@ begin
     C := GetResultColor(Channel)
   else if (Column <> StringColumnName) then
   begin
-    SessionPoint := GetPointByColumn(Column.Index);
-    C := GetCellColor(Channel, SessionPoint);
+    DisplayPoint := GetDisplayPointByColumn(Column.Index);
+    C := GetCellColor(Channel, DisplayPoint);
   end;
 
   SavedState := Canvas.SaveState;

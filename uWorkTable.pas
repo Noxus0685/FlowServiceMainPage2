@@ -193,6 +193,14 @@ type
 
   EMeasurementRunMode = (mrmManual =0, mrmHalfAutomatic, mrmAutomatic);
 
+  { Minimal typed contract exposed without coupling UI modules to uMeasurementRun. }
+  TMeasurementRunBase = class(TObservableObject)
+  protected
+    function GetStage: EMeasurementState; virtual; abstract;
+  public
+    property Stage: EMeasurementState read GetStage;
+  end;
+
   // Алиас для обратной совместимости
   EWorkTableState = EStateWorkTable;
 
@@ -470,7 +478,8 @@ type
     FScales: TObjectList<TWeight>;
     FFlowRate: TFlowRate;
 
-    FMeasurementRun: TObject;
+    FMeasurementRun: TMeasurementRunBase;
+    function GetMeasurementRunStage: EMeasurementState;
     FMode:EMeasurementRunMode;
 
     FFluidTemp: TFluidTemp;
@@ -720,7 +729,8 @@ type
   property Scales: TObjectList<TWeight> read FScales;
   property Weights: TObjectList<TWeight> read FScales;
 
-  property MeasurementRun: TObject read FMeasurementRun;
+  property MeasurementRun: TMeasurementRunBase read FMeasurementRun;
+  property MeasurementRunStage: EMeasurementState read GetMeasurementRunStage;
   property MeasurementMode: EMeasurementRunMode read FMode write FMode;
 
   property FluidTemp: TFluidTemp read FFluidTemp;
@@ -950,6 +960,13 @@ uses
 const
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
   DEVICE_FLOW_RATE_DIM_INDEX = 4;
+
+function TWorkTable.GetMeasurementRunStage: EMeasurementState;
+begin
+  if FMeasurementRun = nil then
+    Exit(msNone);
+  Result := TMeasurementRun(FMeasurementRun).Stage;
+end;
 
   {$REGION 'HELPERS'}
 
