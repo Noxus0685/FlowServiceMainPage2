@@ -324,6 +324,7 @@ type
 implementation
    uses
     uAppServices,
+    uMeasurementRun,
     uMeterValue;
 {$R *.fmx}
 

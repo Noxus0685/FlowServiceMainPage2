@@ -42,6 +42,8 @@ def test_selected_and_all_device_routes_are_explicit():
     assert 'RequestCreateSession(nil)' not in RESULTS
 
 def test_production_guards_and_protocol_outcomes_exist():
+    implementation_uses = PROCEED.split('implementation', 1)[1].split('{$R *.fmx}', 1)[0]
+    assert 'uMeasurementRun' in implementation_uses
     assert 'CanManageResultSessions' in PROCEED
     assert 'Stage in [msNone, msDone]' in PROCEED
     for event in ('ResultsSessionClearRequested', 'ResultsSessionClearCompleted', 'ResultsSessionClearFailed',
