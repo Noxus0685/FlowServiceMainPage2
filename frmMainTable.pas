@@ -3694,7 +3694,8 @@ begin
     RefreshGridColumns(FFrameProceed.GridResults);
   end;
 
-  EnforceDataPointsColumnsLayout;
+  if Length(WorkTable.DataPointsGridColumns) = 0 then
+    EnforceDataPointsColumnsLayout;
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
 end;
 
