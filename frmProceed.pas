@@ -334,6 +334,9 @@ type
     FExportButtonStateLogged: Boolean;
     FToolbarLayoutLogged: Boolean;
     FCurrentResultRows: TArray<TResultGridRow>;
+    FCurrentPointColumnKeys: TArray<string>;
+    FCurrentPointSourceUUIDs: TArray<string>;
+    FCurrentPointHeaders: TArray<string>;
     FCurrentSpillages: TArray<TPointSpillage>;
     FActiveWorkTable: TWorkTable;
     FSessionDevice: TFlowMeter;
@@ -2107,60 +2110,142 @@ begin
 end;
 procedure TFrameProceed.UpdateResultsPointColumns;
 var
-  MaxPoints, I: Integer;
-  AllSameType: Boolean;
-  FirstTypeName: string;
-  HeaderFromPoints: TArray<string>;
+  PointCount: Integer;
 
   function FormatPointHeader(const APointName: string): string;
   begin
     Result := #948 + '(' + APointName + '), %';
   end;
 begin
-  MaxPoints := 0;
-  for I := 0 to High(FCurrentResultRows) do
-    MaxPoints := Max(MaxPoints, Length(FCurrentResultRows[I].PointValues));
+  PointCount := Min(4, Length(FCurrentPointColumnKeys));
+  StringColumnPointNum1.Visible := PointCount >= 1;
+  StringColumnPointNum2.Visible := PointCount >= 2;
+  StringColumnPointNum3.Visible := PointCount >= 3;
+  StringColumnPointNum4.Visible := PointCount >= 4;
+  if PointCount > 0 then StringColumnPointNum1.Header := FormatPointHeader(FCurrentPointHeaders[0]);
+  if PointCount > 1 then StringColumnPointNum2.Header := FormatPointHeader(FCurrentPointHeaders[1]);
+  if PointCount > 2 then StringColumnPointNum3.Header := FormatPointHeader(FCurrentPointHeaders[2]);
+  if PointCount > 3 then StringColumnPointNum4.Header := FormatPointHeader(FCurrentPointHeaders[3]);
+  LoadProceedGridColumns;
+end;
 
-  if MaxPoints > 4 then
-    MaxPoints := 4;
+function TFrameProceed.ProceedGridColumnKey(AColumn: TColumn): string;
+var P: Integer;
+begin
+  if AColumn = StringColumnResultName then Exit('Name');
+  if AColumn = StringColumnResultType then Exit('Type');
+  if AColumn = StringColumnResultSerial then Exit('Serial');
+  if AColumn = StringColumnResult then Exit('Result');
+  P := -1;
+  if AColumn = StringColumnPointNum1 then P := 0
+  else if AColumn = StringColumnPointNum2 then P := 1
+  else if AColumn = StringColumnPointNum3 then P := 2
+  else if AColumn = StringColumnPointNum4 then P := 3;
+  if (P >= 0) and (P < Length(FCurrentPointColumnKeys)) then
+    Exit(FCurrentPointColumnKeys[P]);
+  Result := AColumn.Name;
+end;
 
-  StringColumnPointNum1.Visible := MaxPoints >= 1;
-  StringColumnPointNum2.Visible := MaxPoints >= 2;
-  StringColumnPointNum3.Visible := MaxPoints >= 3;
-  StringColumnPointNum4.Visible := MaxPoints >= 4;
-
-  AllSameType := Length(FCurrentResultRows) > 0;
-  SetLength(HeaderFromPoints, 0);
-  FirstTypeName := '';
-
-  if Length(FCurrentResultRows) > 0 then
-  begin
-    FirstTypeName := FCurrentResultRows[0].DeviceType;
-    SetLength(HeaderFromPoints, Length(FCurrentResultRows[0].PointNames));
-    for I := 0 to High(HeaderFromPoints) do
-      HeaderFromPoints[I] := FCurrentResultRows[0].PointNames[I];
-  end;
-
-  for I := 1 to High(FCurrentResultRows) do
-    if not SameText(FCurrentResultRows[I].DeviceType, FirstTypeName) then
+procedure TFrameProceed.SaveProceedGridColumns;
+var Ini: TIniFile; I: Integer; Key: string;
+begin
+  if (FWorkTableManager = nil) or
+     (Trim(FWorkTableManager.IniFileName) = '') then Exit;
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  try
+    for I := 0 to GridResults.ColumnCount - 1 do
     begin
-      AllSameType := False;
-      Break;
+      Key := ProceedGridColumnKey(GridResults.Columns[I]);
+      Ini.WriteBool(CProceedGridColumnsSection, Key + '.Visible',
+        GridResults.Columns[I].Visible);
+      Ini.WriteFloat(CProceedGridColumnsSection, Key + '.Width',
+        Max(CProceedGridMinWidth, GridResults.Columns[I].Width));
+      Ini.WriteInteger(CProceedGridColumnsSection, Key + '.Order', I);
     end;
+  finally Ini.Free; end;
+end;
 
-  if AllSameType and (Length(HeaderFromPoints) > 0) then
-  begin
-    if Length(HeaderFromPoints) > 0 then StringColumnPointNum1.Header := FormatPointHeader(HeaderFromPoints[0]);
-    if Length(HeaderFromPoints) > 1 then StringColumnPointNum2.Header := FormatPointHeader(HeaderFromPoints[1]);
-    if Length(HeaderFromPoints) > 2 then StringColumnPointNum3.Header := FormatPointHeader(HeaderFromPoints[2]);
-    if Length(HeaderFromPoints) > 3 then StringColumnPointNum4.Header := FormatPointHeader(HeaderFromPoints[3]);
-  end
-  else
-  begin
-    StringColumnPointNum1.Header := FormatPointHeader('Q1');
-    StringColumnPointNum2.Header := FormatPointHeader('Q2');
-    StringColumnPointNum3.Header := FormatPointHeader('Q3');
-    StringColumnPointNum4.Header := FormatPointHeader('Q4');
+procedure TFrameProceed.LoadProceedGridColumns;
+var Ini: TIniFile; I, Loaded, Order: Integer; Key: string; W: Double;
+begin
+  if (FWorkTableManager = nil) or
+     (Trim(FWorkTableManager.IniFileName) = '') or
+     not FileExists(FWorkTableManager.IniFileName) then Exit;
+  Loaded := 0;
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  try
+    { Apply visibility, then order, then width. Unknown saved keys remain intact. }
+    for I := 0 to GridResults.ColumnCount - 1 do begin
+      Key := ProceedGridColumnKey(GridResults.Columns[I]);
+      if Ini.ValueExists(CProceedGridColumnsSection, Key + '.Visible') then begin
+        GridResults.Columns[I].Visible := Ini.ReadBool(CProceedGridColumnsSection,
+          Key + '.Visible', True); Inc(Loaded); end;
+    end;
+    for I := 0 to GridResults.ColumnCount - 1 do begin
+      Key := ProceedGridColumnKey(GridResults.Columns[I]);
+      Order := Ini.ReadInteger(CProceedGridColumnsSection, Key + '.Order', I);
+      if (Order >= 0) and (Order < GridResults.ColumnCount) then
+        GridResults.Columns[I].Index := Order;
+    end;
+    for I := 0 to GridResults.ColumnCount - 1 do begin
+      Key := ProceedGridColumnKey(GridResults.Columns[I]);
+      W := Ini.ReadFloat(CProceedGridColumnsSection, Key + '.Width',
+        GridResults.Columns[I].Width);
+      if W >= CProceedGridMinWidth then GridResults.Columns[I].Width := W;
+    end;
+  finally Ini.Free; end;
+  LogMKS('ProceedGridColumnsLoaded', 'ProceedGridColumnsLoaded',
+    Format('RestoredColumnCount=%d', [Loaded]));
+end;
+
+procedure TFrameProceed.PopupMenuGridResultsPopup(Sender: TObject);
+var I: Integer; Item, ColumnsRoot: TMenuItem;
+begin
+  ColumnsRoot := nil;
+  for I := 0 to PopupMenuGridResults.ItemsCount - 1 do
+    if (PopupMenuGridResults.Items[I] is TMenuItem) and
+       SameText(TMenuItem(PopupMenuGridResults.Items[I]).TagString,
+         'ProceedColumnsRoot') then begin
+      ColumnsRoot := TMenuItem(PopupMenuGridResults.Items[I]); Break; end;
+  if ColumnsRoot = nil then begin
+    ColumnsRoot := TMenuItem.Create(PopupMenuGridResults);
+    ColumnsRoot.Text := 'Столбцы';
+    ColumnsRoot.TagString := 'ProceedColumnsRoot';
+    PopupMenuGridResults.AddObject(ColumnsRoot);
+  end else ColumnsRoot.Clear;
+  for I := 0 to GridResults.ColumnCount - 1 do begin
+    Item := TMenuItem.Create(ColumnsRoot);
+    Item.Text := GridResults.Columns[I].Header;
+    Item.TagString := ProceedGridColumnKey(GridResults.Columns[I]);
+    Item.AutoCheck := True; Item.IsChecked := GridResults.Columns[I].Visible;
+    Item.OnClick := ProceedGridColumnMenuClick;
+    ColumnsRoot.AddObject(Item);
+  end;
+  Item := TMenuItem.Create(ColumnsRoot); Item.Text := '-';
+  ColumnsRoot.AddObject(Item);
+  Item := TMenuItem.Create(ColumnsRoot);
+  Item.Text := 'Восстановить по умолчанию';
+  Item.OnClick := ProceedGridResetColumnsClick;
+  ColumnsRoot.AddObject(Item);
+end;
+
+procedure TFrameProceed.ProceedGridColumnMenuClick(Sender: TObject);
+var I: Integer; Item: TMenuItem;
+begin
+  Item := TMenuItem(Sender);
+  for I := 0 to GridResults.ColumnCount - 1 do
+    if SameText(ProceedGridColumnKey(GridResults.Columns[I]), Item.TagString) then
+    begin GridResults.Columns[I].Visible := Item.IsChecked; Break; end;
+  SaveProceedGridColumns;
+end;
+
+procedure TFrameProceed.ProceedGridResetColumnsClick(Sender: TObject);
+var Ini: TIniFile; I: Integer;
+begin
+  if (FWorkTableManager <> nil) and
+     (Trim(FWorkTableManager.IniFileName) <> '') then begin
+    Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+    try Ini.EraseSection(CProceedGridColumnsSection); finally Ini.Free; end;
   end;
   LoadProceedGridColumns;
 end;
