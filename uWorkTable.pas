@@ -3030,7 +3030,7 @@ var
       Exit;
 
     ProtocolManager.AddMessage(
-      pcInfo,
+      pcProc,
       psWorkTable,
       'SelectEtalons.' + AStage,
       AResult,
@@ -5682,7 +5682,6 @@ begin
     ResetMeter(Ch.ValueInterface);
   end;
 end;
-
 procedure TWorkTable.SaveMeasurementResults;
 var
   DeviceChannel: TChannel;
@@ -5700,7 +5699,9 @@ var
   BeforePointCount: Integer;
   AfterPointCount: Integer;
   BeforePointUUIDs: string;
-
+  ValueTimeSnapshot: Double;
+  SavedPointTime: Double;
+  ProcessedDeviceCount: Integer;
 
   function BoolText(const AValue: Boolean): string;
   begin
@@ -5715,54 +5716,302 @@ var
     P: TDevicePoint;
   begin
     Result := '';
+
     if (ADevice = nil) or (ADevice.Points = nil) then
       Exit;
+
     for P in ADevice.Points do
       if P <> nil then
       begin
         if Result <> '' then
           Result := Result + ',';
+
         Result := Result + P.UUID;
       end;
   end;
 
-  procedure LogDevicePointsForSave(const ACaption: string; ADevice: TDevice);
+  procedure LogDevicePointsForSave(
+    const ACaption: string;
+    ADevice: TDevice
+  );
   var
     P: TDevicePoint;
     PointCount: Integer;
   begin
     PointCount := 0;
+
     if (ADevice <> nil) and (ADevice.Points <> nil) then
       PointCount := ADevice.Points.Count;
+
     if ADevice = nil then
     begin
-      LogMKS('DBG SP 1100', ACaption, 'Device=nil; PointCount=0');
+      ProtocolManager.AddMessage(
+        pcWarning,
+        psWorkTable,
+        'SaveMeasurementResults',
+        ACaption,
+        'Device=nil; PointCount=0'
+      );
       Exit;
     end;
-    LogMKS('DBG SP 1100', ACaption,
-      Format('DeviceUUID=%s; DeviceName=%s; PointCount=%d', [ADevice.UUID, ADevice.Name, PointCount]));
-    if ADevice.Points <> nil then
-      for P in ADevice.Points do
-        if P <> nil then
-          LogMKS('DBG SP 1101', ACaption + ' POINT',
-            Format('PointUUID=%s; PointName=%s; FlowRate=%.9f; Q=%.6f; Enabled=%s; State=%s',
-              [P.UUID, P.Name, P.FlowRate, P.Q, BoolText(P.Enabled),
-               GetEnumName(TypeInfo(TObjectState), Ord(P.State))]));
+
+    ProtocolManager.AddMessage(
+      pcProc,
+      psWorkTable,
+      'SaveMeasurementResults',
+      ACaption,
+      Format(
+        'DeviceUUID=%s; DeviceName=%s; PointCount=%d',
+        [
+          ADevice.UUID,
+          ADevice.Name,
+          PointCount
+        ]
+      )
+    );
+
+    if ADevice.Points = nil then
+      Exit;
+
+    for P in ADevice.Points do
+      if P <> nil then
+        ProtocolManager.AddMessage(
+          pcProc,
+          psWorkTable,
+          'SaveMeasurementResults',
+          ACaption + ': поверочная точка прибора',
+          Format(
+            'DeviceUUID=%s; PointUUID=%s; PointName=%s; ' +
+            'FlowRate=%.9f; Q=%.9f; Enabled=%s; State=%s',
+            [
+              ADevice.UUID,
+              P.UUID,
+              P.Name,
+              P.FlowRate,
+              P.Q,
+              BoolText(P.Enabled),
+              GetEnumName(
+                TypeInfo(TObjectState),
+                Ord(P.State)
+              )
+            ]
+          )
+        );
   end;
+
+  procedure LogPointData(
+    ACategory: EProtocolCategory;
+    const ADescription: string;
+    ADevice: TDevice;
+    AChannel: TChannel;
+    APoint: TPointSpillage
+  );
+  var
+    DeviceName: string;
+    DeviceUUID: string;
+    ChannelName: string;
+  begin
+    if ADevice <> nil then
+    begin
+      DeviceName := ADevice.Name;
+      DeviceUUID := ADevice.UUID;
+    end
+    else
+    begin
+      DeviceName := '';
+      DeviceUUID := '';
+    end;
+
+    if AChannel <> nil then
+      ChannelName := AChannel.Name
+    else
+      ChannelName := '';
+
+    if APoint = nil then
+    begin
+      ProtocolManager.AddMessage(
+        ACategory,
+        psWorkTable,
+        'SaveMeasurementResults',
+        ADescription,
+        Format(
+          'WorkTable=%s; Device=%s; DeviceUUID=%s; ' +
+          'Channel=%s; Point=nil',
+          [
+            Name,
+            DeviceName,
+            DeviceUUID,
+            ChannelName
+          ]
+        )
+      );
+      Exit;
+    end;
+
+    ProtocolManager.AddMessage(
+      ACategory,
+      psWorkTable,
+      'SaveMeasurementResults',
+      ADescription,
+      Format(
+        'WorkTable=%s; Device=%s; DeviceUUID=%s; Channel=%s; ' +
+        'PointNum=%d; PointName=%s; SessionID=%d; ' +
+        'SpillTime=%.9f; QavgEtalon=%.9f; ' +
+        'EtalonName=%s; EtalonUUID=%s; ' +
+        'EtalonVolume=%.9f; EtalonMass=%.9f; ' +
+        'EtalonVolumeFlow=%.9f; EtalonMassFlow=%.9f; ' +
+        'DeviceVolume=%.9f; DeviceMass=%.9f; ' +
+        'DeviceVolumeFlow=%.9f; DeviceMassFlow=%.9f; ' +
+        'PulseCount=%.9f; MeanFrequency=%.9f; ' +
+        'Density=%.9f; Error=%.9f; Coef=%.9f; ' +
+        'AvgCurrent=%.9f; StartTemperature=%.9f; ' +
+        'EndTemperature=%.9f; AvgTemperature=%.9f; ' +
+        'InputPressure=%.9f; OutputPressure=%.9f; ' +
+        'DeltaPressure=%.9f; AtmosphericPressure=%.9f; ' +
+        'AmbientTemperature=%.9f; RelativeHumidity=%.9f; ' +
+        'Valid=%s; State=%s',
+        [
+          Name,
+          DeviceName,
+          DeviceUUID,
+          ChannelName,
+          APoint.Num,
+          APoint.Name,
+          APoint.SessionID,
+          APoint.SpillTime,
+          APoint.QavgEtalon,
+          APoint.EtalonName,
+          APoint.EtalonUUID,
+          APoint.EtalonVolume,
+          APoint.EtalonMass,
+          APoint.EtalonVolumeFlow,
+          APoint.EtalonMassFlow,
+          APoint.DeviceVolume,
+          APoint.DeviceMass,
+          APoint.DeviceVolumeFlow,
+          APoint.DeviceMassFlow,
+          APoint.PulseCount,
+          APoint.MeanFrequency,
+          APoint.Density,
+          APoint.Error,
+          APoint.Coef,
+          APoint.AvgCurrent,
+          APoint.StartTemperature,
+          APoint.EndTemperature,
+          APoint.AvgTemperature,
+          APoint.InputPressure,
+          APoint.OutputPressure,
+          APoint.DeltaPressure,
+          APoint.AtmosphericPressure,
+          APoint.AmbientTemperature,
+          APoint.RelativeHumidity,
+          BoolText(APoint.Valid),
+          GetEnumName(
+            TypeInfo(TObjectState),
+            Ord(APoint.State)
+          )
+        ]
+      )
+    );
+  end;
+
 begin
+  ProcessedDeviceCount := 0;
+  ValueTimeSnapshot := 0.0;
+
+  if ValueTime <> nil then
+    ValueTimeSnapshot := ValueTime.GetDoubleValue;
+
+  ProtocolManager.AddMessage(
+    pcProc,
+    psWorkTable,
+    'SaveMeasurementResults',
+    'Начато сохранение результатов измерения',
+    Format(
+      'WorkTable=%s; State=%s; IsSimulationMode=%s; ' +
+      'DeviceChannelCount=%d; EtalonChannelCount=%d; ' +
+      'Time=%.9f; TimeResult=%.9f; ValueTime=%.9f; ' +
+      'ValueTimeAssigned=%s; CurrentPointAssigned=%s',
+      [
+        Name,
+        WorkTableStateToString(State),
+        BoolText(IsSimulationMode),
+        DeviceChannels.Count,
+        EtalonChannels.Count,
+        Time,
+        TimeResult,
+        ValueTimeSnapshot,
+        BoolText(ValueTime <> nil),
+        BoolText(CurrentPoint <> nil)
+      ]
+    )
+  );
+
+  if CurrentPoint <> nil then
+    ProtocolManager.AddMessage(
+      pcProc,
+      psWorkTable,
+      'SaveMeasurementResults',
+      'Текущая поверочная точка перед сохранением',
+      Format(
+        'WorkTable=%s; PointID=%d; PointUUID=%s; ' +
+        'PointName=%s; FlowRate=%.9f; Q=%.9f',
+        [
+          Name,
+          CurrentPoint.ID,
+          CurrentPoint.UUID,
+          CurrentPoint.Name,
+          CurrentPoint.FlowRate,
+          CurrentPoint.Q
+        ]
+      )
+    );
 
   if IsSimulationMode then
   begin
-    ProtocolManager.AddMessage(pcInfo, psWorkTable, 'SaveMeasurementResults',
-      'Сценарный тест: рабочее сохранение результатов заблокировано', Name);
+    ProtocolManager.AddMessage(
+      pcProc,
+      psWorkTable,
+      'SaveMeasurementResults',
+      'Сценарный тест: рабочее сохранение результатов заблокировано',
+      Name
+    );
     Exit;
   end;
 
   DeviceRepo := nil;
+
   if DataManager <> nil then
     DeviceRepo := DataManager.ActiveDeviceRepo;
 
+  ProtocolManager.AddMessage(
+    pcProc,
+    psWorkTable,
+    'SaveMeasurementResults',
+    'Определён репозиторий результатов',
+    Format(
+      'WorkTable=%s; DataManagerAssigned=%s; DeviceRepoAssigned=%s',
+      [
+        Name,
+        BoolText(DataManager <> nil),
+        BoolText(DeviceRepo <> nil)
+      ]
+    )
+  );
+
   if DeviceChannels.Count = 0 then
+  begin
+    ProtocolManager.AddMessage(
+      pcWarning,
+      psWorkTable,
+      'SaveMeasurementResults',
+      'Каналы поверяемых приборов отсутствуют',
+      Format(
+        'WorkTable=%s; будет создан канал по умолчанию',
+        [Name]
+      )
+    );
+
     AddDeviceChannel(
       True,
       -1,
@@ -5771,13 +6020,60 @@ begin
       '-',
       ''
     );
+  end;
 
   for DeviceChannel in DeviceChannels do
   begin
-    if (DeviceChannel = nil) or (not DeviceChannel.Enabled) then
+    if DeviceChannel = nil then
+    begin
+      ProtocolManager.AddMessage(
+        pcWarning,
+        psWorkTable,
+        'SaveMeasurementResults',
+        'Канал поверяемого прибора не обработан',
+        Format(
+          'WorkTable=%s; Reason=DeviceChannel nil',
+          [Name]
+        )
+      );
       Continue;
+    end;
+
+    if not DeviceChannel.Enabled then
+    begin
+      ProtocolManager.AddMessage(
+        pcProc,
+        psWorkTable,
+        'SaveMeasurementResults',
+        'Отключённый канал поверяемого прибора пропущен',
+        Format(
+          'WorkTable=%s; Channel=%s',
+          [
+            Name,
+            DeviceChannel.Name
+          ]
+        )
+      );
+      Continue;
+    end;
+
+    ProtocolManager.AddMessage(
+      pcProc,
+      psWorkTable,
+      'SaveMeasurementResults',
+      'Начата обработка канала поверяемого прибора',
+      Format(
+        'WorkTable=%s; Channel=%s; FlowMeterAssigned=%s',
+        [
+          Name,
+          DeviceChannel.Name,
+          BoolText(DeviceChannel.FlowMeter <> nil)
+        ]
+      )
+    );
 
     SourceDevice := nil;
+
     if DeviceChannel.FlowMeter <> nil then
       SourceDevice := DeviceChannel.FlowMeter.Device;
 
@@ -5789,20 +6085,144 @@ begin
       SourceDevice,
       CurrentPoint
     );
+
     if Device = nil then
+    begin
+      ProtocolManager.AddMessage(
+        pcError,
+        psWorkTable,
+        'SaveMeasurementResults',
+        'Не удалось получить прибор для сохранения',
+        Format(
+          'WorkTable=%s; Channel=%s; SourceDeviceAssigned=%s; ' +
+          'DeviceRepoAssigned=%s; CurrentPointAssigned=%s',
+          [
+            Name,
+            DeviceChannel.Name,
+            BoolText(SourceDevice <> nil),
+            BoolText(DeviceRepo <> nil),
+            BoolText(CurrentPoint <> nil)
+          ]
+        )
+      );
       Continue;
+    end;
 
+    if DeviceChannel.FlowMeter = nil then
+    begin
+      ProtocolManager.AddMessage(
+        pcError,
+        psWorkTable,
+        'SaveMeasurementResults',
+        'Невозможно сохранить результат: расходомер канала не назначен',
+        Format(
+          'WorkTable=%s; Channel=%s; Device=%s; DeviceUUID=%s',
+          [
+            Name,
+            DeviceChannel.Name,
+            Device.Name,
+            Device.UUID
+          ]
+        )
+      );
+      Continue;
+    end;
 
+    Inc(ProcessedDeviceCount);
+
+    ProtocolManager.AddMessage(
+      pcProc,
+      psWorkTable,
+      'SaveMeasurementResults',
+      'Прибор подготовлен для сохранения',
+      Format(
+        'WorkTable=%s; Channel=%s; Device=%s; DeviceUUID=%s; ' +
+        'SourceDeviceAssigned=%s; ExistingSpillageCount=%d',
+        [
+          Name,
+          DeviceChannel.Name,
+          Device.Name,
+          Device.UUID,
+          BoolText(SourceDevice <> nil),
+          Device.Spillages.Count
+        ]
+      )
+    );
 
     Session := Device.GetActiveSessionSpillage;
+
     if Session = nil then
     begin
       Session := Device.AddSessionSpillage;
+
       if Session <> nil then
+      begin
         Session.State := osNew;
+
+        ProtocolManager.AddMessage(
+          pcProc,
+          psWorkTable,
+          'SaveMeasurementResults',
+          'Создана новая сессия проливки',
+          Format(
+            'WorkTable=%s; Device=%s; DeviceUUID=%s; SessionID=%d',
+            [
+              Name,
+              Device.Name,
+              Device.UUID,
+              Session.ID
+            ]
+          )
+        );
+      end;
     end
-    else if Session.State <> osNew then
-      Session.State := osModified;
+    else
+    begin
+      if Session.State <> osNew then
+        Session.State := osModified;
+
+      ProtocolManager.AddMessage(
+        pcProc,
+        psWorkTable,
+        'SaveMeasurementResults',
+        'Используется активная сессия проливки',
+        Format(
+          'WorkTable=%s; Device=%s; DeviceUUID=%s; ' +
+          'SessionID=%d; SessionState=%s',
+          [
+            Name,
+            Device.Name,
+            Device.UUID,
+            Session.ID,
+            GetEnumName(
+              TypeInfo(TObjectState),
+              Ord(Session.State)
+            )
+          ]
+        )
+      );
+    end;
+
+    if Session = nil then
+    begin
+      ProtocolManager.AddMessage(
+        pcError,
+        psWorkTable,
+        'SaveMeasurementResults',
+        'Не удалось создать сессию проливки',
+        Format(
+          'WorkTable=%s; Channel=%s; Device=%s; DeviceUUID=%s',
+          [
+            Name,
+            DeviceChannel.Name,
+            Device.Name,
+            Device.UUID
+          ]
+        )
+      );
+      Continue;
+    end;
+
     Device.State := osModified;
 
     if Session.DateTimeOpen = 0 then
@@ -5815,16 +6235,90 @@ begin
       Point.SessionID := Session.ID;
       Point.DeviceUUID := Device.UUID;
       Point.DateTime := Now;
-      Point.SpillTime := ValueTime.GetDoubleValue;
+
+      if ValueTime <> nil then
+        ValueTimeSnapshot := ValueTime.GetDoubleValue
+      else
+        ValueTimeSnapshot := 0.0;
+
+      ProtocolManager.AddMessage(
+        pcProc,
+        psWorkTable,
+        'SaveMeasurementResults',
+        'Выбор итогового времени для сохраняемой проливки',
+        Format(
+          'WorkTable=%s; Device=%s; DeviceUUID=%s; Channel=%s; ' +
+          'WorkTable.Time=%.9f; WorkTable.TimeResult=%.9f; ' +
+          'ValueTime=%.9f; ValueTimeAssigned=%s; ' +
+          'SelectedSource=TimeResult',
+          [
+            Name,
+            Device.Name,
+            Device.UUID,
+            DeviceChannel.Name,
+            Time,
+            TimeResult,
+            ValueTimeSnapshot,
+            BoolText(ValueTime <> nil)
+          ]
+        )
+      );
+
+      Point.SpillTime := TimeResult;
+      SavedPointTime := Point.SpillTime;
+
+      ProtocolManager.AddMessage(
+        pcProc,
+        psWorkTable,
+        'SaveMeasurementResults',
+        'Итоговое время записано в результат проливки',
+        Format(
+          'WorkTable=%s; Device=%s; DeviceUUID=%s; Channel=%s; ' +
+          'Time=%.9f; TimeResult=%.9f; ValueTime=%.9f; ' +
+          'Point.SpillTime=%.9f; TimeMatchesTimeResult=%s; ' +
+          'TimeMatchesValueTime=%s',
+          [
+            Name,
+            Device.Name,
+            Device.UUID,
+            DeviceChannel.Name,
+            Time,
+            TimeResult,
+            ValueTimeSnapshot,
+            Point.SpillTime,
+            BoolText(
+              SameValue(
+                Point.SpillTime,
+                TimeResult,
+                1E-9
+              )
+            ),
+            BoolText(
+              SameValue(
+                Point.SpillTime,
+                ValueTimeSnapshot,
+                1E-9
+              )
+            )
+          ]
+        )
+      );
+
       Point.QavgEtalon := ValueFlowRate.GetDoubleValue;
 
       MatchedPoint := nil;
+
       if (CurrentPoint <> nil) and (Device.Points <> nil) then
         for DevicePoint in Device.Points do
           if (DevicePoint <> nil) and
-             (((CurrentPoint.ID <> 0) and (DevicePoint.ID = CurrentPoint.ID)) or
-              ((CurrentPoint.ID = 0) and (Trim(CurrentPoint.Name) <> '') and
-               SameText(DevicePoint.Name, CurrentPoint.Name))) then
+             (
+               ((CurrentPoint.ID <> 0) and
+                (DevicePoint.ID = CurrentPoint.ID)) or
+
+               ((CurrentPoint.ID = 0) and
+                (Trim(CurrentPoint.Name) <> '') and
+                SameText(DevicePoint.Name, CurrentPoint.Name))
+             ) then
           begin
             MatchedPoint := DevicePoint;
             Break;
@@ -5833,130 +6327,488 @@ begin
       if MatchedPoint <> nil then
       begin
         Point.Name := MatchedPoint.Name;
-      end;
 
-      Point.EtalonVolume := TableFlow.ValueVolume.GetDoubleValue;
+        ProtocolManager.AddMessage(
+          pcProc,
+          psWorkTable,
+          'SaveMeasurementResults',
+          'Найдена поверочная точка прибора',
+          Format(
+            'WorkTable=%s; Device=%s; DeviceUUID=%s; ' +
+            'CurrentPointID=%d; CurrentPointUUID=%s; ' +
+            'MatchedPointID=%d; MatchedPointUUID=%s; ' +
+            'MatchedPointName=%s',
+            [
+              Name,
+              Device.Name,
+              Device.UUID,
+              CurrentPoint.ID,
+              CurrentPoint.UUID,
+              MatchedPoint.ID,
+              MatchedPoint.UUID,
+              MatchedPoint.Name
+            ]
+          )
+        );
+      end
+      else
+        ProtocolManager.AddMessage(
+          pcWarning,
+          psWorkTable,
+          'SaveMeasurementResults',
+          'Поверочная точка прибора не найдена',
+          Format(
+            'WorkTable=%s; Device=%s; DeviceUUID=%s; ' +
+            'CurrentPointAssigned=%s; DefaultPointName=%s',
+            [
+              Name,
+              Device.Name,
+              Device.UUID,
+              BoolText(CurrentPoint <> nil),
+              Point.Name
+            ]
+          )
+        );
+
+      Point.EtalonVolume :=
+        TableFlow.ValueVolume.GetDoubleValue;
 
       Point.EtalonName := '';
       Point.EtalonUUID := '';
+
       for EtalonChannel in EtalonChannels do
       begin
-        if (EtalonChannel = nil) or (not EtalonChannel.Enabled) or
+        if (EtalonChannel = nil) or
+           (not EtalonChannel.Enabled) or
            (EtalonChannel.FlowMeter = nil) or
            (EtalonChannel.FlowMeter.Device = nil) then
           Continue;
 
-        if SameText(Trim(EtalonChannel.FlowMeter.Device.Name), 'Новое устройство') then
+        if SameText(
+             Trim(EtalonChannel.FlowMeter.Device.Name),
+             'Новое устройство'
+           ) then
           Continue;
 
-        Point.EtalonName := Trim(EtalonChannel.FlowMeter.Device.Name);
-        Point.EtalonUUID := EtalonChannel.FlowMeter.Device.UUID;
+        Point.EtalonName :=
+          Trim(EtalonChannel.FlowMeter.Device.Name);
+
+        Point.EtalonUUID :=
+          EtalonChannel.FlowMeter.Device.UUID;
+
         Break;
       end;
 
-      if (Point.EtalonName = '') and (TableFlow <> nil) and
-         (not SameText(Trim(TableFlow.Name), 'Новое устройство')) then
+      if (Point.EtalonName = '') and
+         (TableFlow <> nil) and
+         (not SameText(
+           Trim(TableFlow.Name),
+           'Новое устройство'
+         )) then
         Point.EtalonName := Trim(TableFlow.Name);
 
-      Point.EtalonMass := TableFlow.ValueMass.GetDoubleValue;
+      Point.EtalonMass :=
+        TableFlow.ValueMass.GetDoubleValue;
 
-      Point.EtalonVolumeFlow := Point.EtalonVolume/Point.SpillTime;
-      Point.EtalonMassFlow := Point.EtalonMass/Point.SpillTime;
+      if Point.SpillTime > 0.0 then
+      begin
+        Point.EtalonVolumeFlow :=
+          Point.EtalonVolume / Point.SpillTime;
 
-      Point.DeviceVolume := DeviceChannel.FlowMeter.ValueVolume.GetDoubleValue;
-      Point.DeviceMass := DeviceChannel.FlowMeter.ValueMass.GetDoubleValue;
+        Point.EtalonMassFlow :=
+          Point.EtalonMass / Point.SpillTime;
+      end
+      else
+      begin
+        Point.EtalonVolumeFlow := 0.0;
+        Point.EtalonMassFlow := 0.0;
 
-      Point.Density := DeviceChannel.FlowMeter.ValueDensity.GetDoubleValue;
-      Point.Error := DeviceChannel.FlowMeter.ValueError.GetDoubleValue;
-      Point.PulseCount := DeviceChannel.ValueImpResult.GetDoubleValue;
+        ProtocolManager.AddMessage(
+          pcError,
+          psWorkTable,
+          'SaveMeasurementResults',
+          'Невозможно рассчитать расход эталона',
+          Format(
+            'WorkTable=%s; Device=%s; Channel=%s; ' +
+            'Point.SpillTime=%.9f; Time=%.9f; ' +
+            'TimeResult=%.9f; ValueTime=%.9f',
+            [
+              Name,
+              Device.Name,
+              DeviceChannel.Name,
+              Point.SpillTime,
+              Time,
+              TimeResult,
+              ValueTimeSnapshot
+            ]
+          )
+        );
+      end;
 
-      Point.DeviceMassFlow := Point.DeviceMass/Point.SpillTime;
-      Point.DeviceVolumeFlow := Point.DeviceVolume/Point.SpillTime;
-      Point.MeanFrequency := Point.PulseCount/Point.SpillTime;
+      Point.DeviceVolume :=
+        DeviceChannel.FlowMeter.ValueVolume.GetDoubleValue;
+
+      Point.DeviceMass :=
+        DeviceChannel.FlowMeter.ValueMass.GetDoubleValue;
+
+      Point.Density :=
+        DeviceChannel.FlowMeter.ValueDensity.GetDoubleValue;
+
+      Point.Error :=
+        DeviceChannel.FlowMeter.ValueError.GetDoubleValue;
+
+      Point.PulseCount :=
+        DeviceChannel.ValueImpResult.GetDoubleValue;
+
+      if Point.SpillTime > 0.0 then
+      begin
+        Point.DeviceMassFlow :=
+          Point.DeviceMass / Point.SpillTime;
+
+        Point.DeviceVolumeFlow :=
+          Point.DeviceVolume / Point.SpillTime;
+
+        Point.MeanFrequency :=
+          Point.PulseCount / Point.SpillTime;
+      end
+      else
+      begin
+        Point.DeviceMassFlow := 0.0;
+        Point.DeviceVolumeFlow := 0.0;
+        Point.MeanFrequency := 0.0;
+
+        ProtocolManager.AddMessage(
+          pcError,
+          psWorkTable,
+          'SaveMeasurementResults',
+          'Невозможно рассчитать параметры поверяемого прибора',
+          Format(
+            'WorkTable=%s; Device=%s; Channel=%s; ' +
+            'Point.SpillTime=%.9f; DeviceVolume=%.9f; ' +
+            'DeviceMass=%.9f; PulseCount=%.9f',
+            [
+              Name,
+              Device.Name,
+              DeviceChannel.Name,
+              Point.SpillTime,
+              Point.DeviceVolume,
+              Point.DeviceMass,
+              Point.PulseCount
+            ]
+          )
+        );
+      end;
 
       CurrentCoef := 0.0;
-      MeterValueCoef := DeviceChannel.FlowMeter.ValueCoef;
+
+      MeterValueCoef :=
+        DeviceChannel.FlowMeter.ValueCoef;
+
       if MeterValueCoef <> nil then
         CurrentCoef := MeterValueCoef.GetDoubleValue
       else if DeviceChannel.FlowMeter.Device <> nil then
-        CurrentCoef := DeviceChannel.FlowMeter.Device.Coef;
+        CurrentCoef :=
+          DeviceChannel.FlowMeter.Device.Coef;
 
       if SameValue(CurrentCoef, 0.0, 1E-12) and
          (DeviceChannel.FlowMeter.Device <> nil) then
       begin
-        MeasuredDim := TMeasuredDimension(DeviceChannel.FlowMeter.Device.MeasuredDimension);
+        MeasuredDim := TMeasuredDimension(
+          DeviceChannel.FlowMeter.Device.MeasuredDimension
+        );
+
         case MeasuredDim of
-          mdVolumeFlow, mdVolume:
-            if not SameValue(Point.EtalonVolume, 0.0, 1E-12) then
-              CurrentCoef := Point.PulseCount / Point.EtalonVolume;
-          mdMassFlow, mdMass:
-            if not SameValue(Point.EtalonMass, 0.0, 1E-12) then
-              CurrentCoef := Point.PulseCount / Point.EtalonMass;
+          mdVolumeFlow,
+          mdVolume:
+            if not SameValue(
+              Point.EtalonVolume,
+              0.0,
+              1E-12
+            ) then
+              CurrentCoef :=
+                Point.PulseCount / Point.EtalonVolume;
+
+          mdMassFlow,
+          mdMass:
+            if not SameValue(
+              Point.EtalonMass,
+              0.0,
+              1E-12
+            ) then
+              CurrentCoef :=
+                Point.PulseCount / Point.EtalonMass;
         end;
       end;
+
       Point.Coef := CurrentCoef;
 
-      Point.AvgCurrent := DeviceChannel.ValueCurrent.GetDoubleValue;
-      Point.StartTemperature := ValueTempertureBefore.GetDoubleValue;
-      Point.EndTemperature := ValueTempertureAfter.GetDoubleValue;
-      Point.AvgTemperature := ValueTemperture.GetDoubleValue;
-      Point.InputPressure := ValuePressureBefore.GetDoubleValue;
-      Point.OutputPressure := ValuePressureAfter.GetDoubleValue;
-      Point.DeltaPressure :=  Point.InputPressure - Point.OutputPressure;
-      Point.AtmosphericPressure := ValueAirPressure.GetDoubleValue;
-      Point.AmbientTemperature := ValueAirTemperture.GetDoubleValue;
-      Point.RelativeHumidity := ValueHumidity.GetDoubleValue;
+      Point.AvgCurrent :=
+        DeviceChannel.ValueCurrent.GetDoubleValue;
 
-      if Device <> nil then
-      begin
-        LogMKS('DBG SP 1001', 'SaveMeasurementResults BEFORE AnalyseDataPoint',
-          Format('Device=%s UUID=%s | %s', [Device.Name, Device.UUID, DumpSpillage(Point)]));
-        Point.Valid := Device.AnalyseDataPoint(Point);
-        LogMKS('DBG SP 1002', 'SaveMeasurementResults AFTER AnalyseDataPoint',
-          Format('Device=%s UUID=%s | %s', [Device.Name, Device.UUID, DumpSpillage(Point)]));
-      end;
+      Point.StartTemperature :=
+        ValueTempertureBefore.GetDoubleValue;
+
+      Point.EndTemperature :=
+        ValueTempertureAfter.GetDoubleValue;
+
+      Point.AvgTemperature :=
+        ValueTemperture.GetDoubleValue;
+
+      Point.InputPressure :=
+        ValuePressureBefore.GetDoubleValue;
+
+      Point.OutputPressure :=
+        ValuePressureAfter.GetDoubleValue;
+
+      Point.DeltaPressure :=
+        Point.InputPressure - Point.OutputPressure;
+
+      Point.AtmosphericPressure :=
+        ValueAirPressure.GetDoubleValue;
+
+      Point.AmbientTemperature :=
+        ValueAirTemperture.GetDoubleValue;
+
+      Point.RelativeHumidity :=
+        ValueHumidity.GetDoubleValue;
+
+      LogPointData(
+        pcProc,
+        'Окончательные данные перед AnalyseDataPoint',
+        Device,
+        DeviceChannel,
+        Point
+      );
+
+      Device.AnalyseDataPoint(Point);
+
+      LogPointData(
+        pcProc,
+        'Окончательные данные после AnalyseDataPoint',
+        Device,
+        DeviceChannel,
+        Point
+      );
+
+      if not SameValue(
+        Point.SpillTime,
+        SavedPointTime,
+        1E-9
+      ) then
+        ProtocolManager.AddMessage(
+          pcWarning,
+          psWorkTable,
+          'SaveMeasurementResults',
+          'AnalyseDataPoint изменил итоговое время',
+          Format(
+            'WorkTable=%s; Device=%s; DeviceUUID=%s; ' +
+            'BeforeSpillTime=%.9f; AfterSpillTime=%.9f',
+            [
+              Name,
+              Device.Name,
+              Device.UUID,
+              SavedPointTime,
+              Point.SpillTime
+            ]
+          )
+        );
 
       Point.State := osNew;
-      if Session <> nil then
-      begin
-        if Session.State <> osNew then
-          Session.State := osModified;
-        Point.SessionID := Session.ID;
-      end;
+
+      if Session.State <> osNew then
+        Session.State := osModified;
+
+      Point.SessionID := Session.ID;
       Device.State := osModified;
 
-      LogMKS('DBG SP 1003', 'SaveMeasurementResults BEFORE AddDataPoint',
-        Format('Device=%s UUID=%s | %s', [Device.Name, Device.UUID, DumpSpillage(Point)]));
+      LogPointData(
+        pcProc,
+        'Окончательные данные перед AddDataPoint',
+        Device,
+        DeviceChannel,
+        Point
+      );
+
       DeviceChannel.FlowMeter.AddDataPoint(Point);
-      LogMKS('DBG SP 1004', 'SaveMeasurementResults AFTER AddDataPoint',
-        Format('Device=%s UUID=%s; Device.Spillages.Count=%d; Sessions.Count=%d',
-          [Device.Name, Device.UUID, Device.Spillages.Count, Device.Sessions.Count]));
+
+      ProtocolManager.AddMessage(
+        pcProc,
+        psWorkTable,
+        'SaveMeasurementResults',
+        'Результат добавлен в коллекцию прибора',
+        Format(
+          'WorkTable=%s; Device=%s; DeviceUUID=%s; Channel=%s; ' +
+          'SavedSpillTime=%.9f; SourcePoint.SpillTime=%.9f; ' +
+          'Device.Spillages.Count=%d; Sessions.Count=%d',
+          [
+            Name,
+            Device.Name,
+            Device.UUID,
+            DeviceChannel.Name,
+            SavedPointTime,
+            Point.SpillTime,
+            Device.Spillages.Count,
+            Device.Sessions.Count
+          ]
+        )
+      );
 
       if Assigned(DeviceRepo) then
       begin
         BeforePointCount := 0;
+
         if Device.Points <> nil then
           BeforePointCount := Device.Points.Count;
-        BeforePointUUIDs := DevicePointUUIDList(Device);
-        LogDevicePointsForSave('BeforeSaveDevicePoints', Device);
-        DeviceRepo.SaveDeviceResults(Device);
-        LogDevicePointsForSave('AfterSaveDevicePoints', Device);
+
+        BeforePointUUIDs :=
+          DevicePointUUIDList(Device);
+
+        LogDevicePointsForSave(
+          'Список поверочных точек перед сохранением прибора',
+          Device
+        );
+
+        ProtocolManager.AddMessage(
+          pcAction,
+          psWorkTable,
+          'SaveMeasurementResults',
+          'Начато сохранение прибора в репозиторий',
+          Format(
+            'WorkTable=%s; Device=%s; DeviceUUID=%s; ' +
+            'SpillTime=%.9f; Spillages.Count=%d; Sessions.Count=%d',
+            [
+              Name,
+              Device.Name,
+              Device.UUID,
+              Point.SpillTime,
+              Device.Spillages.Count,
+              Device.Sessions.Count
+            ]
+          )
+        );
+
+        try
+          DeviceRepo.SaveDeviceResults(Device);
+
+          ProtocolManager.AddMessage(
+            pcProc,
+            psWorkTable,
+            'SaveMeasurementResults',
+            'Сохранение прибора в репозиторий завершено',
+            Format(
+              'WorkTable=%s; Device=%s; DeviceUUID=%s; ' +
+              'SpillTime=%.9f; TimeResult=%.9f; ValueTime=%.9f',
+              [
+                Name,
+                Device.Name,
+                Device.UUID,
+                Point.SpillTime,
+                TimeResult,
+                ValueTimeSnapshot
+              ]
+            )
+          );
+        except
+          on E: Exception do
+          begin
+            ProtocolManager.AddMessage(
+              pcError,
+              psWorkTable,
+              'SaveMeasurementResults',
+              'Ошибка сохранения прибора в репозиторий',
+              Format(
+                'WorkTable=%s; Device=%s; DeviceUUID=%s; ' +
+                'SpillTime=%.9f; ExceptionClass=%s; Error=%s',
+                [
+                  Name,
+                  Device.Name,
+                  Device.UUID,
+                  Point.SpillTime,
+                  E.ClassName,
+                  E.Message
+                ]
+              )
+            );
+            raise;
+          end;
+        end;
+
+        LogDevicePointsForSave(
+          'Список поверочных точек после сохранения прибора',
+          Device
+        );
+
         AfterPointCount := 0;
+
         if Device.Points <> nil then
           AfterPointCount := Device.Points.Count;
+
         if BeforePointCount <> AfterPointCount then
-          LogMKS('DBG SP 1102', 'DevicePointsChangedDuringSave',
-            Format('DeviceUUID=%s; OldCount=%d; NewCount=%d; RemovedPointsUUID=%s',
-              [Device.UUID, BeforePointCount, AfterPointCount, BeforePointUUIDs]));
-      end;
+          ProtocolManager.AddMessage(
+            pcWarning,
+            psWorkTable,
+            'SaveMeasurementResults',
+            'Список поверочных точек изменился во время сохранения',
+            Format(
+              'DeviceUUID=%s; OldCount=%d; NewCount=%d; ' +
+              'PointUUIDsBeforeSave=%s',
+              [
+                Device.UUID,
+                BeforePointCount,
+                AfterPointCount,
+                BeforePointUUIDs
+              ]
+            )
+          );
+      end
+      else
+        ProtocolManager.AddMessage(
+          pcWarning,
+          psWorkTable,
+          'SaveMeasurementResults',
+          'Результат не сохранён в репозиторий',
+          Format(
+            'WorkTable=%s; Device=%s; DeviceUUID=%s; ' +
+            'Reason=DeviceRepo nil; результат добавлен только в объект прибора',
+            [
+              Name,
+              Device.Name,
+              Device.UUID
+            ]
+          )
+        );
+
     finally
       Point.Free;
     end;
   end;
 
-end;
+  if ValueTime <> nil then
+    ValueTimeSnapshot := ValueTime.GetDoubleValue
+  else
+    ValueTimeSnapshot := 0.0;
 
-procedure TWorkTable.StartTest;
+  ProtocolManager.AddMessage(
+    pcProc,
+    psWorkTable,
+    'SaveMeasurementResults',
+    'Сохранение результатов измерения завершено',
+    Format(
+      'WorkTable=%s; ProcessedDeviceCount=%d; ' +
+      'Time=%.9f; TimeResult=%.9f; ValueTime=%.9f; ' +
+      'ValueTimeAssigned=%s; DeviceRepoAssigned=%s',
+      [
+        Name,
+        ProcessedDeviceCount,
+        Time,
+        TimeResult,
+        ValueTimeSnapshot,
+        BoolText(ValueTime <> nil),
+        BoolText(DeviceRepo <> nil)
+      ]
+    )
+  );
+end;procedure TWorkTable.StartTest;
 begin
   if IsSimulationMode then
   begin

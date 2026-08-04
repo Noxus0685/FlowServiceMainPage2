@@ -5811,10 +5811,9 @@ begin
   Result.DeviceVolume := Q.FieldByName('DeviceVolume').AsFloat;
   Result.DeviceMass := Q.FieldByName('DeviceMass').AsFloat;
   Result.Velocity := Q.FieldByName('Velocity').AsFloat;
-  Result.Status := Q.FieldByName('Status').AsInteger;
-  Result.StatusStr := Q.FieldByName('StatusStr').AsString;
+  Result.ImportLegacyValidation(Q.FieldByName('Status').AsInteger,
+    Q.FieldByName('StatusStr').AsString, Q.FieldByName('Valid').AsInteger <> 0);
   Result.Error := Q.FieldByName('Error').AsFloat;
-  Result.Valid := Q.FieldByName('Valid').AsInteger <> 0;
   Result.QStd := Q.FieldByName('QStd').AsFloat;
   Result.QCV := Q.FieldByName('QCV').AsFloat;
   Result.VolumeBefore := Q.FieldByName('VolumeBefore').AsFloat;
@@ -5993,8 +5992,8 @@ begin
     SetFloatParam(Q, 'DeviceVolume', ASpillage.DeviceVolume);
     SetFloatParam(Q, 'DeviceMass', ASpillage.DeviceMass);
     SetFloatParam(Q, 'Velocity', ASpillage.Velocity);
-    SetIntParam(Q, 'Status', ASpillage.Status);
-    SetStrParam(Q, 'StatusStr', ASpillage.StatusStr);
+    SetIntParam(Q, 'Status', SpillageValidationToLegacyCode(ASpillage.Validation, ASpillage.ValidationReason));
+    SetStrParam(Q, 'StatusStr', ASpillage.ValidationMessage);
     SetFloatParam(Q, 'Error', ASpillage.Error);
     SetIntParam(Q, 'Valid', Ord(ASpillage.Valid));
     SetFloatParam(Q, 'QStd', ASpillage.QStd);

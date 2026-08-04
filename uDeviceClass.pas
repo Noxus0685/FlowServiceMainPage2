@@ -1,4 +1,4 @@
-﻿unit uDeviceClass;
+unit uDeviceClass;
 
 interface
 
@@ -17,6 +17,43 @@ uses
 
 
 type
+  { Execution and metrological state are deliberately orthogonal.  Never use
+    the ordinal of one of these enums as a value of another enum. }
+  EValidationStatus = (vsNone, vsUndefined, vsValid, vsInvalid);
+  EMeasurementSpillageStatus = (mssNone, mssCreated, mssDataAssigned,
+    mssAnalyzing, mssCompleted, mssSavePending, mssSaved, mssInterrupted,
+    mssCancelled, mssError);
+  EMeasurementDeviceStatus = (mdsNone, mdsPrepared, mdsMeasurement,
+    mdsCompleted, mdsSavePending, mdsSaved, mdsInterrupted, mdsCancelled,
+    mdsError);
+  ESpillageValidationReason = (svrNone, svrNotAnalyzed, svrDisabled,
+    svrPointNotMatched, svrStopCriteriaFailed, svrInvalidSourceData,
+    svrErrorExceeded, svrErrorWithinTolerance);
+  EPointValidationReason = (pvrNone, pvrNotAnalyzed, pvrDisabled,
+    pvrNoMeasurements, pvrNoMatchedMeasurements,
+    pvrInsufficientMatchedMeasurements, pvrInsufficientValidMeasurements,
+    pvrRequiredValidMeasurementsCollected, pvrInvalidSettings);
+  EDeviceValidationReason = (dvrNone, dvrNotAnalyzed, dvrNoPoints,
+    dvrNoEnabledPoints, dvrPointsIncomplete, dvrInvalidPointsAndIncomplete,
+    dvrInvalidPointsAndComplete, dvrAllPointsValid);
+
+function ValidationStatusToText(const AValue: EValidationStatus): string;
+function MeasurementSpillageStatusToText(const AValue: EMeasurementSpillageStatus): string;
+function MeasurementPointStatusToText(const AValue: EMeasurementPointStatus): string;
+function MeasurementDeviceStatusToText(const AValue: EMeasurementDeviceStatus): string;
+function SpillageValidationReasonToText(const AValue: ESpillageValidationReason): string;
+function PointValidationReasonToText(const AValue: EPointValidationReason): string;
+function DeviceValidationReasonToText(const AValue: EDeviceValidationReason): string;
+function SpillageValidationToLegacyCode(const AValidation: EValidationStatus;
+  const AReason: ESpillageValidationReason): Integer;
+function GetSpillageValidationColor(const AValidation: EValidationStatus;
+  const AReason: ESpillageValidationReason): TAlphaColor;
+function GetPointValidationColor(const AValidation: EValidationStatus;
+  const AReason: EPointValidationReason): TAlphaColor;
+function GetDeviceValidationColor(const AValidation: EValidationStatus;
+  const AReason: EDeviceValidationReason): TAlphaColor;
+function GetPointExecutionStatusColor(const AStatus: EMeasurementPointStatus): TAlphaColor;
+
 
   TCalibrCoefTableType = (
     cctMeterValueCoef = 0,            // поправка коэффициента пересчёта TMeterValue.Coef
@@ -128,6 +165,9 @@ type
 
     FStatus: EMeasurementPointStatus;
     FEnabled: Boolean;
+    FValidation: EValidationStatus;
+    FValidationReason: EPointValidationReason;
+    FValidationMessage: string;
 
     function GetStopCriteria: TSpillageStopCriteria;
     procedure SetStopCriteria(const Value: TSpillageStopCriteria);
@@ -144,11 +184,6 @@ type
     ProtocolDataPoints: TObjectList<TPointSpillage>;  // Лучшие измерения по погрешности (не более RepeatsProtocol)
 
     /// <summary>
-    /// Current execution/result status of this measurement point. StatusStr is
-    /// kept for persisted metrological analysis details and is not used to
-    /// render the measurement run status text.
-    /// </summary>
-    StatusStr: string;           // Текстовое описание статуса
 
     ResultError: Double;         // Итоговая (худшая из лучших) погрешность
     AverageError: Double;        // Средняя погрешность лучших измерений
@@ -234,6 +269,10 @@ type
     function GetStatus: string;
     function GetStatusHint: string;
     function GetStatusColor: TAlphaColor;
+    procedure SetValidation(const AValidation: EValidationStatus;
+      const AReason: EPointValidationReason; const AMessage: string);
+    function GetShortStateText: string;
+    function GetFullStateText: string;
     class function GetPointSpillageTypeText(const AType: EPointSpillageType): string; overload; static;
     class function GetPointSpillageTypeText(const AType: Integer): string; overload; static;
     class function GetPointEtalonTypeText(const AType: EPointEtalonType): string; overload; static;
@@ -248,23 +287,22 @@ type
     /// intentionally contains no measurement state transition logic.
     /// </summary>
     property Status: EMeasurementPointStatus read GetMeasurementPointStatus write SetMeasurementPointStatus;
+    property Validation: EValidationStatus read FValidation;
+    property ValidationReason: EPointValidationReason read FValidationReason;
+    property ValidationMessage: string read FValidationMessage;
 
     property target_EtalonType: integer read GettargetEtalonType  write SettargetEtalonType;
 
   end;
 
   TPointSpillage = class (TTypeEntity)
-
-            const
-      // Статусы точки проливки (используются для UI/журнала анализа)
-      SPS_CREATED = 0;              // Точка только создана, данные ещё не присваивались
-      SPS_DATA_ASSIGNED = 1;        // Данные присвоены, но анализ ещё не выполнен
-      SPS_FLOW_NOT_MATCHED = 2;     // Анализ выполнен: расход не сопоставлен ни с одной точкой (серый)
-      SPS_STOP_CRITERIA_FAILED = 3; // Анализ выполнен: расход сопоставлен, но критерий остановки не выполнен (серый)
-      SPS_ERROR_EXCEEDED = 4;       // Анализ выполнен: критерий остановки выполнен, но погрешность выше допуска (красный)
-      SPS_OK = 5;                   // Анализ выполнен: критерий остановки выполнен, погрешность в допуске (зелёный)
-
-
+  private
+    FStatus: EMeasurementSpillageStatus;
+    FValidation: EValidationStatus;
+    FValidationReason: ESpillageValidationReason;
+    FValidationMessage: string;
+    procedure SetStatus(const AValue: EMeasurementSpillageStatus);
+    function GetValid: Boolean;
   public
 
     {====================================================================}
@@ -316,11 +354,7 @@ type
     {====================================================================}
     { РЕЗУЛЬТАТ ИЗМЕРЕНИЯ }
     {====================================================================}
-    Status: Integer;             // Статус анализа точки (см. SPS_*)
-    StatusStr: string;           // Текстовое пояснение статуса
-
     Error: Double;               // Итоговая погрешность, %
-    Valid: Boolean;              // Годность измерения (в зачёт / нет)
 
     {====================================================================}
     { СТАТИСТИКА ПРИБОРА }
@@ -387,6 +421,17 @@ type
     constructor Create (ASessionID : Integer);
 
     procedure Assign(ASource: TPointSpillage);
+    procedure SetValidation(const AValidation: EValidationStatus;
+      const AReason: ESpillageValidationReason; const AMessage: string);
+    procedure ImportLegacyValidation(const ALegacyStatus: Integer;
+      const ALegacyMessage: string; const ALegacyValid: Boolean);
+    function GetShortStateText: string;
+    function GetFullStateText: string;
+    property Status: EMeasurementSpillageStatus read FStatus write SetStatus;
+    property Validation: EValidationStatus read FValidation;
+    property ValidationReason: ESpillageValidationReason read FValidationReason;
+    property ValidationMessage: string read FValidationMessage;
+    property Valid: Boolean read GetValid; // compatibility, intentionally read-only
 
 
   end;
@@ -443,6 +488,10 @@ type
       FCalibrCoefTable: TObjectList<TCalibrCoefTable>;
       FDeviceType : TDeviceType;
       FDimensions: TList<TDimension>;
+      FStatus: EMeasurementDeviceStatus;
+      FValidation: EValidationStatus;
+      FValidationReason: EDeviceValidationReason;
+      FValidationMessage: string;
       function GetStopCriteria: TSpillageStopCriteria;
       procedure SetStopCriteria(const Value: TSpillageStopCriteria);
       function NormalizeActiveSessionSpillage: TSessionSpillage;
@@ -573,8 +622,6 @@ type
     SpillageStop: Integer;
     Repeats: Integer;
     RepeatsProtocol: Integer;
-    Status: Integer;            // Итоговый статус прибора по анализу точек (не сохраняется в БД)
-    StatusStr: string;          // Текстовое описание итогового статуса (не сохраняется в БД)
 
     {====================================================================}
     { ОПИСАНИЕ И ПРИМЕЧАНИЯ }
@@ -607,7 +654,7 @@ type
     function IsFlowInPoint(const AFlow: Double; const APoint: TDevicePoint): Boolean;
     function FindMatchedDevicePointForSpillage(const ASpillage: TPointSpillage): TDevicePoint;
 
-    function  AnalyseDataPoint(const ASpillage: TPointSpillage): Boolean;
+    function  AnalyseDataPoint(const ASpillage: TPointSpillage): EValidationStatus;
     procedure FillDataPointsList(APoint: TDevicePoint);
     procedure SetDimensions;
     function GetDimensionName: string;
@@ -615,6 +662,10 @@ type
     function FromBaseUnits(const AValue: Double): Double;
     procedure AnalyseDevicePointsResults;
     procedure AnalyseResults;
+    procedure SetValidation(const AValidation: EValidationStatus;
+      const AReason: EDeviceValidationReason; const AMessage: string);
+    function GetShortStateText: string;
+    function GetFullStateText: string;
 
 
     property  Spillages  : TObjectList<TPointSpillage> read FSpillages write FSpillages;
@@ -624,6 +675,10 @@ type
     property  CalibrCoefTables: TObjectList<TCalibrCoefTable> read FCalibrCoefTable write FCalibrCoefTable;
     property  CalibrCoefTable: TCalibrCoefTable read GetCalibrCoefTable write SetCalibrCoefTable;
     property  StopCriteria: TSpillageStopCriteria read GetStopCriteria write SetStopCriteria;
+    property Status: EMeasurementDeviceStatus read FStatus write FStatus;
+    property Validation: EValidationStatus read FValidation;
+    property ValidationReason: EDeviceValidationReason read FValidationReason;
+    property ValidationMessage: string read FValidationMessage;
 
     procedure AttachType(AType: TDeviceType; RepoName: String);
     procedure AttachDN(ADiameter: TDiameter; AType: TDeviceType);  overload;
@@ -639,6 +694,135 @@ uses
   uAppServices,
   uRepositories,
   uMKSDebug;
+
+function UnknownStateText(const ACode: Integer): string;
+begin
+  Result := Format('Неизвестное состояние (код %d)', [ACode]);
+end;
+
+function ValidationStatusToText(const AValue: EValidationStatus): string;
+begin
+  case AValue of
+    vsNone: Result := 'Метрологический результат отсутствует';
+    vsUndefined: Result := 'Результат не определён';
+    vsValid: Result := 'Годен';
+    vsInvalid: Result := 'Не годен';
+  else Result := UnknownStateText(Ord(AValue)); end;
+end;
+
+function MeasurementSpillageStatusToText(const AValue: EMeasurementSpillageStatus): string;
+begin
+  case AValue of
+    mssNone: Result := 'Состояние не задано'; mssCreated: Result := 'Создано';
+    mssDataAssigned: Result := 'Данные присвоены'; mssAnalyzing: Result := 'Выполняется анализ';
+    mssCompleted: Result := 'Завершено'; mssSavePending: Result := 'Ожидает сохранения';
+    mssSaved: Result := 'Сохранено'; mssInterrupted: Result := 'Прервано';
+    mssCancelled: Result := 'Отменено'; mssError: Result := 'Ошибка';
+  else Result := UnknownStateText(Ord(AValue)); end;
+end;
+
+function MeasurementPointStatusToText(const AValue: EMeasurementPointStatus): string;
+begin
+  case AValue of
+    mptsNone: Result := 'Состояние не задано'; mptsSelectPoint: Result := 'Выбор точки';
+    mptsInvalidPoint: Result := 'Некорректная точка'; mptsSelectEtalon: Result := 'Выбор эталона';
+    mptsSetupPoint: Result := 'Установка точки'; mptsWaitStable: Result := 'Ожидание стабилизации';
+    mptsWaitMeasureStart: Result := 'Ожидание начала измерения'; mptsMeasure: Result := 'Измерение';
+    mptsWaitMeasureStop: Result := 'Ожидание завершения измерения'; mptsResultsRead: Result := 'Чтение результатов';
+    mptsSave: Result := 'Сохранение'; mptsDone: Result := 'Завершено';
+    mptsSetupError: Result := 'Ошибка установки'; mptsMeasureError: Result := 'Ошибка измерения';
+    mptsInterrupted: Result := 'Прервано'; mptsCancelled: Result := 'Отменено';
+    mptsSaved: Result := 'Сохранено'; mptsSkipped: Result := 'Пропущено';
+  else Result := UnknownStateText(Ord(AValue)); end;
+end;
+
+function MeasurementDeviceStatusToText(const AValue: EMeasurementDeviceStatus): string;
+begin
+  case AValue of
+    mdsNone: Result := 'Состояние не задано'; mdsPrepared: Result := 'Подготовлен';
+    mdsMeasurement: Result := 'Выполняется измерение'; mdsCompleted: Result := 'Завершено';
+    mdsSavePending: Result := 'Ожидает сохранения'; mdsSaved: Result := 'Сохранено';
+    mdsInterrupted: Result := 'Прервано'; mdsCancelled: Result := 'Отменено';
+    mdsError: Result := 'Ошибка';
+  else Result := UnknownStateText(Ord(AValue)); end;
+end;
+
+function SpillageValidationReasonToText(const AValue: ESpillageValidationReason): string;
+begin
+  case AValue of
+    svrNone: Result := ''; svrNotAnalyzed: Result := 'Анализ не выполнялся';
+    svrDisabled: Result := 'Измерение отключено'; svrPointNotMatched: Result := 'Измерение не соответствует поверочной точке';
+    svrStopCriteriaFailed: Result := 'Критерий остановки не выполнен'; svrInvalidSourceData: Result := 'Исходные данные некорректны';
+    svrErrorExceeded: Result := 'Превышена допустимая погрешность'; svrErrorWithinTolerance: Result := 'Погрешность находится в допуске';
+  else Result := UnknownStateText(Ord(AValue)); end;
+end;
+
+function PointValidationReasonToText(const AValue: EPointValidationReason): string;
+begin
+  case AValue of
+    pvrNone: Result := ''; pvrNotAnalyzed: Result := 'Анализ не выполнялся'; pvrDisabled: Result := 'Точка отключена';
+    pvrNoMeasurements: Result := 'Измерения отсутствуют'; pvrNoMatchedMeasurements: Result := 'Соответствующие измерения отсутствуют';
+    pvrInsufficientMatchedMeasurements: Result := 'Недостаточно соответствующих измерений';
+    pvrInsufficientValidMeasurements: Result := 'Недостаточно годных измерений';
+    pvrRequiredValidMeasurementsCollected: Result := 'Требуемое количество годных измерений набрано';
+    pvrInvalidSettings: Result := 'Настройки точки некорректны';
+  else Result := UnknownStateText(Ord(AValue)); end;
+end;
+
+function DeviceValidationReasonToText(const AValue: EDeviceValidationReason): string;
+begin
+  case AValue of
+    dvrNone: Result := ''; dvrNotAnalyzed: Result := 'Анализ не выполнялся'; dvrNoPoints: Result := 'Поверочные точки отсутствуют';
+    dvrNoEnabledPoints: Result := 'Нет включённых поверочных точек'; dvrPointsIncomplete: Result := 'Не по всем точкам получен результат';
+    dvrInvalidPointsAndIncomplete: Result := 'Есть негодные и не завершённые точки';
+    dvrInvalidPointsAndComplete: Result := 'Все точки определены, имеются негодные';
+    dvrAllPointsValid: Result := 'Все поверочные точки годны';
+  else Result := UnknownStateText(Ord(AValue)); end;
+end;
+
+function SpillageValidationToLegacyCode(const AValidation: EValidationStatus;
+  const AReason: ESpillageValidationReason): Integer;
+const
+  LEGACY_CREATED = 0;
+  LEGACY_FLOW_NOT_MATCHED = 2;
+  LEGACY_STOP_CRITERIA_FAILED = 3;
+  LEGACY_ERROR_EXCEEDED = 4;
+  LEGACY_OK = 5;
+begin
+  { The database column belongs to the legacy, versionless format.  Keep its
+    encoding at this single compatibility boundary; runtime code never uses it. }
+  if AValidation = vsValid then Exit(LEGACY_OK);
+  if AValidation = vsInvalid then Exit(LEGACY_ERROR_EXCEEDED);
+  case AReason of
+    svrPointNotMatched: Result := LEGACY_FLOW_NOT_MATCHED;
+    svrStopCriteriaFailed: Result := LEGACY_STOP_CRITERIA_FAILED;
+  else Result := LEGACY_CREATED; end;
+end;
+
+function GetSpillageValidationColor(const AValidation: EValidationStatus; const AReason: ESpillageValidationReason): TAlphaColor;
+begin
+  case AValidation of vsValid: Result := COLOR_COMPLETED; vsInvalid: Result := COLOR_WARNING; else Result := COLOR_NONE; end;
+end;
+function GetPointValidationColor(const AValidation: EValidationStatus; const AReason: EPointValidationReason): TAlphaColor;
+begin
+  case AValidation of vsValid: Result := COLOR_COMPLETED; vsInvalid: Result := COLOR_INVALID; else Result := COLOR_NONE; end;
+end;
+function GetDeviceValidationColor(const AValidation: EValidationStatus; const AReason: EDeviceValidationReason): TAlphaColor;
+begin
+  if AValidation = vsValid then Result := COLOR_COMPLETED
+  else if (AValidation = vsInvalid) and (AReason = dvrInvalidPointsAndIncomplete) then Result := COLOR_WARNING
+  else if AValidation = vsInvalid then Result := COLOR_INVALID else Result := COLOR_NONE;
+end;
+function GetPointExecutionStatusColor(const AStatus: EMeasurementPointStatus): TAlphaColor;
+begin
+  case AStatus of
+    mptsSelectEtalon, mptsSetupPoint, mptsWaitStable, mptsWaitMeasureStart, mptsMeasure,
+    mptsWaitMeasureStop, mptsResultsRead, mptsSave: Result := COLOR_RUNNING;
+    mptsDone, mptsInterrupted, mptsCancelled, mptsSkipped: Result := COLOR_WARNING;
+    mptsSaved: Result := COLOR_COMPLETED;
+    mptsInvalidPoint, mptsSetupError, mptsMeasureError: Result := COLOR_INVALID;
+  else Result := COLOR_NONE; end;
+end;
 
 function TryCalibrCoefTableType(const ARawType: Integer;
   out ATableType: TCalibrCoefTableType): Boolean;
@@ -954,8 +1138,10 @@ begin
   SpillageStop := STOP_BY_TIME;
   Repeats := 3;
   RepeatsProtocol := 3;
-  Status := 0;
-  StatusStr := 'Измерения не производились/не анализировались.';
+  FStatus := mdsNone;
+  FValidation := vsNone;
+  FValidationReason := dvrNotAnalyzed;
+  FValidationMessage := '';
 
   {----------------------------------}
   { Описание }
@@ -1302,7 +1488,9 @@ begin
   RepeatsCompleted := 0;
 
   Status := mptsNone;
-  StatusStr := '-';
+  FValidation := vsNone;
+  FValidationReason := pvrNotAnalyzed;
+  FValidationMessage := '';
   ResultError := 0.0;
   AverageError := 0.0;
   StdDev := 0.0;
@@ -1364,7 +1552,9 @@ begin
   RepeatsCompleted := 0;
 
   Status := mptsNone;
-  StatusStr := '-';
+  FValidation := vsNone;
+  FValidationReason := pvrNotAnalyzed;
+  FValidationMessage := '';
   ResultError := 0.0;
   AverageError := 0.0;
   StdDev := 0.0;
@@ -1422,10 +1612,11 @@ begin
   Velocity := 0.0;
 
   { Результат }
-  Status := SPS_CREATED;
-  StatusStr := 'Точка создана. Данные измерения ещё не присваивались.';
+  FStatus := mssCreated;
+  FValidation := vsNone;
+  FValidationReason := svrNotAnalyzed;
+  FValidationMessage := '';
   Error := 0.0;
-  Valid := False;
 
   { Статистика прибора }
   QStd := 0.0;
@@ -1563,7 +1754,9 @@ begin
   Repeats := ASource.Repeats;
   RepeatsProtocol := ASource.RepeatsProtocol;
   Status := ASource.Status;
-  StatusStr := ASource.StatusStr;
+  FValidation := ASource.Validation;
+  FValidationReason := ASource.ValidationReason;
+  FValidationMessage := ASource.ValidationMessage;
 
   Comment := ASource.Comment;
   Description := ASource.Description;
@@ -1913,8 +2106,9 @@ begin
       Add(FloatToStr(S.DeviceVolume));
       Add(FloatToStr(S.DeviceMass));
       Add(FloatToStr(S.Velocity));
-      Add(IntToStr(S.Status));
-      Add(S.StatusStr);
+      { Preserve the legacy hash field order and encoding for stored records. }
+      Add(IntToStr(SpillageValidationToLegacyCode(S.Validation, S.ValidationReason)));
+      Add(S.ValidationMessage);
       Add(FloatToStr(S.Error));
       Add(BoolToStr(S.Valid, True));
       Add(FloatToStr(S.QStd));
@@ -2095,11 +2289,26 @@ begin
   Repeats := ASource.Repeats;
   RepeatsCompleted := ASource.RepeatsCompleted;
 
-  Status := ASource.Status;
-  StatusStr := ASource.StatusStr;
-  ResultError := ASource.ResultError;
-  AverageError := ASource.AverageError;
-  StdDev := ASource.StdDev;
+  { Configuration copies must never inherit state from another measurement
+    run.  Runtime state is copied only by the explicitly requested full copy. }
+  if FullAssign then
+  begin
+    Status := ASource.Status;
+    FValidation := ASource.Validation;
+    FValidationReason := ASource.ValidationReason;
+    FValidationMessage := ASource.ValidationMessage;
+    ResultError := ASource.ResultError;
+    AverageError := ASource.AverageError;
+    StdDev := ASource.StdDev;
+  end
+  else
+  begin
+    Status := mptsNone;
+    FValidation := vsNone;
+    FValidationReason := pvrNotAnalyzed;
+    FValidationMessage := '';
+    ResultError := 0; AverageError := 0; StdDev := 0;
+  end;
 
   if DataPoints = nil then
     DataPoints := TObjectList<TPointSpillage>.Create(False)
@@ -2201,22 +2410,86 @@ end;
 
 function TDevicePoint.GetStatusColor: TAlphaColor;
 begin
-  case Status of
-    mptsNone, mptsSelectPoint:
-      Result := COLOR_NONE;
-    mptsSelectEtalon, mptsSetupPoint, mptsWaitStable,
-    mptsWaitMeasureStart, mptsMeasure, mptsWaitMeasureStop,
-    mptsResultsRead, mptsSave:
-      Result := COLOR_RUNNING;
-    mptsDone, mptsInterrupted, mptsCancelled, mptsSkipped:
-      Result := COLOR_WARNING;
-    mptsSaved:
-      Result := COLOR_COMPLETED;
-    mptsInvalidPoint, mptsSetupError, mptsMeasureError:
-      Result := COLOR_INVALID;
-  else
-    Result := COLOR_NONE;
-  end;
+  Result := GetPointExecutionStatusColor(Status);
+end;
+
+procedure TDevicePoint.SetValidation(const AValidation: EValidationStatus;
+  const AReason: EPointValidationReason; const AMessage: string);
+begin
+  if ((AValidation = vsValid) and (AReason <> pvrRequiredValidMeasurementsCollected)) or
+     ((AValidation = vsInvalid) and (AReason <> pvrInsufficientValidMeasurements)) then
+    raise EArgumentException.Create('Недопустимое сочетание результата и причины поверочной точки');
+  if (FValidation = AValidation) and (FValidationReason = AReason) and
+     (FValidationMessage = AMessage) then Exit;
+  FValidation := AValidation; FValidationReason := AReason; FValidationMessage := AMessage;
+  State := osModified;
+end;
+
+function TDevicePoint.GetShortStateText: string;
+begin
+  Result := LowerCase(ValidationStatusToText(Validation));
+  if Validation in [vsValid, vsInvalid] then
+    Result := Result + ' — ' + LowerCase(PointValidationReasonToText(ValidationReason));
+end;
+
+function TDevicePoint.GetFullStateText: string;
+begin
+  Result := 'Состояние выполнения: ' + MeasurementPointStatusToText(Status) + '.' + sLineBreak +
+    'Метрологический результат: ' + LowerCase(ValidationStatusToText(Validation)) + '.';
+  if PointValidationReasonToText(ValidationReason) <> '' then
+    Result := Result + sLineBreak + 'Причина: ' + LowerCase(PointValidationReasonToText(ValidationReason)) + '.';
+  if Trim(ValidationMessage) <> '' then Result := Result + sLineBreak + 'Пояснение: ' + ValidationMessage + '.';
+end;
+
+procedure TPointSpillage.SetStatus(const AValue: EMeasurementSpillageStatus);
+begin
+  if FStatus = AValue then Exit;
+  FStatus := AValue; State := osModified;
+end;
+
+function TPointSpillage.GetValid: Boolean;
+begin Result := Validation = vsValid; end;
+
+procedure TPointSpillage.SetValidation(const AValidation: EValidationStatus;
+  const AReason: ESpillageValidationReason; const AMessage: string);
+begin
+  if ((AValidation = vsValid) and (AReason <> svrErrorWithinTolerance)) or
+     ((AValidation = vsInvalid) and (AReason <> svrErrorExceeded)) then
+    raise EArgumentException.Create('Недопустимое сочетание результата и причины измерения');
+  if (FValidation = AValidation) and (FValidationReason = AReason) and
+     (FValidationMessage = AMessage) then Exit;
+  FValidation := AValidation; FValidationReason := AReason; FValidationMessage := AMessage;
+  State := osModified;
+end;
+
+procedure TPointSpillage.ImportLegacyValidation(const ALegacyStatus: Integer;
+  const ALegacyMessage: string; const ALegacyValid: Boolean);
+begin
+  { Explicit migration is mandatory: legacy 0..5 represented metrology, not
+    execution.  ALegacyValid is intentionally only a consistency hint. }
+  case ALegacyStatus of
+    0: begin FStatus := mssCreated; SetValidation(vsNone, svrNotAnalyzed, ALegacyMessage); end;
+    1: begin FStatus := mssDataAssigned; SetValidation(vsNone, svrNotAnalyzed, ALegacyMessage); end;
+    2: begin FStatus := mssCompleted; SetValidation(vsUndefined, svrPointNotMatched, ALegacyMessage); end;
+    3: begin FStatus := mssCompleted; SetValidation(vsUndefined, svrStopCriteriaFailed, ALegacyMessage); end;
+    4: begin FStatus := mssCompleted; SetValidation(vsInvalid, svrErrorExceeded, ALegacyMessage); end;
+    5: begin FStatus := mssCompleted; SetValidation(vsValid, svrErrorWithinTolerance, ALegacyMessage); end;
+  else begin FStatus := mssError; SetValidation(vsUndefined, svrInvalidSourceData,
+    Format('%s (неизвестный старый код %d)', [ALegacyMessage, ALegacyStatus])); end; end;
+end;
+
+function TPointSpillage.GetShortStateText: string;
+begin
+  Result := LowerCase(ValidationStatusToText(Validation));
+  if Validation in [vsValid, vsInvalid] then Result := Result + ' — ' + LowerCase(SpillageValidationReasonToText(ValidationReason));
+end;
+
+function TPointSpillage.GetFullStateText: string;
+begin
+  Result := 'Состояние выполнения: ' + MeasurementSpillageStatusToText(Status) + '.' + sLineBreak +
+    'Метрологический результат: ' + LowerCase(ValidationStatusToText(Validation)) + '.';
+  if SpillageValidationReasonToText(ValidationReason) <> '' then Result := Result + sLineBreak + 'Причина: ' + LowerCase(SpillageValidationReasonToText(ValidationReason)) + '.';
+  if Trim(ValidationMessage) <> '' then Result := Result + sLineBreak + 'Пояснение: ' + ValidationMessage + '.';
 end;
 
 function TDevicePoint.GetStopCriteria: TSpillageStopCriteria;
@@ -2288,10 +2561,11 @@ begin
   {====================================================================}
   { РЕЗУЛЬТАТ ИЗМЕРЕНИЯ }
   {====================================================================}
-  Status := ASource.Status;
-  StatusStr := ASource.StatusStr;
+  FStatus := ASource.Status;
+  FValidation := ASource.Validation;
+  FValidationReason := ASource.ValidationReason;
+  FValidationMessage := ASource.ValidationMessage;
   Error := ASource.Error;
-  Valid := ASource.Valid;
 
   {====================================================================}
   { СТАТИСТИКА ПРИБОРА }
@@ -2554,126 +2828,57 @@ begin
 
 end;
 
-function TDevice.AnalyseDataPoint(const ASpillage: TPointSpillage):Boolean;
+function TDevice.AnalyseDataPoint(const ASpillage: TPointSpillage): EValidationStatus;
 var
-  P, MatchedPoint: TDevicePoint;
+  MatchedPoint: TDevicePoint;
   StopOk: Boolean;
   StopCriteria: TSpillageStopCriteria;
   MeasuredValue: Double;
-  AllowedError, ActualError: Double;
+  MessageText: string;
 begin
-
-  LogMKS('DBG SP 4001', 'TDevice.AnalyseDataPoint ENTER',
-    Format('Device=%s UUID=%s | Point=%s', [Self.Name, Self.UUID, DumpSpillage(ASpillage)]));
-
-  result:=False;
-  if ASpillage = nil then
-    Exit;
-
+  Result := vsUndefined;
+  if ASpillage = nil then Exit;
   ASpillage.DeviceUUID := Self.UUID;
-  ASpillage.Status := TPointSpillage.SPS_DATA_ASSIGNED;
-  ASpillage.StatusStr := 'Данные присвоены, анализ выполняется.';
-  ASpillage.Valid := False;
-
-    ASpillage.State := osModified;
-
+  ASpillage.Status := mssAnalyzing;
   MatchedPoint := FindMatchedDevicePointForSpillage(ASpillage);
-  if FPoints <> nil then
-    for P in FPoints do
-      if P <> nil then
-        LogMKS('DBG SP 4002', 'TDevice.AnalyseDataPoint CHECK DEVICE POINT',
-          Format('DevicePoint ID=%d Name=%s Q=%f | Spillage=%s', [P.ID, P.Name, P.Q, DumpSpillage(ASpillage)]));
-
   if MatchedPoint = nil then
   begin
-    ASpillage.Name := '-';
-    ASpillage.Status := TPointSpillage.SPS_FLOW_NOT_MATCHED;
-    ASpillage.StatusStr :=
-      'Анализ выполнен: расход не соответствует ни одной поверочной точке прибора. ' +
-      'Измерение некорректно (цвет: серый).';
-    LogMKS('DBG SP 4005', 'TDevice.AnalyseDataPoint NO MATCH', DumpSpillage(ASpillage));
+    ASpillage.Name := '-'; ASpillage.Status := mssCompleted;
+    ASpillage.SetValidation(vsUndefined, svrPointNotMatched,
+      'Расход не соответствует ни одной поверочной точке прибора');
     Exit;
   end;
-
-  LogMKS('DBG SP 4003', 'TDevice.AnalyseDataPoint MATCH',
-    Format('Matched DevicePoint ID=%d Name=%s | Before assign=%s',
-      [MatchedPoint.ID, MatchedPoint.Name, DumpSpillage(ASpillage)]));
   ASpillage.DeviceTypeUUID := MatchedPoint.DeviceTypeUUID;
   ASpillage.Name := MatchedPoint.Name;
-  LogMKS('DBG SP 4004', 'TDevice.AnalyseDataPoint AFTER MATCH ASSIGN', DumpSpillage(ASpillage));
-
   StopCriteria := MatchedPoint.StopCriteria;
-  if StopCriteria = [] then
-    StopCriteria := Self.StopCriteria;
-  if StopCriteria = [] then
-    StopCriteria := [scTime];
-
-  StopOk := True;
-
+  if StopCriteria = [] then StopCriteria := Self.StopCriteria;
+  if StopCriteria = [] then StopCriteria := [scTime];
+  StopOk := True; MessageText := '';
   if scImpulse in StopCriteria then
   begin
-    StopOk := StopOk and (ASpillage.PulseCount >= MatchedPoint.LimitImp);
-    if not StopOk then
-      ASpillage.StatusStr := Format(
-        'Критерий остановки "Импульсы" не выполнен: %.6f < %d.',
-        [ASpillage.PulseCount, MatchedPoint.LimitImp]
-      );
+    StopOk := ASpillage.PulseCount >= MatchedPoint.LimitImp;
+    if not StopOk then MessageText := Format('Фактическое количество импульсов %.6f, требуется %d', [ASpillage.PulseCount, MatchedPoint.LimitImp]);
   end;
-
   if StopOk and (scVolume in StopCriteria) then
   begin
-    if (MeasuredDimension = Ord(mdMassFlow)) or (MeasuredDimension = Ord(mdMass)) then
-      MeasuredValue := ASpillage.DeviceMass
-    else
-      MeasuredValue := ASpillage.DeviceVolume;
-
+    if (MeasuredDimension = Ord(mdMassFlow)) or (MeasuredDimension = Ord(mdMass)) then MeasuredValue := ASpillage.DeviceMass else MeasuredValue := ASpillage.DeviceVolume;
     StopOk := MeasuredValue >= MatchedPoint.LimitVolume;
-    if not StopOk then
-      ASpillage.StatusStr := Format(
-        'Критерий остановки "Объём/масса" не выполнен: %.6f < %.6f.',
-        [MeasuredValue, MatchedPoint.LimitVolume]
-      );
+    if not StopOk then MessageText := Format('Фактический объём/масса %.6f, требуется %.6f', [MeasuredValue, MatchedPoint.LimitVolume]);
   end;
-
   if StopOk and (scTime in StopCriteria) then
   begin
     StopOk := ASpillage.SpillTime >= MatchedPoint.LimitTime;
-    if not StopOk then
-      ASpillage.StatusStr := Format(
-        'Критерий остановки "Время" не выполнен: %.3f < %.3f с.',
-        [ASpillage.SpillTime, MatchedPoint.LimitTime]
-      );
+    if not StopOk then MessageText := Format('Фактическое время %.3f с, требуется %.3f с', [ASpillage.SpillTime, MatchedPoint.LimitTime]);
   end;
-
-  if not StopOk then
+  ASpillage.Status := mssCompleted;
+  if not StopOk then begin ASpillage.SetValidation(vsUndefined, svrStopCriteriaFailed, MessageText); Exit; end;
+  if Abs(ASpillage.Error) > Abs(MatchedPoint.Error) then
   begin
-    ASpillage.Status := TPointSpillage.SPS_STOP_CRITERIA_FAILED;
-    ASpillage.StatusStr := 'Анализ выполнен: расход сопоставлен, но ' + ASpillage.StatusStr +
-      ' Измерение некорректно (цвет: серый).';
-    Exit;
+    ASpillage.SetValidation(vsInvalid, svrErrorExceeded, Format('Фактическая погрешность %.6f %%, допустимая погрешность %.6f %%', [ASpillage.Error, MatchedPoint.Error]));
+    Result := vsInvalid; Exit;
   end;
-
-  AllowedError := Abs(MatchedPoint.Error);
-  ActualError := Abs(ASpillage.Error);
-
-  if ActualError > AllowedError then
-  begin
-    ASpillage.Status := TPointSpillage.SPS_ERROR_EXCEEDED;
-    ASpillage.StatusStr :=
-      Format('Измерение корректно по расходу и критерию остановки, но погрешность превышена: |%.6f| > |%.6f| (цвет: красный).',
-        [ASpillage.Error, MatchedPoint.Error]);
-    ASpillage.Valid := False;
-    Exit;
-  end;
-
-  ASpillage.Status := TPointSpillage.SPS_OK;
-  ASpillage.StatusStr :=
-    Format('Измерение полностью корректно: расход сопоставлен, критерий остановки выполнен, погрешность в допуске: |%.6f| <= |%.6f| (цвет: зелёный).',
-      [ASpillage.Error, MatchedPoint.Error]);
-  ASpillage.Valid := True;
-    result:=True;
-
-    ASpillage.State := osModified;
+  ASpillage.SetValidation(vsValid, svrErrorWithinTolerance, Format('Фактическая погрешность %.6f %%, допустимая погрешность %.6f %%', [ASpillage.Error, MatchedPoint.Error]));
+  Result := vsValid;
 end;
 
 procedure TDevice.FillDataPointsList(APoint: TDevicePoint);
@@ -2734,9 +2939,7 @@ begin
         end;
 
         APoint.DataPoints.Add(S);
-        if S.Enabled and not ((not S.Valid) and
-          (S.Status in [TPointSpillage.SPS_FLOW_NOT_MATCHED,
-                        TPointSpillage.SPS_STOP_CRITERIA_FAILED])) then
+        if S.Validation in [vsValid, vsInvalid] then
           CandidateList.Add(S);
       end;
 
@@ -2767,274 +2970,84 @@ end;
 
 procedure TDevice.AnalyseDevicePointsResults;
 var
-  DP: TDevicePoint;
-  Spillage: TPointSpillage;
-  S: TPointSpillage;
-  ValidCount: Integer;
-  ErrorsSum: Double;
-  VarianceSum: Double;
-  CandidateError: Double;
-  MinInvalidError: Double;
-  HasMinInvalid: Boolean;
-  ErrorExceededInValid: Boolean;
-  RequiredCount: Integer;
-  ProcessedCount: Integer;
-  HasInvalidSpillage: Boolean;
+  DP: TDevicePoint; S: TPointSpillage;
+  MatchedCount, ValidCount, InvalidCount, RequiredCount: Integer;
+  ErrorsSum, VarianceSum, WorstValid: Double;
 begin
-  if Points = nil then
-    Exit;
-
+  if Points = nil then Exit;
   for DP in Points do
   begin
     FillDataPointsList(DP);
-
-    DP.Status := mptsNone;
-    DP.StatusStr := 'Измерения не производились/не анализировались.';
-    DP.ResultError := 0.0;
-    DP.AverageError := 0.0;
-    DP.StdDev := 0.0;
-
-    if (DP.DataPoints = nil) or (DP.DataPoints.Count = 0) then
-    begin
-      DP.Status := EMeasurementPointStatus(1);
-      DP.StatusStr := 'Измерения производились, но измерений, связанных с данной точкой, нет.';
-      Continue;
-    end;
-
-    ValidCount := 0;
-    ErrorsSum := 0.0;
-    VarianceSum := 0.0;
-    CandidateError := -1.0;
-    MinInvalidError := 0.0;
-    HasMinInvalid := False;
-    ErrorExceededInValid := False;
-    HasInvalidSpillage := False;
-
+    DP.ResultError := 0; DP.AverageError := 0; DP.StdDev := 0;
+    if not DP.Enabled then begin DP.SetValidation(vsUndefined, pvrDisabled, 'Поверочная точка отключена'); Continue; end;
+    RequiredCount := DP.RepeatsProtocol; if RequiredCount <= 0 then RequiredCount := 1;
+    MatchedCount := 0; ValidCount := 0; InvalidCount := 0; ErrorsSum := 0; WorstValid := 0;
     for S in DP.DataPoints do
-      if (S <> nil) and S.Enabled and (not S.Valid) then
+      if (S <> nil) and S.Enabled and (S.State <> osDeleted) and (S.Validation in [vsValid, vsInvalid]) then
       begin
-        HasInvalidSpillage := True;
-        Break;
+        Inc(MatchedCount); ErrorsSum := ErrorsSum + S.Error;
+        if S.Validation = vsValid then begin Inc(ValidCount); if Abs(S.Error) > WorstValid then WorstValid := Abs(S.Error); end
+        else Inc(InvalidCount);
       end;
-
-    for S in DP.ProtocolDataPoints do
+    if MatchedCount > 0 then
     begin
-      ErrorsSum := ErrorsSum + S.Error;
-
-      if S.Valid and (Abs(S.Error) <= Abs(DP.Error)) then
-      begin
-        Inc(ValidCount);
-        if Abs(S.Error) > CandidateError then
-          CandidateError := Abs(S.Error);
-      end
-      else
-      begin
-        ErrorExceededInValid := True;
-        if (not HasMinInvalid) or (Abs(S.Error) < MinInvalidError) then
-        begin
-          MinInvalidError := Abs(S.Error);
-          HasMinInvalid := True;
-        end;
-      end;
+      DP.AverageError := ErrorsSum / MatchedCount; VarianceSum := 0;
+      for S in DP.DataPoints do if (S <> nil) and S.Enabled and (S.State <> osDeleted) and (S.Validation in [vsValid, vsInvalid]) then VarianceSum := VarianceSum + Sqr(S.Error - DP.AverageError);
+      DP.StdDev := Sqrt(VarianceSum / MatchedCount);
     end;
-
-    ProcessedCount := DP.ProtocolDataPoints.Count;
-    if ProcessedCount > 0 then
-      DP.AverageError := ErrorsSum / ProcessedCount;
-
-    if ProcessedCount > 0 then
-    begin
-      for S in DP.ProtocolDataPoints do
-        VarianceSum := VarianceSum + Sqr(S.Error - DP.AverageError);
-      DP.StdDev := Sqrt(VarianceSum / ProcessedCount);
-    end;
-
-    RequiredCount := DP.RepeatsProtocol;
-    if RequiredCount <= 0 then
-      RequiredCount := ProcessedCount;
-
+    DP.ResultError := WorstValid;
     if ValidCount >= RequiredCount then
-      DP.ResultError := CandidateError
-    else if HasMinInvalid then
-      DP.ResultError := MinInvalidError
-    else if ProcessedCount > 0 then
-      DP.ResultError := Abs(DP.ProtocolDataPoints[0].Error)
+      DP.SetValidation(vsValid, pvrRequiredValidMeasurementsCollected, Format('Годных измерений %d из требуемых %d; негодных %d', [ValidCount, RequiredCount, InvalidCount]))
+    else if MatchedCount < RequiredCount then
+      DP.SetValidation(vsUndefined, pvrInsufficientMatchedMeasurements, Format('Соответствующих измерений %d из требуемых %d', [MatchedCount, RequiredCount]))
     else
-      DP.ResultError := 0.0;
-
-    if HasInvalidSpillage then
-    begin
-      DP.Status := EMeasurementPointStatus(3);
-      DP.StatusStr := 'Есть включённые измерения по точке с признаком "Годность = Нет"; результат точки не годен.';
-      Continue;
-    end;
-
-    if ValidCount = 0 then
-    begin
-      if ErrorExceededInValid then
-      begin
-        DP.Status := EMeasurementPointStatus(3);
-        DP.StatusStr := 'Есть измерения по расходу, но погрешность превышает допуск (красный).';
-      end
-      else
-      begin
-        DP.Status := EMeasurementPointStatus(2);
-        DP.StatusStr := 'Есть измерения по расходу, но корректных измерений недостаточно или нет.';
-      end;
-    end
-    else if ValidCount < RequiredCount then
-    begin
-      if ErrorExceededInValid then
-      begin
-        DP.Status := EMeasurementPointStatus(3);
-        DP.StatusStr := 'Есть корректные измерения, но их меньше RepeatsProtocol и часть измерений превышает допуск по погрешности (красный).';
-      end
-      else
-      begin
-        DP.Status := EMeasurementPointStatus(4);
-        DP.StatusStr := 'Корректные измерения есть, их меньше RepeatsProtocol, но погрешности в пределах допуска (желтый).';
-      end;
-    end
-    else
-    begin
-      DP.Status := EMeasurementPointStatus(5);
-      DP.StatusStr := 'Корректных измерений не меньше RepeatsProtocol, требование по погрешности выполнено (зеленый).';
-    end;
+      DP.SetValidation(vsInvalid, pvrInsufficientValidMeasurements, Format('Годных измерений %d из требуемых %d; негодных %d', [ValidCount, RequiredCount, InvalidCount]));
   end;
 end;
 
 procedure TDevice.AnalyseResults;
 var
   DP: TDevicePoint;
-  Spillage: TPointSpillage;
-  PointsCount: Integer;
-  SessionsCount: Integer;
-  SpillagesCount: Integer;
-  HasStatus3: Boolean;
-  HasStatus4: Boolean;
-  AllStatus5: Boolean;
-  AllStatus0: Boolean;
-  AllStatus01: Boolean;
-  AllStatus012: Boolean;
-  HasMissingData: Boolean;
+  EnabledCount, ValidCount, InvalidCount, UndefinedCount: Integer;
 begin
-  PointsCount := 0;
-  SessionsCount := 0;
-  SpillagesCount := 0;
-  if Self.Points <> nil then
-    PointsCount := Self.Points.Count;
-  if Self.Sessions <> nil then
-    SessionsCount := Self.Sessions.Count;
-  if Self.Spillages <> nil then
-    SpillagesCount := Self.Spillages.Count;
-
-  LogMKS('DBG SP 5001', 'TDevice.AnalyseResults ENTER',
-    Format('Device=%s UUID=%s; Points.Count=%d; Sessions.Count=%d; Spillages.Count=%d',
-      [Self.Name, Self.UUID, PointsCount, SessionsCount, SpillagesCount]));
-  if Self.Spillages <> nil then
-    for Spillage in Self.Spillages do
-      LogMKS('DBG SP 5002', 'TDevice.AnalyseResults SPILLAGE BEFORE', DumpSpillage(Spillage));
-
   AnalyseDevicePointsResults;
-
-  if Self.Spillages <> nil then
-    for Spillage in Self.Spillages do
-      LogMKS('DBG SP 5003', 'TDevice.AnalyseResults SPILLAGE AFTER', DumpSpillage(Spillage));
-
-  Status := 0;
-  StatusStr := 'Измерения не производились/не анализировались.';
-
-  if (Points = nil) or (Points.Count = 0) then
-    Exit;
-
-  HasStatus3 := False;
-  HasStatus4 := False;
-  AllStatus5 := True;
-  AllStatus0 := True;
-  AllStatus01 := True;
-  AllStatus012 := True;
-  HasMissingData := False;
-
-  for DP in Points do
+  if (Points = nil) or (Points.Count = 0) then begin SetValidation(vsUndefined, dvrNoPoints, 'У прибора отсутствуют поверочные точки'); Exit; end;
+  EnabledCount := 0; ValidCount := 0; InvalidCount := 0; UndefinedCount := 0;
+  for DP in Points do if (DP <> nil) and DP.Enabled then
   begin
-    if DP = nil then
-      Continue;
-
-    if Ord(DP.Status) <> 5 then
-      AllStatus5 := False;
-
-    if Ord(DP.Status) in [0, 1] then
-      HasMissingData := True;
-
-    if Ord(DP.Status) <> 0 then
-      AllStatus0 := False;
-
-    if not (Ord(DP.Status) in [0, 1]) then
-      AllStatus01 := False;
-
-    if not (Ord(DP.Status) in [0, 1, 2]) then
-      AllStatus012 := False;
-
-    if Ord(DP.Status) = 3 then
-      HasStatus3 := True;
-
-    if Ord(DP.Status) = 4 then
-      HasStatus4 := True;
+    Inc(EnabledCount);
+    case DP.Validation of vsValid: Inc(ValidCount); vsInvalid: Inc(InvalidCount); else Inc(UndefinedCount); end;
   end;
+  if EnabledCount = 0 then SetValidation(vsUndefined, dvrNoEnabledPoints, 'Нет включённых поверочных точек')
+  else if ValidCount = EnabledCount then SetValidation(vsValid, dvrAllPointsValid, Format('Годны все %d поверочных точек', [EnabledCount]))
+  else if InvalidCount > 0 then
+    if UndefinedCount > 0 then SetValidation(vsInvalid, dvrInvalidPointsAndIncomplete, Format('Негодных точек %d, без результата %d', [InvalidCount, UndefinedCount]))
+    else SetValidation(vsInvalid, dvrInvalidPointsAndComplete, Format('Негодных точек %d из %d', [InvalidCount, EnabledCount]))
+  else SetValidation(vsUndefined, dvrPointsIncomplete, Format('Без результата %d из %d точек', [UndefinedCount, EnabledCount]));
+end;
 
-  if AllStatus5 then
-  begin
-    Status := 5;
-    StatusStr := 'Все поверочные точки имеют достаточное количество корректных измерений в пределах допуска (зеленый).';
-    Exit;
-  end;
+procedure TDevice.SetValidation(const AValidation: EValidationStatus;
+  const AReason: EDeviceValidationReason; const AMessage: string);
+begin
+  if ((AValidation = vsValid) and (AReason <> dvrAllPointsValid)) or
+     ((AValidation = vsInvalid) and not (AReason in [dvrInvalidPointsAndIncomplete, dvrInvalidPointsAndComplete])) then
+    raise EArgumentException.Create('Недопустимое сочетание результата и причины прибора');
+  if (FValidation = AValidation) and (FValidationReason = AReason) and (FValidationMessage = AMessage) then Exit;
+  FValidation := AValidation; FValidationReason := AReason; FValidationMessage := AMessage; State := osModified;
+end;
 
-  if HasStatus3 then
-  begin
-    Status := 3;
-    StatusStr := 'Есть поверочные точки с недостаточным количеством корректных измерений и превышением допуска по погрешности (красный).';
-    Exit;
-  end;
+function TDevice.GetShortStateText: string;
+begin
+  Result := LowerCase(ValidationStatusToText(Validation));
+  if Validation in [vsValid, vsInvalid] then Result := Result + ' — ' + LowerCase(DeviceValidationReasonToText(ValidationReason));
+end;
 
-  if HasStatus4 then
-  begin
-    Status := 4;
-    StatusStr := 'Есть поверочные точки с корректными измерениями в допуске, но их меньше RepeatsProtocol (желтый).';
-    Exit;
-  end;
-
-  if AllStatus012 then
-  begin
-    Status := 2;
-    StatusStr := 'Есть измерения, связанные с поверочными точками, но корректных измерений недостаточно или они некорректны (серый).';
-    Exit;
-  end;
-
-  if AllStatus01 then
-  begin
-    Status := 1;
-    StatusStr := 'Измерения производились, но измерений, связанных с поверочными точками, нет.';
-    Exit;
-  end;
-
-  if AllStatus0 then
-  begin
-    Status := 0;
-    StatusStr := 'Измерения не производились/не анализировались.';
-    Exit;
-  end;
-
-  if HasMissingData then
-  begin
-    Status := 2;
-    StatusStr := 'Есть поверочные точки без достаточных данных для результата.';
-    Exit;
-  end;
-
-  Status := 3;
-  StatusStr := 'По всем поверочным точкам есть данные, но не все точки годны.';
-  LogMKS('DBG SP 5004', 'TDevice.AnalyseResults EXIT',
-    Format('Device=%s UUID=%s Status=%d', [Self.Name, Self.UUID, Self.Status]));
+function TDevice.GetFullStateText: string;
+begin
+  Result := 'Состояние выполнения: ' + MeasurementDeviceStatusToText(Status) + '.' + sLineBreak +
+    'Метрологический результат: ' + LowerCase(ValidationStatusToText(Validation)) + '.';
+  if DeviceValidationReasonToText(ValidationReason) <> '' then Result := Result + sLineBreak + 'Причина: ' + LowerCase(DeviceValidationReasonToText(ValidationReason)) + '.';
+  if Trim(ValidationMessage) <> '' then Result := Result + sLineBreak + 'Пояснение: ' + ValidationMessage + '.';
 end;
 
 function TDevice.FindDiameter(AType: TDeviceType): TDiameter;

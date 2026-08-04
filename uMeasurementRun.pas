@@ -6143,6 +6143,10 @@ begin
         if IsStopRequested and not HasPhysicalMeasurementStarted then
         begin
           // Защитная ветка сохраняет отмену без msSave, если физического старта не было.
+           ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessResultsRead',
+            'Защитная ветка сохраняет отмену без msSave, если физического старта не было.',
+            MeasurementStopReasonToString(GetStopReason));
+
           FinalizeMeasurementRun(mrrCancelled, mdrUserCancelled);
           Exit;
         end;
@@ -6204,6 +6208,7 @@ begin
 
   ResultsSaved := not RequiresSaveConfirmation or
     (FSaveConfirmationResult = scrAccepted);
+
   if ResultsSaved then
   begin
     SaveMeasurementResults;
@@ -6360,10 +6365,11 @@ begin
       if FWorkTable <> nil then
       begin
         FWorkTable.RecalculateAllMeterValues;
-        if FWorkTable.ValueTime <> nil then
+        // Берем сохраненное  TimeResult
+       { if FWorkTable.ValueTime <> nil then
           FWorkTable.TimeResult := FWorkTable.ValueTime.GetDoubleValue
         else
-          FWorkTable.TimeResult := Point.LimitTime;
+          FWorkTable.TimeResult := Point.LimitTime;}
       end;
 
       WorkTable.SaveMeasurementResults;

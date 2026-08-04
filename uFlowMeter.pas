@@ -671,8 +671,7 @@ begin
       Format('NewPoint=%s | Last=%s', [DumpSpillage(NewPoint), DumpSpillage(Sess.Spillages.Last)]));
     Sess.Spillages.Last.SessionID := NewPoint.SessionID;
     Sess.Spillages.Last.Name := NewPoint.Name;
-    Sess.Spillages.Last.Valid := NewPoint.Valid;
-    Sess.Spillages.Last.Status := NewPoint.Status;
+    { Assign above transfers execution and metrological state atomically. }
     Sess.Spillages.Last.Error := NewPoint.Error;
     Sess.Spillages.Last.State := NewPoint.State;
   end;

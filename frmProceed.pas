@@ -2119,7 +2119,7 @@ begin
   Result := TAlphaColors.Null;
   if (ADevice = nil) or (ADevicePoint = nil) or (ASpillage = nil) then
     Exit;
-  Result := GetStatusColor(ASpillage.Status);
+  Result := GetSpillageValidationColor(ASpillage.Validation, ASpillage.ValidationReason);
 end;
 
 function TFrameProceed.ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
@@ -2166,16 +2166,14 @@ end;
 
 function TFrameProceed.GetDeviceResultText(ADevice: TDevice): string;
 begin
-  if ADevice <> nil then
-    ADevice.AnalyseResults;
-  Result := BuildResultTextByStatus(ResolveDeviceSummaryStatus(ADevice));
+  if ADevice = nil then Exit('-');
+  Result := ADevice.GetShortStateText;
 end;
 
 function TFrameProceed.GetDeviceResultColor(ADevice: TDevice): TAlphaColor;
 begin
-  if ADevice <> nil then
-    ADevice.AnalyseResults;
-  Result := GetStatusColor(ResolveDeviceSummaryStatus(ADevice));
+  if ADevice = nil then Exit(TAlphaColors.Null);
+  Result := GetDeviceValidationColor(ADevice.Validation, ADevice.ValidationReason);
 end;
 function TFrameProceed.BuildResultTextByStatus(const AStatus: Integer): string;
 begin
@@ -2386,8 +2384,6 @@ begin
            IsProcessingDevicePendingRemoved(Device) then
           Continue;
 
-        Device.AnalyseResults;
-
         Row.Device := Device;
         Row.Name := Device.Name;
         Row.DeviceType := Device.DeviceTypeName;
@@ -2417,7 +2413,7 @@ begin
                 Inc(FoundPointsCount);
                 HasAnyData := True;
                 if (not Spillage.Valid) or
-                   (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
+                   (Spillage.Validation = vsInvalid) then
                   Inc(InvalidCount);
                 Row.PointStatuses[I] := Spillage.Status;
                 { Point columns always show the measured error.  Only the
@@ -4414,7 +4410,7 @@ begin
         end;
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageSpillTime then
-    Value := IntToStr(Trunc(P.SpillTime))
+    Value :=  FActiveWorkTable.ValueTime.GetStrNum(P.SpillTime)
 
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQavgEtalon then
   begin
@@ -4658,7 +4654,7 @@ begin
   if P = nil then
     Exit;
 
-  Color := GetStatusColor(P.Status);
+  Color := GetSpillageValidationColor(P.Validation, P.ValidationReason);
   if Color = TAlphaColors.Null then
     Exit;
 
