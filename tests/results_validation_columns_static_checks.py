@@ -51,6 +51,16 @@ def test_proceed_uses_current_validation_model():
     assert "Value := P.GetShortStateText" in get_value
 
 
+def test_result_point_colors_use_validation_model():
+    refresh = body("procedure TFrameProceed.ShowDevicesResults")
+    draw = body("procedure TFrameProceed.GridResultsDrawColumnCell")
+
+    assert "Row.PointColors[I] := GetSpillageValidationColor(" in refresh
+    assert "Spillage.Validation, Spillage.ValidationReason" in refresh
+    assert "Row.PointStatuses" not in refresh
+    assert "Color := GridRow.PointColors[PointIdx]" in draw
+
+
 def test_measurement_grid_keeps_hints_enabled_and_targets_validity_column():
     mouse_move = body("procedure TFrameProceed.GridDataPointsMouseMove")
 

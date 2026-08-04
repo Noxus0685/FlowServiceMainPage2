@@ -55,7 +55,7 @@ type
     DeviceUUID: string;
     PointNames: TArray<string>;
     PointValues: TArray<string>;
-    PointStatuses: TArray<Integer>;
+    PointColors: TArray<TAlphaColor>;
     ResultText: string;
     ResultStatus: Integer;
   end;
@@ -2331,7 +2331,7 @@ begin
           RequiredPointsCount := Device.Points.Count;
           SetLength(Row.PointNames, Device.Points.Count);
           SetLength(Row.PointValues, Device.Points.Count);
-          SetLength(Row.PointStatuses, Device.Points.Count);
+          SetLength(Row.PointColors, Device.Points.Count);
           for I := 0 to Device.Points.Count - 1 do
           begin
             P := Device.Points[I];
@@ -2346,14 +2346,15 @@ begin
                 if (not Spillage.Valid) or
                    (Spillage.Validation = vsInvalid) then
                   Inc(InvalidCount);
-                Row.PointStatuses[I] := Spillage.Status;
+                Row.PointColors[I] := GetSpillageValidationColor(
+                  Spillage.Validation, Spillage.ValidationReason);
                 { Point columns always show the measured error.  Only the
                   aggregate Result column may display an em dash. }
                 Row.PointValues[I] := FormatResultErrorValue(Spillage.Error);
               end
               else
               begin
-                Row.PointStatuses[I] := 1;
+                Row.PointColors[I] := TAlphaColors.Null;
                 Row.PointValues[I] := '-';
               end;
               LogResultCellDebug(Row, P, Spillage, Row.PointValues[I]);
@@ -2361,7 +2362,7 @@ begin
             else
             begin
               Row.PointNames[I] := '';
-              Row.PointStatuses[I] := 1;
+              Row.PointColors[I] := TAlphaColors.Null;
               Row.PointValues[I] := '-';
             end;
           end;
@@ -2370,7 +2371,7 @@ begin
         begin
           SetLength(Row.PointNames, 0);
           SetLength(Row.PointValues, 0);
-          SetLength(Row.PointStatuses, 0);
+          SetLength(Row.PointColors, 0);
         end;
 
         Row.ResultStatus := ResolveDeviceSummaryStatus(Device);
@@ -4166,8 +4167,8 @@ begin
     if Column = StringColumnPointNum3 then PointIdx := 2;
     if Column = StringColumnPointNum4 then PointIdx := 3;
 
-    if (PointIdx >= 0) and (PointIdx < Length(GridRow.PointStatuses)) then
-      Color := GetStatusColor(GridRow.PointStatuses[PointIdx]);
+    if (PointIdx >= 0) and (PointIdx < Length(GridRow.PointColors)) then
+      Color := GridRow.PointColors[PointIdx];
   end;
 
   SavedState := Canvas.SaveState;
