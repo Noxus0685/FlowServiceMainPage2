@@ -26,7 +26,8 @@ assert 'Size.Height = 32.000000000000000000' in button
 assert "StyleLookup = 'composetoolbutton'" in button
 assert 'ParentShowHint = False' in button and 'ShowHint = True' in button
 assert 'OnClick = ButtonProceedExportExcelClick' in button
-assert '#1042#1099#1075#1088#1091#1079#1080#1090#1100' in button
+assert "Hint = 'Выгрузить выбранные данные в Excel'" in button
+assert 'Visible = True' in button
 
 assert 'TToolBar.Create' not in pas and 'TButton.Create' not in pas
 assert pas.count('procedure TFrameProceed.ButtonProceedExportExcelClick') == 1

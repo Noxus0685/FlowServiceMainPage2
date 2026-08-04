@@ -615,7 +615,7 @@
         object ButtonProceedExportExcel: TButton
           Align = Left
           Enabled = False
-	  Hint = #1042#1099#1075#1088#1091#1079#1080#1090#1100' '#1074#1099#1073#1088#1072#1085#1085#1099#1077' '#1076#1072#1085#1085#1099#1077' '#1074' '#1045#1082#1089#1077#1083#1100
+          Hint = 'Выгрузить выбранные данные в Excel'
           Size.Width = 40.000000000000000000
           Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
@@ -623,6 +623,7 @@
           TabOrder = 5
           ParentShowHint = False
           ShowHint = True
+          Visible = True
           OnClick = ButtonProceedExportExcelClick
         end
       end
@@ -665,6 +666,7 @@
         Stroke.Color = claGray
       end
     end
+  end
   object lyt1: TLayout
     Align = MostBottom
     Position.Y = 642.000000000000000000
