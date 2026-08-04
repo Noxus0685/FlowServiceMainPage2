@@ -214,6 +214,7 @@ type
     procedure PopulateTreeViewDevices;
     function GetStatusColor(const AStatus: Integer): TAlphaColor;
     function BuildResultTextByStatus(const AStatus: Integer): string;
+    function ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
     procedure UpdateResultsPointColumns;
     procedure LogResultCellDebug(const ARow: TResultGridRow; APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
     procedure ShowAllDevicesResults;
@@ -297,14 +298,27 @@ type
     FSkipPointDeleteConfirm: Boolean;
     FPointDeleteOwner: TObject;
     FProcessingChangesSaved: Boolean;
+    FOnResultsSynchronized: TNotifyEvent;
   public
     { Public declarations }
     procedure Initialize;
     procedure RefreshResultsTab;
+    function RequestClearActiveSession(ADevice: TDevice): Boolean;
+    function RequestCreateSession(ADevice: TDevice): TSessionSpillage;
+    function RequestClearActiveSessions: Boolean;
+    function RequestCreateSessions: Boolean;
+    function CanManageResultSessions: Boolean;
     function FindResultSpillageForPoint(ADevice: TDevice; APoint: TDevicePoint): TPointSpillage;
     function GetPointResultError(const ADevice: TDevice; const APoint: TDevicePoint): Double;
     function GetPointResultFlowLS(const ADevice: TDevice; const APoint: TDevicePoint): Double;
+    function FormatResultErrorValue(const AValue: Double): string;
+    function GetPointResultColor(ADevice: TDevice; ADevicePoint: TDevicePoint;
+      ASpillage: TPointSpillage): TAlphaColor;
+    function GetDeviceResultText(ADevice: TDevice): string;
+    function GetDeviceResultColor(ADevice: TDevice): TAlphaColor;
     destructor Destroy; override;
+    property OnResultsSynchronized: TNotifyEvent read FOnResultsSynchronized
+      write FOnResultsSynchronized;
   end;
 
 implementation
@@ -1373,8 +1387,125 @@ begin
     UpdateSessionItems;
   end;
 
-
+  if Assigned(FOnResultsSynchronized) then
+    FOnResultsSynchronized(Self);
   end;
+
+function TFrameProceed.CanManageResultSessions: Boolean;
+begin
+  Result := (FActiveWorkTable = nil) or (FActiveWorkTable.MeasurementRun = nil) or
+    (FActiveWorkTable.MeasurementRun.Stage in [msNone, msDone]);
+end;
+
+function TFrameProceed.RequestClearActiveSession(ADevice: TDevice): Boolean;
+var
+  Session: TSessionSpillage;
+  Point: TPointSpillage;
+  OldSessionID, SpillageCount: Integer;
+begin
+  Result := False;
+  if not CanManageResultSessions then
+  begin
+    ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionClearFailed',
+      'Очистка сессии заблокирована во время измерения',
+      'Scope=SelectedDevice; Error=MeasurementActive');
+    ShowMessage('Во время активного измерения очистка сессии недоступна.');
+    Exit;
+  end;
+  if ADevice = nil then Exit;
+  Session := GetActiveVisibleSession(ADevice);
+  if Session = nil then
+  begin
+    ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionClearFailed',
+      'Активная сессия прибора не найдена', Format('Scope=SelectedDevice; DeviceUUID=%s; Serial=%s; Error=NoActiveSession', [ADevice.UUID, ADevice.SerialNumber]));
+    ShowMessage('У выбранного прибора нет активной сессии.');
+    Exit;
+  end;
+  OldSessionID := Session.ID;
+  SpillageCount := Session.Spillages.Count;
+  ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionClearRequested',
+    'Запрошена очистка активной сессии', Format('Scope=SelectedDevice; DeviceUUID=%s; Serial=%s; OldSessionID=%d; NewSessionID=%d; Spillages=%d', [ADevice.UUID, ADevice.SerialNumber, OldSessionID, OldSessionID, SpillageCount]));
+  if MessageDlg('Очистить все результаты данной сессии измерений?',
+      TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then Exit;
+  SelectTreeItemByTagObject(Session);
+  ActionSessionPointsClearExecute(ActionSessionPointsClear);
+  SpillageCount := 0;
+  for Point in Session.Spillages do
+    if (Point <> nil) and (Point.State <> osDeleted) then Inc(SpillageCount);
+  Result := SpillageCount = 0;
+  if Result then
+    ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionClearCompleted',
+      'Активная сессия очищена штатным маршрутом обработки', Format('Scope=SelectedDevice; DeviceUUID=%s; Serial=%s; OldSessionID=%d; NewSessionID=%d; Spillages=%d', [ADevice.UUID, ADevice.SerialNumber, OldSessionID, OldSessionID, 0]))
+  else
+    ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionClearFailed',
+      'Очистить активную сессию не удалось', Format('Scope=SelectedDevice; DeviceUUID=%s; Serial=%s; OldSessionID=%d; NewSessionID=%d; Spillages=%d; Error=ProductionRouteRejected', [ADevice.UUID, ADevice.SerialNumber, OldSessionID, OldSessionID, SpillageCount]));
+end;
+
+function TFrameProceed.RequestCreateSession(ADevice: TDevice): TSessionSpillage;
+var OldSession: TSessionSpillage; OldSessionID, Spillages: Integer;
+begin
+  Result := nil;
+  if not CanManageResultSessions then
+  begin
+    ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionCreateFailed', 'Создание сессии заблокировано во время измерения', 'Scope=SelectedDevice; Error=MeasurementActive');
+    ShowMessage('Во время активного измерения создание сессии недоступно.'); Exit;
+  end;
+  if ADevice = nil then Exit;
+  OldSession := GetActiveVisibleSession(ADevice); OldSessionID := 0; Spillages := 0;
+  if OldSession <> nil then begin OldSessionID := OldSession.ID; Spillages := OldSession.Spillages.Count; end;
+  ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionCreateRequested', 'Запрошено создание сессии', Format('Scope=SelectedDevice; DeviceUUID=%s; Serial=%s; OldSessionID=%d; NewSessionID=0; Spillages=%d', [ADevice.UUID, ADevice.SerialNumber, OldSessionID, Spillages]));
+  SelectTreeItemByTagObject(ADevice); ActionSessionNewExecute(ActionSessionNew);
+  Result := GetActiveVisibleSession(ADevice);
+  if (Result <> nil) and (Result <> OldSession) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionCreateCompleted', 'Сессия создана штатным маршрутом обработки', Format('Scope=SelectedDevice; DeviceUUID=%s; Serial=%s; OldSessionID=%d; NewSessionID=%d; Spillages=%d', [ADevice.UUID, ADevice.SerialNumber, OldSessionID, Result.ID, Result.Spillages.Count]))
+  else begin
+    ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionCreateFailed', 'Создать сессию не удалось', Format('Scope=SelectedDevice; DeviceUUID=%s; Serial=%s; OldSessionID=%d; NewSessionID=0; Spillages=%d; Error=ProductionRouteRejected', [ADevice.UUID, ADevice.SerialNumber, OldSessionID, Spillages]));
+    ShowMessage('Не удалось создать новую сессию.'); Result := nil;
+  end;
+end;
+
+function TFrameProceed.RequestClearActiveSessions: Boolean;
+var Device: TDevice; Ch: TChannel; Changed: Boolean;
+begin
+  Result := False;
+  ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionClearRequested', 'Запрошена групповая очистка активных сессий', 'Scope=AllDevices; DeviceUUID=; Serial=; OldSessionID=0; NewSessionID=0; Spillages=0');
+  if not CanManageResultSessions then begin ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionClearFailed', 'Групповая очистка заблокирована', 'Scope=AllDevices; Error=MeasurementActive'); ShowMessage('Во время активного измерения очистка сессий недоступна.'); Exit; end;
+  if MessageDlg('Очистить активные сессии всех приборов рабочего стола?', TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then Exit;
+  Changed := False;
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.DeviceChannels <> nil) then
+    for Ch in FActiveWorkTable.DeviceChannels do begin
+    Device := nil;
+    if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
+      Device := FindProcessingDeviceByUUID(Ch.FlowMeter.Device.UUID);
+    if (Device <> nil) and (GetActiveVisibleSession(Device) <> nil) then begin
+      SelectTreeItemByTagObject(GetActiveVisibleSession(Device));
+      ActionSessionPointsClearExecute(ActionSessionPointsClear); Changed := True;
+    end;
+    end;
+  Result := Changed;
+  if Result then ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionClearCompleted', 'Групповая очистка завершена', 'Scope=AllDevices; DeviceUUID=; Serial=; OldSessionID=0; NewSessionID=0; Spillages=0')
+  else ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionClearFailed', 'Нет активных сессий для очистки', 'Scope=AllDevices; Error=NoActiveSessions');
+end;
+
+function TFrameProceed.RequestCreateSessions: Boolean;
+var Device: TDevice; Ch: TChannel; OldSession: TSessionSpillage;
+begin
+  Result := False;
+  ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionCreateRequested', 'Запрошено групповое создание сессий', 'Scope=AllDevices; DeviceUUID=; Serial=; OldSessionID=0; NewSessionID=0; Spillages=0');
+  if not CanManageResultSessions then begin ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionCreateFailed', 'Групповое создание заблокировано', 'Scope=AllDevices; Error=MeasurementActive'); ShowMessage('Во время активного измерения создание сессий недоступно.'); Exit; end;
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.DeviceChannels <> nil) then
+    for Ch in FActiveWorkTable.DeviceChannels do begin
+    Device := nil;
+    if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
+      Device := FindProcessingDeviceByUUID(Ch.FlowMeter.Device.UUID);
+    if Device = nil then Continue;
+    OldSession := GetActiveVisibleSession(Device); SelectTreeItemByTagObject(Device);
+    ActionSessionNewExecute(ActionSessionNew);
+    Result := Result or (GetActiveVisibleSession(Device) <> OldSession);
+  end;
+  if Result then ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionCreateCompleted', 'Групповое создание завершено', 'Scope=AllDevices; DeviceUUID=; Serial=; OldSessionID=0; NewSessionID=0; Spillages=0')
+  else ProtocolManager.AddMessage(pcProc, psForm, 'ResultsSessionCreateFailed', 'Нет приборов для создания сессий', 'Scope=AllDevices; Error=NoDevices');
+end;
 
 procedure TFrameProceed.LoadProcessingDevices;
 var
@@ -1699,6 +1830,72 @@ begin
     Result := TAlphaColors.Null;
   end;
 end;
+
+function TFrameProceed.FormatResultErrorValue(const AValue: Double): string;
+begin
+  Result := FormatFloat('0.###', AValue);
+end;
+
+function TFrameProceed.GetPointResultColor(ADevice: TDevice;
+  ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): TAlphaColor;
+begin
+  Result := TAlphaColors.Null;
+  if (ADevice = nil) or (ADevicePoint = nil) or (ASpillage = nil) then
+    Exit;
+  Result := GetStatusColor(ASpillage.Status);
+end;
+
+function TFrameProceed.ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
+var
+  Point: TDevicePoint;
+  Spillage: TPointSpillage;
+  FoundPointsCount, RequiredPointsCount, InvalidCount: Integer;
+begin
+  Result := 2;
+  if ADevice = nil then
+    Exit;
+  FoundPointsCount := 0;
+  RequiredPointsCount := 0;
+  InvalidCount := 0;
+  if ADevice.Points <> nil then
+  begin
+    RequiredPointsCount := ADevice.Points.Count;
+    for Point in ADevice.Points do
+    begin
+      if Point = nil then
+        Continue;
+      Spillage := FindResultSpillageForPoint(ADevice, Point);
+      if Spillage = nil then
+        Continue;
+      Inc(FoundPointsCount);
+      if (not Spillage.Valid) or
+         (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
+        Inc(InvalidCount);
+    end;
+  end;
+  if FoundPointsCount = 0 then
+    Result := 2
+  else if InvalidCount > 0 then
+    Result := 3
+  else if FoundPointsCount < RequiredPointsCount then
+    Result := 2
+  else
+    Result := 5;
+end;
+
+function TFrameProceed.GetDeviceResultText(ADevice: TDevice): string;
+begin
+  if ADevice <> nil then
+    ADevice.AnalyseResults;
+  Result := BuildResultTextByStatus(ResolveDeviceSummaryStatus(ADevice));
+end;
+
+function TFrameProceed.GetDeviceResultColor(ADevice: TDevice): TAlphaColor;
+begin
+  if ADevice <> nil then
+    ADevice.AnalyseResults;
+  Result := GetStatusColor(ResolveDeviceSummaryStatus(ADevice));
+end;
 function TFrameProceed.BuildResultTextByStatus(const AStatus: Integer): string;
 begin
   case AStatus of
@@ -1939,7 +2136,7 @@ begin
                    (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
                   Inc(InvalidCount);
                 Row.PointStatuses[I] := Spillage.Status;
-                Row.PointValues[I] := FormatFloat('0.###', Spillage.Error);
+                Row.PointValues[I] := FormatResultErrorValue(Spillage.Error);
               end
               else
               begin
@@ -1963,14 +2160,7 @@ begin
           SetLength(Row.PointStatuses, 0);
         end;
 
-        if FoundPointsCount = 0 then
-          Row.ResultStatus := 2
-        else if InvalidCount > 0 then
-          Row.ResultStatus := 3
-        else if FoundPointsCount < RequiredPointsCount then
-          Row.ResultStatus := 2
-        else
-          Row.ResultStatus := 5;
+        Row.ResultStatus := ResolveDeviceSummaryStatus(Device);
 
         Row.ResultText := BuildResultTextByStatus(Row.ResultStatus);
 

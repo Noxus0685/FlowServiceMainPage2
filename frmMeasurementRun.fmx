@@ -1,4 +1,4 @@
-﻿object FrameMeasurementRun: TFrameMeasurementRun
+object FrameMeasurementRun: TFrameMeasurementRun
   Size.Width = 1228.000000000000000000
   Size.Height = 888.000000000000000000
   Size.PlatformDefault = False
@@ -7,18 +7,18 @@
     CanFocus = True
     ClipChildren = True
     Size.Width = 1228.000000000000000000
-    Size.Height = 676.000000000000000000
+    Size.Height = 856.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
     RowCount = 1
     Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
     OnHeaderClick = GridMeasurmentRunHeaderClick
+    OnSelChanged = GridMeasurmentRunSelChanged
     OnDrawColumnCell = GridMeasurmentRunDrawColumnCell
     OnGetValue = GridMeasurmentRunGetValue
     OnCellClick = GridMeasurmentRunCellClick
-    OnSelChanged = GridMeasurmentRunSelChanged
     Viewport.Width = 1228.000000000000000000
-    Viewport.Height = 676.000000000000000000
+    Viewport.Height = 856.000000000000000000
     object CheckColumnMREnable: TCheckColumn
       HeaderSettings.TextSettings.Trimming = Character
       HeaderSettings.TextSettings.WordWrap = False
@@ -78,106 +78,119 @@
     TabOrder = 1
     object SpeedButtonPointPrev: TSpeedButton
       Align = Left
+      Hint = #1055#1088#1077#1076#1099#1076#1091#1097#1072#1103' '#1090#1086#1095#1082#1072
       Size.Width = 57.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
-      StyleLookup = 'arrowlefttoolbutton'
-      Hint = 'Предыдущая точка'
+      ParentShowHint = False
       ShowHint = True
+      StyleLookup = 'arrowlefttoolbutton'
       Text = 'SpeedButtonPointPrev'
       TextSettings.Trimming = None
       OnClick = SpeedButtonPointPrevClick
     end
     object SpeedButtonPointNext: TSpeedButton
       Align = Left
+      Hint = #1057#1083#1077#1076#1091#1102#1097#1072#1103' '#1090#1086#1095#1082#1072
       Position.X = 114.000000000000000000
       Size.Width = 57.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
-      StyleLookup = 'arrowrighttoolbutton'
-      Hint = 'Следующая точка'
+      ParentShowHint = False
       ShowHint = True
+      StyleLookup = 'arrowrighttoolbutton'
       Text = 'SpeedButton7'
       TextSettings.Trimming = None
       OnClick = SpeedButtonPointNextClick
     end
     object SpeedButtonPause: TSpeedButton
       Align = Left
+      Hint = #1054#1089#1090#1072#1085#1086#1074#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
       Position.X = 57.000000000000000000
       Size.Width = 57.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
-      StyleLookup = 'stoptoolbutton'
-      Hint = 'Остановить измерение'
+      ParentShowHint = False
       ShowHint = True
+      StyleLookup = 'stoptoolbutton'
       Text = 'SpeedButton7'
       TextSettings.Trimming = None
       OnClick = SpeedButtonPauseClick
     end
     object LinePointControlsSeparator: TLine
       Align = Left
-      Position.X = 179.000000000000000000
+      LineType = Left
       Margins.Left = 8.000000000000000000
       Margins.Right = 8.000000000000000000
+      Position.X = 179.000000000000000000
       Size.Width = 1.000000000000000000
       Size.Height = 32.000000000000000000
-      LineType = Left
+      Size.PlatformDefault = False
     end
     object SpeedButtonPointMoveUp: TSpeedButton
       Align = Left
+      Hint = #1055#1077#1088#1077#1084#1077#1089#1090#1080#1090#1100' '#1074#1074#1077#1088#1093
       Position.X = 188.000000000000000000
       Size.Width = 57.000000000000000000
       Size.Height = 32.000000000000000000
-      StyleLookup = 'arrowuptoolbutton'
-      Hint = 'Переместить вверх'
+      Size.PlatformDefault = False
+      ParentShowHint = False
       ShowHint = True
+      StyleLookup = 'arrowuptoolbutton'
       Text = 'SpeedButtonPointMoveUp'
+      TextSettings.Trimming = None
       OnClick = SpeedButtonPointMoveUpClick
     end
     object SpeedButtonPointMoveDown: TSpeedButton
       Align = Left
+      Hint = #1055#1077#1088#1077#1084#1077#1089#1090#1080#1090#1100' '#1074#1085#1080#1079
       Position.X = 245.000000000000000000
       Size.Width = 57.000000000000000000
       Size.Height = 32.000000000000000000
-      StyleLookup = 'arrowdowntoolbutton'
-      Hint = 'Переместить вниз'
+      Size.PlatformDefault = False
+      ParentShowHint = False
       ShowHint = True
+      StyleLookup = 'arrowdowntoolbutton'
       Text = 'SpeedButtonPointMoveDown'
+      TextSettings.Trimming = None
       OnClick = SpeedButtonPointMoveDownClick
     end
     object SpeedButtonPointDelete: TSpeedButton
       Align = Left
+      Hint = #1059#1076#1072#1083#1080#1090#1100' '#1090#1086#1095#1082#1091
       Position.X = 302.000000000000000000
       Size.Width = 70.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
-      StyleLookup = 'cleareditbutton'
-      Hint = 'Удалить точку'
+      ParentShowHint = False
       ShowHint = True
+      StyleLookup = 'cleareditbutton'
       Text = 'SpeedButtonPointDelete'
       TextSettings.Trimming = None
       OnClick = SpeedButtonPointDeleteClick
     end
     object SpeedButtonCreatePoints: TSpeedButton
       Align = Left
+      Hint = #1054#1073#1085#1086#1074#1080#1090#1100
       Position.X = 372.000000000000000000
       Size.Width = 80.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
-      StyleLookup = 'refreshtoolbutton'
-      Hint = 'Обновить'
+      ParentShowHint = False
       ShowHint = True
+      StyleLookup = 'refreshtoolbutton'
       Text = 'SpeedButtonCreatePoints'
       TextSettings.Trimming = None
       OnClick = SpeedButtonCreatePointsClick
     end
     object CheckBoxMergePoints: TCheckBox
       Align = Left
+      IsChecked = True
       Position.X = 452.000000000000000000
       Size.Width = 160.000000000000000000
       Size.Height = 32.000000000000000000
-      IsChecked = True
-      Text = 'Объединять точки'
+      Size.PlatformDefault = False
+      Text = #1054#1073#1098#1077#1076#1080#1085#1103#1090#1100' '#1090#1086#1095#1082#1080
       OnChange = CheckBoxMergePointsChange
     end
   end

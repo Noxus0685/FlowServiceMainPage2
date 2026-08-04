@@ -1010,6 +1010,8 @@ type
     procedure BeforeDestruction; override;
   public
     procedure AttachGraphsTo(AParent: TFmxObject);
+    procedure ConnectResultsProcessing(AProceed: TFrameProceed);
+    procedure RefreshSynchronizedResults(Sender: TObject);
     { Public declarations }
     procedure Initialize;
     destructor Destroy; override;
@@ -2673,8 +2675,22 @@ end;
 
 procedure TFrameMainTable.TabControl1Change(Sender: TObject);
 begin
-//  if (TabControl1.ActiveTab = TabItemResults) and (FFrameProceed <> nil) then
-//    FFrameProceed.RefreshResultsTab;
+  if (TabControlDevices.ActiveTab = TabItemMRResults) and
+     Assigned(FFrameMRResults) then
+    FFrameMRResults.ReloadAndUpdate;
+end;
+
+procedure TFrameMainTable.ConnectResultsProcessing(AProceed: TFrameProceed);
+begin
+  FFrameProceed := AProceed;
+  if FFrameMRResults <> nil then
+    FFrameMRResults.ConnectProcessingFrame(AProceed);
+end;
+
+procedure TFrameMainTable.RefreshSynchronizedResults(Sender: TObject);
+begin
+  if FFrameMRResults <> nil then
+    FFrameMRResults.ReloadAndUpdate;
 end;
 
 function TFrameMainTable.GetPointResultError(const ADevice: TDevice;

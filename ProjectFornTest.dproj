@@ -242,6 +242,11 @@
             <FormType>fmx</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
+        <DCCReference Include="frmMRResults.pas">
+            <Form>FrameMRResults</Form>
+            <FormType>fmx</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
         <DCCReference Include="frmProceed.pas">
             <Form>FrameProceed</Form>
             <FormType>fmx</FormType>
@@ -293,6 +298,8 @@
         <DCCReference Include="uRepositories.pas"/>
         <DCCReference Include="uAppServices.pas"/>
         <DCCReference Include="uAppVersion.pas"/>
+        <DCCReference Include="uOpenXmlXlsx.pas"/>
+        <DCCReference Include="uResultsXlsxExporter.pas"/>
         <DCCReference Include="uTable_Data.pas">
             <Form>TableDM</Form>
             <FormType>dfm</FormType>

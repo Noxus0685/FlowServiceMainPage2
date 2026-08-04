@@ -13,27 +13,27 @@ object FrameMRResults: TFrameMRResults
     Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, AutoDisplacement]
     OnDrawColumnCell = GridMRResultsDrawColumnCell
     OnGetValue = GridMRResultsGetValue
-    Viewport.Width = 1230.000000000000000000
-    Viewport.Height = 688.000000000000000000
+    Viewport.Width = 1210.000000000000000000
+    Viewport.Height = 663.000000000000000000
     object StringColumnName: TStringColumn
-      ReadOnly = True
       Header = #1055#1088#1080#1073#1086#1088
       HeaderSettings.TextSettings.WordWrap = False
+      ReadOnly = True
     end
     object StringColumnPoint1: TStringColumn
-      ReadOnly = True
       Header = #1058#1086#1095#1082#1072' 1'
       HeaderSettings.TextSettings.WordWrap = False
+      ReadOnly = True
     end
     object StringColumnPoint2: TStringColumn
-      ReadOnly = True
       Header = #1058#1086#1095#1082#1072' 2'
       HeaderSettings.TextSettings.WordWrap = False
+      ReadOnly = True
     end
     object StringColumnResult: TStringColumn
-      ReadOnly = True
       Header = #1056#1077#1079#1091#1083#1100#1090#1072#1090
       HeaderSettings.TextSettings.WordWrap = False
+      ReadOnly = True
     end
   end
   object ToolBar: TToolBar
@@ -41,6 +41,43 @@ object FrameMRResults: TFrameMRResults
     Size.Height = 32.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 1
+    object ButtonClearSession: TSpeedButton
+      Align = Left
+      Hint = #1054#1095#1080#1089#1090#1080#1090#1100' '#1089#1077#1089#1089#1080#1102
+      Size.Width = 44.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      ParentShowHint = False
+      ShowHint = True
+      StyleLookup = 'pagecurltoolbutton'
+      TextSettings.Trimming = None
+      OnClick = ButtonClearSessionClick
+    end
+    object ButtonCreateSession: TSpeedButton
+      Align = Left
+      Hint = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
+      Position.X = 44.000000000000000000
+      Size.Width = 39.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      ParentShowHint = False
+      ShowHint = True
+      StyleLookup = 'additembutton'
+      TextSettings.Trimming = None
+      OnClick = ButtonCreateSessionClick
+    end
+    object ButtonExportExcel: TButton
+      Align = Left
+      Enabled = False
+      Position.X = 83.000000000000000000
+      Size.Width = 46.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = 'composetoolbutton'
+      Text = #1042#1099#1075#1088#1091#1079#1080#1090#1100' '#1074' Excel'
+      TextSettings.Trimming = None
+      OnClick = ButtonExportExcelClick
+    end
     object SpeedButton11: TSpeedButton
       Align = Left
       Size.Width = 57.000000000000000000
@@ -83,7 +120,8 @@ object FrameMRResults: TFrameMRResults
     end
     object SpeedButtonCreatePoints: TSpeedButton
       Align = Left
-      Size.Width = 80.000000000000000000
+      Position.X = 129.000000000000000000
+      Size.Width = 48.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = 'refreshtoolbutton'
