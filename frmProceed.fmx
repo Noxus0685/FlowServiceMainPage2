@@ -219,6 +219,7 @@ object FrameProceed: TFrameProceed
           Size.PlatformDefault = False
           TabOrder = 0
           Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
+          OnColumnMoved = GridDataPointsColumnMoved
           OnSelChanged = GridResultsSelChanged
           OnGetValue = GridResultsGetValue
           Viewport.Width = 961.000000000000000000
@@ -521,6 +522,19 @@ object FrameProceed: TFrameProceed
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 1
+      object ButtonExportExcel: TButton
+        Align = Right
+        Enabled = False
+        Hint = #1042#1099#1075#1088#1091#1079#1080#1090#1100' '#1074#1099#1073#1088#1072#1085#1085#1099#1077' '#1076#1072#1085#1085#1099#1077' '#1074' Excel'
+        Size.Width = 210.000000000000000000
+        Size.Height = 32.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'composetoolbutton'
+        Text = #1042#1099#1075#1088#1091#1079#1080#1090#1100' '#1074#1099#1073#1088#1072#1085#1085#1099#1077' '#1076#1072#1085#1085#1099#1077' '#1074' Excel'
+        ParentShowHint = False
+        ShowHint = True
+        OnClick = ButtonExportExcelClick
+      end
       object Line4: TLine
         Align = Left
         LineType = Right
@@ -815,6 +829,7 @@ object FrameProceed: TFrameProceed
     end
   end
   object PopupMenuGridDataPoints: TPopupMenu
+    OnPopup = PopupMenuGridResultsPopup
     Left = 578
     Top = 200
     object MenuItemGridDataPointsDelete: TMenuItem
@@ -831,6 +846,7 @@ object FrameProceed: TFrameProceed
     end
   end
   object PopupMenuGridResults: TPopupMenu
+    OnPopup = PopupMenuGridResultsPopup
     Left = 730
     Top = 200
     object MenuItemGridResultsDelete: TMenuItem
