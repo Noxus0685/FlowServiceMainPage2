@@ -442,6 +442,12 @@ begin
   if GridResults <> nil then
     GridResults.ShowHint := True;
 
+  // Hints remain enabled after the grids are repopulated or their layout changes.
+  if GridDataPoints <> nil then
+    GridDataPoints.ShowHint := True;
+  if GridResults <> nil then
+    GridResults.ShowHint := True;
+
   SetGridReadOnly(GridDataPoints);
   SetGridReadOnly(GridResults);
   SetGridReadOnly(GridCoefs);
@@ -1974,6 +1980,12 @@ begin
     Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
     if (Spillage <> nil) and
        (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
+      Exit(GetSpillageResultHint(ADevice, Spillage));
+  end;
+  for DevicePoint in ADevice.Points do
+  begin
+    Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
+    if (Spillage <> nil) and (Spillage.Status = TPointSpillage.SPS_OK) then
       Exit(GetSpillageResultHint(ADevice, Spillage));
   end;
 end;
