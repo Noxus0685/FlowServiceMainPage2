@@ -677,14 +677,7 @@ begin
   Result := FormatFloat('0.###', AValue);
 end;
 
-function FormatMRActualErrorValue(const AValue: Double): string;
-begin
-  // Processing renders saved result cells with this production precision.
-  // -MaxDouble is TMeterValue's marker for an unavailable numeric value.
-  if IsNan(AValue) or IsInfinite(AValue) or (AValue <= -MaxDouble) then
-    Exit('-');
-  Result := FormatFloat('0.###', AValue);
-end;
+
 
 function TFrameMRResults.FormatSpillageErrors(ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): string;
 var

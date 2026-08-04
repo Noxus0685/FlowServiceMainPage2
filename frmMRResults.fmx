@@ -16,24 +16,24 @@ object FrameMRResults: TFrameMRResults
     Viewport.Width = 1230.000000000000000000
     Viewport.Height = 688.000000000000000000
     object StringColumnName: TStringColumn
-      ReadOnly = True
       Header = #1055#1088#1080#1073#1086#1088
       HeaderSettings.TextSettings.WordWrap = False
+      ReadOnly = True
     end
     object StringColumnPoint1: TStringColumn
-      ReadOnly = True
       Header = #1058#1086#1095#1082#1072' 1'
       HeaderSettings.TextSettings.WordWrap = False
+      ReadOnly = True
     end
     object StringColumnPoint2: TStringColumn
-      ReadOnly = True
       Header = #1058#1086#1095#1082#1072' 2'
       HeaderSettings.TextSettings.WordWrap = False
+      ReadOnly = True
     end
     object StringColumnResult: TStringColumn
-      ReadOnly = True
       Header = #1056#1077#1079#1091#1083#1100#1090#1072#1090
       HeaderSettings.TextSettings.WordWrap = False
+      ReadOnly = True
     end
   end
   object ToolBar: TToolBar
@@ -52,6 +52,7 @@ object FrameMRResults: TFrameMRResults
     end
     object ButtonCreateSession: TButton
       Align = Left
+      Position.X = 130.000000000000000000
       Size.Width = 165.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
@@ -62,6 +63,7 @@ object FrameMRResults: TFrameMRResults
     object ButtonExportExcel: TButton
       Align = Left
       Enabled = False
+      Position.X = 295.000000000000000000
       Size.Width = 150.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
@@ -111,6 +113,7 @@ object FrameMRResults: TFrameMRResults
     end
     object SpeedButtonCreatePoints: TSpeedButton
       Align = Left
+      Position.X = 445.000000000000000000
       Size.Width = 80.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
