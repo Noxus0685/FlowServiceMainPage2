@@ -272,11 +272,18 @@ object FrameProceed: TFrameProceed
             Size.Width = 125.000000000000000000
           end
           object StringColumnResult: TStringColumn
-            Header = #1056#1077#1079#1091#1083#1100#1090#1072#1090
+            Header = #1043#1086#1076#1085#1086#1089#1090#1100
             HeaderSettings.TextSettings.Trimming = Character
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center
             Size.Width = 125.000000000000000000
+          end
+          object StringColumnResultComment: TStringColumn
+            Header = #1050#1086#1084#1084#1077#1085#1090#1072#1088#1080#1081
+            HeaderSettings.TextSettings.Trimming = Character
+            HeaderSettings.TextSettings.WordWrap = False
+            HeaderSettings.TextSettings.HorzAlign = Center
+            Size.Width = 220.000000000000000000
           end
         end
       end
@@ -522,20 +529,6 @@ object FrameProceed: TFrameProceed
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 1
-      object ButtonExportExcel: TButton
-        Align = Left
-        Enabled = False
-        Hint = #1042#1099#1075#1088#1091#1079#1080#1090#1100' '#1074#1099#1073#1088#1072#1085#1085#1099#1077' '#1076#1072#1085#1085#1099#1077' '#1074' Excel'
-        Size.Width = 210.000000000000000000
-        Size.Height = 32.000000000000000000
-        Size.PlatformDefault = False
-        StyleLookup = 'composetoolbutton'
-        Text = #1042#1099#1075#1088#1091#1079#1080#1090#1100' '#1074#1099#1073#1088#1072#1085#1085#1099#1077' '#1076#1072#1085#1085#1099#1077' '#1074' Excel'
-        TextSettings.Trimming = None
-        ParentShowHint = False
-        ShowHint = True
-        OnClick = ButtonExportExcelClick
-      end
       object Line4: TLine
         Align = Left
         LineType = Right
@@ -632,6 +625,20 @@ object FrameProceed: TFrameProceed
           ParentShowHint = False
           ShowHint = True
         end
+      end
+      object ButtonExportExcel: TButton
+        Align = Left
+        Enabled = False
+        Hint = #1042#1099#1075#1088#1091#1079#1080#1090#1100' '#1074#1099#1073#1088#1072#1085#1085#1099#1077' '#1076#1072#1085#1085#1099#1077' '#1074' Excel'
+        Size.Width = 47.000000000000000000
+        Size.Height = 32.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'composetoolbutton'
+        Text = 'Excel'
+        TextSettings.Trimming = None
+        ParentShowHint = False
+        ShowHint = True
+        OnClick = ButtonExportExcelClick
       end
       object Layout19: TLayout
         Align = Left
