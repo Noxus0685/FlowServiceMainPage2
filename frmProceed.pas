@@ -50,7 +50,6 @@ uses
 type
   TProceedResultPointColumn = record
     Header: string;
-    Key: string;
     DeviceUUID: string;
     SourcePointUUID: string;
     ScenarioPoint: TDevicePoint;
@@ -236,7 +235,7 @@ type
     function ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
     procedure UpdateResultsPointColumns;
     function FindResultPointForColumn(ADevice: TDevice; const AColumn: TProceedResultPointColumn): TDevicePoint;
-    procedure BuildProcessingPointsContext(const ADevices: TList<TDevice>; const AMergePoints: Boolean);
+    procedure BuildSummaryResultPointColumns(const ADevices: TList<TDevice>; const AMergePoints: Boolean);
     procedure LogResultCellDebug(const ARow: TResultGridRow; APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
     procedure ShowAllDevicesResults;
     procedure ShowDevicesResults(const ADevices: TList<TDevice>);
@@ -720,8 +719,6 @@ end;
 procedure TFrameProceed.RefreshResultsTab;
 begin
   DbgProceedTree(1501, 'RefreshResultsTab ENTER'#13#10 + GetSelectedTreeDebugText);
-  FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
-  LoadProcessingDevices;
   SyncProcessingDevicesWithNewPoints;
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
@@ -1207,7 +1204,7 @@ end;
 procedure TFrameProceed.CaptureGridColumnsLayout(AGrid: TGrid;
   out AColumns: TArray<TGridColumnLayout>);
 var
-  I, Count: Integer;
+  I: Integer;
   Column: TColumn;
 begin
   SetLength(AColumns, 0);
@@ -1215,29 +1212,23 @@ begin
     Exit;
 
   SetLength(AColumns, AGrid.ColumnCount);
-  Count := 0;
   ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutSaveOrderBegin',
     'Начато сохранение порядка столбцов', 'GridName=' + AGrid.Name);
   for I := 0 to AGrid.ColumnCount - 1 do
   begin
     Column := AGrid.Columns[I];
-    if (Trim(Column.Name) = '') or SameText(Column.TagString, 'ProcessingDynamicPoint') then
-      Continue;
-
-    AColumns[Count].Name := Column.Name;
+    AColumns[I].Name := Column.Name;
     // TColumn.Index is updated by the standard FMX drag operation and is the
     // visual position. Columns[I] remains the grid's column collection lookup.
-    AColumns[Count].Position := Column.Index;
-    AColumns[Count].Width := Column.Width;
-    AColumns[Count].Visible := Column.Visible;
+    AColumns[I].Position := Column.Index;
+    AColumns[I].Width := Column.Width;
+    AColumns[I].Visible := Column.Visible;
     ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutSaved',
       'Сохранена раскладка столбца',
       Format('GridName=%s; ColumnName=%s; ColumnsIndex=%d; VisualIndex=%d; Position=%d; Width=%g; Visible=%s',
-        [AGrid.Name, Column.Name, I, Column.Index, AColumns[Count].Position,
+        [AGrid.Name, Column.Name, I, Column.Index, AColumns[I].Position,
          Column.Width, BoolToStr(Column.Visible, True)]));
-    Inc(Count);
   end;
-  SetLength(AColumns, Count);
 end;
 
 
@@ -1252,11 +1243,11 @@ begin
   if (AGrid = nil) or (Length(AColumns) = 0) then
     Exit;
 
+  // Work on a copy: the WorkTable array remains in its persisted form. FMX
+  // receives columns in ascending visual Position order.
   SortedColumns := Copy(AColumns, 0, Length(AColumns));
   for I := 1 to High(SortedColumns) do
   begin
-    if Trim(SortedColumns[I].Name) = '' then
-      Continue;
     Temp := SortedColumns[I];
     J := I - 1;
     while (J >= 0) and (SortedColumns[J].Position > Temp.Position) do
@@ -1272,9 +1263,9 @@ begin
   try
     for I := 0 to High(SortedColumns) do
     begin
-      if Trim(SortedColumns[I].Name) = '' then
-        Continue;
       Column := nil;
+      // Name is the persistent identity: the current index changes when a user
+      // moves a column and therefore cannot identify it on the next form open.
       for J := 0 to AGrid.ColumnCount - 1 do
         if SameText(AGrid.Columns[J].Name, SortedColumns[I].Name) then
         begin
@@ -1291,8 +1282,6 @@ begin
 
     for I := 0 to High(SortedColumns) do
     begin
-      if Trim(SortedColumns[I].Name) = '' then
-        Continue;
       TargetIndex := EnsureRange(SortedColumns[I].Position, 0,
         AGrid.ColumnCount - 1);
       Column := nil;
@@ -1305,6 +1294,9 @@ begin
       if Column = nil then
         Continue;
 
+      // Index is the standard FMX column move mechanism and triggers the grid
+      // model's normal reindexing. Suppress the resulting save callback while
+      // the complete saved order is still being restored.
       Column.Index := TargetIndex;
       ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutLoaded',
         'Загружена раскладка столбца',
@@ -2243,29 +2235,41 @@ begin
   end;
 end;
 
-procedure TFrameProceed.BuildProcessingPointsContext(const ADevices: TList<TDevice>;
+procedure TFrameProceed.BuildSummaryResultPointColumns(const ADevices: TList<TDevice>;
   const AMergePoints: Boolean);
 var
   Cols: TList<TProceedResultPointColumn>;
   Col: TProceedResultPointColumn;
   WT: TWorkTable;
+  Run: TMeasurementRun;
   Point: TDevicePoint;
   Device: TDevice;
   I, J: Integer;
-  Merged: Boolean;
-  WorkTableUUID: string;
-  PointKey: string;
 begin
   SetLength(FResultPointColumns, 0);
   Cols := TList<TProceedResultPointColumn>.Create;
   try
     WT := ResolveManagerWorkTable(FWorkTableManager);
-    if WT <> nil then
-      WorkTableUUID := WT.UUID
-    else
-      WorkTableUUID := '';
+    Run := nil;
+    if (WT <> nil) and (WT.MeasurementRun <> nil) then
+      Run := TMeasurementRun(WT.MeasurementRun);
 
-    if ADevices <> nil then
+    if AMergePoints and (Run <> nil) and (Run.Points <> nil) then
+    begin
+      for I := 0 to Run.Points.Count - 1 do
+      begin
+        Point := Run.Points[I];
+        if (Point = nil) or not Point.Enabled then
+          Continue;
+        Col := Default(TProceedResultPointColumn);
+        Col.Header := Trim(Point.Name);
+        if Col.Header = '' then
+          Col.Header := Format('Q%d', [Cols.Count + 1]);
+        Col.ScenarioPoint := Point;
+        Cols.Add(Col);
+      end;
+    end
+    else if ADevices <> nil then
       for Device in ADevices do
         if (Device <> nil) and (Device.Points <> nil) then
           for I := 0 to Device.Points.Count - 1 do
@@ -2273,50 +2277,13 @@ begin
             Point := Device.Points[I];
             if (Point = nil) or not Point.Enabled then
               Continue;
-
-            Merged := False;
-            if AMergePoints then
-              for J := 0 to Cols.Count - 1 do
-                if (Cols[J].ScenarioPoint <> nil) and
-                   TMeasurementRun.IsPointEquivalent(Point, Cols[J].ScenarioPoint) then
-                begin
-                  Merged := True;
-                  Break;
-                end;
-
-            if not Merged then
-            begin
-              Col := Default(TProceedResultPointColumn);
-              if AMergePoints then
-                begin
-                  Col.ScenarioPoint := Point;
-                  Col.Key := 'Point.' + Point.UUID;
-                end
-              else
-              begin
-                Col.DeviceUUID := Device.UUID;
-                Col.SourcePointUUID := Point.UUID;
-                Col.Key := 'Device.' + Device.UUID + '.Point.' + Point.UUID;
-              end;
-              if AMergePoints then
-                Col.Header := Trim(Point.Name)
-              else
-                Col.Header := Trim(Device.Name + ' ' + Point.Name);
-              if Col.Header = '' then
-                Col.Header := Format('Q%d', [Cols.Count + 1]);
-              Cols.Add(Col);
-            end;
-
-            if AMergePoints then
-              PointKey := 'Point.' + Point.UUID
-            else
-              PointKey := 'Device.' + Device.UUID + '.Point.' + Point.UUID;
-
-            ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingPointsContextPoint',
-              'Точка контекста обработки',
-              Format('WorkTableUUID=%s; DeviceUUID=%s; DeviceName=%s; PointUUID=%s; PointName=%s; PointKey=%s; MergeEnabled=%s',
-                [WorkTableUUID, Device.UUID, Device.Name, Point.UUID, Point.Name,
-                 PointKey, BoolToStr(AMergePoints, True)]));
+            Col := Default(TProceedResultPointColumn);
+            Col.DeviceUUID := Device.UUID;
+            Col.SourcePointUUID := Point.UUID;
+            Col.Header := Trim(Device.Name + ' ' + Point.Name);
+            if Col.Header = '' then
+              Col.Header := Format('Q%d', [Cols.Count + 1]);
+            Cols.Add(Col);
           end;
 
     for I := 0 to Cols.Count - 1 do
@@ -2330,11 +2297,6 @@ begin
         end;
 
     FResultPointColumns := Cols.ToArray;
-    ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingPointsContextBuilt',
-      'Построен контекст точек обработки',
-      Format('WorkTableUUID=%s; DeviceCount=%d; PointCount=%d; MergeEnabled=%s',
-        [WorkTableUUID, IfThen(ADevices <> nil, ADevices.Count, 0),
-         Length(FResultPointColumns), BoolToStr(AMergePoints, True)]));
   finally
     Cols.Free;
   end;
@@ -2342,23 +2304,25 @@ end;
 
 procedure TFrameProceed.UpdateResultsPointColumns;
 var
-  MaxPoints, I, StartDynamicIndex: Integer;
+  MaxPoints, I: Integer;
   Col: TStringColumn;
-  UseStaticPointColumns: Boolean;
-  HeaderText: string;
-  CreatedKeys: string;
-  CreatedColumnsCount: Integer;
-  ContextName: string;
+
+  function FormatPointHeader(const APointName: string): string;
+  begin
+    Result := #948 + '(' + APointName + '), %';
+  end;
+
+  procedure ApplyPointColumn(AColumn: TStringColumn; const AIndex: Integer);
+  begin
+    if AColumn = nil then
+      Exit;
+    AColumn.Visible := AIndex < MaxPoints;
+    if AColumn.Visible then
+      AColumn.Header := FormatPointHeader(FResultPointColumns[AIndex].Header);
+    AColumn.HeaderSettings.TextSettings.WordWrap := False;
+    AColumn.Stored := True;
+  end;
 begin
-  for I := GridResults.ColumnCount - 1 downto 0 do
-    if (Trim(GridResults.Columns[I].Name) = '') or
-       SameText(GridResults.Columns[I].TagString, 'ProcessingDynamicPoint') then
-      GridResults.Columns[I].Free;
-
-  UseStaticPointColumns := True;
-  if ResolveManagerWorkTable(FWorkTableManager) <> nil then
-    UseStaticPointColumns := ResolveManagerWorkTable(FWorkTableManager).MergeMeasurementPoints;
-
   MaxPoints := Length(FResultPointColumns);
   if MaxPoints = 0 then
     for I := 0 to High(FCurrentResultRows) do
@@ -2367,83 +2331,23 @@ begin
   while StringColumnResult.Index > StringColumnPointNum4.Index + 1 do
     GridResults.Columns[StringColumnPointNum4.Index + 1].Free;
 
-  if UseStaticPointColumns then
-  begin
-    StringColumnPointNum1.Visible := MaxPoints >= 1;
-    if StringColumnPointNum1.Visible then
-      if Length(FResultPointColumns) > 0 then
-        StringColumnPointNum1.Header := #948 + '(' + FResultPointColumns[0].Header + '), %';
-    StringColumnPointNum2.Visible := MaxPoints >= 2;
-    if StringColumnPointNum2.Visible then
-      if Length(FResultPointColumns) > 1 then
-        StringColumnPointNum2.Header := #948 + '(' + FResultPointColumns[1].Header + '), %';
-    StringColumnPointNum3.Visible := MaxPoints >= 3;
-    if StringColumnPointNum3.Visible then
-      if Length(FResultPointColumns) > 2 then
-        StringColumnPointNum3.Header := #948 + '(' + FResultPointColumns[2].Header + '), %';
-    StringColumnPointNum4.Visible := MaxPoints >= 4;
-    if StringColumnPointNum4.Visible then
-      if Length(FResultPointColumns) > 3 then
-        StringColumnPointNum4.Header := #948 + '(' + FResultPointColumns[3].Header + '), %';
-    StringColumnPointNum1.Stored := True;
-    StringColumnPointNum2.Stored := True;
-    StringColumnPointNum3.Stored := True;
-    StringColumnPointNum4.Stored := True;
-    StartDynamicIndex := 4;
-  end
-  else
-  begin
-    StringColumnPointNum1.Visible := False;
-    StringColumnPointNum2.Visible := False;
-    StringColumnPointNum3.Visible := False;
-    StringColumnPointNum4.Visible := False;
-    StartDynamicIndex := 0;
-  end;
-end;
+  ApplyPointColumn(StringColumnPointNum1, 0);
+  ApplyPointColumn(StringColumnPointNum2, 1);
+  ApplyPointColumn(StringColumnPointNum3, 2);
+  ApplyPointColumn(StringColumnPointNum4, 3);
 
-  CreatedKeys := '';
-  CreatedColumnsCount := 0;
-  for I := StartDynamicIndex to MaxPoints - 1 do
+  for I := 4 to MaxPoints - 1 do
   begin
     Col := TStringColumn.Create(GridResults);
     Col.Parent := GridResults;
     Col.Stored := False;
-    Col.Name := 'ProcessingPointColumn' + IntToStr(I + 1);
-    Col.TagString := 'ProcessingDynamicPoint';
-    Col.Tag := I;
-    Col.Visible := True;
     Col.Width := 125;
     Col.HeaderSettings.TextSettings.Trimming := TTextTrimming.Character;
     Col.HeaderSettings.TextSettings.WordWrap := False;
     Col.HeaderSettings.TextSettings.HorzAlign := TTextAlign.Center;
-    if Length(FResultPointColumns) > I then
-      HeaderText := FResultPointColumns[I].Header
-    else
-      HeaderText := Format('Q%d', [I + 1]);
-    if UseStaticPointColumns then
-      HeaderText := #948 + '(' + HeaderText + '), %';
-    Col.Header := HeaderText;
+    Col.Header := FormatPointHeader(FResultPointColumns[I].Header);
     Col.Index := StringColumnResult.Index;
-    Inc(CreatedColumnsCount);
-    if Length(FResultPointColumns) > I then
-    begin
-      if CreatedKeys <> '' then
-        CreatedKeys := CreatedKeys + ',';
-      CreatedKeys := CreatedKeys + FResultPointColumns[I].Key;
-    end;
   end;
-  if UseStaticPointColumns then
-  begin
-    CreatedColumnsCount := Min(MaxPoints, 4);
-    ContextName := 'Summary';
-  end
-  else
-    ContextName := 'Points';
-  ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingGridColumnsCreated',
-    'Созданы столбцы точек обработки',
-    Format('Context=%s; MergeEnabled=%s; ColumnsCount=%d; List=%s',
-      [ContextName, BoolToStr(UseStaticPointColumns, True),
-       CreatedColumnsCount, CreatedKeys]));
   StringColumnResult.Index := GridResults.ColumnCount - 2;
   StringColumnResultComment.Index := GridResults.ColumnCount - 1;
 end;
@@ -2583,10 +2487,7 @@ begin
   UseMergePoints := True;
   if ResolveManagerWorkTable(FWorkTableManager) <> nil then
     UseMergePoints := ResolveManagerWorkTable(FWorkTableManager).MergeMeasurementPoints;
-  if UseMergePoints then
-    SetLength(FResultPointColumns, 0)
-  else
-    BuildProcessingPointsContext(ADevices, UseMergePoints);
+  BuildSummaryResultPointColumns(ADevices, UseMergePoints);
 
   Rows := TList<TResultGridRow>.Create;
   try
@@ -2608,7 +2509,7 @@ begin
         InvalidCount := 0;
         HasAnyData := False;
 
-        if UseMergePoints and (Device.Points <> nil) then
+        if Length(FResultPointColumns) > 0 then
         begin
           if Device.Points <> nil then
             RequiredPointsCount := Device.Points.Count;
@@ -2633,46 +2534,6 @@ begin
                 Row.PointColors[I] := GetPointResultColor(Device, P, Spillage);
                 { Point columns always show the measured error.  Only the
                   aggregate Result column may display an em dash. }
-                Row.PointValues[I] := FormatResultErrorValue(Spillage.Error);
-              end
-              else
-              begin
-                Row.PointColors[I] := TAlphaColors.Null;
-                Row.PointValues[I] := '-';
-              end;
-              LogResultCellDebug(Row, P, Spillage, Row.PointValues[I]);
-            end
-            else
-            begin
-              Row.PointNames[I] := '';
-              Row.PointColors[I] := TAlphaColors.Null;
-              Row.PointValues[I] := '-';
-            end;
-          end;
-        end
-        else if Length(FResultPointColumns) > 0 then
-        begin
-          if Device.Points <> nil then
-            RequiredPointsCount := Device.Points.Count;
-          SetLength(Row.PointNames, Length(FResultPointColumns));
-          SetLength(Row.PointValues, Length(FResultPointColumns));
-          SetLength(Row.PointColors, Length(FResultPointColumns));
-          for I := 0 to High(FResultPointColumns) do
-          begin
-            Row.PointNames[I] := FResultPointColumns[I].Header;
-            P := FindResultPointForColumn(Device, FResultPointColumns[I]);
-            if P <> nil then
-            begin
-              Row.PointNames[I] := P.Name;
-              Spillage := FindResultSpillageForPoint(Device, P);
-              if Spillage <> nil then
-              begin
-                Inc(FoundPointsCount);
-                HasAnyData := True;
-                if (not Spillage.Valid) or
-                   (Spillage.Validation = vsInvalid) then
-                  Inc(InvalidCount);
-                Row.PointColors[I] := GetPointResultColor(Device, P, Spillage);
                 Row.PointValues[I] := FormatResultErrorValue(Spillage.Error);
               end
               else
@@ -2793,22 +2654,8 @@ begin
   end;
 end;
 procedure TFrameProceed.UpdateGridResults;
-var
-  MergeEnabled: Boolean;
-  ResultsContext: string;
-  VisibleColumns: Integer;
-  DynamicColumnsCreated: Integer;
-  I: Integer;
 begin
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
-  MergeEnabled := True;
-  if FActiveWorkTable <> nil then
-    MergeEnabled := FActiveWorkTable.MergeMeasurementPoints;
-  if MergeEnabled then
-    ResultsContext := 'Summary'
-  else
-    ResultsContext := 'Points';
-  DynamicColumnsCreated := 0;
   GridResults.BeginUpdate;
   try
     if GridDataPoints <> nil then
@@ -2835,30 +2682,12 @@ begin
   GridDataPoints.Visible := False;
   // Data and all named columns now exist, so no later default population can
   // overwrite the persisted order, width or visibility.
-  if (FActiveWorkTable <> nil) and MergeEnabled then
+  if FActiveWorkTable <> nil then
     ApplyGridColumnsLayout(GridResults, FActiveWorkTable.ResultsGridColumns);
   SetGridReadOnly(GridResults);
   UpdateActionHints;
-  VisibleColumns := 0;
-  for I := 0 to GridResults.ColumnCount - 1 do
-    if GridResults.Columns[I].Visible then
-      Inc(VisibleColumns);
-  for I := 0 to GridResults.ColumnCount - 1 do
-    if SameText(GridResults.Columns[I].TagString, 'ProcessingDynamicPoint') then
-      Inc(DynamicColumnsCreated);
-  ProtocolManager.AddMessage(pcProc, psForm, 'GridResultsContextSelected',
-    'Выбран контекст таблицы обработки',
-    Format('MergeEnabled=%s; Context=%s; DynamicPointColumnsCount=%d',
-      [BoolToStr(MergeEnabled, True), ResultsContext, Length(FResultPointColumns)]));
-  if MergeEnabled then
-    LogProceedGridContext(ResultsContext, nil, nil, GridResults.RowCount,
-      GridResults.ColumnCount)
-  else
-    ProtocolManager.AddMessage(pcProc, psForm, 'ProceedGridContext',
-      'Построена таблица обработки',
-      Format('Context=%s; MergeEnabled=%s; DynamicColumnsCreated=%d; DeviceUUID=; SessionID=; Rows=%d; Columns=%d',
-        [ResultsContext, BoolToStr(MergeEnabled, True), DynamicColumnsCreated,
-         GridResults.RowCount, VisibleColumns]));
+  LogProceedGridContext('Summary', nil, nil, GridResults.RowCount,
+    GridResults.ColumnCount);
 end;
 procedure SaveGridColumnWidths(AGrid: TGrid; out AWidths: TArray<Single>);
 var
@@ -4494,9 +4323,10 @@ begin
   begin
     if Length(Row.PointValues) > 3 then Value := Row.PointValues[3] else Value := '';
   end
-  else if SameText(GridResults.Columns[ACol].TagString, 'ProcessingDynamicPoint') then
+  else if (GridResults.Columns[ACol].Index > StringColumnPointNum4.Index) and
+          (GridResults.Columns[ACol].Index < StringColumnResult.Index) then
   begin
-    PointIdx := GridResults.Columns[ACol].Tag;
+    PointIdx := GridResults.Columns[ACol].Index - StringColumnPointNum1.Index;
     if (PointIdx >= 0) and (PointIdx < Length(Row.PointValues)) then
       Value := Row.PointValues[PointIdx]
     else
@@ -4533,8 +4363,9 @@ begin
     if Column = StringColumnPointNum2 then PointIdx := 1;
     if Column = StringColumnPointNum3 then PointIdx := 2;
     if Column = StringColumnPointNum4 then PointIdx := 3;
-    if (PointIdx < 0) and SameText(Column.TagString, 'ProcessingDynamicPoint') then
-      PointIdx := Column.Tag;
+    if (PointIdx < 0) and (Column.Index > StringColumnPointNum4.Index) and
+       (Column.Index < StringColumnResult.Index) then
+      PointIdx := Column.Index - StringColumnPointNum1.Index;
 
     if (PointIdx >= 0) and (PointIdx < Length(GridRow.PointColors)) then
       Color := GridRow.PointColors[PointIdx];
