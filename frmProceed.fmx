@@ -33,6 +33,7 @@ object FrameProceed: TFrameProceed
           Visible = False
           Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
           OnColumnMoved = GridDataPointsColumnMoved
+          OnHeaderClick = GridDataPointsHeaderClick
           OnGetValue = GridDataPointsGetValue
           OnCellClick = GridDataPointsCellClick
           Viewport.Width = 961.000000000000000000

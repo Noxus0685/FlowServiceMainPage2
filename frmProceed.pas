@@ -28,6 +28,7 @@ uses
   System.Actions,
   System.Classes,
   System.Generics.Collections,
+  System.Generics.Defaults,
   System.IniFiles,
   System.IOUtils,
   System.Math,
@@ -48,6 +49,9 @@ uses
   uMeasurementRun;
 
 type
+  // Направление сортировки таблицы обработки.
+  TGridSortDirection = (gsdNone, gsdAscending, gsdDescending);
+
   TProceedResultPointColumn = record
     Header: string;
     DeviceUUID: string;
@@ -212,6 +216,10 @@ type
     function IsProcessingDevicePendingRemoved(ADevice: TDevice): Boolean;
     procedure MarkProcessingDeviceDeleted(ADevice: TDevice);
     function GetDeviceSpillageCount(ADevice: TDevice): Integer;
+    // Возвращает дату последней проливки прибора для сортировки результатов обработки.
+    function GetLastSpillageDate(ADevice: TDevice): TDateTime;
+    // Сортирует загруженные данные обработки по дате выполнения измерений.
+    procedure SortProcessingDataByDate;
     procedure SaveProcessingPointCounts;
     procedure SaveProcessingDevices;
     procedure LoadManualProcessingDevices;
@@ -307,6 +315,8 @@ type
     procedure GridDataPointsCellClick(const Column: TColumn; const Row: Integer);
     procedure GridDataPointsDrawColumnCell(Sender: TObject; const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF; const Row: Integer; const Value: TValue; const State: TGridDrawStates);
     procedure GridDataPointsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+    // Обрабатывает выбор пользователем колонки сортировки таблицы обработки.
+    procedure GridDataPointsHeaderClick(Column: TColumn);
     procedure UpdateGridDataPointsHeaders(QuantityDimName: string; FlowDimName: string);
     procedure SetSessionDim(UnitName: string; QuantityUnitName: string);
     procedure UpdateCalibrCoefsFrame;
@@ -356,6 +366,9 @@ type
     FLastDataPointsHintRow: Integer;
     FLastDataPointsHintCol: Integer;
     FApplyingGridColumnsLayout: Boolean;
+    // Текущая сортировка таблицы точек обработки.
+    FGridDataPointsSortColumn: string;
+    FGridDataPointsSortDirection: TGridSortDirection;
   public
     { Public declarations }
     procedure Initialize;
@@ -479,6 +492,7 @@ begin
     // Подключаем существующий обработчик Hint для ячеек таблицы измерений.
     GridDataPoints.OnMouseMove := GridDataPointsMouseMove;
     GridDataPoints.OnMouseUp := GridColumnLayoutMouseUp;
+    GridDataPoints.OnHeaderClick := GridDataPointsHeaderClick;
   end;
 
   // FMX popup contents must be stable while the native menu is open.
@@ -494,6 +508,8 @@ begin
   FLastResultsHintCol := -1;
   FLastDataPointsHintRow := -1;
   FLastDataPointsHintCol := -1;
+  FGridDataPointsSortColumn := '';
+  FGridDataPointsSortDirection := gsdNone;
 
   SetGridReadOnly(GridDataPoints);
   SetGridReadOnly(GridResults);
@@ -960,6 +976,105 @@ begin
   for Point in ADevice.Spillages do
     if (Point <> nil) and (Point.State <> osDeleted) then
       Inc(Result);
+end;
+
+function TFrameProceed.GetLastSpillageDate(ADevice: TDevice): TDateTime;
+var
+  Point: TPointSpillage;
+begin
+  Result := 0;
+  if (ADevice = nil) or (ADevice.Spillages = nil) then
+    Exit;
+
+  for Point in ADevice.Spillages do
+    if (Point <> nil) and (Point.State <> osDeleted) and
+       (Point.DateTime > Result) then
+      Result := Point.DateTime;
+end;
+
+procedure TFrameProceed.SortProcessingDataByDate;
+var
+  FirstDate, LastDate: TDateTime;
+
+  function DirectionText: string;
+  begin
+    if FGridDataPointsSortDirection = gsdAscending then
+      Result := 'Ascending'
+    else if FGridDataPointsSortDirection = gsdDescending then
+      Result := 'Descending'
+    else
+      Result := 'None';
+  end;
+
+  function FormatSortDate(const ADate: TDateTime): string;
+  begin
+    if ADate > 0 then
+      Result := FormatDateTime('yyyy-mm-dd hh:nn:ss', ADate)
+    else
+      Result := '';
+  end;
+
+begin
+  if StringColumnSpillageDateTime <> nil then
+  begin
+    if SameText(FGridDataPointsSortColumn, StringColumnSpillageDateTime.Name) then
+    begin
+      if FGridDataPointsSortDirection = gsdAscending then
+        StringColumnSpillageDateTime.Header := 'Дата/время ↑'
+      else if FGridDataPointsSortDirection = gsdDescending then
+        StringColumnSpillageDateTime.Header := 'Дата/время ↓'
+      else
+        StringColumnSpillageDateTime.Header := 'Дата/время';
+    end
+    else
+      StringColumnSpillageDateTime.Header := 'Дата/время';
+  end;
+
+  if (not SameText(FGridDataPointsSortColumn, 'StringColumnSpillageDateTime')) or
+     (FGridDataPointsSortDirection = gsdNone) then
+    Exit;
+
+  if Length(FCurrentSpillages) > 1 then
+    TArray.Sort<TPointSpillage>(FCurrentSpillages,
+      TComparer<TPointSpillage>.Construct(
+        function(const Left, Right: TPointSpillage): Integer
+        var
+          LeftDate, RightDate: TDateTime;
+        begin
+          LeftDate := 0;
+          RightDate := 0;
+          if Left <> nil then
+            LeftDate := Left.DateTime;
+          if Right <> nil then
+            RightDate := Right.DateTime;
+
+          if LeftDate < RightDate then
+            Result := -1
+          else if LeftDate > RightDate then
+            Result := 1
+          else
+            Result := 0;
+
+          if FGridDataPointsSortDirection = gsdDescending then
+            Result := -Result;
+        end));
+
+  FirstDate := 0;
+  LastDate := 0;
+  if Length(FCurrentSpillages) > 0 then
+  begin
+    if FCurrentSpillages[0] <> nil then
+      FirstDate := FCurrentSpillages[0].DateTime;
+    if FCurrentSpillages[High(FCurrentSpillages)] <> nil then
+      LastDate := FCurrentSpillages[High(FCurrentSpillages)].DateTime;
+  end;
+
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingGridSortChanged',
+      'Изменена сортировка таблицы точек обработки',
+      Format('Grid=GridDataPoints; Column=StringColumnSpillageDateTime; Direction=%s; Count=%d; FirstDate=%s; LastDate=%s',
+        [DirectionText, Length(FCurrentSpillages), FormatSortDate(FirstDate),
+         FormatSortDate(LastDate)]));
 end;
 
 procedure TFrameProceed.SaveProcessingPointCounts;
@@ -3014,6 +3129,7 @@ begin
       Inc(Count);
     end;
   SetLength(FCurrentSpillages, Count);
+  SortProcessingDataByDate;
 
   SaveGridColumnWidths(GridDataPoints, ColumnWidths);
   GridDataPoints.BeginUpdate;
@@ -5139,6 +5255,20 @@ begin
   GridDataPoints.Hint := HintText;
   GridDataPoints.ShowHint := HintText <> '';
 end;
+procedure TFrameProceed.GridDataPointsHeaderClick(Column: TColumn);
+begin
+  if Column <> StringColumnSpillageDateTime then
+    Exit;
+
+  FGridDataPointsSortColumn := StringColumnSpillageDateTime.Name;
+  if FGridDataPointsSortDirection = gsdAscending then
+    FGridDataPointsSortDirection := gsdDescending
+  else
+    FGridDataPointsSortDirection := gsdAscending;
+
+  UpdateGridDataPoints;
+end;
+
 procedure TFrameProceed.UpdateGridDataPointsHeaders(QuantityDimName: string; FlowDimName: string);
 var
   WorkTable: TWorkTable;
