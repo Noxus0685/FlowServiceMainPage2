@@ -28,6 +28,7 @@ uses
   System.Actions,
   System.Classes,
   System.Generics.Collections,
+  System.Generics.Defaults,
   System.IniFiles,
   System.IOUtils,
   System.Math,
@@ -212,6 +213,10 @@ type
     function IsProcessingDevicePendingRemoved(ADevice: TDevice): Boolean;
     procedure MarkProcessingDeviceDeleted(ADevice: TDevice);
     function GetDeviceSpillageCount(ADevice: TDevice): Integer;
+    // Возвращает дату последней проливки прибора для сортировки результатов обработки.
+    function GetLastSpillageDate(ADevice: TDevice): TDateTime;
+    // Сортирует загруженные данные обработки по дате выполнения измерений.
+    procedure SortProcessingDataByDate;
     procedure SaveProcessingPointCounts;
     procedure SaveProcessingDevices;
     procedure LoadManualProcessingDevices;
@@ -960,6 +965,123 @@ begin
   for Point in ADevice.Spillages do
     if (Point <> nil) and (Point.State <> osDeleted) then
       Inc(Result);
+end;
+
+function TFrameProceed.GetLastSpillageDate(ADevice: TDevice): TDateTime;
+var
+  Point: TPointSpillage;
+begin
+  Result := 0;
+  if (ADevice = nil) or (ADevice.Spillages = nil) then
+    Exit;
+
+  for Point in ADevice.Spillages do
+    if (Point <> nil) and (Point.State <> osDeleted) and
+       (Point.DateTime > Result) then
+      Result := Point.DateTime;
+end;
+
+procedure TFrameProceed.SortProcessingDataByDate;
+var
+  DevicesCount, SessionsCount, SpillagesCount: Integer;
+  FirstDate, LastDate: TDateTime;
+  Device: TDevice;
+  Session: TSessionSpillage;
+  Point: TPointSpillage;
+
+  procedure RegisterDate(const ADate: TDateTime);
+  begin
+    if ADate <= 0 then
+      Exit;
+    if (FirstDate = 0) or (ADate > FirstDate) then
+      FirstDate := ADate;
+    if (LastDate = 0) or (ADate < LastDate) then
+      LastDate := ADate;
+  end;
+
+  function FormatSortDate(const ADate: TDateTime): string;
+  begin
+    if ADate > 0 then
+      Result := FormatDateTime('yyyy-mm-dd hh:nn:ss', ADate)
+    else
+      Result := '';
+  end;
+
+begin
+  DevicesCount := 0;
+  SessionsCount := 0;
+  SpillagesCount := 0;
+  FirstDate := 0;
+  LastDate := 0;
+
+  if FProcessingDevices <> nil then
+    for Device in FProcessingDevices do
+    begin
+      if (Device = nil) or (Device.State = osDeleted) or
+         IsProcessingDevicePendingRemoved(Device) then
+        Continue;
+
+      Inc(DevicesCount);
+      RegisterDate(GetLastSpillageDate(Device));
+
+      if Device.Sessions <> nil then
+        for Session in Device.Sessions do
+          if (Session <> nil) and (Session.State <> osDeleted) then
+            Inc(SessionsCount);
+
+      if Device.Spillages <> nil then
+        for Point in Device.Spillages do
+          if (Point <> nil) and (Point.State <> osDeleted) then
+          begin
+            Inc(SpillagesCount);
+            RegisterDate(Point.DateTime);
+          end;
+    end;
+
+  if Length(FCurrentSpillages) > 1 then
+    TArray.Sort<TPointSpillage>(FCurrentSpillages,
+      TComparer<TPointSpillage>.Construct(
+        function(const Left, Right: TPointSpillage): Integer
+        var
+          LeftDate, RightDate: TDateTime;
+        begin
+          LeftDate := 0;
+          RightDate := 0;
+          if Left <> nil then
+            LeftDate := Left.DateTime;
+          if Right <> nil then
+            RightDate := Right.DateTime;
+          if LeftDate > RightDate then
+            Result := -1
+          else if LeftDate < RightDate then
+            Result := 1
+          else
+            Result := 0;
+        end));
+
+  if Length(FCurrentResultRows) > 1 then
+    TArray.Sort<TResultGridRow>(FCurrentResultRows,
+      TComparer<TResultGridRow>.Construct(
+        function(const Left, Right: TResultGridRow): Integer
+        var
+          LeftDate, RightDate: TDateTime;
+        begin
+          LeftDate := GetLastSpillageDate(Left.Device);
+          RightDate := GetLastSpillageDate(Right.Device);
+          if LeftDate > RightDate then
+            Result := -1
+          else if LeftDate < RightDate then
+            Result := 1
+          else
+            Result := 0;
+        end));
+
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingDataSorted',
+      'Данные обработки отсортированы по дате измерений',
+      Format('SortField=DateTime; Direction=Descending; DevicesCount=%d; SessionsCount=%d; SpillagesCount=%d; FirstDate=%s; LastDate=%s',
+        [DevicesCount, SessionsCount, SpillagesCount, FormatSortDate(FirstDate),
+         FormatSortDate(LastDate)]));
 end;
 
 procedure TFrameProceed.SaveProcessingPointCounts;
@@ -2850,6 +2972,7 @@ begin
       end;
 
     FCurrentResultRows := Rows.ToArray;
+    SortProcessingDataByDate;
   finally
     Rows.Free;
   end;
@@ -3014,6 +3137,7 @@ begin
       Inc(Count);
     end;
   SetLength(FCurrentSpillages, Count);
+  SortProcessingDataByDate;
 
   SaveGridColumnWidths(GridDataPoints, ColumnWidths);
   GridDataPoints.BeginUpdate;
