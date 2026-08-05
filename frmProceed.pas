@@ -46,6 +46,7 @@ uses
   uProtocols,
   uWorkTable,
   uMKSDebug,
+  uMeasurementPointGrouping,
   uMeasurementRun;
 
 type
@@ -63,6 +64,10 @@ type
     SourcePointName: string;
     SourcePointNum: Integer;
     IsMerged: Boolean;
+    CommonMinQ: Double;
+    CommonMaxQ: Double;
+    MinEtalonDeltaQ: Double;
+    EtalonRangeValid: Boolean;
   end;
 
   TResultGridRow = record
@@ -2311,7 +2316,6 @@ end;
 function TFrameProceed.BuildResultComment(ADevice: TDevice;
   const AStatus: Integer): string;
 var
-  DevicePoint: TDevicePoint;
   Spillage: TPointSpillage;
 begin
   Result := '';
@@ -2397,21 +2401,20 @@ end;
 
 function TFrameProceed.IsProcessingSpillageInMergedColumn(ASpillage: TPointSpillage;
   const AColumn: TProceedResultPointColumn): Boolean;
-const
-  SUMMARY_MERGE_FLOW_REL_TOLERANCE = 0.005;
-  SUMMARY_MERGE_FLOW_ABS_TOLERANCE = 0.000001;
 var
-  MaxFlow: Double;
+  PointMinQ, PointMaxQ, PointDeltaQ: Double;
+  NewCommonMinQ, NewCommonMaxQ, IntersectionQ, ControlDeltaQ: Double;
 begin
   Result := False;
-  if (ASpillage = nil) or (ASpillage.State = osDeleted) or (not ASpillage.Enabled) then
+  if (ASpillage = nil) or (ASpillage.State = osDeleted) or (not ASpillage.Enabled) or
+     (not AColumn.EtalonRangeValid) then
     Exit;
-  if IsNan(ASpillage.QavgEtalon) or IsInfinite(ASpillage.QavgEtalon) or
-     IsNan(AColumn.TargetFlow) or IsInfinite(AColumn.TargetFlow) then
+  if not TMeasurementPointGrouping.CalculatePointRange(ASpillage.QavgEtalon,
+    ASpillage.Error, PointMinQ, PointMaxQ, PointDeltaQ) then
     Exit;
-  MaxFlow := Max(Abs(ASpillage.QavgEtalon), Abs(AColumn.TargetFlow));
-  Result := Abs(ASpillage.QavgEtalon - AColumn.TargetFlow) <=
-    Max(SUMMARY_MERGE_FLOW_ABS_TOLERANCE, MaxFlow * SUMMARY_MERGE_FLOW_REL_TOLERANCE);
+  Result := TMeasurementPointGrouping.CalculateMergedRange(AColumn.CommonMinQ,
+    AColumn.CommonMaxQ, AColumn.MinEtalonDeltaQ, PointMinQ, PointMaxQ,
+    PointDeltaQ, NewCommonMinQ, NewCommonMaxQ, IntersectionQ, ControlDeltaQ);
 end;
 
 function TFrameProceed.FindResultSpillageForColumn(ADevice: TDevice;
@@ -2516,6 +2519,10 @@ var
   RunPointsEmpty: Boolean;
   GroupNames, GroupFlows, GroupEtalons: string;
   GroupCount: Integer;
+  PointMinQ, PointMaxQ, PointDeltaQ: Double;
+  NewCommonMinQ, NewCommonMaxQ, IntersectionQ, ControlDeltaQ: Double;
+  BestIntersectionQ, BestDistance, CandidateDistance: Double;
+  PointErrorPercent: Double;
 
   function IsUsableSummarySpillage(ASpillage: TPointSpillage): Boolean;
   begin
@@ -2548,6 +2555,23 @@ var
     if AText <> '' then
       AText := AText + ',';
     AText := AText + AValue;
+  end;
+
+  function SpillagePointErrorPercent(AOwnerDevice: TDevice; ASpillage: TPointSpillage): Double;
+  var
+    MatchedPoint: TDevicePoint;
+  begin
+    Result := NaN;
+    if (AOwnerDevice <> nil) and (ASpillage <> nil) then
+    begin
+      MatchedPoint := AOwnerDevice.FindMatchedDevicePointForSpillage(ASpillage);
+      if (MatchedPoint <> nil) and (not IsNan(MatchedPoint.Error)) and
+         (not IsInfinite(MatchedPoint.Error)) and (MatchedPoint.Error > 0) then
+        Exit(MatchedPoint.Error);
+    end;
+    if (ASpillage <> nil) and (not IsNan(ASpillage.Error)) and
+       (not IsInfinite(ASpillage.Error)) and (ASpillage.Error > 0) then
+      Result := ASpillage.Error;
   end;
 
   function FindOwnerDeviceUUID(ASpillage: TPointSpillage): string;
@@ -2608,19 +2632,56 @@ begin
       Col.TargetFlow := Spillage.QavgEtalon;
       Col.SourcePointName := Trim(Spillage.Name);
       Col.SourcePointNum := Spillage.Num;
+      Device := nil;
+      if ADevices <> nil then
+        for Device in ADevices do
+        if (Device <> nil) and (Device.Spillages <> nil) and
+           (Device.Spillages.IndexOf(Spillage) >= 0) then
+        begin
+          Break;
+        end;
+      PointErrorPercent := SpillagePointErrorPercent(Device, Spillage);
       if AMergePoints then
       begin
         J := -1;
-        for I := 0 to Cols.Count - 1 do
-          if IsProcessingSpillageInMergedColumn(Spillage, Cols[I]) then
+        BestIntersectionQ := -MaxDouble;
+        BestDistance := MaxDouble;
+        if TMeasurementPointGrouping.CalculatePointRange(Spillage.QavgEtalon,
+          PointErrorPercent, PointMinQ, PointMaxQ, PointDeltaQ) then
+          for I := 0 to Cols.Count - 1 do
           begin
-            J := I;
-            Break;
+            { IsProcessingSpillageInMergedColumn(Spillage, Cols[I]) delegates to the same math. }
+            if TMeasurementPointGrouping.CalculateMergedRange(Cols[I].CommonMinQ,
+                 Cols[I].CommonMaxQ, Cols[I].MinEtalonDeltaQ, PointMinQ,
+                 PointMaxQ, PointDeltaQ, NewCommonMinQ, NewCommonMaxQ,
+                 IntersectionQ, ControlDeltaQ) then
+            begin
+              CandidateDistance := Abs(Cols[I].TargetFlow - Spillage.QavgEtalon);
+              if (J < 0) or (IntersectionQ > BestIntersectionQ + 1E-9) or
+                 (SameValue(IntersectionQ, BestIntersectionQ, 1E-9) and
+                  (CandidateDistance < BestDistance - 1E-9)) then
+              begin
+                J := I;
+                BestIntersectionQ := IntersectionQ;
+                BestDistance := CandidateDistance;
+              end;
+            end;
+            ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementPointMergeMath',
+              'Проверка математики объединения поверочных точек',
+              Format('Point1Q=%.6f; Point2Q=%.6f; Point1Range=[%.6f..%.6f]; Point2Range=[%.6f..%.6f]; Intersection=%.6f; ControlDelta=%.6f; Result=%s',
+                [Cols[I].TargetFlow, Spillage.QavgEtalon, Cols[I].CommonMinQ,
+                 Cols[I].CommonMaxQ, PointMinQ, PointMaxQ, IntersectionQ,
+                 ControlDeltaQ, BoolToStr((J = I) and SameValue(IntersectionQ, BestIntersectionQ, 1E-9), True)]));
           end;
         if J >= 0 then
         begin
           Col := Cols[J];
-          Col.TargetFlow := (Col.TargetFlow + Spillage.QavgEtalon) / 2;
+          TMeasurementPointGrouping.CalculateMergedRange(Col.CommonMinQ,
+            Col.CommonMaxQ, Col.MinEtalonDeltaQ, PointMinQ, PointMaxQ,
+            PointDeltaQ, Col.CommonMinQ, Col.CommonMaxQ, IntersectionQ,
+            ControlDeltaQ);
+          Col.MinEtalonDeltaQ := Min(Col.MinEtalonDeltaQ, PointDeltaQ);
+          Col.TargetFlow := (Col.CommonMinQ + Col.CommonMaxQ) / 2;
           AppendHeaderName(Col.Header, SpillageHeader(Spillage, Format('Q%d', [J + 1])));
           Cols[J] := Col;
         end
@@ -2631,6 +2692,14 @@ begin
           Col.EtalonUUID := '';
           Col.SourcePointUUID := '';
           Col.Header := SpillageHeader(Spillage, Format('Q%d', [Cols.Count + 1]));
+          Col.EtalonRangeValid := TMeasurementPointGrouping.CalculatePointRange(
+            Spillage.QavgEtalon, PointErrorPercent, PointMinQ, PointMaxQ, PointDeltaQ);
+          if Col.EtalonRangeValid then
+          begin
+            Col.CommonMinQ := PointMinQ;
+            Col.CommonMaxQ := PointMaxQ;
+            Col.MinEtalonDeltaQ := PointDeltaQ;
+          end;
           Cols.Add(Col);
         end;
       end

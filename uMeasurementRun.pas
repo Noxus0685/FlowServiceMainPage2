@@ -127,6 +127,7 @@ uses
   uDeviceClass,
   uFlowMeter,
   uMeterValue,
+  uMeasurementPointGrouping,
   uObservable,
   uProtocols,
   uRepositories,
@@ -893,17 +894,15 @@ end;
 
 class function TMeasurementRun.IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean;
 begin
-  Result := (AP1 <> nil) and (AP2 <> nil)
-    and IsFlowFit(AP1.Q, AP1.FlowAccuracy, AP2.Q)
-    and IsTemperatureFit(AP1.Temp, AP1.TempAccuracy, AP2.Temp);
+  Result := (AP1 <> nil) and (AP2 <> nil) and
+    TMeasurementPointGrouping.ArePointsEquivalent(AP1.Q, AP1.Error, AP2.Q, AP2.Error);
 end;
 
 class function TMeasurementRun.IsPointEquivalent(AP1: TDevicePoint; AP2: TPointSpillage): Boolean;
-
 begin
-  Result := (AP1 <> nil) and (AP2 <> nil)
-    and IsFlowFit(AP1.Q, AP1.FlowAccuracy, AP2.QavgEtalon)
-    and IsTemperatureFit(AP1.Temp, AP1.TempAccuracy, AP2.AvgTemperature);
+  Result := (AP1 <> nil) and (AP2 <> nil) and
+    TMeasurementPointGrouping.ArePointsEquivalent(AP1.Q, AP1.Error,
+      AP2.QavgEtalon, AP2.Error);
 end;
 
 procedure MergePointParams(ATarget, ASource: TDevicePoint);
@@ -3679,39 +3678,6 @@ var
     Result := Max(1E-6, Max(Abs(AQ1), Abs(AQ2)) * 1E-4);
   end;
 
-  function CalculatePointEtalonRange(const APointQ, AEtalonErrorPercent: Double;
-    out ADeltaQ, AMinQ, AMaxQ: Double): Boolean;
-  begin
-    ADeltaQ := 0;
-    AMinQ := APointQ;
-    AMaxQ := APointQ;
-    Result := (not IsNan(AEtalonErrorPercent)) and
-      (not IsInfinite(AEtalonErrorPercent)) and (AEtalonErrorPercent > 0) and
-      (not IsNan(APointQ)) and (not IsInfinite(APointQ));
-    if not Result then
-      Exit;
-    ADeltaQ := Abs(APointQ) * AEtalonErrorPercent / 100;
-    Result := (ADeltaQ > 0) and (not IsNan(ADeltaQ)) and (not IsInfinite(ADeltaQ));
-    if Result then
-    begin
-      AMinQ := APointQ - ADeltaQ;
-      AMaxQ := APointQ + ADeltaQ;
-    end;
-  end;
-
-  function TryCalculateMergedRange(APoint: TDevicePoint;
-    const APointMinQ, APointMaxQ, APointEtalonDeltaQ: Double;
-    out ANewMinQ, ANewMaxQ, AIntersectionQ, AControlDeltaQ: Double): Boolean;
-  begin
-    ANewMinQ := Max(APoint.CommonMinQ, APointMinQ);
-    ANewMaxQ := Min(APoint.CommonMaxQ, APointMaxQ);
-    AIntersectionQ := ANewMaxQ - ANewMinQ;
-    AControlDeltaQ := Min(APoint.MinEtalonDeltaQ, APointEtalonDeltaQ);
-    Result := APoint.EtalonRangeValid and
-      (AIntersectionQ > FloatTolerance) and
-      (AIntersectionQ + FloatTolerance >= AControlDeltaQ);
-  end;
-
   function PtrText(AObject: TObject): string;
   begin
     if AObject = nil then
@@ -4035,8 +4001,8 @@ begin
       Participant.SourcePauseSec := SourcePoint.Pause;
 
       EtalonErrorPercent := SourcePoint.Error;
-      if not CalculatePointEtalonRange(TargetQLS, EtalonErrorPercent,
-        EtalonDeltaQ, PointMinQ, PointMaxQ) then
+      if not TMeasurementPointGrouping.CalculatePointRange(TargetQLS, EtalonErrorPercent,
+        PointMinQ, PointMaxQ, EtalonDeltaQ) then
         MergeReason := 'InvalidEtalonError'
       else
         MergeReason := '';
@@ -4065,9 +4031,11 @@ begin
           NewCommonMinQ := 0; NewCommonMaxQ := 0; IntersectionDeltaQ := 0; ControlEtalonDeltaQ := 0;
           Reason := 'InvalidEtalonError';
         end
-        else if TryCalculateMergedRange(SessionPoint, PointMinQ, PointMaxQ,
-          EtalonDeltaQ, NewCommonMinQ, NewCommonMaxQ, IntersectionDeltaQ,
-          ControlEtalonDeltaQ) then
+        else if SessionPoint.EtalonRangeValid and
+          TMeasurementPointGrouping.CalculateMergedRange(SessionPoint.CommonMinQ,
+            SessionPoint.CommonMaxQ, SessionPoint.MinEtalonDeltaQ, PointMinQ,
+            PointMaxQ, EtalonDeltaQ, NewCommonMinQ, NewCommonMaxQ,
+            IntersectionDeltaQ, ControlEtalonDeltaQ) then
           Reason := 'MergedByCommonRange'
         else if not SessionPoint.EtalonRangeValid then
           Reason := 'InvalidEtalonError'
@@ -4082,6 +4050,12 @@ begin
            SessionPoint.CommonMinQ, SessionPoint.CommonMaxQ, PointMinQ, PointMaxQ,
            NewCommonMinQ, NewCommonMaxQ, IntersectionDeltaQ, SessionPoint.MinEtalonDeltaQ,
            EtalonDeltaQ, ControlEtalonDeltaQ, BoolText(Reason = 'MergedByCommonRange'), Reason]));
+        ProtocolManager.AddMessage(pcProc, psMeasurement, 'MeasurementPointMergeMath',
+          'Проверка математики объединения поверочных точек',
+          Format('Point1Q=%.6f; Point2Q=%.6f; Point1Range=[%.6f..%.6f]; Point2Range=[%.6f..%.6f]; Intersection=%.6f; ControlDelta=%.6f; Result=%s',
+            [SessionPoint.Q, TargetQLS, SessionPoint.CommonMinQ,
+             SessionPoint.CommonMaxQ, PointMinQ, PointMaxQ, IntersectionDeltaQ,
+             ControlEtalonDeltaQ, BoolText(Reason = 'MergedByCommonRange')]));
         if Reason = 'MergedByCommonRange' then
         begin
           CandidateDistance := Abs(SessionPoint.Q - TargetQLS);
