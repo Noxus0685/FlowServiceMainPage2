@@ -2727,6 +2727,9 @@ procedure TFrameProceed.UpdateGridResults;
 var
   MergeEnabled: Boolean;
   ResultsContext: string;
+  VisibleColumns: Integer;
+  DynamicColumnsCreated: Integer;
+  I: Integer;
 begin
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
   MergeEnabled := True;
@@ -2736,6 +2739,7 @@ begin
     ResultsContext := 'Summary'
   else
     ResultsContext := 'Points';
+  DynamicColumnsCreated := 0;
   GridResults.BeginUpdate;
   try
     if GridDataPoints <> nil then
@@ -2766,12 +2770,26 @@ begin
     ApplyGridColumnsLayout(GridResults, FActiveWorkTable.ResultsGridColumns);
   SetGridReadOnly(GridResults);
   UpdateActionHints;
+  VisibleColumns := 0;
+  for I := 0 to GridResults.ColumnCount - 1 do
+    if GridResults.Columns[I].Visible then
+      Inc(VisibleColumns);
+  for I := 0 to GridResults.ColumnCount - 1 do
+    if SameText(GridResults.Columns[I].TagString, 'ProcessingDynamicPoint') then
+      Inc(DynamicColumnsCreated);
   ProtocolManager.AddMessage(pcProc, psForm, 'GridResultsContextSelected',
     'Выбран контекст таблицы обработки',
     Format('MergeEnabled=%s; Context=%s; DynamicPointColumnsCount=%d',
       [BoolToStr(MergeEnabled, True), ResultsContext, Length(FResultPointColumns)]));
-  LogProceedGridContext(ResultsContext, nil, nil, GridResults.RowCount,
-    GridResults.ColumnCount);
+  if MergeEnabled then
+    LogProceedGridContext(ResultsContext, nil, nil, GridResults.RowCount,
+      GridResults.ColumnCount)
+  else
+    ProtocolManager.AddMessage(pcProc, psForm, 'ProceedGridContext',
+      'Построена таблица обработки',
+      Format('Context=%s; MergeEnabled=%s; DynamicColumnsCreated=%d; DeviceUUID=; SessionID=; Rows=%d; Columns=%d',
+        [ResultsContext, BoolToStr(MergeEnabled, True), DynamicColumnsCreated,
+         GridResults.RowCount, VisibleColumns]));
 end;
 procedure SaveGridColumnWidths(AGrid: TGrid; out AWidths: TArray<Single>);
 var
