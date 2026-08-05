@@ -2965,6 +2965,7 @@ begin
       end;
 
     FCurrentResultRows := Rows.ToArray;
+    SortProcessingDataByDate;
   finally
     Rows.Free;
   end;
