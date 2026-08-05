@@ -239,6 +239,8 @@ type
     function BuildSpillageCommentText(ASpillage: TPointSpillage): string;
     function GetSpillageErrorResultColor(ASpillage: TPointSpillage): TAlphaColor;
     function ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
+    // Принудительно синхронизирует видимость статических и динамических point-колонок GridResults с FResultPointColumns после построения и после загрузки layout.
+    procedure NormalizeResultsPointColumnsVisibility;
     procedure UpdateResultsPointColumns;
     function FindResultPointForColumn(ADevice: TDevice; const AColumn: TProceedResultPointColumn): TDevicePoint;
     // Проверяет принадлежность сохранённой проливки merged-колонке Summary по расходу и признакам эталона; не зависит от TMeasurementRun.Points.
@@ -2475,9 +2477,76 @@ begin
   end;
 end;
 
+procedure TFrameProceed.NormalizeResultsPointColumnsVisibility;
+var
+  PointColumnCount: Integer;
+  StaticVisibleCount: Integer;
+  DynamicVisibleCount: Integer;
+  HiddenStaticColumns: string;
+  I, PointIndex: Integer;
+  Column: TColumn;
+
+  procedure SetStaticPointColumnVisibility(AColumn: TColumn; const APointIndex: Integer);
+  begin
+    if AColumn = nil then
+      Exit;
+    AColumn.Visible := APointIndex < PointColumnCount;
+    if AColumn.Visible then
+      Inc(StaticVisibleCount)
+    else
+    begin
+      if HiddenStaticColumns <> '' then
+        HiddenStaticColumns := HiddenStaticColumns + ',';
+      HiddenStaticColumns := HiddenStaticColumns + AColumn.Name;
+    end;
+  end;
+
+  function IsDynamicPointColumn(AColumn: TColumn): Boolean;
+  begin
+    Result := (AColumn <> nil) and
+      (SameText(AColumn.TagString, 'ProcessingDynamicPoint') or
+       SameText(Copy(AColumn.Name, 1, Length('ProcessingPointColumn')), 'ProcessingPointColumn')) and
+      (AColumn <> StringColumnResult) and (AColumn <> StringColumnResultComment);
+  end;
+begin
+  if GridResults = nil then
+    Exit;
+
+  PointColumnCount := Length(FResultPointColumns);
+  StaticVisibleCount := 0;
+  DynamicVisibleCount := 0;
+  HiddenStaticColumns := '';
+
+  SetStaticPointColumnVisibility(StringColumnPointNum1, 0);
+  SetStaticPointColumnVisibility(StringColumnPointNum2, 1);
+  SetStaticPointColumnVisibility(StringColumnPointNum3, 2);
+  SetStaticPointColumnVisibility(StringColumnPointNum4, 3);
+
+  for I := GridResults.ColumnCount - 1 downto 0 do
+  begin
+    Column := GridResults.Columns[I];
+    if not IsDynamicPointColumn(Column) then
+      Continue;
+    PointIndex := Column.Tag;
+    if (PointIndex < 4) or (PointIndex >= PointColumnCount) then
+      Column.Free
+    else
+    begin
+      Column.Visible := True;
+      Inc(DynamicVisibleCount);
+    end;
+  end;
+
+  ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingResultColumnsNormalized',
+    'Нормализованы колонки точек Summary обработки',
+    Format('PointColumnCount=%d; StaticVisibleCount=%d; DynamicVisibleCount=%d; GridColumnCount=%d; HiddenStaticColumns=%s',
+      [PointColumnCount, StaticVisibleCount, DynamicVisibleCount,
+       GridResults.ColumnCount, HiddenStaticColumns]));
+end;
+
 procedure TFrameProceed.UpdateResultsPointColumns;
 var
-  MaxPoints, I: Integer;
+  PointColumnCount, StaticPointColumnCount, DynamicPointColumnCount, I: Integer;
   Col: TStringColumn;
 
   function FormatPointHeader(const APointName: string): string;
@@ -2489,31 +2558,41 @@ var
   begin
     if AColumn = nil then
       Exit;
-    AColumn.Visible := AIndex < MaxPoints;
+    AColumn.Visible := AIndex < PointColumnCount;
     if AColumn.Visible then
       AColumn.Header := FormatPointHeader(FResultPointColumns[AIndex].Header);
     AColumn.HeaderSettings.TextSettings.WordWrap := False;
     AColumn.Stored := True;
   end;
-begin
-  MaxPoints := Length(FResultPointColumns);
-  if MaxPoints = 0 then
-    for I := 0 to High(FCurrentResultRows) do
-      MaxPoints := Max(MaxPoints, Length(FCurrentResultRows[I].PointValues));
 
-  while StringColumnResult.Index > StringColumnPointNum4.Index + 1 do
-    GridResults.Columns[StringColumnPointNum4.Index + 1].Free;
+  function IsDynamicPointColumn(AColumn: TColumn): Boolean;
+  begin
+    Result := (AColumn <> nil) and
+      (SameText(AColumn.TagString, 'ProcessingDynamicPoint') or
+       SameText(Copy(AColumn.Name, 1, Length('ProcessingPointColumn')), 'ProcessingPointColumn')) and
+      (AColumn <> StringColumnResult) and (AColumn <> StringColumnResultComment);
+  end;
+begin
+  PointColumnCount := Length(FResultPointColumns);
+  StaticPointColumnCount := Min(PointColumnCount, 4);
+  DynamicPointColumnCount := Max(PointColumnCount - 4, 0);
+
+  for I := GridResults.ColumnCount - 1 downto 0 do
+    if IsDynamicPointColumn(GridResults.Columns[I]) then
+      GridResults.Columns[I].Free;
 
   ApplyPointColumn(StringColumnPointNum1, 0);
   ApplyPointColumn(StringColumnPointNum2, 1);
   ApplyPointColumn(StringColumnPointNum3, 2);
   ApplyPointColumn(StringColumnPointNum4, 3);
 
-  for I := 4 to MaxPoints - 1 do
+  for I := 4 to 4 + DynamicPointColumnCount - 1 do
   begin
     Col := TStringColumn.Create(GridResults);
     Col.Parent := GridResults;
     Col.Name := Format('ProcessingPointColumn%d', [I + 1]);
+    Col.Tag := I;
+    Col.TagString := 'ProcessingDynamicPoint';
     Col.Stored := False;
     Col.Width := 125;
     Col.HeaderSettings.TextSettings.Trimming := TTextTrimming.Character;
@@ -2522,8 +2601,14 @@ begin
     Col.Header := FormatPointHeader(FResultPointColumns[I].Header);
     Col.Index := StringColumnResult.Index;
   end;
-  StringColumnResult.Index := GridResults.ColumnCount - 2;
-  StringColumnResultComment.Index := GridResults.ColumnCount - 1;
+
+  if StaticPointColumnCount > 0 then
+    StringColumnResult.Index := GridResults.ColumnCount - 2
+  else
+    StringColumnResult.Index := StringColumnResultSerial.Index + 1;
+  StringColumnResultComment.Index := StringColumnResult.Index + 1;
+
+  NormalizeResultsPointColumnsVisibility;
 end;
 
 function TFrameProceed.FindResultSpillageForPoint(ADevice: TDevice;
@@ -2847,6 +2932,8 @@ begin
   end;
 end;
 procedure TFrameProceed.UpdateGridResults;
+var
+  I, VisibleColumnCount: Integer;
 begin
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
   GridResults.BeginUpdate;
@@ -2877,10 +2964,15 @@ begin
   // overwrite the persisted order, width or visibility.
   if FActiveWorkTable <> nil then
     ApplyGridColumnsLayout(GridResults, FActiveWorkTable.ResultsGridColumns);
+  NormalizeResultsPointColumnsVisibility;
   SetGridReadOnly(GridResults);
   UpdateActionHints;
+  VisibleColumnCount := 0;
+  for I := 0 to GridResults.ColumnCount - 1 do
+    if GridResults.Columns[I].Visible then
+      Inc(VisibleColumnCount);
   LogProceedGridContext('Summary', nil, nil, GridResults.RowCount,
-    GridResults.ColumnCount);
+    VisibleColumnCount);
 end;
 procedure SaveGridColumnWidths(AGrid: TGrid; out AWidths: TArray<Single>);
 var
@@ -4491,6 +4583,9 @@ var
 begin
   if (ARow < 0) or (ARow >= Length(FCurrentResultRows)) then
     Exit;
+  if (ACol < 0) or (ACol >= GridResults.ColumnCount) or
+     (not GridResults.Columns[ACol].Visible) then
+    Exit;
 
   Row := FCurrentResultRows[ARow];
 
@@ -4516,10 +4611,9 @@ begin
   begin
     if Length(Row.PointValues) > 3 then Value := Row.PointValues[3] else Value := '';
   end
-  else if (GridResults.Columns[ACol].Index > StringColumnPointNum4.Index) and
-          (GridResults.Columns[ACol].Index < StringColumnResult.Index) then
+  else if SameText(GridResults.Columns[ACol].TagString, 'ProcessingDynamicPoint') then
   begin
-    PointIdx := GridResults.Columns[ACol].Index - StringColumnPointNum1.Index;
+    PointIdx := GridResults.Columns[ACol].Tag;
     if (PointIdx >= 0) and (PointIdx < Length(Row.PointValues)) then
       Value := Row.PointValues[PointIdx]
     else
@@ -4543,6 +4637,8 @@ var
 begin
   if (Row < 0) or (Row >= Length(FCurrentResultRows)) then
     Exit;
+  if (Column = nil) or (not Column.Visible) then
+    Exit;
 
   GridRow := FCurrentResultRows[Row];
   Color := TAlphaColors.Null;
@@ -4552,13 +4648,12 @@ begin
   else
   begin
     PointIdx := -1;
-    if Column = StringColumnPointNum1 then PointIdx := 0;
-    if Column = StringColumnPointNum2 then PointIdx := 1;
-    if Column = StringColumnPointNum3 then PointIdx := 2;
-    if Column = StringColumnPointNum4 then PointIdx := 3;
-    if (PointIdx < 0) and (Column.Index > StringColumnPointNum4.Index) and
-       (Column.Index < StringColumnResult.Index) then
-      PointIdx := Column.Index - StringColumnPointNum1.Index;
+    if (Column = StringColumnPointNum1) and StringColumnPointNum1.Visible then PointIdx := 0;
+    if (Column = StringColumnPointNum2) and StringColumnPointNum2.Visible then PointIdx := 1;
+    if (Column = StringColumnPointNum3) and StringColumnPointNum3.Visible then PointIdx := 2;
+    if (Column = StringColumnPointNum4) and StringColumnPointNum4.Visible then PointIdx := 3;
+    if (PointIdx < 0) and SameText(Column.TagString, 'ProcessingDynamicPoint') then
+      PointIdx := Column.Tag;
 
     if (PointIdx >= 0) and (PointIdx < Length(GridRow.PointColors)) then
       Color := GridRow.PointColors[PointIdx];
@@ -4626,9 +4721,8 @@ begin
     else if GridResults.Columns[Col] = StringColumnPointNum2 then PointIndex := 1
     else if GridResults.Columns[Col] = StringColumnPointNum3 then PointIndex := 2
     else if GridResults.Columns[Col] = StringColumnPointNum4 then PointIndex := 3
-    else if (GridResults.Columns[Col].Index > StringColumnPointNum4.Index) and
-            (GridResults.Columns[Col].Index < StringColumnResult.Index) then
-      PointIndex := GridResults.Columns[Col].Index - StringColumnPointNum1.Index;
+    else if SameText(GridResults.Columns[Col].TagString, 'ProcessingDynamicPoint') then
+      PointIndex := GridResults.Columns[Col].Tag;
     if (PointIndex >= 0) and (Device <> nil) and
        (PointIndex < Length(FResultPointColumns)) then
     begin
