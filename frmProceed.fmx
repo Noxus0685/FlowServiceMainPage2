@@ -646,10 +646,25 @@ object FrameProceed: TFrameProceed
         ShowHint = True
         OnClick = ButtonExportExcelClick
       end
+      object ButtonRemoveInvalidAndExcessMeasurements: TButton
+        Action = ActionRemoveInvalidAndExcessMeasurements
+        Align = Left
+        Hint = #1059#1076#1072#1083#1080#1090#1100#32#1085#1077#1087#1086#1076#1082#1083#1102#1095#1105#1085#1085#1099#1077#32#1080#1079#1084#1077#1088#1077#1085#1080#1103#32#1080#32#1087#1086#1074#1090#1086#1088#1099#32#1089#1074#1077#1088#1093#32#1087#1086#1083#1103#32#171#1055#1086#1074#1090#1086#1088#1099#187#32#1087#1086#1074#1077#1088#1086#1095#1085#1099#1093#32#1090#1086#1095#1077#1082
+        Position.X = 517.000000000000000000
+        Size.Width = 180.000000000000000000
+        Size.Height = 32.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 40
+        Text = #1059#1076#1072#1083#1080#1090#1100#32#1083#1080#1096#1085#1080#1077#32#1080#1079#1084#1077#1088#1077#1085#1080#1103
+        TextSettings.Trimming = Character
+        ParentShowHint = False
+        ShowHint = True
+      end
       object Layout19: TLayout
         Align = Left
-        Position.X = 564.000000000000000000
-        Size.Width = 0.000000000000000000
+        Position.X = 697.000000000000000000
+        Size.Width = 240.000000000000000000
+
         Size.Height = 32.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 37
@@ -957,6 +972,12 @@ object FrameProceed: TFrameProceed
       Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1089#1077' '#1088#1072#1073#1086#1095#1080#1077' '#1089#1090#1086#1083#1099
       OnExecute = ActionDeleteSelectedWorkTablesExecute
       OnUpdate = ActionDeleteSelectedWorkTablesUpdate
+    end
+    object ActionRemoveInvalidAndExcessMeasurements: TAction
+      Category = 'Session'
+      Text = #1059#1076#1072#1083#1080#1090#1100#32#1083#1080#1096#1085#1080#1077#32#1080#1079#1084#1077#1088#1077#1085#1080#1103
+      Hint = #1059#1076#1072#1083#1080#1090#1100#32#1085#1077#1087#1086#1076#1082#1083#1102#1095#1105#1085#1085#1099#1077#32#1080#1079#1084#1077#1088#1077#1085#1080#1103#32#1080#32#1087#1086#1074#1090#1086#1088#1099#32#1089#1074#1077#1088#1093#32#1087#1086#1083#1103#32#171#1055#1086#1074#1090#1086#1088#1099#187#32#1087#1086#1074#1077#1088#1086#1095#1085#1099#1093#32#1090#1086#1095#1077#1082
+      OnExecute = ActionRemoveInvalidAndExcessMeasurementsExecute
     end
   end
 end
