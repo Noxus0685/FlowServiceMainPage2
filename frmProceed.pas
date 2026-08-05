@@ -68,6 +68,9 @@ type
     MinEtalonDeltaQ: Double;
     EtalonRangeValid: Boolean;
     MergedSpillageNames: string;
+    GroupedSpillages: TArray<TPointSpillage>;
+    SelectedSpillage: TPointSpillage;
+    SelectionReason: string;
   end;
 
   TResultGridRow = record
@@ -2604,6 +2607,15 @@ begin
   if ActiveSession = nil then
     Exit;
 
+  if (not AColumn.IsMerged) and (AColumn.SelectedSpillage <> nil) then
+  begin
+    if (AColumn.SelectedSpillage.SessionID = ActiveSession.ID) and
+       ((Trim(AColumn.SelectedSpillage.DeviceUUID) = '') or (DeviceUUID = '') or
+        SameText(Trim(AColumn.SelectedSpillage.DeviceUUID), DeviceUUID)) then
+      AddResult(AColumn.SelectedSpillage);
+    Exit;
+  end;
+
   BestSingle := nil;
   BestDiff := MaxDouble;
   for Spillage in ADevice.Spillages do
@@ -2665,13 +2677,15 @@ end;
 procedure TFrameProceed.BuildSummaryColumnsWithoutMerge(const ADevices: TList<TDevice>);
 var
   Cols: TList<TProceedResultPointColumn>;
-  SeenKeys: TDictionary<string, Boolean>;
+  Groups: TDictionary<string, TList<TPointSpillage>>;
+  GroupKeys: TList<string>;
   Col: TProceedResultPointColumn;
   Device: TDevice;
-  Spillage: TPointSpillage;
+  Spillage, SelectedSpillage: TPointSpillage;
   ActiveSession: TSessionSpillage;
-  DeviceUUID, SourcePointUUID, PointName, PointKey, Headers: string;
-  DevicesCount, SpillagesCount, I: Integer;
+  GroupSpillages: TList<TPointSpillage>;
+  DeviceUUID, SourcePointUUID, PointName, GroupKey, Headers, SpillageIDs: string;
+  DevicesCount, SpillagesCount, I, J: Integer;
 
   function IsUsableSummarySpillage(ASpillage: TPointSpillage): Boolean;
   begin
@@ -2687,10 +2701,56 @@ var
       Result := ADefault;
   end;
 
+  function BuildWithoutMergeGroupKey(const ADeviceUUID, ASourcePointUUID,
+    APointName: string; const AQavgEtalon: Double): string;
+  begin
+    if Trim(ASourcePointUUID) <> '' then
+      Result := AnsiUpperCase(Trim(ADeviceUUID)) + '|UUID:' +
+        AnsiUpperCase(Trim(ASourcePointUUID))
+    else
+      Result := AnsiUpperCase(Trim(ADeviceUUID)) + '|POINT:' +
+        AnsiUpperCase(Trim(APointName)) + '|Q:' + FormatFloat('0.##########', AQavgEtalon);
+  end;
+
+  function SelectBestSpillageByAbsoluteError(AItems: TList<TPointSpillage>): TPointSpillage;
+  var
+    Item: TPointSpillage;
+  begin
+    Result := nil;
+    if AItems = nil then
+      Exit;
+    for Item in AItems do
+    begin
+      if Item = nil then
+        Continue;
+      if (Result = nil) or (Abs(Item.Error) < Abs(Result.Error)) or
+         (SameValue(Abs(Item.Error), Abs(Result.Error), 1E-9) and (Item.ID >= Result.ID)) then
+        Result := Item;
+    end;
+  end;
+
+  function BuildSpillageIDs(AItems: TList<TPointSpillage>): string;
+  var
+    Item: TPointSpillage;
+  begin
+    Result := '';
+    if AItems = nil then
+      Exit;
+    for Item in AItems do
+    begin
+      if Item = nil then
+        Continue;
+      if Result <> '' then
+        Result := Result + ',';
+      Result := Result + IntToStr(Item.ID);
+    end;
+  end;
+
 begin
   SetLength(FResultPointColumns, 0);
   Cols := TList<TProceedResultPointColumn>.Create;
-  SeenKeys := TDictionary<string, Boolean>.Create;
+  Groups := TDictionary<string, TList<TPointSpillage>>.Create;
+  GroupKeys := TList<string>.Create;
   try
     DevicesCount := 0;
     SpillagesCount := 0;
@@ -2717,27 +2777,54 @@ begin
 
           Inc(SpillagesCount);
           SourcePointUUID := Trim(Spillage.DeviceTypeUUID);
-          PointName := SpillageHeader(Spillage, Format('Q%d', [Cols.Count + 1]));
-          if SourcePointUUID <> '' then
-            PointKey := AnsiUpperCase(DeviceUUID) + '|UUID:' + AnsiUpperCase(SourcePointUUID)
-          else
-            PointKey := AnsiUpperCase(DeviceUUID) + '|POINT:' +
-              AnsiUpperCase(Trim(PointName)) + '|' + IntToStr(Spillage.Num);
-          if SeenKeys.ContainsKey(PointKey) then
-            Continue;
-          SeenKeys.Add(PointKey, True);
-
-          Col := Default(TProceedResultPointColumn);
-          Col.IsMerged := False;
-          Col.DeviceUUID := DeviceUUID;
-          Col.SourcePointUUID := SourcePointUUID;
-          Col.SourcePointName := PointName;
-          Col.SourcePointNum := Spillage.Num;
-          Col.TargetFlow := Spillage.QavgEtalon;
-          Col.Header := PointName;
-          Cols.Add(Col);
+          PointName := SpillageHeader(Spillage, Format('Q%d', [Groups.Count + 1]));
+          GroupKey := BuildWithoutMergeGroupKey(DeviceUUID, SourcePointUUID,
+            PointName, Spillage.QavgEtalon);
+          if not Groups.TryGetValue(GroupKey, GroupSpillages) then
+          begin
+            GroupSpillages := TList<TPointSpillage>.Create;
+            Groups.Add(GroupKey, GroupSpillages);
+            GroupKeys.Add(GroupKey);
+          end;
+          GroupSpillages.Add(Spillage);
         end;
       end;
+
+    for I := 0 to GroupKeys.Count - 1 do
+    begin
+      GroupKey := GroupKeys[I];
+      if not Groups.TryGetValue(GroupKey, GroupSpillages) then
+        Continue;
+      SelectedSpillage := SelectBestSpillageByAbsoluteError(GroupSpillages);
+      if SelectedSpillage = nil then
+        Continue;
+
+      SourcePointUUID := Trim(SelectedSpillage.DeviceTypeUUID);
+      PointName := SpillageHeader(SelectedSpillage, Format('Q%d', [Cols.Count + 1]));
+      SpillageIDs := BuildSpillageIDs(GroupSpillages);
+
+      Col := Default(TProceedResultPointColumn);
+      Col.IsMerged := False;
+      Col.DeviceUUID := Trim(SelectedSpillage.DeviceUUID);
+      if Col.DeviceUUID = '' then
+        Col.DeviceUUID := Copy(GroupKey, 1, Pos('|', GroupKey) - 1);
+      Col.SourcePointUUID := SourcePointUUID;
+      Col.SourcePointName := PointName;
+      Col.SourcePointNum := SelectedSpillage.Num;
+      Col.TargetFlow := SelectedSpillage.QavgEtalon;
+      Col.Header := PointName;
+      Col.GroupedSpillages := GroupSpillages.ToArray;
+      Col.SelectedSpillage := SelectedSpillage;
+      Col.SelectionReason := 'MinimumAbsoluteError';
+      Cols.Add(Col);
+
+      ProtocolManager.AddMessage(pcProc, psForm, 'SummaryPointGrouping',
+        'Сгруппированы проливки Summary без объединения физических точек',
+        Format('Mode=WithoutMerge; DeviceUUID=%s; SourcePointUUID=%s; GroupKey=%s; SpillageIDs=%s; SelectedSpillageID=%d; SelectedError=%s; GroupCount=%d',
+          [Col.DeviceUUID, Col.SourcePointUUID, GroupKey, SpillageIDs,
+           SelectedSpillage.ID, FormatResultErrorValue(SelectedSpillage.Error),
+           GroupSpillages.Count]));
+    end;
 
     Headers := '';
     for I := 0 to Cols.Count - 1 do
@@ -2752,7 +2839,11 @@ begin
       Format('MergeEnabled=False; Source=Spillages; DevicesCount=%d; SpillagesCount=%d; ColumnsCount=%d; ColumnHeaders=%s; SummaryColumnsSource=ProcessingSpillages; BuildMode=WithoutMerge',
         [DevicesCount, SpillagesCount, Cols.Count, Headers]));
   finally
-    SeenKeys.Free;
+    for J := 0 to GroupKeys.Count - 1 do
+      if Groups.TryGetValue(GroupKeys[J], GroupSpillages) then
+        GroupSpillages.Free;
+    GroupKeys.Free;
+    Groups.Free;
     Cols.Free;
   end;
 end;
@@ -2779,7 +2870,7 @@ var
   I, J, DevicesCount, SpillagesCount: Integer;
   Headers: string;
   RunPointsEmpty: Boolean;
-  GroupNames, GroupFlows, GroupEtalons: string;
+  GroupNames, GroupFlows, GroupEtalons, GroupSpillageIDs: string;
   GroupCount: Integer;
   PointMinQ, PointMaxQ, PointDeltaQ: Double;
   NewCommonMinQ, NewCommonMaxQ, IntersectionQ, ControlDeltaQ: Double;
@@ -2817,6 +2908,15 @@ var
     if AText <> '' then
       AText := AText + ',';
     AText := AText + AValue;
+  end;
+
+  procedure AppendSpillageID(var AText: string; ASpillage: TPointSpillage);
+  begin
+    if ASpillage = nil then
+      Exit;
+    if AText <> '' then
+      AText := AText + ',';
+    AText := AText + IntToStr(ASpillage.ID);
   end;
 
   function SpillageNameKey(ASpillage: TPointSpillage): string;
@@ -2977,6 +3077,7 @@ begin
         GroupNames := '';
         GroupFlows := '';
         GroupEtalons := '';
+        GroupSpillageIDs := '';
         GroupCount := 0;
         for GroupSpillage in ProcessingSpillages do
           if IsProcessingSpillageInMergedColumn(GroupSpillage, Cols[I]) then
@@ -2985,12 +3086,17 @@ begin
             AppendCsvValue(GroupNames, SpillageHeader(GroupSpillage, Format('Q%d', [I + 1])));
             AppendCsvValue(GroupFlows, FormatFloat('0.######', GroupSpillage.QavgEtalon));
             AppendCsvValue(GroupEtalons, Trim(GroupSpillage.EtalonName));
+            AppendSpillageID(GroupSpillageIDs, GroupSpillage);
           end;
         ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingSummaryMergeGroup',
           'Сформирована merged-группа Summary по фактическому расходу',
           Format('GroupIndex=%d; TargetQ=%s; Count=%d; SpillageNames=%s; QValues=%s; EtalonNames=%s',
             [I + 1, FormatFloat('0.######', Cols[I].TargetFlow), GroupCount,
              GroupNames, GroupFlows, GroupEtalons]));
+        ProtocolManager.AddMessage(pcProc, psForm, 'SummaryPointGrouping',
+          'Сгруппированы проливки Summary с объединением физических точек',
+          Format('Mode=Merge; DeviceUUID=%s; SourcePointUUID=%s; GroupKey=%s; SpillageIDs=%s; SelectedSpillageID=%d; SelectedError=%s; GroupCount=%d',
+            ['', '', Cols[I].Header, GroupSpillageIDs, 0, '', GroupCount]));
       end;
 
     Headers := '';
