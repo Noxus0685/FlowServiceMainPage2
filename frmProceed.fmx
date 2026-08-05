@@ -115,6 +115,11 @@ object FrameProceed: TFrameProceed
             Header = #1043#1086#1076#1085#1086#1089#1090#1100
             HeaderSettings.TextSettings.WordWrap = False
           end
+          object StringColumnSpillageComment: TStringColumn
+            Header = #1050#1086#1084#1084#1077#1085#1090#1072#1088#1080#1081
+            HeaderSettings.TextSettings.WordWrap = False
+            Size.Width = 220.000000000000000000
+          end
           object StringColumnSpillageQStd: TStringColumn
             Header = #1057#1050#1054' '#1087#1088#1080#1073#1086#1088#1072', %'
             HeaderSettings.TextSettings.WordWrap = False
@@ -627,7 +632,7 @@ object FrameProceed: TFrameProceed
         end
       end
       object ButtonExportExcel: TButton
-        Align = Left
+        Align = Right
         Enabled = False
         Hint = #1042#1099#1075#1088#1091#1079#1080#1090#1100' '#1074#1099#1073#1088#1072#1085#1085#1099#1077' '#1076#1072#1085#1085#1099#1077' '#1074' Excel'
         Size.Width = 47.000000000000000000

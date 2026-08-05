@@ -82,6 +82,7 @@ type
     StringColumnSpillageVelocity: TStringColumn;
     StringColumnSpillageError: TStringColumn;
     StringColumnSpillageValid: TStringColumn;
+    StringColumnSpillageComment: TStringColumn;
     StringColumnSpillageQStd: TStringColumn;
     StringColumnSpillageQCV: TStringColumn;
     StringColumnSpillageVolumeBefore: TStringColumn;
@@ -220,6 +221,9 @@ type
     function GetStatusColor(const AStatus: Integer): TAlphaColor;
     function BuildResultTextByStatus(const AStatus: Integer): string;
     function BuildResultComment(ADevice: TDevice; const AStatus: Integer): string;
+    function BuildSpillageStatusText(ASpillage: TPointSpillage): string;
+    function BuildSpillageCommentText(ASpillage: TPointSpillage): string;
+    function GetSpillageErrorResultColor(ASpillage: TPointSpillage): TAlphaColor;
     function ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
     procedure UpdateResultsPointColumns;
     procedure LogResultCellDebug(const ARow: TResultGridRow; APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
@@ -2050,8 +2054,13 @@ end;
 function TFrameProceed.GetPointResultColor(ADevice: TDevice;
   ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): TAlphaColor;
 begin
+  Result := GetSpillageErrorResultColor(ASpillage);
+end;
+
+function TFrameProceed.GetSpillageErrorResultColor(ASpillage: TPointSpillage): TAlphaColor;
+begin
   Result := TAlphaColors.Null;
-  if (ADevice = nil) or (ADevicePoint = nil) or (ASpillage = nil) then
+  if ASpillage = nil then
     Exit;
 
   case ASpillage.ValidationReason of
@@ -2156,6 +2165,29 @@ begin
        (Spillage.ValidationReason <> svrNotAnalyzed) then
       Exit(SpillageValidationReasonToText(Spillage.ValidationReason));
   end;
+end;
+
+function TFrameProceed.BuildSpillageStatusText(ASpillage: TPointSpillage): string;
+begin
+  Result := #$2014;
+  if ASpillage = nil then
+    Exit;
+  case ASpillage.Validation of
+    vsValid:
+      Result := 'Годен';
+    vsInvalid:
+      Result := 'Не годен';
+  else
+    Result := #$2014;
+  end;
+end;
+
+function TFrameProceed.BuildSpillageCommentText(ASpillage: TPointSpillage): string;
+begin
+  Result := '';
+  if (ASpillage = nil) or (ASpillage.ValidationReason in [svrNone, svrNotAnalyzed]) then
+    Exit;
+  Result := SpillageValidationReasonToText(ASpillage.ValidationReason);
 end;
 procedure TFrameProceed.UpdateResultsPointColumns;
 var
@@ -4466,7 +4498,9 @@ begin
       Value := FloatToStr(P.Error);
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageValid then
-    Value := P.GetShortStateText
+    Value := BuildSpillageStatusText(P)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageComment then
+    Value := BuildSpillageCommentText(P)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQStd then
     Value := FloatToStr(P.QStd)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQCV then
@@ -4614,7 +4648,8 @@ var
   P: TPointSpillage;
   Color: TAlphaColor;
 begin
-  if (Column <> StringColumnSpillageValid) or (Row < 0) or
+  if ((Column <> StringColumnSpillageValid) and
+      (Column <> StringColumnSpillageError)) or (Row < 0) or
      (Row >= Length(FCurrentSpillages)) then
     Exit;
 
@@ -4622,7 +4657,10 @@ begin
   if P = nil then
     Exit;
 
-  Color := GetSpillageValidationColor(P.Validation, P.ValidationReason);
+  if Column = StringColumnSpillageError then
+    Color := GetSpillageErrorResultColor(P)
+  else
+    Color := GetSpillageValidationColor(P.Validation, P.ValidationReason);
   if Color = TAlphaColors.Null then
     Exit;
 
