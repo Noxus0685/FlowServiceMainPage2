@@ -978,6 +978,8 @@ begin
   SaveMergePointsSetting;
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementPointMergeModeChanged', 'Изменён режим объединения точек',
     'Enabled=' + BoolToStr(CheckBoxMergePoints.IsChecked, True));
+  if Assigned(FOnRunUIChanged) then
+    FOnRunUIChanged(Self);
   if (MeasurementRun.Mode = mrmAutomatic) and
      (MeasurementRun.Stage in [msNone, msDone]) then begin
     MeasurementRun.InvalidatePreparedPoints; MeasurementRun.RebuildMeasurementPoints;

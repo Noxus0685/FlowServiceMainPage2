@@ -235,7 +235,7 @@ type
     function ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
     procedure UpdateResultsPointColumns;
     function FindResultPointForColumn(ADevice: TDevice; const AColumn: TProceedResultPointColumn): TDevicePoint;
-    procedure BuildSummaryResultPointColumns(const ADevices: TList<TDevice>; const AMergePoints: Boolean);
+    procedure BuildProcessingPointsContext(const ADevices: TList<TDevice>; const AMergePoints: Boolean);
     procedure LogResultCellDebug(const ARow: TResultGridRow; APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
     procedure ShowAllDevicesResults;
     procedure ShowDevicesResults(const ADevices: TList<TDevice>);
@@ -719,6 +719,8 @@ end;
 procedure TFrameProceed.RefreshResultsTab;
 begin
   DbgProceedTree(1501, 'RefreshResultsTab ENTER'#13#10 + GetSelectedTreeDebugText);
+  FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
+  LoadProcessingDevices;
   SyncProcessingDevicesWithNewPoints;
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
@@ -2235,41 +2237,28 @@ begin
   end;
 end;
 
-procedure TFrameProceed.BuildSummaryResultPointColumns(const ADevices: TList<TDevice>;
+procedure TFrameProceed.BuildProcessingPointsContext(const ADevices: TList<TDevice>;
   const AMergePoints: Boolean);
 var
   Cols: TList<TProceedResultPointColumn>;
   Col: TProceedResultPointColumn;
   WT: TWorkTable;
-  Run: TMeasurementRun;
   Point: TDevicePoint;
   Device: TDevice;
   I, J: Integer;
+  Merged: Boolean;
+  WorkTableUUID: string;
 begin
   SetLength(FResultPointColumns, 0);
   Cols := TList<TProceedResultPointColumn>.Create;
   try
     WT := ResolveManagerWorkTable(FWorkTableManager);
-    Run := nil;
-    if (WT <> nil) and (WT.MeasurementRun <> nil) then
-      Run := TMeasurementRun(WT.MeasurementRun);
+    if WT <> nil then
+      WorkTableUUID := WT.UUID
+    else
+      WorkTableUUID := '';
 
-    if AMergePoints and (Run <> nil) and (Run.Points <> nil) then
-    begin
-      for I := 0 to Run.Points.Count - 1 do
-      begin
-        Point := Run.Points[I];
-        if (Point = nil) or not Point.Enabled then
-          Continue;
-        Col := Default(TProceedResultPointColumn);
-        Col.Header := Trim(Point.Name);
-        if Col.Header = '' then
-          Col.Header := Format('Q%d', [Cols.Count + 1]);
-        Col.ScenarioPoint := Point;
-        Cols.Add(Col);
-      end;
-    end
-    else if ADevices <> nil then
+    if ADevices <> nil then
       for Device in ADevices do
         if (Device <> nil) and (Device.Points <> nil) then
           for I := 0 to Device.Points.Count - 1 do
@@ -2277,13 +2266,41 @@ begin
             Point := Device.Points[I];
             if (Point = nil) or not Point.Enabled then
               Continue;
-            Col := Default(TProceedResultPointColumn);
-            Col.DeviceUUID := Device.UUID;
-            Col.SourcePointUUID := Point.UUID;
-            Col.Header := Trim(Device.Name + ' ' + Point.Name);
-            if Col.Header = '' then
-              Col.Header := Format('Q%d', [Cols.Count + 1]);
-            Cols.Add(Col);
+
+            Merged := False;
+            if AMergePoints then
+              for J := 0 to Cols.Count - 1 do
+                if (Cols[J].ScenarioPoint <> nil) and
+                   TMeasurementRun.IsPointEquivalent(Point, Cols[J].ScenarioPoint) then
+                begin
+                  Merged := True;
+                  Break;
+                end;
+
+            if not Merged then
+            begin
+              Col := Default(TProceedResultPointColumn);
+              if AMergePoints then
+                Col.ScenarioPoint := Point
+              else
+              begin
+                Col.DeviceUUID := Device.UUID;
+                Col.SourcePointUUID := Point.UUID;
+              end;
+              if AMergePoints then
+                Col.Header := Trim(Point.Name)
+              else
+                Col.Header := Trim(Device.Name + ' ' + Point.Name);
+              if Col.Header = '' then
+                Col.Header := Format('Q%d', [Cols.Count + 1]);
+              Cols.Add(Col);
+            end;
+
+            ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingPointsContextPoint',
+              'Точка контекста обработки',
+              Format('WorkTableUUID=%s; DeviceUUID=%s; DeviceName=%s; PointUUID=%s; PointName=%s; MergeEnabled=%s',
+                [WorkTableUUID, Device.UUID, Device.Name, Point.UUID, Point.Name,
+                 BoolToStr(AMergePoints, True)]));
           end;
 
     for I := 0 to Cols.Count - 1 do
@@ -2297,6 +2314,11 @@ begin
         end;
 
     FResultPointColumns := Cols.ToArray;
+    ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingPointsContextBuilt',
+      'Построен контекст точек обработки',
+      Format('WorkTableUUID=%s; DeviceCount=%d; PointCount=%d; MergeEnabled=%s',
+        [WorkTableUUID, IfThen(ADevices <> nil, ADevices.Count, 0),
+         Length(FResultPointColumns), BoolToStr(AMergePoints, True)]));
   finally
     Cols.Free;
   end;
@@ -2487,7 +2509,7 @@ begin
   UseMergePoints := True;
   if ResolveManagerWorkTable(FWorkTableManager) <> nil then
     UseMergePoints := ResolveManagerWorkTable(FWorkTableManager).MergeMeasurementPoints;
-  BuildSummaryResultPointColumns(ADevices, UseMergePoints);
+  BuildProcessingPointsContext(ADevices, UseMergePoints);
 
   Rows := TList<TResultGridRow>.Create;
   try
