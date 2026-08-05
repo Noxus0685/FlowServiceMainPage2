@@ -2345,27 +2345,7 @@ var
   MaxPoints, I, StartDynamicIndex: Integer;
   Col: TStringColumn;
   UseStaticPointColumns: Boolean;
-
-  function FormatPointHeader(const APointName: string): string;
-  begin
-    Result := #948 + '(' + APointName + '), %';
-  end;
-begin
-  for I := GridResults.ColumnCount - 1 downto 0 do
-    if (Trim(GridResults.Columns[I].Name) = '') or
-       SameText(GridResults.Columns[I].TagString, 'ProcessingDynamicPoint') then
-      GridResults.Columns[I].Free;
-
-  procedure ApplyPointColumn(AColumn: TStringColumn; const AIndex: Integer);
-  begin
-    if AColumn = nil then
-      Exit;
-    AColumn.Visible := AIndex < MaxPoints;
-    if AColumn.Visible then
-      AColumn.Header := FormatPointHeader(FResultPointColumns[AIndex].Header);
-    AColumn.HeaderSettings.TextSettings.WordWrap := False;
-    AColumn.Stored := True;
-  end;
+  HeaderText: string;
 begin
   for I := GridResults.ColumnCount - 1 downto 0 do
     if (Trim(GridResults.Columns[I].Name) = '') or
@@ -2386,10 +2366,26 @@ begin
 
   if UseStaticPointColumns then
   begin
-    ApplyPointColumn(StringColumnPointNum1, 0);
-    ApplyPointColumn(StringColumnPointNum2, 1);
-    ApplyPointColumn(StringColumnPointNum3, 2);
-    ApplyPointColumn(StringColumnPointNum4, 3);
+    StringColumnPointNum1.Visible := MaxPoints >= 1;
+    if StringColumnPointNum1.Visible then
+      if Length(FResultPointColumns) > 0 then
+        StringColumnPointNum1.Header := #948 + '(' + FResultPointColumns[0].Header + '), %';
+    StringColumnPointNum2.Visible := MaxPoints >= 2;
+    if StringColumnPointNum2.Visible then
+      if Length(FResultPointColumns) > 1 then
+        StringColumnPointNum2.Header := #948 + '(' + FResultPointColumns[1].Header + '), %';
+    StringColumnPointNum3.Visible := MaxPoints >= 3;
+    if StringColumnPointNum3.Visible then
+      if Length(FResultPointColumns) > 2 then
+        StringColumnPointNum3.Header := #948 + '(' + FResultPointColumns[2].Header + '), %';
+    StringColumnPointNum4.Visible := MaxPoints >= 4;
+    if StringColumnPointNum4.Visible then
+      if Length(FResultPointColumns) > 3 then
+        StringColumnPointNum4.Header := #948 + '(' + FResultPointColumns[3].Header + '), %';
+    StringColumnPointNum1.Stored := True;
+    StringColumnPointNum2.Stored := True;
+    StringColumnPointNum3.Stored := True;
+    StringColumnPointNum4.Stored := True;
     StartDynamicIndex := 4;
   end
   else
@@ -2413,10 +2409,13 @@ begin
     Col.HeaderSettings.TextSettings.Trimming := TTextTrimming.Character;
     Col.HeaderSettings.TextSettings.WordWrap := False;
     Col.HeaderSettings.TextSettings.HorzAlign := TTextAlign.Center;
-    if UseStaticPointColumns then
-      Col.Header := FormatPointHeader(FResultPointColumns[I].Header)
+    if Length(FResultPointColumns) > I then
+      HeaderText := FResultPointColumns[I].Header
     else
-      Col.Header := FResultPointColumns[I].Header;
+      HeaderText := Format('Q%d', [I + 1]);
+    if UseStaticPointColumns then
+      HeaderText := #948 + '(' + HeaderText + '), %';
+    Col.Header := HeaderText;
     Col.Index := StringColumnResult.Index;
   end;
   StringColumnResult.Index := GridResults.ColumnCount - 2;
