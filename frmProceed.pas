@@ -53,6 +53,12 @@ type
     DeviceUUID: string;
     SourcePointUUID: string;
     ScenarioPoint: TDevicePoint;
+    // Расход merged-колонки Summary, рассчитанный по сохранённым проливкам обработки; не зависит от MeasurementRun.Points.
+    TargetFlow: Double;
+    EtalonUUID: string;
+    SourcePointName: string;
+    SourcePointNum: Integer;
+    IsMerged: Boolean;
   end;
 
   TResultGridRow = record
@@ -233,8 +239,14 @@ type
     function BuildSpillageCommentText(ASpillage: TPointSpillage): string;
     function GetSpillageErrorResultColor(ASpillage: TPointSpillage): TAlphaColor;
     function ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
+    // Принудительно синхронизирует видимость статических и динамических point-колонок GridResults с FResultPointColumns после построения и после загрузки layout.
+    procedure NormalizeResultsPointColumnsVisibility;
     procedure UpdateResultsPointColumns;
     function FindResultPointForColumn(ADevice: TDevice; const AColumn: TProceedResultPointColumn): TDevicePoint;
+    // Проверяет принадлежность сохранённой проливки merged-колонке Summary по расходу и признакам эталона; не зависит от TMeasurementRun.Points.
+    function IsProcessingSpillageInMergedColumn(ASpillage: TPointSpillage; const AColumn: TProceedResultPointColumn): Boolean;
+    // Возвращает проливку прибора для Summary-колонки обработки; в merged-режиме ищет ближайшую сохранённую проливку по расходу.
+    function FindResultSpillageForColumn(ADevice: TDevice; const AColumn: TProceedResultPointColumn): TPointSpillage;
     procedure BuildSummaryResultPointColumns(const ADevices: TList<TDevice>; const AMergePoints: Boolean);
     procedure LogResultCellDebug(const ARow: TResultGridRow; APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
     procedure ShowAllDevicesResults;
@@ -2235,6 +2247,114 @@ begin
   end;
 end;
 
+function TFrameProceed.IsProcessingSpillageInMergedColumn(ASpillage: TPointSpillage;
+  const AColumn: TProceedResultPointColumn): Boolean;
+const
+  SUMMARY_MERGE_FLOW_REL_TOLERANCE = 0.005;
+  SUMMARY_MERGE_FLOW_ABS_TOLERANCE = 0.000001;
+var
+  MaxFlow: Double;
+begin
+  Result := False;
+  if (ASpillage = nil) or (ASpillage.State = osDeleted) or (not ASpillage.Enabled) then
+    Exit;
+  if IsNan(ASpillage.QavgEtalon) or IsInfinite(ASpillage.QavgEtalon) or
+     IsNan(AColumn.TargetFlow) or IsInfinite(AColumn.TargetFlow) then
+    Exit;
+  if (Trim(AColumn.EtalonUUID) <> '') and (Trim(ASpillage.EtalonUUID) <> '') and
+     (not SameText(Trim(AColumn.EtalonUUID), Trim(ASpillage.EtalonUUID))) then
+    Exit;
+  MaxFlow := Max(Abs(ASpillage.QavgEtalon), Abs(AColumn.TargetFlow));
+  Result := Abs(ASpillage.QavgEtalon - AColumn.TargetFlow) <=
+    Max(SUMMARY_MERGE_FLOW_ABS_TOLERANCE, MaxFlow * SUMMARY_MERGE_FLOW_REL_TOLERANCE);
+end;
+
+function TFrameProceed.FindResultSpillageForColumn(ADevice: TDevice;
+  const AColumn: TProceedResultPointColumn): TPointSpillage;
+const
+  SUMMARY_MERGE_FLOW_REL_TOLERANCE = 0.005;
+  SUMMARY_MERGE_FLOW_ABS_TOLERANCE = 0.000001;
+var
+  Spillage, Candidate: TPointSpillage;
+  ActiveSession: TSessionSpillage;
+  DeviceUUID: string;
+  BestDiff, Diff, MaxFlow, Tolerance: Double;
+
+  function IsBetterSpillage(ANew, ACurrent: TPointSpillage; const ANewDiff, ACurrentDiff: Double): Boolean;
+  begin
+    Result := ACurrent = nil;
+    if Result then
+      Exit;
+    if ANewDiff < ACurrentDiff then
+      Exit(True);
+    if ANewDiff > ACurrentDiff then
+      Exit(False);
+    if ANew.Valid and (not ACurrent.Valid) then
+      Exit(True);
+    if (ANew.Validation = vsValid) and (ACurrent.Validation <> vsValid) then
+      Exit(True);
+    Result := ANew.ID >= ACurrent.ID;
+  end;
+begin
+  Result := nil;
+  if (ADevice = nil) or (ADevice.Spillages = nil) then
+    Exit;
+
+  DeviceUUID := Trim(ADevice.UUID);
+  ActiveSession := GetActiveVisibleSession(ADevice);
+  if ActiveSession = nil then
+    Exit;
+
+  BestDiff := MaxDouble;
+  for Spillage in ADevice.Spillages do
+  begin
+    if (Spillage = nil) or (Spillage.State = osDeleted) or (not Spillage.Enabled) then
+      Continue;
+    if Spillage.SessionID <> ActiveSession.ID then
+      Continue;
+    if (Trim(Spillage.DeviceUUID) <> '') and (DeviceUUID <> '') and
+       (not SameText(Trim(Spillage.DeviceUUID), DeviceUUID)) then
+      Continue;
+
+    Candidate := nil;
+    if AColumn.IsMerged then
+    begin
+      if IsProcessingSpillageInMergedColumn(Spillage, AColumn) then
+        Candidate := Spillage;
+    end
+    else
+    begin
+      if (Trim(AColumn.DeviceUUID) <> '') and (DeviceUUID <> '') and
+         (not SameText(Trim(AColumn.DeviceUUID), DeviceUUID)) then
+        Continue;
+      if (Trim(AColumn.SourcePointUUID) <> '') and (Trim(Spillage.DeviceTypeUUID) <> '') and
+         SameText(Trim(AColumn.SourcePointUUID), Trim(Spillage.DeviceTypeUUID)) then
+        Candidate := Spillage
+      else if (Trim(AColumn.SourcePointName) <> '') and
+              SameText(Trim(AColumn.SourcePointName), Trim(Spillage.Name)) then
+        Candidate := Spillage
+      else if (AColumn.SourcePointNum > 0) and (Spillage.Num = AColumn.SourcePointNum) then
+        Candidate := Spillage
+      else if (not IsNan(AColumn.TargetFlow)) and (not IsInfinite(AColumn.TargetFlow)) then
+      begin
+        MaxFlow := Max(Abs(Spillage.QavgEtalon), Abs(AColumn.TargetFlow));
+        Tolerance := Max(SUMMARY_MERGE_FLOW_ABS_TOLERANCE, MaxFlow * SUMMARY_MERGE_FLOW_REL_TOLERANCE);
+        if Abs(Spillage.QavgEtalon - AColumn.TargetFlow) <= Tolerance then
+          Candidate := Spillage;
+      end;
+    end;
+
+    if Candidate = nil then
+      Continue;
+    Diff := Abs(Candidate.QavgEtalon - AColumn.TargetFlow);
+    if IsBetterSpillage(Candidate, Result, Diff, BestDiff) then
+    begin
+      Result := Candidate;
+      BestDiff := Diff;
+    end;
+  end;
+end;
+
 procedure TFrameProceed.BuildSummaryResultPointColumns(const ADevices: TList<TDevice>;
   const AMergePoints: Boolean);
 var
@@ -2242,9 +2362,32 @@ var
   Col: TProceedResultPointColumn;
   WT: TWorkTable;
   Run: TMeasurementRun;
-  Point: TDevicePoint;
   Device: TDevice;
-  I, J: Integer;
+  Spillage: TPointSpillage;
+  ActiveSession: TSessionSpillage;
+  I, J, DevicesCount, SpillagesCount: Integer;
+  Headers: string;
+  RunPointsEmpty: Boolean;
+
+  function SpillageHeader(ASpillage: TPointSpillage; const ADefault: string): string;
+  begin
+    Result := Trim(ASpillage.Name);
+    if Result = '' then
+      Result := ADefault;
+  end;
+
+  procedure AppendHeaderName(var AHeader: string; const AName: string);
+  begin
+    if Trim(AName) = '' then
+      Exit;
+    if AHeader = '' then
+      AHeader := AName
+    else if Pos('|' + AName + '|', '|' + StringReplace(AHeader, ' / ', '|', [rfReplaceAll]) + '|') = 0 then
+      AHeader := AHeader + ' / ' + AName;
+    if Length(AHeader) > 80 then
+      AHeader := Copy(AHeader, 1, 77) + '...';
+  end;
+
 begin
   SetLength(FResultPointColumns, 0);
   Cols := TList<TProceedResultPointColumn>.Create;
@@ -2253,58 +2396,157 @@ begin
     Run := nil;
     if (WT <> nil) and (WT.MeasurementRun <> nil) then
       Run := TMeasurementRun(WT.MeasurementRun);
+    RunPointsEmpty := (Run = nil) or (Run.Points = nil) or (Run.Points.Count = 0);
+    DevicesCount := 0;
+    SpillagesCount := 0;
 
-    if AMergePoints and (Run <> nil) and (Run.Points <> nil) then
-    begin
-      for I := 0 to Run.Points.Count - 1 do
-      begin
-        Point := Run.Points[I];
-        if (Point = nil) or not Point.Enabled then
-          Continue;
-        Col := Default(TProceedResultPointColumn);
-        Col.Header := Trim(Point.Name);
-        if Col.Header = '' then
-          Col.Header := Format('Q%d', [Cols.Count + 1]);
-        Col.ScenarioPoint := Point;
-        Cols.Add(Col);
-      end;
-    end
-    else if ADevices <> nil then
+    if ADevices <> nil then
       for Device in ADevices do
-        if (Device <> nil) and (Device.Points <> nil) then
-          for I := 0 to Device.Points.Count - 1 do
+      begin
+        if (Device = nil) or (Device.State = osDeleted) or
+           IsProcessingDevicePendingRemoved(Device) then
+          Continue;
+        Inc(DevicesCount);
+        ActiveSession := GetActiveVisibleSession(Device);
+        if (ActiveSession = nil) or (Device.Spillages = nil) then
+          Continue;
+        for Spillage in Device.Spillages do
+        begin
+          if (Spillage = nil) or (Spillage.State = osDeleted) or (not Spillage.Enabled) or
+             (Spillage.SessionID <> ActiveSession.ID) then
+            Continue;
+          Inc(SpillagesCount);
+          Col := Default(TProceedResultPointColumn);
+          Col.TargetFlow := Spillage.QavgEtalon;
+          Col.EtalonUUID := Trim(Spillage.EtalonUUID);
+          Col.SourcePointName := Trim(Spillage.Name);
+          Col.SourcePointNum := Spillage.Num;
+          if AMergePoints then
           begin
-            Point := Device.Points[I];
-            if (Point = nil) or not Point.Enabled then
-              Continue;
-            Col := Default(TProceedResultPointColumn);
-            Col.DeviceUUID := Device.UUID;
-            Col.SourcePointUUID := Point.UUID;
-            Col.Header := Trim(Device.Name + ' ' + Point.Name);
-            if Col.Header = '' then
-              Col.Header := Format('Q%d', [Cols.Count + 1]);
+            J := -1;
+            for I := 0 to Cols.Count - 1 do
+              if IsProcessingSpillageInMergedColumn(Spillage, Cols[I]) then
+              begin
+                J := I;
+                Break;
+              end;
+            if J >= 0 then
+            begin
+              Col := Cols[J];
+              Col.TargetFlow := (Col.TargetFlow + Spillage.QavgEtalon) / 2;
+              if (Trim(Col.EtalonUUID) = '') and (Trim(Spillage.EtalonUUID) <> '') then
+                Col.EtalonUUID := Trim(Spillage.EtalonUUID);
+              AppendHeaderName(Col.Header, SpillageHeader(Spillage, Format('Q%d', [J + 1])));
+              Cols[J] := Col;
+            end
+            else
+            begin
+              Col.IsMerged := True;
+              Col.DeviceUUID := '';
+              Col.SourcePointUUID := '';
+              Col.Header := SpillageHeader(Spillage, Format('Q%d', [Cols.Count + 1]));
+              Cols.Add(Col);
+            end;
+          end
+          else
+          begin
+            Col.IsMerged := False;
+            Col.DeviceUUID := Trim(Device.UUID);
+            Col.SourcePointUUID := Trim(Spillage.DeviceTypeUUID);
+            Col.Header := Trim(Device.Name + ' ' + SpillageHeader(Spillage, Format('Q%d', [Cols.Count + 1])));
             Cols.Add(Col);
           end;
-
-    for I := 0 to Cols.Count - 1 do
-      for J := 0 to I - 1 do
-        if SameText(Cols[I].Header, Cols[J].Header) then
-        begin
-          Col := Cols[I];
-          Col.Header := Col.Header + ' (' + Copy(Col.DeviceUUID + Col.SourcePointUUID, 1, 8) + ')';
-          Cols[I] := Col;
-          Break;
         end;
+      end;
 
+    Headers := '';
+    for I := 0 to Cols.Count - 1 do
+    begin
+      if I > 0 then Headers := Headers + ', ';
+      Headers := Headers + Cols[I].Header;
+    end;
     FResultPointColumns := Cols.ToArray;
+
+    ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingSummaryColumnsBuilt',
+      'Построены колонки Summary обработки',
+      Format('MergeEnabled=%s; Source=Spillages; DevicesCount=%d; SpillagesCount=%d; ColumnsCount=%d; ColumnHeaders=%s; MergedGroupsCount=%d; FallbackMeasurementRunUsed=False; MeasurementRunPointsEmpty=%s; SummaryColumnsSource=ProcessingSpillages',
+        [BoolToStr(AMergePoints, True), DevicesCount, SpillagesCount, Cols.Count, Headers,
+         Cols.Count, BoolToStr(RunPointsEmpty, True)]));
   finally
     Cols.Free;
   end;
 end;
 
+procedure TFrameProceed.NormalizeResultsPointColumnsVisibility;
+var
+  PointColumnCount: Integer;
+  StaticVisibleCount: Integer;
+  DynamicVisibleCount: Integer;
+  HiddenStaticColumns: string;
+  I, PointIndex: Integer;
+  Column: TColumn;
+
+  procedure SetStaticPointColumnVisibility(AColumn: TColumn; const APointIndex: Integer);
+  begin
+    if AColumn = nil then
+      Exit;
+    AColumn.Visible := APointIndex < PointColumnCount;
+    if AColumn.Visible then
+      Inc(StaticVisibleCount)
+    else
+    begin
+      if HiddenStaticColumns <> '' then
+        HiddenStaticColumns := HiddenStaticColumns + ',';
+      HiddenStaticColumns := HiddenStaticColumns + AColumn.Name;
+    end;
+  end;
+
+  function IsDynamicPointColumn(AColumn: TColumn): Boolean;
+  begin
+    Result := (AColumn <> nil) and
+      (SameText(AColumn.TagString, 'ProcessingDynamicPoint') or
+       SameText(Copy(AColumn.Name, 1, Length('ProcessingPointColumn')), 'ProcessingPointColumn')) and
+      (AColumn <> StringColumnResult) and (AColumn <> StringColumnResultComment);
+  end;
+begin
+  if GridResults = nil then
+    Exit;
+
+  PointColumnCount := Length(FResultPointColumns);
+  StaticVisibleCount := 0;
+  DynamicVisibleCount := 0;
+  HiddenStaticColumns := '';
+
+  SetStaticPointColumnVisibility(StringColumnPointNum1, 0);
+  SetStaticPointColumnVisibility(StringColumnPointNum2, 1);
+  SetStaticPointColumnVisibility(StringColumnPointNum3, 2);
+  SetStaticPointColumnVisibility(StringColumnPointNum4, 3);
+
+  for I := GridResults.ColumnCount - 1 downto 0 do
+  begin
+    Column := GridResults.Columns[I];
+    if not IsDynamicPointColumn(Column) then
+      Continue;
+    PointIndex := Column.Tag;
+    if (PointIndex < 4) or (PointIndex >= PointColumnCount) then
+      Column.Free
+    else
+    begin
+      Column.Visible := True;
+      Inc(DynamicVisibleCount);
+    end;
+  end;
+
+  ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingResultColumnsNormalized',
+    'Нормализованы колонки точек Summary обработки',
+    Format('PointColumnCount=%d; StaticVisibleCount=%d; DynamicVisibleCount=%d; GridColumnCount=%d; HiddenStaticColumns=%s',
+      [PointColumnCount, StaticVisibleCount, DynamicVisibleCount,
+       GridResults.ColumnCount, HiddenStaticColumns]));
+end;
+
 procedure TFrameProceed.UpdateResultsPointColumns;
 var
-  MaxPoints, I: Integer;
+  PointColumnCount, StaticPointColumnCount, DynamicPointColumnCount, I: Integer;
   Col: TStringColumn;
 
   function FormatPointHeader(const APointName: string): string;
@@ -2316,30 +2558,41 @@ var
   begin
     if AColumn = nil then
       Exit;
-    AColumn.Visible := AIndex < MaxPoints;
+    AColumn.Visible := AIndex < PointColumnCount;
     if AColumn.Visible then
       AColumn.Header := FormatPointHeader(FResultPointColumns[AIndex].Header);
     AColumn.HeaderSettings.TextSettings.WordWrap := False;
     AColumn.Stored := True;
   end;
-begin
-  MaxPoints := Length(FResultPointColumns);
-  if MaxPoints = 0 then
-    for I := 0 to High(FCurrentResultRows) do
-      MaxPoints := Max(MaxPoints, Length(FCurrentResultRows[I].PointValues));
 
-  while StringColumnResult.Index > StringColumnPointNum4.Index + 1 do
-    GridResults.Columns[StringColumnPointNum4.Index + 1].Free;
+  function IsDynamicPointColumn(AColumn: TColumn): Boolean;
+  begin
+    Result := (AColumn <> nil) and
+      (SameText(AColumn.TagString, 'ProcessingDynamicPoint') or
+       SameText(Copy(AColumn.Name, 1, Length('ProcessingPointColumn')), 'ProcessingPointColumn')) and
+      (AColumn <> StringColumnResult) and (AColumn <> StringColumnResultComment);
+  end;
+begin
+  PointColumnCount := Length(FResultPointColumns);
+  StaticPointColumnCount := Min(PointColumnCount, 4);
+  DynamicPointColumnCount := Max(PointColumnCount - 4, 0);
+
+  for I := GridResults.ColumnCount - 1 downto 0 do
+    if IsDynamicPointColumn(GridResults.Columns[I]) then
+      GridResults.Columns[I].Free;
 
   ApplyPointColumn(StringColumnPointNum1, 0);
   ApplyPointColumn(StringColumnPointNum2, 1);
   ApplyPointColumn(StringColumnPointNum3, 2);
   ApplyPointColumn(StringColumnPointNum4, 3);
 
-  for I := 4 to MaxPoints - 1 do
+  for I := 4 to 4 + DynamicPointColumnCount - 1 do
   begin
     Col := TStringColumn.Create(GridResults);
     Col.Parent := GridResults;
+    Col.Name := Format('ProcessingPointColumn%d', [I + 1]);
+    Col.Tag := I;
+    Col.TagString := 'ProcessingDynamicPoint';
     Col.Stored := False;
     Col.Width := 125;
     Col.HeaderSettings.TextSettings.Trimming := TTextTrimming.Character;
@@ -2348,8 +2601,14 @@ begin
     Col.Header := FormatPointHeader(FResultPointColumns[I].Header);
     Col.Index := StringColumnResult.Index;
   end;
-  StringColumnResult.Index := GridResults.ColumnCount - 2;
-  StringColumnResultComment.Index := GridResults.ColumnCount - 1;
+
+  if StaticPointColumnCount > 0 then
+    StringColumnResult.Index := GridResults.ColumnCount - 2
+  else
+    StringColumnResult.Index := StringColumnResultSerial.Index + 1;
+  StringColumnResultComment.Index := StringColumnResult.Index + 1;
+
+  NormalizeResultsPointColumnsVisibility;
 end;
 
 function TFrameProceed.FindResultSpillageForPoint(ADevice: TDevice;
@@ -2433,10 +2692,19 @@ var
   FoundID: Integer;
   FoundDeviceUUID: string;
   FoundError: string;
+  PointName: string;
+  PointTypeUUID: string;
 begin
   FoundID := 0;
   FoundDeviceUUID := '';
   FoundError := '';
+  PointName := '';
+  PointTypeUUID := '';
+  if APoint <> nil then
+  begin
+    PointName := APoint.Name;
+    PointTypeUUID := APoint.DeviceTypeUUID;
+  end;
   if ASpillage <> nil then
   begin
     FoundID := ASpillage.ID;
@@ -2446,7 +2714,7 @@ begin
 
   LogMKS('DBG SP 9101', 'SummaryResults CELL',
     Format('RowDeviceUUID=%s; RowSerial=%s; ColumnPointName=%s; ColumnPointDeviceTypeUUID=%s; FoundSpillageID=%d; FoundSpillageDeviceUUID=%s; FoundError=%s; CellValue=%s',
-      [ARow.DeviceUUID, ARow.Serial, APoint.Name, APoint.DeviceTypeUUID,
+      [ARow.DeviceUUID, ARow.Serial, PointName, PointTypeUUID,
        FoundID, FoundDeviceUUID, FoundError, ACellValue]));
 end;
 
@@ -2511,44 +2779,37 @@ begin
 
         if Length(FResultPointColumns) > 0 then
         begin
-          if Device.Points <> nil then
-            RequiredPointsCount := Device.Points.Count;
           SetLength(Row.PointNames, Length(FResultPointColumns));
           SetLength(Row.PointValues, Length(FResultPointColumns));
           SetLength(Row.PointColors, Length(FResultPointColumns));
           for I := 0 to High(FResultPointColumns) do
           begin
             Row.PointNames[I] := FResultPointColumns[I].Header;
+            if FResultPointColumns[I].IsMerged or
+               SameText(Trim(FResultPointColumns[I].DeviceUUID), Trim(Device.UUID)) then
+              Inc(RequiredPointsCount);
+
+            Spillage := FindResultSpillageForColumn(Device, FResultPointColumns[I]);
             P := FindResultPointForColumn(Device, FResultPointColumns[I]);
-            if P <> nil then
+            if Spillage <> nil then
             begin
-              Row.PointNames[I] := P.Name;
-              Spillage := FindResultSpillageForPoint(Device, P);
-              if Spillage <> nil then
-              begin
-                Inc(FoundPointsCount);
-                HasAnyData := True;
-                if (not Spillage.Valid) or
-                   (Spillage.Validation = vsInvalid) then
-                  Inc(InvalidCount);
-                Row.PointColors[I] := GetPointResultColor(Device, P, Spillage);
-                { Point columns always show the measured error.  Only the
-                  aggregate Result column may display an em dash. }
-                Row.PointValues[I] := FormatResultErrorValue(Spillage.Error);
-              end
-              else
-              begin
-                Row.PointColors[I] := TAlphaColors.Null;
-                Row.PointValues[I] := '-';
-              end;
-              LogResultCellDebug(Row, P, Spillage, Row.PointValues[I]);
+              Row.PointNames[I] := Spillage.Name;
+              Inc(FoundPointsCount);
+              HasAnyData := True;
+              if (not Spillage.Valid) or
+                 (Spillage.Validation = vsInvalid) then
+                Inc(InvalidCount);
+              Row.PointColors[I] := GetSpillageErrorResultColor(Spillage);
+              { Point columns always show the measured error.  Only the
+                aggregate Result column may display an em dash. }
+              Row.PointValues[I] := FormatResultErrorValue(Spillage.Error);
             end
             else
             begin
-              Row.PointNames[I] := '';
               Row.PointColors[I] := TAlphaColors.Null;
               Row.PointValues[I] := '-';
             end;
+            LogResultCellDebug(Row, P, Spillage, Row.PointValues[I]);
           end;
         end
         else
@@ -2559,9 +2820,26 @@ begin
         end;
 
         Row.ResultStatus := ResolveDeviceSummaryStatus(Device);
+        if RequiredPointsCount > 0 then
+        begin
+          if FoundPointsCount = 0 then
+            Row.ResultStatus := 2
+          else if InvalidCount > 0 then
+            Row.ResultStatus := 4
+          else if FoundPointsCount < RequiredPointsCount then
+            Row.ResultStatus := 2
+          else
+            Row.ResultStatus := 5;
+        end;
 
         Row.ResultText := BuildResultTextByStatus(Row.ResultStatus);
         Row.ResultComment := BuildResultComment(Device, Row.ResultStatus);
+        if (RequiredPointsCount = 0) and (not HasAnyData) then
+        begin
+          Row.ResultStatus := 2;
+          Row.ResultText := #$2014;
+          Row.ResultComment := 'Нет данных обработки';
+        end;
 
         LogMKS('DBG SP 9102', 'SummaryResults RESULT',
           Format('RowDeviceUUID=%s; RowSerial=%s; RequiredPointsCount=%d; FoundPointsCount=%d; InvalidCount=%d; HasAnyData=%s; ResultText=%s',
@@ -2654,6 +2932,8 @@ begin
   end;
 end;
 procedure TFrameProceed.UpdateGridResults;
+var
+  I, VisibleColumnCount: Integer;
 begin
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
   GridResults.BeginUpdate;
@@ -2684,10 +2964,15 @@ begin
   // overwrite the persisted order, width or visibility.
   if FActiveWorkTable <> nil then
     ApplyGridColumnsLayout(GridResults, FActiveWorkTable.ResultsGridColumns);
+  NormalizeResultsPointColumnsVisibility;
   SetGridReadOnly(GridResults);
   UpdateActionHints;
+  VisibleColumnCount := 0;
+  for I := 0 to GridResults.ColumnCount - 1 do
+    if GridResults.Columns[I].Visible then
+      Inc(VisibleColumnCount);
   LogProceedGridContext('Summary', nil, nil, GridResults.RowCount,
-    GridResults.ColumnCount);
+    VisibleColumnCount);
 end;
 procedure SaveGridColumnWidths(AGrid: TGrid; out AWidths: TArray<Single>);
 var
@@ -4298,6 +4583,9 @@ var
 begin
   if (ARow < 0) or (ARow >= Length(FCurrentResultRows)) then
     Exit;
+  if (ACol < 0) or (ACol >= GridResults.ColumnCount) or
+     (not GridResults.Columns[ACol].Visible) then
+    Exit;
 
   Row := FCurrentResultRows[ARow];
 
@@ -4323,10 +4611,9 @@ begin
   begin
     if Length(Row.PointValues) > 3 then Value := Row.PointValues[3] else Value := '';
   end
-  else if (GridResults.Columns[ACol].Index > StringColumnPointNum4.Index) and
-          (GridResults.Columns[ACol].Index < StringColumnResult.Index) then
+  else if SameText(GridResults.Columns[ACol].TagString, 'ProcessingDynamicPoint') then
   begin
-    PointIdx := GridResults.Columns[ACol].Index - StringColumnPointNum1.Index;
+    PointIdx := GridResults.Columns[ACol].Tag;
     if (PointIdx >= 0) and (PointIdx < Length(Row.PointValues)) then
       Value := Row.PointValues[PointIdx]
     else
@@ -4350,6 +4637,8 @@ var
 begin
   if (Row < 0) or (Row >= Length(FCurrentResultRows)) then
     Exit;
+  if (Column = nil) or (not Column.Visible) then
+    Exit;
 
   GridRow := FCurrentResultRows[Row];
   Color := TAlphaColors.Null;
@@ -4359,13 +4648,12 @@ begin
   else
   begin
     PointIdx := -1;
-    if Column = StringColumnPointNum1 then PointIdx := 0;
-    if Column = StringColumnPointNum2 then PointIdx := 1;
-    if Column = StringColumnPointNum3 then PointIdx := 2;
-    if Column = StringColumnPointNum4 then PointIdx := 3;
-    if (PointIdx < 0) and (Column.Index > StringColumnPointNum4.Index) and
-       (Column.Index < StringColumnResult.Index) then
-      PointIdx := Column.Index - StringColumnPointNum1.Index;
+    if (Column = StringColumnPointNum1) and StringColumnPointNum1.Visible then PointIdx := 0;
+    if (Column = StringColumnPointNum2) and StringColumnPointNum2.Visible then PointIdx := 1;
+    if (Column = StringColumnPointNum3) and StringColumnPointNum3.Visible then PointIdx := 2;
+    if (Column = StringColumnPointNum4) and StringColumnPointNum4.Visible then PointIdx := 3;
+    if (PointIdx < 0) and SameText(Column.TagString, 'ProcessingDynamicPoint') then
+      PointIdx := Column.Tag;
 
     if (PointIdx >= 0) and (PointIdx < Length(GridRow.PointColors)) then
       Color := GridRow.PointColors[PointIdx];
@@ -4432,12 +4720,14 @@ begin
     if GridResults.Columns[Col] = StringColumnPointNum1 then PointIndex := 0
     else if GridResults.Columns[Col] = StringColumnPointNum2 then PointIndex := 1
     else if GridResults.Columns[Col] = StringColumnPointNum3 then PointIndex := 2
-    else if GridResults.Columns[Col] = StringColumnPointNum4 then PointIndex := 3;
-    if (PointIndex >= 0) and (Device <> nil) and (Device.Points <> nil) and
-       (PointIndex < Device.Points.Count) then
+    else if GridResults.Columns[Col] = StringColumnPointNum4 then PointIndex := 3
+    else if SameText(GridResults.Columns[Col].TagString, 'ProcessingDynamicPoint') then
+      PointIndex := GridResults.Columns[Col].Tag;
+    if (PointIndex >= 0) and (Device <> nil) and
+       (PointIndex < Length(FResultPointColumns)) then
     begin
-      DevicePoint := Device.Points[PointIndex];
-      Spillage := FindResultSpillageForPoint(Device, DevicePoint);
+      DevicePoint := FindResultPointForColumn(Device, FResultPointColumns[PointIndex]);
+      Spillage := FindResultSpillageForColumn(Device, FResultPointColumns[PointIndex]);
       HintText := GetSpillageResultHint(Device, Spillage);
     end;
   end;
