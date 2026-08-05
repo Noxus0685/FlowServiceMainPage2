@@ -264,6 +264,9 @@ type
     function FindResultSpillagesForColumn(ADevice: TDevice; const AColumn: TProceedResultPointColumn): TArray<TPointSpillage>;
     // Возвращает одну проливку прибора для Summary-колонки обработки; используется для старых call-site, где нужен представитель.
     function FindResultSpillageForColumn(ADevice: TDevice; const AColumn: TProceedResultPointColumn): TPointSpillage;
+    function FormatMergedSummarySeriesResults(const AColumn: TProceedResultPointColumn; const ASpillages: TArray<TPointSpillage>; out ASelectedSpillages: TArray<TPointSpillage>): string;
+    procedure BuildSummaryColumnsWithoutMerge(const ADevices: TList<TDevice>);
+    procedure BuildSummaryColumnsWithMerge(const ADevices: TList<TDevice>);
     procedure BuildSummaryResultPointColumns(const ADevices: TList<TDevice>; const AMergePoints: Boolean);
     procedure LogResultCellDebug(const ARow: TResultGridRow; APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
     procedure ShowAllDevicesResults;
@@ -502,22 +505,8 @@ begin
     GridResults.OnMouseMove := GridResultsMouseMove;
     GridResults.OnMouseUp := GridColumnLayoutMouseUp;
   end;
-  if ActionRemoveInvalidAndExcessMeasurements = nil then
-  begin
-    ActionRemoveInvalidAndExcessMeasurements := TAction.Create(Self);
-    ActionRemoveInvalidAndExcessMeasurements.Text := 'Удалить лишние измерения';
-    ActionRemoveInvalidAndExcessMeasurements.Hint := 'Удалить неподключённые измерения и лишние повторы по настройкам точек';
-    ActionRemoveInvalidAndExcessMeasurements.OnExecute := ActionRemoveInvalidAndExcessMeasurementsExecute;
-  end;
-
-  if ButtonRemoveInvalidAndExcessMeasurements = nil then
-  begin
-    ButtonRemoveInvalidAndExcessMeasurements := TButton.Create(Self);
-    ButtonRemoveInvalidAndExcessMeasurements.Parent := ToolBarDataPoints;
-    ButtonRemoveInvalidAndExcessMeasurements.Text := 'Удалить лишние измерения';
+  if ButtonRemoveInvalidAndExcessMeasurements <> nil then
     ButtonRemoveInvalidAndExcessMeasurements.Action := ActionRemoveInvalidAndExcessMeasurements;
-    ButtonRemoveInvalidAndExcessMeasurements.Width := 180;
-  end;
 
   if GridDataPoints <> nil then
   begin
@@ -2255,9 +2244,6 @@ function TFrameProceed.ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
 var
   Point: TDevicePoint;
   Spillage: TPointSpillage;
-  Spillages: TArray<TPointSpillage>;
-  K: Integer;
-  CellValues, CellNames: string;
   FoundPointsCount, RequiredPointsCount, InvalidCount, ConditionFailedCount: Integer;
 begin
   Result := 2;
@@ -2434,6 +2420,132 @@ begin
     Result := Spillages[0];
 end;
 
+function TFrameProceed.FormatMergedSummarySeriesResults(const AColumn: TProceedResultPointColumn;
+  const ASpillages: TArray<TPointSpillage>; out ASelectedSpillages: TArray<TPointSpillage>): string;
+var
+  Ordered: TList<TPointSpillage>;
+  SeriesBest: TDictionary<Integer, TPointSpillage>;
+  SeriesMembers: TDictionary<Integer, string>;
+  PointCounters: TDictionary<string, Integer>;
+  SeriesKeys: TList<Integer>;
+  Spillage, CurrentBest: TPointSpillage;
+  PointKey, MembersText, SelectionReason: string;
+  SeriesIndex, CurrentCount, I, MembersCount: Integer;
+  SelectedCount: Integer;
+
+  function ParticipantKey(ASpillage: TPointSpillage): string;
+  begin
+    if ASpillage = nil then
+      Exit('');
+    Result := AnsiUpperCase(Trim(ASpillage.DeviceUUID)) + '|' +
+      AnsiUpperCase(Trim(ASpillage.DeviceTypeUUID));
+    if Result = '|' then
+      Result := AnsiUpperCase(Trim(ASpillage.DeviceUUID)) + '|NAME:' +
+        AnsiUpperCase(Trim(ASpillage.Name));
+  end;
+
+  procedure AppendMember(var AText: string; ASpillage: TPointSpillage);
+  begin
+    if ASpillage = nil then
+      Exit;
+    if AText <> '' then
+      AText := AText + '; ';
+    AText := AText + Format('%s Error=%s',
+      [Trim(ASpillage.Name), FormatResultErrorValue(ASpillage.Error)]);
+  end;
+
+  procedure AddSelected(ASpillage: TPointSpillage);
+  begin
+    if ASpillage = nil then
+      Exit;
+    SetLength(ASelectedSpillages, SelectedCount + 1);
+    ASelectedSpillages[SelectedCount] := ASpillage;
+    Inc(SelectedCount);
+  end;
+
+begin
+  Result := '';
+  SetLength(ASelectedSpillages, 0);
+  SelectedCount := 0;
+  if Length(ASpillages) = 0 then
+    Exit;
+
+  Ordered := TList<TPointSpillage>.Create;
+  SeriesBest := TDictionary<Integer, TPointSpillage>.Create;
+  SeriesMembers := TDictionary<Integer, string>.Create;
+  PointCounters := TDictionary<string, Integer>.Create;
+  SeriesKeys := TList<Integer>.Create;
+  try
+    for Spillage in ASpillages do
+      if Spillage <> nil then
+        Ordered.Add(Spillage);
+    Ordered.Sort(TComparer<TPointSpillage>.Construct(
+      function(const Left, Right: TPointSpillage): Integer
+      begin
+        Result := CompareValue(Left.DateTime, Right.DateTime);
+        if Result <> 0 then Exit;
+        Result := CompareValue(Left.ID, Right.ID);
+      end));
+
+    for Spillage in Ordered do
+    begin
+      PointKey := ParticipantKey(Spillage);
+      if not PointCounters.TryGetValue(PointKey, CurrentCount) then
+        CurrentCount := 0;
+      Inc(CurrentCount);
+      PointCounters.AddOrSetValue(PointKey, CurrentCount);
+      SeriesIndex := CurrentCount;
+
+      if not SeriesMembers.TryGetValue(SeriesIndex, MembersText) then
+      begin
+        MembersText := '';
+        SeriesKeys.Add(SeriesIndex);
+      end;
+      AppendMember(MembersText, Spillage);
+      SeriesMembers.AddOrSetValue(SeriesIndex, MembersText);
+
+      if (not SeriesBest.TryGetValue(SeriesIndex, CurrentBest)) or
+         (Abs(Spillage.Error) < Abs(CurrentBest.Error)) or
+         (SameValue(Abs(Spillage.Error), Abs(CurrentBest.Error), 1E-9) and (Spillage.ID >= CurrentBest.ID)) then
+        SeriesBest.AddOrSetValue(SeriesIndex, Spillage);
+    end;
+
+    SeriesKeys.Sort;
+    for I := 0 to SeriesKeys.Count - 1 do
+    begin
+      SeriesIndex := SeriesKeys[I];
+      if not SeriesBest.TryGetValue(SeriesIndex, Spillage) then
+        Continue;
+      AddSelected(Spillage);
+      if Result <> '' then
+        Result := Result + sLineBreak;
+      Result := Result + Format('Серия %d: %s', [SeriesIndex, FormatResultErrorValue(Spillage.Error)]);
+
+      MembersText := '';
+      SeriesMembers.TryGetValue(SeriesIndex, MembersText);
+      MembersCount := 0;
+      for CurrentCount := 1 to Length(MembersText) do
+        if MembersText[CurrentCount] = ';' then
+          Inc(MembersCount);
+      if MembersText <> '' then
+        Inc(MembersCount);
+      SelectionReason := 'MinimumAbsoluteError';
+      ProtocolManager.AddMessage(pcProc, psForm, 'SummarySeriesResultSelection',
+        'Выбран результат серии merged-точки Summary',
+        Format('MergedPointName=%s; SessionID=%d; SeriesIndex=%d; MembersCount=%d; Members=%s; DeviceUUID=%s; SourcePointUUID=%s; MemberPointName=%s; MemberError=%s; SelectedError=%s; SelectionReason=%s',
+          [AColumn.Header, Spillage.SessionID, SeriesIndex, MembersCount,
+           MembersText, Spillage.DeviceUUID, Spillage.DeviceTypeUUID, Spillage.Name, FormatResultErrorValue(Spillage.Error),
+           FormatResultErrorValue(Spillage.Error), SelectionReason]));
+    end;
+  finally
+    SeriesKeys.Free;
+    PointCounters.Free;
+    SeriesMembers.Free;
+    SeriesBest.Free;
+    Ordered.Free;
+  end;
+end;
+
 function TFrameProceed.FindResultSpillagesForColumn(ADevice: TDevice;
   const AColumn: TProceedResultPointColumn): TArray<TPointSpillage>;
 const
@@ -2550,8 +2662,111 @@ begin
     AddResult(BestSingle);
 end;
 
+procedure TFrameProceed.BuildSummaryColumnsWithoutMerge(const ADevices: TList<TDevice>);
+var
+  Cols: TList<TProceedResultPointColumn>;
+  SeenKeys: TDictionary<string, Boolean>;
+  Col: TProceedResultPointColumn;
+  Device: TDevice;
+  Spillage: TPointSpillage;
+  ActiveSession: TSessionSpillage;
+  DeviceUUID, SourcePointUUID, PointName, PointKey, Headers: string;
+  DevicesCount, SpillagesCount, I: Integer;
+
+  function IsUsableSummarySpillage(ASpillage: TPointSpillage): Boolean;
+  begin
+    Result := (ASpillage <> nil) and (ASpillage.State <> osDeleted) and
+      ASpillage.Enabled and (ASpillage.Validation = vsValid) and
+      (not IsNan(ASpillage.QavgEtalon)) and (not IsInfinite(ASpillage.QavgEtalon));
+  end;
+
+  function SpillageHeader(ASpillage: TPointSpillage; const ADefault: string): string;
+  begin
+    Result := Trim(ASpillage.Name);
+    if Result = '' then
+      Result := ADefault;
+  end;
+
+begin
+  SetLength(FResultPointColumns, 0);
+  Cols := TList<TProceedResultPointColumn>.Create;
+  SeenKeys := TDictionary<string, Boolean>.Create;
+  try
+    DevicesCount := 0;
+    SpillagesCount := 0;
+    if ADevices <> nil then
+      for Device in ADevices do
+      begin
+        if (Device = nil) or (Device.State = osDeleted) or
+           IsProcessingDevicePendingRemoved(Device) then
+          Continue;
+        Inc(DevicesCount);
+        ActiveSession := GetActiveVisibleSession(Device);
+        if (ActiveSession = nil) or (Device.Spillages = nil) then
+          Continue;
+
+        DeviceUUID := Trim(Device.UUID);
+        for Spillage in Device.Spillages do
+        begin
+          if (not IsUsableSummarySpillage(Spillage)) or
+             (Spillage.SessionID <> ActiveSession.ID) then
+            Continue;
+          if (Trim(Spillage.DeviceUUID) <> '') and (DeviceUUID <> '') and
+             (not SameText(Trim(Spillage.DeviceUUID), DeviceUUID)) then
+            Continue;
+
+          Inc(SpillagesCount);
+          SourcePointUUID := Trim(Spillage.DeviceTypeUUID);
+          PointName := SpillageHeader(Spillage, Format('Q%d', [Cols.Count + 1]));
+          if SourcePointUUID <> '' then
+            PointKey := AnsiUpperCase(DeviceUUID) + '|UUID:' + AnsiUpperCase(SourcePointUUID)
+          else
+            PointKey := AnsiUpperCase(DeviceUUID) + '|POINT:' +
+              AnsiUpperCase(Trim(PointName)) + '|' + IntToStr(Spillage.Num);
+          if SeenKeys.ContainsKey(PointKey) then
+            Continue;
+          SeenKeys.Add(PointKey, True);
+
+          Col := Default(TProceedResultPointColumn);
+          Col.IsMerged := False;
+          Col.DeviceUUID := DeviceUUID;
+          Col.SourcePointUUID := SourcePointUUID;
+          Col.SourcePointName := PointName;
+          Col.SourcePointNum := Spillage.Num;
+          Col.TargetFlow := Spillage.QavgEtalon;
+          Col.Header := PointName;
+          Cols.Add(Col);
+        end;
+      end;
+
+    Headers := '';
+    for I := 0 to Cols.Count - 1 do
+    begin
+      if I > 0 then Headers := Headers + ', ';
+      Headers := Headers + Cols[I].Header;
+    end;
+    FResultPointColumns := Cols.ToArray;
+
+    ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingSummaryColumnsBuilt',
+      'Построены колонки Summary обработки без объединения точек',
+      Format('MergeEnabled=False; Source=Spillages; DevicesCount=%d; SpillagesCount=%d; ColumnsCount=%d; ColumnHeaders=%s; SummaryColumnsSource=ProcessingSpillages; BuildMode=WithoutMerge',
+        [DevicesCount, SpillagesCount, Cols.Count, Headers]));
+  finally
+    SeenKeys.Free;
+    Cols.Free;
+  end;
+end;
+
 procedure TFrameProceed.BuildSummaryResultPointColumns(const ADevices: TList<TDevice>;
   const AMergePoints: Boolean);
+begin
+  if AMergePoints then
+    BuildSummaryColumnsWithMerge(ADevices)
+  else
+    BuildSummaryColumnsWithoutMerge(ADevices);
+end;
+
+procedure TFrameProceed.BuildSummaryColumnsWithMerge(const ADevices: TList<TDevice>);
 var
   Cols: TList<TProceedResultPointColumn>;
   ProcessingSpillages: TList<TPointSpillage>;
@@ -2640,19 +2855,6 @@ var
       Result := ASpillage.Error;
   end;
 
-  function FindOwnerDeviceUUID(ASpillage: TPointSpillage): string;
-  var
-    OwnerDevice: TDevice;
-  begin
-    Result := Trim(ASpillage.DeviceUUID);
-    if (Result <> '') or (ADevices = nil) then
-      Exit;
-    for OwnerDevice in ADevices do
-      if (OwnerDevice <> nil) and (OwnerDevice.Spillages <> nil) and
-         (OwnerDevice.Spillages.IndexOf(ASpillage) >= 0) then
-        Exit(Trim(OwnerDevice.UUID));
-  end;
-
 begin
   SetLength(FResultPointColumns, 0);
   Cols := TList<TProceedResultPointColumn>.Create;
@@ -2707,12 +2909,10 @@ begin
           Break;
         end;
       PointErrorPercent := SpillagePointErrorPercent(Device, Spillage);
-      if AMergePoints then
-      begin
-        J := -1;
-        BestIntersectionQ := -MaxDouble;
-        BestDistance := MaxDouble;
-        if CalculatePointFlowRange(Spillage.QavgEtalon,
+      J := -1;
+      BestIntersectionQ := -MaxDouble;
+      BestDistance := MaxDouble;
+      if CalculatePointFlowRange(Spillage.QavgEtalon,
           PointErrorPercent, PointMinQ, PointMaxQ, PointDeltaQ) then
           for I := 0 to Cols.Count - 1 do
           begin
@@ -2770,19 +2970,9 @@ begin
           end;
           Cols.Add(Col);
         end;
-      end
-      else
-      begin
-        Col.IsMerged := False;
-        Col.DeviceUUID := FindOwnerDeviceUUID(Spillage);
-        Col.SourcePointUUID := Trim(Spillage.DeviceTypeUUID);
-        Col.Header := SpillageHeader(Spillage, Format('Q%d', [Cols.Count + 1]));
-        Cols.Add(Col);
-      end;
     end;
 
-    if AMergePoints then
-      for I := 0 to Cols.Count - 1 do
+    for I := 0 to Cols.Count - 1 do
       begin
         GroupNames := '';
         GroupFlows := '';
@@ -2814,7 +3004,7 @@ begin
     ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingSummaryColumnsBuilt',
       'Построены колонки Summary обработки',
       Format('MergeEnabled=%s; Source=Spillages; DevicesCount=%d; SpillagesCount=%d; MergedGroupsCount=%d; ColumnsCount=%d; ColumnHeaders=%s; FallbackMeasurementRunUsed=False; MeasurementRunPointsEmpty=%s; SummaryColumnsSource=ProcessingSpillages',
-        [BoolToStr(AMergePoints, True), DevicesCount, SpillagesCount, Cols.Count,
+        [BoolToStr(True, True), DevicesCount, SpillagesCount, Cols.Count,
          Cols.Count, Headers, BoolToStr(RunPointsEmpty, True)]));
   finally
     ProcessingSpillages.Free;
@@ -3092,6 +3282,7 @@ var
   I: Integer;
   Spillage: TPointSpillage;
   Spillages: TArray<TPointSpillage>;
+  SelectedSpillages: TArray<TPointSpillage>;
   K: Integer;
   CellValues, CellNames: string;
   FoundPointsCount: Integer;
@@ -3144,29 +3335,50 @@ begin
               CellValues := '';
               CellNames := '';
               Row.PointColors[I] := TAlphaColors.Null;
-              for K := 0 to High(Spillages) do
+              if FResultPointColumns[I].IsMerged then
               begin
-                Spillage := Spillages[K];
-                if CellValues <> '' then
-                  CellValues := CellValues + ' / ';
-                CellValues := CellValues + FormatResultErrorValue(Spillage.Error);
-                if CellNames <> '' then
-                  CellNames := CellNames + ' / ';
-                CellNames := CellNames + Spillage.Name;
-                Inc(FoundPointsCount);
-                HasAnyData := True;
-                if (not Spillage.Valid) or
-                   (Spillage.Validation = vsInvalid) then
-                  Inc(InvalidCount);
-                if (K = 0) or ((not Spillage.Valid) or (Spillage.Validation = vsInvalid)) then
-                  Row.PointColors[I] := GetSpillageErrorResultColor(Spillage);
-              end;
-              if not FResultPointColumns[I].IsMerged then
+                CellValues := FormatMergedSummarySeriesResults(FResultPointColumns[I], Spillages, SelectedSpillages);
+                for K := 0 to High(SelectedSpillages) do
+                begin
+                  Spillage := SelectedSpillages[K];
+                  Inc(FoundPointsCount);
+                  HasAnyData := True;
+                  if (not Spillage.Valid) or
+                     (Spillage.Validation = vsInvalid) then
+                    Inc(InvalidCount);
+                  if (K = 0) or ((not Spillage.Valid) or (Spillage.Validation = vsInvalid)) then
+                    Row.PointColors[I] := GetSpillageErrorResultColor(Spillage);
+                end;
+                if Length(SelectedSpillages) > 0 then
+                  Spillage := SelectedSpillages[0]
+                else
+                  Spillage := Spillages[0];
+              end
+              else
+              begin
+                for K := 0 to High(Spillages) do
+                begin
+                  Spillage := Spillages[K];
+                  if CellValues <> '' then
+                    CellValues := CellValues + ' / ';
+                  CellValues := CellValues + FormatResultErrorValue(Spillage.Error);
+                  if CellNames <> '' then
+                    CellNames := CellNames + ' / ';
+                  CellNames := CellNames + Spillage.Name;
+                  Inc(FoundPointsCount);
+                  HasAnyData := True;
+                  if (not Spillage.Valid) or
+                     (Spillage.Validation = vsInvalid) then
+                    Inc(InvalidCount);
+                  if (K = 0) or ((not Spillage.Valid) or (Spillage.Validation = vsInvalid)) then
+                    Row.PointColors[I] := GetSpillageErrorResultColor(Spillage);
+                end;
                 Row.PointNames[I] := CellNames;
+                Spillage := Spillages[0];
+              end;
               { Point columns always show all measured errors.  Only the
                 aggregate Result column may display an em dash. }
               Row.PointValues[I] := CellValues;
-              Spillage := Spillages[0];
             end
             else
             begin
