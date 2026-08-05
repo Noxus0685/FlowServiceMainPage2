@@ -44,9 +44,17 @@ uses
   uRepositories,
   uProtocols,
   uWorkTable,
-  uMKSDebug;
+  uMKSDebug,
+  uMeasurementRun;
 
 type
+  TProceedResultPointColumn = record
+    Header: string;
+    DeviceUUID: string;
+    SourcePointUUID: string;
+    ScenarioPoint: TDevicePoint;
+  end;
+
   TResultGridRow = record
     Device: TDevice;
     Name: string;
@@ -57,6 +65,7 @@ type
     PointValues: TArray<string>;
     PointColors: TArray<TAlphaColor>;
     ResultText: string;
+    ResultComment: string;
     ResultStatus: Integer;
   end;
 
@@ -81,6 +90,7 @@ type
     StringColumnSpillageVelocity: TStringColumn;
     StringColumnSpillageError: TStringColumn;
     StringColumnSpillageValid: TStringColumn;
+    StringColumnSpillageComment: TStringColumn;
     StringColumnSpillageQStd: TStringColumn;
     StringColumnSpillageQCV: TStringColumn;
     StringColumnSpillageVolumeBefore: TStringColumn;
@@ -113,6 +123,7 @@ type
     StringColumnPointNum3: TStringColumn;
     StringColumnPointNum4: TStringColumn;
     StringColumnResult: TStringColumn;
+    StringColumnResultComment: TStringColumn;
     MemoLog: TMemo;
     LayoutLeft: TLayout;
     TreeViewDevices: TTreeView;
@@ -217,8 +228,14 @@ type
     procedure PopulateTreeViewDevices;
     function GetStatusColor(const AStatus: Integer): TAlphaColor;
     function BuildResultTextByStatus(const AStatus: Integer): string;
+    function BuildResultComment(ADevice: TDevice; const AStatus: Integer): string;
+    function BuildSpillageStatusText(ASpillage: TPointSpillage): string;
+    function BuildSpillageCommentText(ASpillage: TPointSpillage): string;
+    function GetSpillageErrorResultColor(ASpillage: TPointSpillage): TAlphaColor;
     function ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
     procedure UpdateResultsPointColumns;
+    function FindResultPointForColumn(ADevice: TDevice; const AColumn: TProceedResultPointColumn): TDevicePoint;
+    procedure BuildProcessingPointsContext(const ADevices: TList<TDevice>; const AMergePoints: Boolean);
     procedure LogResultCellDebug(const ARow: TResultGridRow; APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
     procedure ShowAllDevicesResults;
     procedure ShowDevicesResults(const ADevices: TList<TDevice>);
@@ -314,6 +331,7 @@ type
     FCurrentSession: TSessionSpillage;
     FCurrentResultRows: TArray<TResultGridRow>;
     FCurrentSpillages: TArray<TPointSpillage>;
+    FResultPointColumns: TArray<TProceedResultPointColumn>;
     FActiveWorkTable: TWorkTable;
     FSessionDevice: TFlowMeter;
     FSessionEtalon: TFlowMeter;
@@ -701,6 +719,8 @@ end;
 procedure TFrameProceed.RefreshResultsTab;
 begin
   DbgProceedTree(1501, 'RefreshResultsTab ENTER'#13#10 + GetSelectedTreeDebugText);
+  FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
+  LoadProcessingDevices;
   SyncProcessingDevicesWithNewPoints;
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
@@ -2047,10 +2067,23 @@ end;
 function TFrameProceed.GetPointResultColor(ADevice: TDevice;
   ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): TAlphaColor;
 begin
+  Result := GetSpillageErrorResultColor(ASpillage);
+end;
+
+function TFrameProceed.GetSpillageErrorResultColor(ASpillage: TPointSpillage): TAlphaColor;
+begin
   Result := TAlphaColors.Null;
-  if (ADevice = nil) or (ADevicePoint = nil) or (ASpillage = nil) then
+  if ASpillage = nil then
     Exit;
-  Result := GetSpillageValidationColor(ASpillage.Validation, ASpillage.ValidationReason);
+
+  case ASpillage.ValidationReason of
+    svrErrorWithinTolerance:
+      Result := COLOR_COMPLETED;
+    svrErrorExceeded:
+      Result := COLOR_WARNING;
+  else
+    Result := TAlphaColors.Null;
+  end;
 end;
 
 function TFrameProceed.ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
@@ -2116,63 +2149,229 @@ begin
     Result := '-';
   end;
 end;
+
+function TFrameProceed.BuildResultComment(ADevice: TDevice;
+  const AStatus: Integer): string;
+var
+  DevicePoint: TDevicePoint;
+  Spillage: TPointSpillage;
+begin
+  Result := '';
+  if (ADevice = nil) or (ADevice.Points = nil) then
+    Exit;
+
+  if AStatus = 5 then
+  begin
+    for DevicePoint in ADevice.Points do
+    begin
+      Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
+      if (Spillage <> nil) and (Spillage.ValidationReason = svrErrorWithinTolerance) then
+        Exit(SpillageValidationReasonToText(Spillage.ValidationReason));
+    end;
+    Exit;
+  end;
+
+  for DevicePoint in ADevice.Points do
+  begin
+    Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
+    if (Spillage <> nil) and (Spillage.ValidationReason <> svrNone) and
+       (Spillage.ValidationReason <> svrNotAnalyzed) then
+      Exit(SpillageValidationReasonToText(Spillage.ValidationReason));
+  end;
+end;
+
+function TFrameProceed.BuildSpillageStatusText(ASpillage: TPointSpillage): string;
+begin
+  Result := #$2014;
+  if ASpillage = nil then
+    Exit;
+  case ASpillage.Validation of
+    vsValid:
+      Result := 'Годен';
+    vsInvalid:
+      Result := 'Не годен';
+  else
+    Result := #$2014;
+  end;
+end;
+
+function TFrameProceed.BuildSpillageCommentText(ASpillage: TPointSpillage): string;
+begin
+  Result := '';
+  if (ASpillage = nil) or (ASpillage.ValidationReason in [svrNone, svrNotAnalyzed]) then
+    Exit;
+  Result := SpillageValidationReasonToText(ASpillage.ValidationReason);
+end;
+
+function TFrameProceed.FindResultPointForColumn(ADevice: TDevice;
+  const AColumn: TProceedResultPointColumn): TDevicePoint;
+var
+  I: Integer;
+  P: TDevicePoint;
+begin
+  Result := nil;
+  if (ADevice = nil) or (ADevice.Points = nil) then
+    Exit;
+  if (Trim(AColumn.DeviceUUID) <> '') and
+     (not SameText(Trim(AColumn.DeviceUUID), Trim(ADevice.UUID))) then
+    Exit;
+  if Trim(AColumn.SourcePointUUID) <> '' then
+    for I := 0 to ADevice.Points.Count - 1 do
+      if (ADevice.Points[I] <> nil) and
+         SameText(Trim(ADevice.Points[I].UUID), Trim(AColumn.SourcePointUUID)) then
+        Exit(ADevice.Points[I]);
+  if AColumn.ScenarioPoint <> nil then
+  begin
+    for I := 0 to High(AColumn.ScenarioPoint.Participants) do
+      if SameText(Trim(AColumn.ScenarioPoint.Participants[I].DeviceUUID), Trim(ADevice.UUID)) and
+         (Trim(AColumn.ScenarioPoint.Participants[I].SourcePointUUID) <> '') then
+        for P in ADevice.Points do
+          if (P <> nil) and SameText(Trim(P.UUID),
+             Trim(AColumn.ScenarioPoint.Participants[I].SourcePointUUID)) then
+            Exit(P);
+
+    for I := 0 to ADevice.Points.Count - 1 do
+      if (ADevice.Points[I] <> nil) and
+         TMeasurementRun.IsPointEquivalent(ADevice.Points[I], AColumn.ScenarioPoint) then
+        Exit(ADevice.Points[I]);
+  end;
+end;
+
+procedure TFrameProceed.BuildProcessingPointsContext(const ADevices: TList<TDevice>;
+  const AMergePoints: Boolean);
+var
+  Cols: TList<TProceedResultPointColumn>;
+  Col: TProceedResultPointColumn;
+  WT: TWorkTable;
+  Point: TDevicePoint;
+  Device: TDevice;
+  I, J: Integer;
+  Merged: Boolean;
+  WorkTableUUID: string;
+begin
+  SetLength(FResultPointColumns, 0);
+  Cols := TList<TProceedResultPointColumn>.Create;
+  try
+    WT := ResolveManagerWorkTable(FWorkTableManager);
+    if WT <> nil then
+      WorkTableUUID := WT.UUID
+    else
+      WorkTableUUID := '';
+
+    if ADevices <> nil then
+      for Device in ADevices do
+        if (Device <> nil) and (Device.Points <> nil) then
+          for I := 0 to Device.Points.Count - 1 do
+          begin
+            Point := Device.Points[I];
+            if (Point = nil) or not Point.Enabled then
+              Continue;
+
+            Merged := False;
+            if AMergePoints then
+              for J := 0 to Cols.Count - 1 do
+                if (Cols[J].ScenarioPoint <> nil) and
+                   TMeasurementRun.IsPointEquivalent(Point, Cols[J].ScenarioPoint) then
+                begin
+                  Merged := True;
+                  Break;
+                end;
+
+            if not Merged then
+            begin
+              Col := Default(TProceedResultPointColumn);
+              if AMergePoints then
+                Col.ScenarioPoint := Point
+              else
+              begin
+                Col.DeviceUUID := Device.UUID;
+                Col.SourcePointUUID := Point.UUID;
+              end;
+              if AMergePoints then
+                Col.Header := Trim(Point.Name)
+              else
+                Col.Header := Trim(Device.Name + ' ' + Point.Name);
+              if Col.Header = '' then
+                Col.Header := Format('Q%d', [Cols.Count + 1]);
+              Cols.Add(Col);
+            end;
+
+            ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingPointsContextPoint',
+              'Точка контекста обработки',
+              Format('WorkTableUUID=%s; DeviceUUID=%s; DeviceName=%s; PointUUID=%s; PointName=%s; MergeEnabled=%s',
+                [WorkTableUUID, Device.UUID, Device.Name, Point.UUID, Point.Name,
+                 BoolToStr(AMergePoints, True)]));
+          end;
+
+    for I := 0 to Cols.Count - 1 do
+      for J := 0 to I - 1 do
+        if SameText(Cols[I].Header, Cols[J].Header) then
+        begin
+          Col := Cols[I];
+          Col.Header := Col.Header + ' (' + Copy(Col.DeviceUUID + Col.SourcePointUUID, 1, 8) + ')';
+          Cols[I] := Col;
+          Break;
+        end;
+
+    FResultPointColumns := Cols.ToArray;
+    ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingPointsContextBuilt',
+      'Построен контекст точек обработки',
+      Format('WorkTableUUID=%s; DeviceCount=%d; PointCount=%d; MergeEnabled=%s',
+        [WorkTableUUID, IfThen(ADevices <> nil, ADevices.Count, 0),
+         Length(FResultPointColumns), BoolToStr(AMergePoints, True)]));
+  finally
+    Cols.Free;
+  end;
+end;
+
 procedure TFrameProceed.UpdateResultsPointColumns;
 var
   MaxPoints, I: Integer;
-  AllSameType: Boolean;
-  FirstTypeName: string;
-  HeaderFromPoints: TArray<string>;
+  Col: TStringColumn;
 
   function FormatPointHeader(const APointName: string): string;
   begin
     Result := #948 + '(' + APointName + '), %';
   end;
+
+  procedure ApplyPointColumn(AColumn: TStringColumn; const AIndex: Integer);
+  begin
+    if AColumn = nil then
+      Exit;
+    AColumn.Visible := AIndex < MaxPoints;
+    if AColumn.Visible then
+      AColumn.Header := FormatPointHeader(FResultPointColumns[AIndex].Header);
+    AColumn.HeaderSettings.TextSettings.WordWrap := False;
+    AColumn.Stored := True;
+  end;
 begin
-  MaxPoints := 0;
-  for I := 0 to High(FCurrentResultRows) do
-    MaxPoints := Max(MaxPoints, Length(FCurrentResultRows[I].PointValues));
+  MaxPoints := Length(FResultPointColumns);
+  if MaxPoints = 0 then
+    for I := 0 to High(FCurrentResultRows) do
+      MaxPoints := Max(MaxPoints, Length(FCurrentResultRows[I].PointValues));
 
-  if MaxPoints > 4 then
-    MaxPoints := 4;
+  while StringColumnResult.Index > StringColumnPointNum4.Index + 1 do
+    GridResults.Columns[StringColumnPointNum4.Index + 1].Free;
 
-  StringColumnPointNum1.Visible := MaxPoints >= 1;
-  StringColumnPointNum2.Visible := MaxPoints >= 2;
-  StringColumnPointNum3.Visible := MaxPoints >= 3;
-  StringColumnPointNum4.Visible := MaxPoints >= 4;
+  ApplyPointColumn(StringColumnPointNum1, 0);
+  ApplyPointColumn(StringColumnPointNum2, 1);
+  ApplyPointColumn(StringColumnPointNum3, 2);
+  ApplyPointColumn(StringColumnPointNum4, 3);
 
-  AllSameType := Length(FCurrentResultRows) > 0;
-  SetLength(HeaderFromPoints, 0);
-  FirstTypeName := '';
-
-  if Length(FCurrentResultRows) > 0 then
+  for I := 4 to MaxPoints - 1 do
   begin
-    FirstTypeName := FCurrentResultRows[0].DeviceType;
-    SetLength(HeaderFromPoints, Length(FCurrentResultRows[0].PointNames));
-    for I := 0 to High(HeaderFromPoints) do
-      HeaderFromPoints[I] := FCurrentResultRows[0].PointNames[I];
+    Col := TStringColumn.Create(GridResults);
+    Col.Parent := GridResults;
+    Col.Stored := False;
+    Col.Width := 125;
+    Col.HeaderSettings.TextSettings.Trimming := TTextTrimming.Character;
+    Col.HeaderSettings.TextSettings.WordWrap := False;
+    Col.HeaderSettings.TextSettings.HorzAlign := TTextAlign.Center;
+    Col.Header := FormatPointHeader(FResultPointColumns[I].Header);
+    Col.Index := StringColumnResult.Index;
   end;
-
-  for I := 1 to High(FCurrentResultRows) do
-    if not SameText(FCurrentResultRows[I].DeviceType, FirstTypeName) then
-    begin
-      AllSameType := False;
-      Break;
-    end;
-
-  if AllSameType and (Length(HeaderFromPoints) > 0) then
-  begin
-    if Length(HeaderFromPoints) > 0 then StringColumnPointNum1.Header := FormatPointHeader(HeaderFromPoints[0]);
-    if Length(HeaderFromPoints) > 1 then StringColumnPointNum2.Header := FormatPointHeader(HeaderFromPoints[1]);
-    if Length(HeaderFromPoints) > 2 then StringColumnPointNum3.Header := FormatPointHeader(HeaderFromPoints[2]);
-    if Length(HeaderFromPoints) > 3 then StringColumnPointNum4.Header := FormatPointHeader(HeaderFromPoints[3]);
-  end
-  else
-  begin
-    StringColumnPointNum1.Header := FormatPointHeader('Q1');
-    StringColumnPointNum2.Header := FormatPointHeader('Q2');
-    StringColumnPointNum3.Header := FormatPointHeader('Q3');
-    StringColumnPointNum4.Header := FormatPointHeader('Q4');
-  end;
+  StringColumnResult.Index := GridResults.ColumnCount - 2;
+  StringColumnResultComment.Index := GridResults.ColumnCount - 1;
 end;
 
 function TFrameProceed.FindResultSpillageForPoint(ADevice: TDevice;
@@ -2305,7 +2504,13 @@ var
   RequiredPointsCount: Integer;
   InvalidCount: Integer;
   HasAnyData: Boolean;
+  UseMergePoints: Boolean;
 begin
+  UseMergePoints := True;
+  if ResolveManagerWorkTable(FWorkTableManager) <> nil then
+    UseMergePoints := ResolveManagerWorkTable(FWorkTableManager).MergeMeasurementPoints;
+  BuildProcessingPointsContext(ADevices, UseMergePoints);
+
   Rows := TList<TResultGridRow>.Create;
   try
     if ADevices <> nil then
@@ -2326,15 +2531,17 @@ begin
         InvalidCount := 0;
         HasAnyData := False;
 
-        if Device.Points <> nil then
+        if Length(FResultPointColumns) > 0 then
         begin
-          RequiredPointsCount := Device.Points.Count;
-          SetLength(Row.PointNames, Device.Points.Count);
-          SetLength(Row.PointValues, Device.Points.Count);
-          SetLength(Row.PointColors, Device.Points.Count);
-          for I := 0 to Device.Points.Count - 1 do
+          if Device.Points <> nil then
+            RequiredPointsCount := Device.Points.Count;
+          SetLength(Row.PointNames, Length(FResultPointColumns));
+          SetLength(Row.PointValues, Length(FResultPointColumns));
+          SetLength(Row.PointColors, Length(FResultPointColumns));
+          for I := 0 to High(FResultPointColumns) do
           begin
-            P := Device.Points[I];
+            Row.PointNames[I] := FResultPointColumns[I].Header;
+            P := FindResultPointForColumn(Device, FResultPointColumns[I]);
             if P <> nil then
             begin
               Row.PointNames[I] := P.Name;
@@ -2346,8 +2553,7 @@ begin
                 if (not Spillage.Valid) or
                    (Spillage.Validation = vsInvalid) then
                   Inc(InvalidCount);
-                Row.PointColors[I] := GetSpillageValidationColor(
-                  Spillage.Validation, Spillage.ValidationReason);
+                Row.PointColors[I] := GetPointResultColor(Device, P, Spillage);
                 { Point columns always show the measured error.  Only the
                   aggregate Result column may display an em dash. }
                 Row.PointValues[I] := FormatResultErrorValue(Spillage.Error);
@@ -2377,6 +2583,7 @@ begin
         Row.ResultStatus := ResolveDeviceSummaryStatus(Device);
 
         Row.ResultText := BuildResultTextByStatus(Row.ResultStatus);
+        Row.ResultComment := BuildResultComment(Device, Row.ResultStatus);
 
         LogMKS('DBG SP 9102', 'SummaryResults RESULT',
           Format('RowDeviceUUID=%s; RowSerial=%s; RequiredPointsCount=%d; FoundPointsCount=%d; InvalidCount=%d; HasAnyData=%s; ResultText=%s',
@@ -4109,6 +4316,7 @@ procedure TFrameProceed.GridResultsGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
   Row: TResultGridRow;
+  PointIdx: Integer;
 begin
   if (ARow < 0) or (ARow >= Length(FCurrentResultRows)) then
     Exit;
@@ -4137,8 +4345,19 @@ begin
   begin
     if Length(Row.PointValues) > 3 then Value := Row.PointValues[3] else Value := '';
   end
+  else if (GridResults.Columns[ACol].Index > StringColumnPointNum4.Index) and
+          (GridResults.Columns[ACol].Index < StringColumnResult.Index) then
+  begin
+    PointIdx := GridResults.Columns[ACol].Index - StringColumnPointNum1.Index;
+    if (PointIdx >= 0) and (PointIdx < Length(Row.PointValues)) then
+      Value := Row.PointValues[PointIdx]
+    else
+      Value := '';
+  end
   else if GridResults.Columns[ACol] = StringColumnResult then
-    Value := Row.ResultText;
+    Value := Row.ResultText
+  else if GridResults.Columns[ACol] = StringColumnResultComment then
+    Value := Row.ResultComment;
 end;
 
 
@@ -4166,6 +4385,9 @@ begin
     if Column = StringColumnPointNum2 then PointIdx := 1;
     if Column = StringColumnPointNum3 then PointIdx := 2;
     if Column = StringColumnPointNum4 then PointIdx := 3;
+    if (PointIdx < 0) and (Column.Index > StringColumnPointNum4.Index) and
+       (Column.Index < StringColumnResult.Index) then
+      PointIdx := Column.Index - StringColumnPointNum1.Index;
 
     if (PointIdx >= 0) and (PointIdx < Length(GridRow.PointColors)) then
       Color := GridRow.PointColors[PointIdx];
@@ -4423,7 +4645,9 @@ begin
       Value := FloatToStr(P.Error);
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageValid then
-    Value := P.GetShortStateText
+    Value := BuildSpillageStatusText(P)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageComment then
+    Value := BuildSpillageCommentText(P)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQStd then
     Value := FloatToStr(P.QStd)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQCV then
@@ -4571,7 +4795,8 @@ var
   P: TPointSpillage;
   Color: TAlphaColor;
 begin
-  if (Column <> StringColumnSpillageValid) or (Row < 0) or
+  if ((Column <> StringColumnSpillageValid) and
+      (Column <> StringColumnSpillageError)) or (Row < 0) or
      (Row >= Length(FCurrentSpillages)) then
     Exit;
 
@@ -4579,7 +4804,10 @@ begin
   if P = nil then
     Exit;
 
-  Color := GetSpillageValidationColor(P.Validation, P.ValidationReason);
+  if Column = StringColumnSpillageError then
+    Color := GetSpillageErrorResultColor(P)
+  else
+    Color := GetSpillageValidationColor(P.Validation, P.ValidationReason);
   if Color = TAlphaColors.Null then
     Exit;
 
