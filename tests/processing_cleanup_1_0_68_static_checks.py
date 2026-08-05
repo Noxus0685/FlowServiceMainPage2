@@ -2,11 +2,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PROCEED = (ROOT / 'frmProceed.pas').read_text(encoding='utf-8-sig')
+FORM = (ROOT / 'frmProceed.fmx').read_text(encoding='utf-8-sig')
 VERSION = (ROOT / 'uAppVersion.pas').read_text(encoding='utf-8-sig')
 
 
 def test_cleanup_button_and_public_api_present():
-    assert "ButtonRemoveInvalidAndExcessMeasurements.Text := 'Удалить лишние измерения'" in PROCEED
+    assert 'ButtonRemoveInvalidAndExcessMeasurements: TButton' in FORM
+    assert 'ActionRemoveInvalidAndExcessMeasurements: TAction' in FORM
+    assert 'ButtonRemoveInvalidAndExcessMeasurements := TButton.Create' not in PROCEED
+    assert 'ActionRemoveInvalidAndExcessMeasurements := TAction.Create' not in PROCEED
     assert 'function FindUnassignedMeasurements: TArray<TPointSpillage>;' in PROCEED
     assert 'function FindExcessMeasurements: TArray<TPointSpillage>;' in PROCEED
     assert 'procedure RemoveInvalidAndExcessMeasurements;' in PROCEED
@@ -31,5 +35,5 @@ def test_cleanup_confirmation_report_logging_and_refresh():
     assert 'SavePendingProcessingChanges(Self);' in cleanup
 
 
-def test_version_bumped_to_1_0_68():
-    assert "APP_VERSION = '1.0.68'" in VERSION
+def test_version_bumped_to_1_0_74():
+    assert "APP_VERSION = '1.0.75'" in VERSION
