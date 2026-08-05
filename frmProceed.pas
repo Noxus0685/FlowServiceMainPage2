@@ -2346,6 +2346,9 @@ var
   Col: TStringColumn;
   UseStaticPointColumns: Boolean;
   HeaderText: string;
+  CreatedKeys: string;
+  CreatedColumnsCount: Integer;
+  ContextName: string;
 begin
   for I := GridResults.ColumnCount - 1 downto 0 do
     if (Trim(GridResults.Columns[I].Name) = '') or
@@ -2396,7 +2399,10 @@ begin
     StringColumnPointNum4.Visible := False;
     StartDynamicIndex := 0;
   end;
+end;
 
+  CreatedKeys := '';
+  CreatedColumnsCount := 0;
   for I := StartDynamicIndex to MaxPoints - 1 do
   begin
     Col := TStringColumn.Create(GridResults);
@@ -2405,6 +2411,7 @@ begin
     Col.Name := 'ProcessingPointColumn' + IntToStr(I + 1);
     Col.TagString := 'ProcessingDynamicPoint';
     Col.Tag := I;
+    Col.Visible := True;
     Col.Width := 125;
     Col.HeaderSettings.TextSettings.Trimming := TTextTrimming.Character;
     Col.HeaderSettings.TextSettings.WordWrap := False;
@@ -2417,7 +2424,26 @@ begin
       HeaderText := #948 + '(' + HeaderText + '), %';
     Col.Header := HeaderText;
     Col.Index := StringColumnResult.Index;
+    Inc(CreatedColumnsCount);
+    if Length(FResultPointColumns) > I then
+    begin
+      if CreatedKeys <> '' then
+        CreatedKeys := CreatedKeys + ',';
+      CreatedKeys := CreatedKeys + FResultPointColumns[I].Key;
+    end;
   end;
+  if UseStaticPointColumns then
+  begin
+    CreatedColumnsCount := Min(MaxPoints, 4);
+    ContextName := 'Summary';
+  end
+  else
+    ContextName := 'Points';
+  ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingGridColumnsCreated',
+    'Созданы столбцы точек обработки',
+    Format('Context=%s; MergeEnabled=%s; ColumnsCount=%d; List=%s',
+      [ContextName, BoolToStr(UseStaticPointColumns, True),
+       CreatedColumnsCount, CreatedKeys]));
   StringColumnResult.Index := GridResults.ColumnCount - 2;
   StringColumnResultComment.Index := GridResults.ColumnCount - 1;
 end;
