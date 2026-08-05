@@ -58,4 +58,4 @@ def test_results_columns_are_rebuilt_only_from_enabled_current_points():
     assert 'MeasurementRun.Points = nil' in has and '.Enabled' in has
 
 def test_version_is_1_0_62():
-    assert "APP_VERSION = '1.0.63'" in text('uAppVersion.pas')
+    assert "APP_VERSION = '1.0.64'" in text('uAppVersion.pas')

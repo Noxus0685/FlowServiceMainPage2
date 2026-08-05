@@ -49,4 +49,4 @@ def test_columns_menu_uses_logical_items_not_fmx_style_children():
 
 
 def test_release_version():
-    assert "APP_VERSION = '1.0.63'" in VERSION
+    assert "APP_VERSION = '1.0.64'" in VERSION
