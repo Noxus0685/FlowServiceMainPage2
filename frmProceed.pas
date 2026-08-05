@@ -204,8 +204,10 @@ type
     ActionSessionDeviceAdd: TAction;
     ActionDeleteWorkTable: TAction;
     ActionDeleteSelectedWorkTables: TAction;
+    ActionRemoveInvalidAndExcessMeasurements: TAction;
     btnCancel: TCornerButton;
     ButtonExportExcel: TButton;
+    ButtonRemoveInvalidAndExcessMeasurements: TButton;
     function FindProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
     function GetActiveVisibleSession(ADevice: TDevice): TSessionSpillage;
     function HasDeviceInProcessing(ADevice: TDevice): Boolean;
@@ -285,6 +287,13 @@ type
     function IsSelectedTreeWorkTable(out AWorkTable: TWorkTable): Boolean;
     procedure ClearCurrentResultsView;
     procedure RefreshAfterWorkTableDeletion;
+    // Возвращает измерения, которые не удалось сопоставить с поверочной точкой.
+    function FindUnassignedMeasurements: TArray<TPointSpillage>;
+    // Возвращает измерения, превышающие количество повторов поверочной точки.
+    function FindExcessMeasurements: TArray<TPointSpillage>;
+    // Удаляет неподключённые измерения и превышающие количество повторов согласно настройкам поверочных точек.
+    procedure RemoveInvalidAndExcessMeasurements;
+    procedure ActionRemoveInvalidAndExcessMeasurementsExecute(Sender: TObject);
     procedure MenuTreeViewDevicesDeleteWorkTableClick(Sender: TObject);
     procedure ActionDeleteWorkTableExecute(Sender: TObject);
     procedure ActionDeleteWorkTableUpdate(Sender: TObject);
@@ -486,6 +495,23 @@ begin
     GridResults.OnMouseMove := GridResultsMouseMove;
     GridResults.OnMouseUp := GridColumnLayoutMouseUp;
   end;
+  if ActionRemoveInvalidAndExcessMeasurements = nil then
+  begin
+    ActionRemoveInvalidAndExcessMeasurements := TAction.Create(Self);
+    ActionRemoveInvalidAndExcessMeasurements.Text := 'Удалить лишние измерения';
+    ActionRemoveInvalidAndExcessMeasurements.Hint := 'Удалить неподключённые измерения и лишние повторы по настройкам точек';
+    ActionRemoveInvalidAndExcessMeasurements.OnExecute := ActionRemoveInvalidAndExcessMeasurementsExecute;
+  end;
+
+  if ButtonRemoveInvalidAndExcessMeasurements = nil then
+  begin
+    ButtonRemoveInvalidAndExcessMeasurements := TButton.Create(Self);
+    ButtonRemoveInvalidAndExcessMeasurements.Parent := ToolBarDataPoints;
+    ButtonRemoveInvalidAndExcessMeasurements.Text := 'Удалить лишние измерения';
+    ButtonRemoveInvalidAndExcessMeasurements.Action := ActionRemoveInvalidAndExcessMeasurements;
+    ButtonRemoveInvalidAndExcessMeasurements.Width := 180;
+  end;
+
   if GridDataPoints <> nil then
   begin
     GridDataPoints.OnDrawColumnCell := GridDataPointsDrawColumnCell;
@@ -656,6 +682,13 @@ begin
       'Выберите в дереве рабочий стол для удаления';
   ActionDeleteSelectedWorkTables.Hint :=
     'Удалить все рабочие столы и связанные с ними данные';
+  if ActionRemoveInvalidAndExcessMeasurements <> nil then
+  begin
+    ActionRemoveInvalidAndExcessMeasurements.Enabled :=
+      (FProcessingDevices <> nil) and (FProcessingDevices.Count > 0);
+    ActionRemoveInvalidAndExcessMeasurements.Hint :=
+      'Удалить неподключённые измерения и повторы сверх поля «Повторы» поверочных точек';
+  end;
 
   if Session <> nil then
     ActionSessionActive.Hint := 'Сделать выбранную в дереве сессию активной'
@@ -2376,9 +2409,6 @@ begin
   if IsNan(ASpillage.QavgEtalon) or IsInfinite(ASpillage.QavgEtalon) or
      IsNan(AColumn.TargetFlow) or IsInfinite(AColumn.TargetFlow) then
     Exit;
-  if (Trim(AColumn.EtalonUUID) <> '') and (Trim(ASpillage.EtalonUUID) <> '') and
-     (not SameText(Trim(AColumn.EtalonUUID), Trim(ASpillage.EtalonUUID))) then
-    Exit;
   MaxFlow := Max(Abs(ASpillage.QavgEtalon), Abs(AColumn.TargetFlow));
   Result := Abs(ASpillage.QavgEtalon - AColumn.TargetFlow) <=
     Max(SUMMARY_MERGE_FLOW_ABS_TOLERANCE, MaxFlow * SUMMARY_MERGE_FLOW_REL_TOLERANCE);
@@ -2474,15 +2504,25 @@ procedure TFrameProceed.BuildSummaryResultPointColumns(const ADevices: TList<TDe
   const AMergePoints: Boolean);
 var
   Cols: TList<TProceedResultPointColumn>;
+  ProcessingSpillages: TList<TPointSpillage>;
   Col: TProceedResultPointColumn;
   WT: TWorkTable;
   Run: TMeasurementRun;
   Device: TDevice;
-  Spillage: TPointSpillage;
+  Spillage, GroupSpillage: TPointSpillage;
   ActiveSession: TSessionSpillage;
   I, J, DevicesCount, SpillagesCount: Integer;
   Headers: string;
   RunPointsEmpty: Boolean;
+  GroupNames, GroupFlows, GroupEtalons: string;
+  GroupCount: Integer;
+
+  function IsUsableSummarySpillage(ASpillage: TPointSpillage): Boolean;
+  begin
+    Result := (ASpillage <> nil) and (ASpillage.State <> osDeleted) and
+      ASpillage.Enabled and (ASpillage.Validation = vsValid) and
+      (not IsNan(ASpillage.QavgEtalon)) and (not IsInfinite(ASpillage.QavgEtalon));
+  end;
 
   function SpillageHeader(ASpillage: TPointSpillage; const ADefault: string): string;
   begin
@@ -2503,9 +2543,30 @@ var
       AHeader := Copy(AHeader, 1, 77) + '...';
   end;
 
+  procedure AppendCsvValue(var AText: string; const AValue: string);
+  begin
+    if AText <> '' then
+      AText := AText + ',';
+    AText := AText + AValue;
+  end;
+
+  function FindOwnerDeviceUUID(ASpillage: TPointSpillage): string;
+  var
+    OwnerDevice: TDevice;
+  begin
+    Result := Trim(ASpillage.DeviceUUID);
+    if (Result <> '') or (ADevices = nil) then
+      Exit;
+    for OwnerDevice in ADevices do
+      if (OwnerDevice <> nil) and (OwnerDevice.Spillages <> nil) and
+         (OwnerDevice.Spillages.IndexOf(ASpillage) >= 0) then
+        Exit(Trim(OwnerDevice.UUID));
+  end;
+
 begin
   SetLength(FResultPointColumns, 0);
   Cols := TList<TProceedResultPointColumn>.Create;
+  ProcessingSpillages := TList<TPointSpillage>.Create;
   try
     WT := ResolveManagerWorkTable(FWorkTableManager);
     Run := nil;
@@ -2513,7 +2574,6 @@ begin
       Run := TMeasurementRun(WT.MeasurementRun);
     RunPointsEmpty := (Run = nil) or (Run.Points = nil) or (Run.Points.Count = 0);
     DevicesCount := 0;
-    SpillagesCount := 0;
 
     if ADevices <> nil then
       for Device in ADevices do
@@ -2526,52 +2586,84 @@ begin
         if (ActiveSession = nil) or (Device.Spillages = nil) then
           Continue;
         for Spillage in Device.Spillages do
-        begin
-          if (Spillage = nil) or (Spillage.State = osDeleted) or (not Spillage.Enabled) or
-             (Spillage.SessionID <> ActiveSession.ID) then
-            Continue;
-          Inc(SpillagesCount);
-          Col := Default(TProceedResultPointColumn);
-          Col.TargetFlow := Spillage.QavgEtalon;
-          Col.EtalonUUID := Trim(Spillage.EtalonUUID);
-          Col.SourcePointName := Trim(Spillage.Name);
-          Col.SourcePointNum := Spillage.Num;
-          if AMergePoints then
+          if IsUsableSummarySpillage(Spillage) and
+             (Spillage.SessionID = ActiveSession.ID) then
+            ProcessingSpillages.Add(Spillage);
+      end;
+
+    ProcessingSpillages.Sort(TComparer<TPointSpillage>.Construct(
+      function(const Left, Right: TPointSpillage): Integer
+      begin
+        Result := CompareValue(Left.QavgEtalon, Right.QavgEtalon);
+        if Result <> 0 then Exit;
+        Result := CompareValue(Left.DateTime, Right.DateTime);
+        if Result <> 0 then Exit;
+        Result := CompareValue(Left.ID, Right.ID);
+      end));
+
+    SpillagesCount := ProcessingSpillages.Count;
+    for Spillage in ProcessingSpillages do
+    begin
+      Col := Default(TProceedResultPointColumn);
+      Col.TargetFlow := Spillage.QavgEtalon;
+      Col.SourcePointName := Trim(Spillage.Name);
+      Col.SourcePointNum := Spillage.Num;
+      if AMergePoints then
+      begin
+        J := -1;
+        for I := 0 to Cols.Count - 1 do
+          if IsProcessingSpillageInMergedColumn(Spillage, Cols[I]) then
           begin
-            J := -1;
-            for I := 0 to Cols.Count - 1 do
-              if IsProcessingSpillageInMergedColumn(Spillage, Cols[I]) then
-              begin
-                J := I;
-                Break;
-              end;
-            if J >= 0 then
-            begin
-              Col := Cols[J];
-              Col.TargetFlow := (Col.TargetFlow + Spillage.QavgEtalon) / 2;
-              if (Trim(Col.EtalonUUID) = '') and (Trim(Spillage.EtalonUUID) <> '') then
-                Col.EtalonUUID := Trim(Spillage.EtalonUUID);
-              AppendHeaderName(Col.Header, SpillageHeader(Spillage, Format('Q%d', [J + 1])));
-              Cols[J] := Col;
-            end
-            else
-            begin
-              Col.IsMerged := True;
-              Col.DeviceUUID := '';
-              Col.SourcePointUUID := '';
-              Col.Header := SpillageHeader(Spillage, Format('Q%d', [Cols.Count + 1]));
-              Cols.Add(Col);
-            end;
-          end
-          else
-          begin
-            Col.IsMerged := False;
-            Col.DeviceUUID := Trim(Device.UUID);
-            Col.SourcePointUUID := Trim(Spillage.DeviceTypeUUID);
-            Col.Header := Trim(Device.Name + ' ' + SpillageHeader(Spillage, Format('Q%d', [Cols.Count + 1])));
-            Cols.Add(Col);
+            J := I;
+            Break;
           end;
+        if J >= 0 then
+        begin
+          Col := Cols[J];
+          Col.TargetFlow := (Col.TargetFlow + Spillage.QavgEtalon) / 2;
+          AppendHeaderName(Col.Header, SpillageHeader(Spillage, Format('Q%d', [J + 1])));
+          Cols[J] := Col;
+        end
+        else
+        begin
+          Col.IsMerged := True;
+          Col.DeviceUUID := '';
+          Col.EtalonUUID := '';
+          Col.SourcePointUUID := '';
+          Col.Header := SpillageHeader(Spillage, Format('Q%d', [Cols.Count + 1]));
+          Cols.Add(Col);
         end;
+      end
+      else
+      begin
+        Col.IsMerged := False;
+        Col.DeviceUUID := FindOwnerDeviceUUID(Spillage);
+        Col.SourcePointUUID := Trim(Spillage.DeviceTypeUUID);
+        Col.Header := SpillageHeader(Spillage, Format('Q%d', [Cols.Count + 1]));
+        Cols.Add(Col);
+      end;
+    end;
+
+    if AMergePoints then
+      for I := 0 to Cols.Count - 1 do
+      begin
+        GroupNames := '';
+        GroupFlows := '';
+        GroupEtalons := '';
+        GroupCount := 0;
+        for GroupSpillage in ProcessingSpillages do
+          if IsProcessingSpillageInMergedColumn(GroupSpillage, Cols[I]) then
+          begin
+            Inc(GroupCount);
+            AppendCsvValue(GroupNames, SpillageHeader(GroupSpillage, Format('Q%d', [I + 1])));
+            AppendCsvValue(GroupFlows, FormatFloat('0.######', GroupSpillage.QavgEtalon));
+            AppendCsvValue(GroupEtalons, Trim(GroupSpillage.EtalonName));
+          end;
+        ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingSummaryMergeGroup',
+          'Сформирована merged-группа Summary по фактическому расходу',
+          Format('GroupIndex=%d; TargetQ=%s; Count=%d; SpillageNames=%s; QValues=%s; EtalonNames=%s',
+            [I + 1, FormatFloat('0.######', Cols[I].TargetFlow), GroupCount,
+             GroupNames, GroupFlows, GroupEtalons]));
       end;
 
     Headers := '';
@@ -2584,10 +2676,11 @@ begin
 
     ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingSummaryColumnsBuilt',
       'Построены колонки Summary обработки',
-      Format('MergeEnabled=%s; Source=Spillages; DevicesCount=%d; SpillagesCount=%d; ColumnsCount=%d; ColumnHeaders=%s; MergedGroupsCount=%d; FallbackMeasurementRunUsed=False; MeasurementRunPointsEmpty=%s; SummaryColumnsSource=ProcessingSpillages',
-        [BoolToStr(AMergePoints, True), DevicesCount, SpillagesCount, Cols.Count, Headers,
-         Cols.Count, BoolToStr(RunPointsEmpty, True)]));
+      Format('MergeEnabled=%s; Source=Spillages; DevicesCount=%d; SpillagesCount=%d; MergedGroupsCount=%d; ColumnsCount=%d; ColumnHeaders=%s; FallbackMeasurementRunUsed=False; MeasurementRunPointsEmpty=%s; SummaryColumnsSource=ProcessingSpillages',
+        [BoolToStr(AMergePoints, True), DevicesCount, SpillagesCount, Cols.Count,
+         Cols.Count, Headers, BoolToStr(RunPointsEmpty, True)]));
   finally
+    ProcessingSpillages.Free;
     Cols.Free;
   end;
 end;
@@ -3859,6 +3952,199 @@ begin
     ClearCurrentResultsView;
 
   UpdateSessionItems;
+end;
+
+
+function TFrameProceed.FindUnassignedMeasurements: TArray<TPointSpillage>;
+var
+  Items: TList<TPointSpillage>;
+  Device: TDevice;
+  Spillage: TPointSpillage;
+begin
+  Items := TList<TPointSpillage>.Create;
+  try
+    if FProcessingDevices <> nil then
+      for Device in FProcessingDevices do
+        if (Device <> nil) and (Device.State <> osDeleted) and (Device.Spillages <> nil) then
+          for Spillage in Device.Spillages do
+            if (Spillage <> nil) and (Spillage.State <> osDeleted) and Spillage.Enabled and
+               (Device.FindMatchedDevicePointForSpillage(Spillage) = nil) then
+              Items.Add(Spillage);
+    Result := Items.ToArray;
+  finally
+    Items.Free;
+  end;
+end;
+
+function TFrameProceed.FindExcessMeasurements: TArray<TPointSpillage>;
+var
+  Excess, Candidates: TList<TPointSpillage>;
+  Device: TDevice;
+  Point: TDevicePoint;
+  Spillage: TPointSpillage;
+  AllowedCount, I: Integer;
+begin
+  Excess := TList<TPointSpillage>.Create;
+  Candidates := TList<TPointSpillage>.Create;
+  try
+    if FProcessingDevices <> nil then
+      for Device in FProcessingDevices do
+        if (Device <> nil) and (Device.State <> osDeleted) and (Device.Points <> nil) and
+           (Device.Spillages <> nil) then
+          for Point in Device.Points do
+          begin
+            if (Point = nil) or (not Point.Enabled) then
+              Continue;
+
+            AllowedCount := Max(Point.Repeats, 1);
+            Candidates.Clear;
+            for Spillage in Device.Spillages do
+              if (Spillage <> nil) and (Spillage.State <> osDeleted) and Spillage.Enabled and
+                 (Device.FindMatchedDevicePointForSpillage(Spillage) = Point) then
+                Candidates.Add(Spillage);
+
+            if Candidates.Count <= AllowedCount then
+              Continue;
+
+            Candidates.Sort(TComparer<TPointSpillage>.Construct(
+              function(const Left, Right: TPointSpillage): Integer
+              begin
+                Result := CompareValue(Ord(Right.Validation = vsValid), Ord(Left.Validation = vsValid));
+                if Result <> 0 then Exit;
+                Result := CompareValue(Ord(Right.Validation in [vsValid, vsInvalid]), Ord(Left.Validation in [vsValid, vsInvalid]));
+                if Result <> 0 then Exit;
+                Result := CompareValue(Abs(Left.Error), Abs(Right.Error));
+                if Result <> 0 then Exit;
+                Result := CompareValue(Left.DateTime, Right.DateTime);
+              end));
+
+            for I := AllowedCount to Candidates.Count - 1 do
+              Excess.Add(Candidates[I]);
+          end;
+    Result := Excess.ToArray;
+  finally
+    Candidates.Free;
+    Excess.Free;
+  end;
+end;
+
+procedure TFrameProceed.RemoveInvalidAndExcessMeasurements;
+var
+  Unassigned, Excess: TArray<TPointSpillage>;
+  Device: TDevice;
+  Point: TDevicePoint;
+  Spillage: TPointSpillage;
+  TotalBefore, TotalAfter, DeviceCount, PointCount, UnassignedRemoved, ExcessRemoved: Integer;
+  Report, Details: TStringList;
+  BeforeCount, RemovedCount, AllowedCount: Integer;
+
+  function ContainsSpillage(const AItems: TArray<TPointSpillage>; ASpillage: TPointSpillage): Boolean;
+  var
+    Item: TPointSpillage;
+  begin
+    Result := False;
+    for Item in AItems do
+      if Item = ASpillage then
+        Exit(True);
+  end;
+
+begin
+  TotalBefore := 0;
+  DeviceCount := 0;
+  PointCount := 0;
+  if FProcessingDevices <> nil then
+    for Device in FProcessingDevices do
+      if (Device <> nil) and (Device.State <> osDeleted) then
+      begin
+        Inc(DeviceCount);
+        Inc(TotalBefore, GetDeviceSpillageCount(Device));
+        if Device.Points <> nil then
+          Inc(PointCount, Device.Points.Count);
+      end;
+
+  Unassigned := FindUnassignedMeasurements;
+  Excess := FindExcessMeasurements;
+
+  Report := TStringList.Create;
+  Details := TStringList.Create;
+  try
+    Report.Add(Format('Всего измерений: %d', [TotalBefore]));
+    Report.Add('');
+    Report.Add(Format('Не привязано к точкам: %d', [Length(Unassigned)]));
+    Report.Add('');
+    Report.Add('Лишние повторы:');
+
+    if FProcessingDevices <> nil then
+      for Device in FProcessingDevices do
+        if (Device <> nil) and (Device.State <> osDeleted) and (Device.Points <> nil) and
+           (Device.Spillages <> nil) then
+          for Point in Device.Points do
+          begin
+            if Point = nil then Continue;
+            AllowedCount := Max(Point.Repeats, 1);
+            BeforeCount := 0;
+            RemovedCount := 0;
+            for Spillage in Device.Spillages do
+              if (Spillage <> nil) and (Spillage.Enabled) and (Device.FindMatchedDevicePointForSpillage(Spillage) = Point) then
+              begin
+                if (Spillage.State <> osDeleted) or ContainsSpillage(Excess, Spillage) then
+                  Inc(BeforeCount);
+                if ContainsSpillage(Excess, Spillage) then
+                  Inc(RemovedCount);
+              end;
+            if RemovedCount > 0 then
+              Report.Add(Format('%s: было %d, разрешено %d, удалено %d',
+                [Point.Name, BeforeCount, AllowedCount, RemovedCount]));
+            Details.Add(Format('Device=%s; PointName=%s; AllowedRepeats=%d; BeforeCount=%d; RemovedCount=%d; AfterCount=%d',
+              [Device.Name, Point.Name, AllowedCount, BeforeCount, RemovedCount, BeforeCount - RemovedCount]));
+          end;
+
+    Report.Add('');
+    Report.Add(Format('Будет удалено всего: %d', [Length(Unassigned) + Length(Excess)]));
+    Report.Add('');
+    Report.Add('Будут удалены:'#13#10 +
+      '- все измерения, которые не удалось сопоставить с поверочной точкой;'#13#10 +
+      '- измерения сверх заданного количества повторов для каждой точки.'#13#10#13#10 +
+      'Продолжить?');
+
+    if MessageDlg(Report.Text, TMsgDlgType.mtConfirmation,
+        [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
+      Exit;
+
+    for Spillage in Unassigned do
+      if Spillage <> nil then
+        Spillage.State := osDeleted;
+    for Spillage in Excess do
+      if Spillage <> nil then
+        Spillage.State := osDeleted;
+
+    UnassignedRemoved := Length(Unassigned);
+    ExcessRemoved := Length(Excess);
+    TotalAfter := TotalBefore - UnassignedRemoved - ExcessRemoved;
+    if FProcessingDevices <> nil then
+      for Device in FProcessingDevices do
+        if (Device <> nil) and (Device.State = osClean) then
+          Device.State := osModified;
+
+    ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingMeasurementsCleanup',
+      'Удаление неподключённых измерений и лишних повторов',
+      Format('TotalBefore=%d; UnassignedRemoved=%d; ExcessRemoved=%d; TotalAfter=%d; DeviceCount=%d; PointCount=%d%s%s',
+        [TotalBefore, UnassignedRemoved, ExcessRemoved, TotalAfter, DeviceCount, PointCount,
+         sLineBreak, Details.Text]));
+
+    PopulateTreeViewDevices;
+    ShowAllDevicesResults;
+    SavePendingProcessingChanges(Self);
+    ShowMessage(Format('Удалено измерений: %d', [UnassignedRemoved + ExcessRemoved]));
+  finally
+    Details.Free;
+    Report.Free;
+  end;
+end;
+
+procedure TFrameProceed.ActionRemoveInvalidAndExcessMeasurementsExecute(Sender: TObject);
+begin
+  RemoveInvalidAndExcessMeasurements;
 end;
 
 procedure TFrameProceed.MenuTreeViewDevicesDeleteWorkTableClick(Sender: TObject);
