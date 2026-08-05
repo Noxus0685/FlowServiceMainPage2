@@ -2316,6 +2316,7 @@ function TFrameProceed.BuildResultComment(ADevice: TDevice;
   const AStatus: Integer): string;
 var
   Spillage: TPointSpillage;
+  DevicePoint:tDevicePoint;
 begin
   Result := '';
   if (ADevice = nil) or (ADevice.Points = nil) then
