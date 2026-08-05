@@ -2557,7 +2557,10 @@ begin
   UseMergePoints := True;
   if ResolveManagerWorkTable(FWorkTableManager) <> nil then
     UseMergePoints := ResolveManagerWorkTable(FWorkTableManager).MergeMeasurementPoints;
-  BuildProcessingPointsContext(ADevices, UseMergePoints);
+  if UseMergePoints then
+    SetLength(FResultPointColumns, 0)
+  else
+    BuildProcessingPointsContext(ADevices, UseMergePoints);
 
   Rows := TList<TResultGridRow>.Create;
   try
@@ -2579,7 +2582,7 @@ begin
         InvalidCount := 0;
         HasAnyData := False;
 
-        if Length(FResultPointColumns) > 0 then
+        if UseMergePoints and (Device.Points <> nil) then
         begin
           if Device.Points <> nil then
             RequiredPointsCount := Device.Points.Count;
@@ -2604,6 +2607,46 @@ begin
                 Row.PointColors[I] := GetPointResultColor(Device, P, Spillage);
                 { Point columns always show the measured error.  Only the
                   aggregate Result column may display an em dash. }
+                Row.PointValues[I] := FormatResultErrorValue(Spillage.Error);
+              end
+              else
+              begin
+                Row.PointColors[I] := TAlphaColors.Null;
+                Row.PointValues[I] := '-';
+              end;
+              LogResultCellDebug(Row, P, Spillage, Row.PointValues[I]);
+            end
+            else
+            begin
+              Row.PointNames[I] := '';
+              Row.PointColors[I] := TAlphaColors.Null;
+              Row.PointValues[I] := '-';
+            end;
+          end;
+        end
+        else if Length(FResultPointColumns) > 0 then
+        begin
+          if Device.Points <> nil then
+            RequiredPointsCount := Device.Points.Count;
+          SetLength(Row.PointNames, Length(FResultPointColumns));
+          SetLength(Row.PointValues, Length(FResultPointColumns));
+          SetLength(Row.PointColors, Length(FResultPointColumns));
+          for I := 0 to High(FResultPointColumns) do
+          begin
+            Row.PointNames[I] := FResultPointColumns[I].Header;
+            P := FindResultPointForColumn(Device, FResultPointColumns[I]);
+            if P <> nil then
+            begin
+              Row.PointNames[I] := P.Name;
+              Spillage := FindResultSpillageForPoint(Device, P);
+              if Spillage <> nil then
+              begin
+                Inc(FoundPointsCount);
+                HasAnyData := True;
+                if (not Spillage.Valid) or
+                   (Spillage.Validation = vsInvalid) then
+                  Inc(InvalidCount);
+                Row.PointColors[I] := GetPointResultColor(Device, P, Spillage);
                 Row.PointValues[I] := FormatResultErrorValue(Spillage.Error);
               end
               else
