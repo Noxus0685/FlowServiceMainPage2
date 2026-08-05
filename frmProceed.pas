@@ -2399,6 +2399,7 @@ begin
     StringColumnPointNum4.Visible := False;
     StartDynamicIndex := 0;
   end;
+end;
 
   CreatedKeys := '';
   CreatedColumnsCount := 0;
@@ -2609,13 +2610,15 @@ begin
 
         if UseMergePoints and (Device.Points <> nil) then
         begin
-          RequiredPointsCount := Device.Points.Count;
-          SetLength(Row.PointNames, Device.Points.Count);
-          SetLength(Row.PointValues, Device.Points.Count);
-          SetLength(Row.PointColors, Device.Points.Count);
-          for I := 0 to Device.Points.Count - 1 do
+          if Device.Points <> nil then
+            RequiredPointsCount := Device.Points.Count;
+          SetLength(Row.PointNames, Length(FResultPointColumns));
+          SetLength(Row.PointValues, Length(FResultPointColumns));
+          SetLength(Row.PointColors, Length(FResultPointColumns));
+          for I := 0 to High(FResultPointColumns) do
           begin
-            P := Device.Points[I];
+            Row.PointNames[I] := FResultPointColumns[I].Header;
+            P := FindResultPointForColumn(Device, FResultPointColumns[I]);
             if P <> nil then
             begin
               Row.PointNames[I] := P.Name;
