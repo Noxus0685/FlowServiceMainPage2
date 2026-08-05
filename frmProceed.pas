@@ -2499,35 +2499,9 @@ function TFrameProceed.FormatMergedSummarySeriesResults(const AColumn: TProceedR
   const ASpillages: TArray<TPointSpillage>; out ASelectedSpillages: TArray<TPointSpillage>): string;
 var
   Ordered: TList<TPointSpillage>;
-  SeriesBest: TDictionary<Integer, TPointSpillage>;
-  SeriesMembers: TDictionary<Integer, string>;
-  PointCounters: TDictionary<string, Integer>;
-  SeriesKeys: TList<Integer>;
   Spillage, CurrentBest: TPointSpillage;
-  PointKey, MembersText, SelectionReason, SkipReason: string;
-  SeriesIndex, CurrentCount, I, MembersCount: Integer;
+  SkipReason: string;
   SelectedCount: Integer;
-
-  function ParticipantKey(ASpillage: TPointSpillage): string;
-  begin
-    if ASpillage = nil then
-      Exit('');
-    Result := AnsiUpperCase(Trim(ASpillage.DeviceUUID)) + '|' +
-      AnsiUpperCase(Trim(ASpillage.DeviceTypeUUID));
-    if Result = '|' then
-      Result := AnsiUpperCase(Trim(ASpillage.DeviceUUID)) + '|NAME:' +
-        AnsiUpperCase(Trim(ASpillage.Name));
-  end;
-
-  procedure AppendMember(var AText: string; ASpillage: TPointSpillage);
-  begin
-    if ASpillage = nil then
-      Exit;
-    if AText <> '' then
-      AText := AText + '; ';
-    AText := AText + Format('%s Error=%s',
-      [Trim(ASpillage.Name), FormatResultErrorValue(ASpillage.Error)]);
-  end;
 
   procedure AddSelected(ASpillage: TPointSpillage);
   begin
@@ -2546,10 +2520,6 @@ begin
     Exit;
 
   Ordered := TList<TPointSpillage>.Create;
-  SeriesBest := TDictionary<Integer, TPointSpillage>.Create;
-  SeriesMembers := TDictionary<Integer, string>.Create;
-  PointCounters := TDictionary<string, Integer>.Create;
-  SeriesKeys := TList<Integer>.Create;
   try
     for Spillage in ASpillages do
       if Spillage <> nil then
@@ -2562,35 +2532,21 @@ begin
         Result := CompareValue(Left.ID, Right.ID);
       end));
 
+    CurrentBest := nil;
     for Spillage in Ordered do
     begin
-      PointKey := ParticipantKey(Spillage);
-      if not PointCounters.TryGetValue(PointKey, CurrentCount) then
-        CurrentCount := 0;
-      Inc(CurrentCount);
-      PointCounters.AddOrSetValue(PointKey, CurrentCount);
-      SeriesIndex := CurrentCount;
-
-      if not SeriesMembers.TryGetValue(SeriesIndex, MembersText) then
-      begin
-        MembersText := '';
-        SeriesKeys.Add(SeriesIndex);
-      end;
-      AppendMember(MembersText, Spillage);
-      SeriesMembers.AddOrSetValue(SeriesIndex, MembersText);
-
       if not IsValidSummaryResultSpillage(Spillage, SkipReason) then
       begin
         LogSummaryResultSelection(AColumn.Header, Spillage, False, SkipReason,
-          nil, '');
+          CurrentBest, 'MinimumAbsoluteError');
         Continue;
       end;
 
-      if (not SeriesBest.TryGetValue(SeriesIndex, CurrentBest)) or
+      if (CurrentBest = nil) or
          (Abs(Spillage.Error) < Abs(CurrentBest.Error)) or
          (SameValue(Abs(Spillage.Error), Abs(CurrentBest.Error), 1E-9) and (Spillage.ID >= CurrentBest.ID)) then
       begin
-        SeriesBest.AddOrSetValue(SeriesIndex, Spillage);
+        CurrentBest := Spillage;
         LogSummaryResultSelection(AColumn.Header, Spillage, True, '',
           Spillage, 'MinimumAbsoluteError');
       end
@@ -2599,38 +2555,12 @@ begin
           CurrentBest, 'MinimumAbsoluteError');
     end;
 
-    SeriesKeys.Sort;
-    for I := 0 to SeriesKeys.Count - 1 do
+    if CurrentBest <> nil then
     begin
-      SeriesIndex := SeriesKeys[I];
-      if not SeriesBest.TryGetValue(SeriesIndex, Spillage) then
-        Continue;
-      AddSelected(Spillage);
-      if Result <> '' then
-        Result := Result + sLineBreak;
-      Result := Result + Format('Серия %d: %s', [SeriesIndex, FormatResultErrorValue(Spillage.Error)]);
-
-      MembersText := '';
-      SeriesMembers.TryGetValue(SeriesIndex, MembersText);
-      MembersCount := 0;
-      for CurrentCount := 1 to Length(MembersText) do
-        if MembersText[CurrentCount] = ';' then
-          Inc(MembersCount);
-      if MembersText <> '' then
-        Inc(MembersCount);
-      SelectionReason := 'MinimumAbsoluteError';
-      ProtocolManager.AddMessage(pcProc, psForm, 'SummarySeriesResultSelection',
-        'Выбран результат серии merged-точки Summary',
-        Format('MergedPointName=%s; SessionID=%d; SeriesIndex=%d; MembersCount=%d; Members=%s; DeviceUUID=%s; SourcePointUUID=%s; MemberPointName=%s; MemberError=%s; SelectedError=%s; SelectionReason=%s',
-          [AColumn.Header, Spillage.SessionID, SeriesIndex, MembersCount,
-           MembersText, Spillage.DeviceUUID, Spillage.DeviceTypeUUID, Spillage.Name, FormatResultErrorValue(Spillage.Error),
-           FormatResultErrorValue(Spillage.Error), SelectionReason]));
+      AddSelected(CurrentBest);
+      Result := FormatResultErrorValue(CurrentBest.Error);
     end;
   finally
-    SeriesKeys.Free;
-    PointCounters.Free;
-    SeriesMembers.Free;
-    SeriesBest.Free;
     Ordered.Free;
   end;
 end;

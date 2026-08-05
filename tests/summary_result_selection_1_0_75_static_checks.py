@@ -14,3 +14,7 @@ assert 'not ASpillage.Valid' in PROCEED
 assert 'LogSummaryResultSelection(AColumn.Header, Spillage, False, SkipReason' in PROCEED
 assert 'LogSummaryResultSelection(GroupKey, Item, False, SkipReason' in PROCEED
 assert 'MinimumAbsoluteError' in PROCEED
+
+assert 'CurrentBest := nil;' in PROCEED
+assert 'Result := FormatResultErrorValue(CurrentBest.Error)' in PROCEED
+assert "Format('Серия %d: %s'" not in PROCEED
