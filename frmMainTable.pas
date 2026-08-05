@@ -8006,8 +8006,6 @@ end;
 procedure TFrameMainTable.MeasurementRunUiChanged(Sender: TObject);
 begin
   UpdateMeasurementStartStopButton('MeasurementRunEvent');
-  if FFrameProceed <> nil then
-    FFrameProceed.RefreshResultsTab;
 end;
 
 procedure TFrameMainTable.UpdateMeasurementStartStopButton(const AReason: string);
