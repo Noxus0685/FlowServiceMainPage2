@@ -127,11 +127,33 @@ uses
   uDeviceClass,
   uFlowMeter,
   uMeterValue,
-  uMeasurementPointGrouping,
   uObservable,
   uProtocols,
   uRepositories,
   uWorkTable;
+
+// Рассчитывает диапазон расхода поверочной точки с учетом погрешности.
+function CalculatePointFlowRange(
+  AQ: Double;
+  AErrorPercent: Double;
+  out AMinQ: Double;
+  out AMaxQ: Double;
+  out ADeltaQ: Double
+): Boolean;
+
+// Проверяет возможность объединения двух поверочных точек по пересечению диапазонов расхода.
+function TryMergePointRanges(
+  ACurrentMinQ,
+  ACurrentMaxQ,
+  ACurrentDeltaQ,
+  ANewMinQ,
+  ANewMaxQ,
+  ANewDeltaQ: Double;
+  out ANewCommonMinQ,
+  ANewCommonMaxQ,
+  AIntersectionQ,
+  AControlDeltaQ: Double
+): Boolean;
 
 type
 
@@ -576,6 +598,54 @@ function AccuracyToRange(const AAccuracy: string; out AMin, AMax: Double): Boole
 
 implementation
 
+const
+  MeasurementPointRangeFloatTolerance = 1E-9;
+
+function CalculatePointFlowRange(AQ, AErrorPercent: Double; out AMinQ,
+  AMaxQ, ADeltaQ: Double): Boolean;
+begin
+  ADeltaQ := 0;
+  AMinQ := AQ;
+  AMaxQ := AQ;
+  Result := (not IsNan(AErrorPercent)) and
+    (not IsInfinite(AErrorPercent)) and (AErrorPercent > 0) and
+    (not IsNan(AQ)) and (not IsInfinite(AQ));
+  if not Result then
+    Exit;
+
+  ADeltaQ := Abs(AQ) * AErrorPercent / 100;
+  Result := (ADeltaQ > 0) and (not IsNan(ADeltaQ)) and (not IsInfinite(ADeltaQ));
+  if Result then
+  begin
+    AMinQ := AQ - ADeltaQ;
+    AMaxQ := AQ + ADeltaQ;
+  end;
+end;
+
+function TryMergePointRanges(ACurrentMinQ, ACurrentMaxQ, ACurrentDeltaQ,
+  ANewMinQ, ANewMaxQ, ANewDeltaQ: Double; out ANewCommonMinQ,
+  ANewCommonMaxQ, AIntersectionQ, AControlDeltaQ: Double): Boolean;
+begin
+  ANewCommonMinQ := Max(ACurrentMinQ, ANewMinQ);
+  ANewCommonMaxQ := Min(ACurrentMaxQ, ANewMaxQ);
+  AIntersectionQ := ANewCommonMaxQ - ANewCommonMinQ;
+  AControlDeltaQ := Min(ACurrentDeltaQ, ANewDeltaQ);
+  Result := (AIntersectionQ > MeasurementPointRangeFloatTolerance) and
+    (AIntersectionQ + MeasurementPointRangeFloatTolerance >= AControlDeltaQ);
+end;
+
+function ArePointFlowsEquivalent(AQ1, AError1, AQ2, AError2: Double): Boolean;
+var
+  MinQ1, MaxQ1, DeltaQ1: Double;
+  MinQ2, MaxQ2, DeltaQ2: Double;
+  CommonMinQ, CommonMaxQ, IntersectionQ, ControlDeltaQ: Double;
+begin
+  Result := CalculatePointFlowRange(AQ1, AError1, MinQ1, MaxQ1, DeltaQ1) and
+    CalculatePointFlowRange(AQ2, AError2, MinQ2, MaxQ2, DeltaQ2) and
+    TryMergePointRanges(MinQ1, MaxQ1, DeltaQ1, MinQ2, MaxQ2, DeltaQ2,
+      CommonMinQ, CommonMaxQ, IntersectionQ, ControlDeltaQ);
+end;
+
 function TMeasurementRun.GetStage: EMeasurementState;
 begin
   Result := FCurrentStage;
@@ -895,13 +965,13 @@ end;
 class function TMeasurementRun.IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean;
 begin
   Result := (AP1 <> nil) and (AP2 <> nil) and
-    TMeasurementPointGrouping.ArePointsEquivalent(AP1.Q, AP1.Error, AP2.Q, AP2.Error);
+    ArePointFlowsEquivalent(AP1.Q, AP1.Error, AP2.Q, AP2.Error);
 end;
 
 class function TMeasurementRun.IsPointEquivalent(AP1: TDevicePoint; AP2: TPointSpillage): Boolean;
 begin
   Result := (AP1 <> nil) and (AP2 <> nil) and
-    TMeasurementPointGrouping.ArePointsEquivalent(AP1.Q, AP1.Error,
+    ArePointFlowsEquivalent(AP1.Q, AP1.Error,
       AP2.QavgEtalon, AP2.Error);
 end;
 
@@ -4001,7 +4071,7 @@ begin
       Participant.SourcePauseSec := SourcePoint.Pause;
 
       EtalonErrorPercent := SourcePoint.Error;
-      if not TMeasurementPointGrouping.CalculatePointRange(TargetQLS, EtalonErrorPercent,
+      if not CalculatePointFlowRange(TargetQLS, EtalonErrorPercent,
         PointMinQ, PointMaxQ, EtalonDeltaQ) then
         MergeReason := 'InvalidEtalonError'
       else
@@ -4032,7 +4102,7 @@ begin
           Reason := 'InvalidEtalonError';
         end
         else if SessionPoint.EtalonRangeValid and
-          TMeasurementPointGrouping.CalculateMergedRange(SessionPoint.CommonMinQ,
+          TryMergePointRanges(SessionPoint.CommonMinQ,
             SessionPoint.CommonMaxQ, SessionPoint.MinEtalonDeltaQ, PointMinQ,
             PointMaxQ, EtalonDeltaQ, NewCommonMinQ, NewCommonMaxQ,
             IntersectionDeltaQ, ControlEtalonDeltaQ) then

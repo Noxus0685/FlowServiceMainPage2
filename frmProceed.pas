@@ -46,7 +46,6 @@ uses
   uProtocols,
   uWorkTable,
   uMKSDebug,
-  uMeasurementPointGrouping,
   uMeasurementRun;
 
 type
@@ -2409,10 +2408,10 @@ begin
   if (ASpillage = nil) or (ASpillage.State = osDeleted) or (not ASpillage.Enabled) or
      (not AColumn.EtalonRangeValid) then
     Exit;
-  if not TMeasurementPointGrouping.CalculatePointRange(ASpillage.QavgEtalon,
+  if not CalculatePointFlowRange(ASpillage.QavgEtalon,
     ASpillage.Error, PointMinQ, PointMaxQ, PointDeltaQ) then
     Exit;
-  Result := TMeasurementPointGrouping.CalculateMergedRange(AColumn.CommonMinQ,
+  Result := TryMergePointRanges(AColumn.CommonMinQ,
     AColumn.CommonMaxQ, AColumn.MinEtalonDeltaQ, PointMinQ, PointMaxQ,
     PointDeltaQ, NewCommonMinQ, NewCommonMaxQ, IntersectionQ, ControlDeltaQ);
 end;
@@ -2646,12 +2645,12 @@ begin
         J := -1;
         BestIntersectionQ := -MaxDouble;
         BestDistance := MaxDouble;
-        if TMeasurementPointGrouping.CalculatePointRange(Spillage.QavgEtalon,
+        if CalculatePointFlowRange(Spillage.QavgEtalon,
           PointErrorPercent, PointMinQ, PointMaxQ, PointDeltaQ) then
           for I := 0 to Cols.Count - 1 do
           begin
             { IsProcessingSpillageInMergedColumn(Spillage, Cols[I]) delegates to the same math. }
-            if TMeasurementPointGrouping.CalculateMergedRange(Cols[I].CommonMinQ,
+            if TryMergePointRanges(Cols[I].CommonMinQ,
                  Cols[I].CommonMaxQ, Cols[I].MinEtalonDeltaQ, PointMinQ,
                  PointMaxQ, PointDeltaQ, NewCommonMinQ, NewCommonMaxQ,
                  IntersectionQ, ControlDeltaQ) then
@@ -2676,7 +2675,7 @@ begin
         if J >= 0 then
         begin
           Col := Cols[J];
-          TMeasurementPointGrouping.CalculateMergedRange(Col.CommonMinQ,
+          TryMergePointRanges(Col.CommonMinQ,
             Col.CommonMaxQ, Col.MinEtalonDeltaQ, PointMinQ, PointMaxQ,
             PointDeltaQ, Col.CommonMinQ, Col.CommonMaxQ, IntersectionQ,
             ControlDeltaQ);
@@ -2692,7 +2691,7 @@ begin
           Col.EtalonUUID := '';
           Col.SourcePointUUID := '';
           Col.Header := SpillageHeader(Spillage, Format('Q%d', [Cols.Count + 1]));
-          Col.EtalonRangeValid := TMeasurementPointGrouping.CalculatePointRange(
+          Col.EtalonRangeValid := CalculatePointFlowRange(
             Spillage.QavgEtalon, PointErrorPercent, PointMinQ, PointMaxQ, PointDeltaQ);
           if Col.EtalonRangeValid then
           begin
