@@ -2409,9 +2409,6 @@ begin
   if IsNan(ASpillage.QavgEtalon) or IsInfinite(ASpillage.QavgEtalon) or
      IsNan(AColumn.TargetFlow) or IsInfinite(AColumn.TargetFlow) then
     Exit;
-  if (Trim(AColumn.EtalonUUID) <> '') and (Trim(ASpillage.EtalonUUID) <> '') and
-     (not SameText(Trim(AColumn.EtalonUUID), Trim(ASpillage.EtalonUUID))) then
-    Exit;
   MaxFlow := Max(Abs(ASpillage.QavgEtalon), Abs(AColumn.TargetFlow));
   Result := Abs(ASpillage.QavgEtalon - AColumn.TargetFlow) <=
     Max(SUMMARY_MERGE_FLOW_ABS_TOLERANCE, MaxFlow * SUMMARY_MERGE_FLOW_REL_TOLERANCE);
@@ -2507,15 +2504,25 @@ procedure TFrameProceed.BuildSummaryResultPointColumns(const ADevices: TList<TDe
   const AMergePoints: Boolean);
 var
   Cols: TList<TProceedResultPointColumn>;
+  ProcessingSpillages: TList<TPointSpillage>;
   Col: TProceedResultPointColumn;
   WT: TWorkTable;
   Run: TMeasurementRun;
   Device: TDevice;
-  Spillage: TPointSpillage;
+  Spillage, GroupSpillage: TPointSpillage;
   ActiveSession: TSessionSpillage;
   I, J, DevicesCount, SpillagesCount: Integer;
   Headers: string;
   RunPointsEmpty: Boolean;
+  GroupNames, GroupFlows, GroupEtalons: string;
+  GroupCount: Integer;
+
+  function IsUsableSummarySpillage(ASpillage: TPointSpillage): Boolean;
+  begin
+    Result := (ASpillage <> nil) and (ASpillage.State <> osDeleted) and
+      ASpillage.Enabled and (ASpillage.Validation = vsValid) and
+      (not IsNan(ASpillage.QavgEtalon)) and (not IsInfinite(ASpillage.QavgEtalon));
+  end;
 
   function SpillageHeader(ASpillage: TPointSpillage; const ADefault: string): string;
   begin
@@ -2536,9 +2543,30 @@ var
       AHeader := Copy(AHeader, 1, 77) + '...';
   end;
 
+  procedure AppendCsvValue(var AText: string; const AValue: string);
+  begin
+    if AText <> '' then
+      AText := AText + ',';
+    AText := AText + AValue;
+  end;
+
+  function FindOwnerDeviceUUID(ASpillage: TPointSpillage): string;
+  var
+    OwnerDevice: TDevice;
+  begin
+    Result := Trim(ASpillage.DeviceUUID);
+    if (Result <> '') or (ADevices = nil) then
+      Exit;
+    for OwnerDevice in ADevices do
+      if (OwnerDevice <> nil) and (OwnerDevice.Spillages <> nil) and
+         (OwnerDevice.Spillages.IndexOf(ASpillage) >= 0) then
+        Exit(Trim(OwnerDevice.UUID));
+  end;
+
 begin
   SetLength(FResultPointColumns, 0);
   Cols := TList<TProceedResultPointColumn>.Create;
+  ProcessingSpillages := TList<TPointSpillage>.Create;
   try
     WT := ResolveManagerWorkTable(FWorkTableManager);
     Run := nil;
@@ -2546,7 +2574,6 @@ begin
       Run := TMeasurementRun(WT.MeasurementRun);
     RunPointsEmpty := (Run = nil) or (Run.Points = nil) or (Run.Points.Count = 0);
     DevicesCount := 0;
-    SpillagesCount := 0;
 
     if ADevices <> nil then
       for Device in ADevices do
@@ -2559,52 +2586,84 @@ begin
         if (ActiveSession = nil) or (Device.Spillages = nil) then
           Continue;
         for Spillage in Device.Spillages do
-        begin
-          if (Spillage = nil) or (Spillage.State = osDeleted) or (not Spillage.Enabled) or
-             (Spillage.SessionID <> ActiveSession.ID) then
-            Continue;
-          Inc(SpillagesCount);
-          Col := Default(TProceedResultPointColumn);
-          Col.TargetFlow := Spillage.QavgEtalon;
-          Col.EtalonUUID := Trim(Spillage.EtalonUUID);
-          Col.SourcePointName := Trim(Spillage.Name);
-          Col.SourcePointNum := Spillage.Num;
-          if AMergePoints then
+          if IsUsableSummarySpillage(Spillage) and
+             (Spillage.SessionID = ActiveSession.ID) then
+            ProcessingSpillages.Add(Spillage);
+      end;
+
+    ProcessingSpillages.Sort(TComparer<TPointSpillage>.Construct(
+      function(const Left, Right: TPointSpillage): Integer
+      begin
+        Result := CompareValue(Left.QavgEtalon, Right.QavgEtalon);
+        if Result <> 0 then Exit;
+        Result := CompareValue(Left.DateTime, Right.DateTime);
+        if Result <> 0 then Exit;
+        Result := CompareValue(Left.ID, Right.ID);
+      end));
+
+    SpillagesCount := ProcessingSpillages.Count;
+    for Spillage in ProcessingSpillages do
+    begin
+      Col := Default(TProceedResultPointColumn);
+      Col.TargetFlow := Spillage.QavgEtalon;
+      Col.SourcePointName := Trim(Spillage.Name);
+      Col.SourcePointNum := Spillage.Num;
+      if AMergePoints then
+      begin
+        J := -1;
+        for I := 0 to Cols.Count - 1 do
+          if IsProcessingSpillageInMergedColumn(Spillage, Cols[I]) then
           begin
-            J := -1;
-            for I := 0 to Cols.Count - 1 do
-              if IsProcessingSpillageInMergedColumn(Spillage, Cols[I]) then
-              begin
-                J := I;
-                Break;
-              end;
-            if J >= 0 then
-            begin
-              Col := Cols[J];
-              Col.TargetFlow := (Col.TargetFlow + Spillage.QavgEtalon) / 2;
-              if (Trim(Col.EtalonUUID) = '') and (Trim(Spillage.EtalonUUID) <> '') then
-                Col.EtalonUUID := Trim(Spillage.EtalonUUID);
-              AppendHeaderName(Col.Header, SpillageHeader(Spillage, Format('Q%d', [J + 1])));
-              Cols[J] := Col;
-            end
-            else
-            begin
-              Col.IsMerged := True;
-              Col.DeviceUUID := '';
-              Col.SourcePointUUID := '';
-              Col.Header := SpillageHeader(Spillage, Format('Q%d', [Cols.Count + 1]));
-              Cols.Add(Col);
-            end;
-          end
-          else
-          begin
-            Col.IsMerged := False;
-            Col.DeviceUUID := Trim(Device.UUID);
-            Col.SourcePointUUID := Trim(Spillage.DeviceTypeUUID);
-            Col.Header := Trim(Device.Name + ' ' + SpillageHeader(Spillage, Format('Q%d', [Cols.Count + 1])));
-            Cols.Add(Col);
+            J := I;
+            Break;
           end;
+        if J >= 0 then
+        begin
+          Col := Cols[J];
+          Col.TargetFlow := (Col.TargetFlow + Spillage.QavgEtalon) / 2;
+          AppendHeaderName(Col.Header, SpillageHeader(Spillage, Format('Q%d', [J + 1])));
+          Cols[J] := Col;
+        end
+        else
+        begin
+          Col.IsMerged := True;
+          Col.DeviceUUID := '';
+          Col.EtalonUUID := '';
+          Col.SourcePointUUID := '';
+          Col.Header := SpillageHeader(Spillage, Format('Q%d', [Cols.Count + 1]));
+          Cols.Add(Col);
         end;
+      end
+      else
+      begin
+        Col.IsMerged := False;
+        Col.DeviceUUID := FindOwnerDeviceUUID(Spillage);
+        Col.SourcePointUUID := Trim(Spillage.DeviceTypeUUID);
+        Col.Header := SpillageHeader(Spillage, Format('Q%d', [Cols.Count + 1]));
+        Cols.Add(Col);
+      end;
+    end;
+
+    if AMergePoints then
+      for I := 0 to Cols.Count - 1 do
+      begin
+        GroupNames := '';
+        GroupFlows := '';
+        GroupEtalons := '';
+        GroupCount := 0;
+        for GroupSpillage in ProcessingSpillages do
+          if IsProcessingSpillageInMergedColumn(GroupSpillage, Cols[I]) then
+          begin
+            Inc(GroupCount);
+            AppendCsvValue(GroupNames, SpillageHeader(GroupSpillage, Format('Q%d', [I + 1])));
+            AppendCsvValue(GroupFlows, FormatFloat('0.######', GroupSpillage.QavgEtalon));
+            AppendCsvValue(GroupEtalons, Trim(GroupSpillage.EtalonName));
+          end;
+        ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingSummaryMergeGroup',
+          'Сформирована merged-группа Summary по фактическому расходу',
+          Format('GroupIndex=%d; TargetQ=%s; Count=%d; SpillageNames=%s; QValues=%s; EtalonNames=%s',
+            [I + 1, FormatFloat('0.######', Cols[I].TargetFlow), GroupCount,
+             GroupNames, GroupFlows, GroupEtalons]));
       end;
 
     Headers := '';
@@ -2617,10 +2676,11 @@ begin
 
     ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingSummaryColumnsBuilt',
       'Построены колонки Summary обработки',
-      Format('MergeEnabled=%s; Source=Spillages; DevicesCount=%d; SpillagesCount=%d; ColumnsCount=%d; ColumnHeaders=%s; MergedGroupsCount=%d; FallbackMeasurementRunUsed=False; MeasurementRunPointsEmpty=%s; SummaryColumnsSource=ProcessingSpillages',
-        [BoolToStr(AMergePoints, True), DevicesCount, SpillagesCount, Cols.Count, Headers,
-         Cols.Count, BoolToStr(RunPointsEmpty, True)]));
+      Format('MergeEnabled=%s; Source=Spillages; DevicesCount=%d; SpillagesCount=%d; MergedGroupsCount=%d; ColumnsCount=%d; ColumnHeaders=%s; FallbackMeasurementRunUsed=False; MeasurementRunPointsEmpty=%s; SummaryColumnsSource=ProcessingSpillages',
+        [BoolToStr(AMergePoints, True), DevicesCount, SpillagesCount, Cols.Count,
+         Cols.Count, Headers, BoolToStr(RunPointsEmpty, True)]));
   finally
+    ProcessingSpillages.Free;
     Cols.Free;
   end;
 end;
