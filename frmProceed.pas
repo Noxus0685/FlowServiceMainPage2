@@ -2342,8 +2342,9 @@ end;
 
 procedure TFrameProceed.UpdateResultsPointColumns;
 var
-  MaxPoints, I: Integer;
+  MaxPoints, I, StartDynamicIndex: Integer;
   Col: TStringColumn;
+  UseStaticPointColumns: Boolean;
 
   function FormatPointHeader(const APointName: string): string;
   begin
@@ -2366,6 +2367,10 @@ begin
        SameText(GridResults.Columns[I].TagString, 'ProcessingDynamicPoint') then
       GridResults.Columns[I].Free;
 
+  UseStaticPointColumns := True;
+  if ResolveManagerWorkTable(FWorkTableManager) <> nil then
+    UseStaticPointColumns := ResolveManagerWorkTable(FWorkTableManager).MergeMeasurementPoints;
+
   MaxPoints := Length(FResultPointColumns);
   if MaxPoints = 0 then
     for I := 0 to High(FCurrentResultRows) do
@@ -2374,17 +2379,30 @@ begin
   while StringColumnResult.Index > StringColumnPointNum4.Index + 1 do
     GridResults.Columns[StringColumnPointNum4.Index + 1].Free;
 
-  ApplyPointColumn(StringColumnPointNum1, 0);
-  ApplyPointColumn(StringColumnPointNum2, 1);
-  ApplyPointColumn(StringColumnPointNum3, 2);
-  ApplyPointColumn(StringColumnPointNum4, 3);
+  if UseStaticPointColumns then
+  begin
+    ApplyPointColumn(StringColumnPointNum1, 0);
+    ApplyPointColumn(StringColumnPointNum2, 1);
+    ApplyPointColumn(StringColumnPointNum3, 2);
+    ApplyPointColumn(StringColumnPointNum4, 3);
+    StartDynamicIndex := 4;
+  end
+  else
+  begin
+    StringColumnPointNum1.Visible := False;
+    StringColumnPointNum2.Visible := False;
+    StringColumnPointNum3.Visible := False;
+    StringColumnPointNum4.Visible := False;
+    StartDynamicIndex := 0;
+  end;
 
-  for I := 4 to MaxPoints - 1 do
+  for I := StartDynamicIndex to MaxPoints - 1 do
   begin
     Col := TStringColumn.Create(GridResults);
     Col.Parent := GridResults;
     Col.Stored := False;
     Col.TagString := 'ProcessingDynamicPoint';
+    Col.Tag := I;
     Col.Width := 125;
     Col.HeaderSettings.TextSettings.Trimming := TTextTrimming.Character;
     Col.HeaderSettings.TextSettings.WordWrap := False;
@@ -4367,10 +4385,9 @@ begin
   begin
     if Length(Row.PointValues) > 3 then Value := Row.PointValues[3] else Value := '';
   end
-  else if (GridResults.Columns[ACol].Index > StringColumnPointNum4.Index) and
-          (GridResults.Columns[ACol].Index < StringColumnResult.Index) then
+  else if SameText(GridResults.Columns[ACol].TagString, 'ProcessingDynamicPoint') then
   begin
-    PointIdx := GridResults.Columns[ACol].Index - StringColumnPointNum1.Index;
+    PointIdx := GridResults.Columns[ACol].Tag;
     if (PointIdx >= 0) and (PointIdx < Length(Row.PointValues)) then
       Value := Row.PointValues[PointIdx]
     else
@@ -4407,9 +4424,8 @@ begin
     if Column = StringColumnPointNum2 then PointIdx := 1;
     if Column = StringColumnPointNum3 then PointIdx := 2;
     if Column = StringColumnPointNum4 then PointIdx := 3;
-    if (PointIdx < 0) and (Column.Index > StringColumnPointNum4.Index) and
-       (Column.Index < StringColumnResult.Index) then
-      PointIdx := Column.Index - StringColumnPointNum1.Index;
+    if (PointIdx < 0) and SameText(Column.TagString, 'ProcessingDynamicPoint') then
+      PointIdx := Column.Tag;
 
     if (PointIdx >= 0) and (PointIdx < Length(GridRow.PointColors)) then
       Color := GridRow.PointColors[PointIdx];
