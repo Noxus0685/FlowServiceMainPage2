@@ -267,6 +267,10 @@ type
     function FindResultSpillagesForColumn(ADevice: TDevice; const AColumn: TProceedResultPointColumn): TArray<TPointSpillage>;
     // Возвращает одну проливку прибора для Summary-колонки обработки; используется для старых call-site, где нужен представитель.
     function FindResultSpillageForColumn(ADevice: TDevice; const AColumn: TProceedResultPointColumn): TPointSpillage;
+    function IsValidSummaryResultSpillage(ASpillage: TPointSpillage; out ASkipReason: string): Boolean;
+    procedure LogSummaryResultSelection(const AGroupName: string; ACandidate: TPointSpillage;
+      const AIsValid: Boolean; const ASkipReason: string; ASelected: TPointSpillage;
+      const ASelectionReason: string);
     function FormatMergedSummarySeriesResults(const AColumn: TProceedResultPointColumn; const ASpillages: TArray<TPointSpillage>; out ASelectedSpillages: TArray<TPointSpillage>): string;
     procedure BuildSummaryColumnsWithoutMerge(const ADevices: TList<TDevice>);
     procedure BuildSummaryColumnsWithMerge(const ADevices: TList<TDevice>);
@@ -2423,6 +2427,74 @@ begin
     Result := Spillages[0];
 end;
 
+function TFrameProceed.IsValidSummaryResultSpillage(ASpillage: TPointSpillage;
+  out ASkipReason: string): Boolean;
+begin
+  ASkipReason := '';
+  Result := False;
+  if ASpillage = nil then
+  begin
+    ASkipReason := 'NilSpillage';
+    Exit;
+  end;
+  if ASpillage.State = osDeleted then
+  begin
+    ASkipReason := 'DeletedSpillage';
+    Exit;
+  end;
+  if not ASpillage.Enabled then
+  begin
+    ASkipReason := 'DisabledSpillage';
+    Exit;
+  end;
+  if (not ASpillage.Valid) or (ASpillage.Validation <> vsValid) then
+  begin
+    ASkipReason := 'MeasurementNotCompleted';
+    Exit;
+  end;
+  if IsNan(ASpillage.Error) or IsInfinite(ASpillage.Error) or
+     (Abs(ASpillage.Error) >= MaxDouble) then
+  begin
+    ASkipReason := 'InvalidDoubleValue';
+    Exit;
+  end;
+  Result := True;
+end;
+
+procedure TFrameProceed.LogSummaryResultSelection(const AGroupName: string;
+  ACandidate: TPointSpillage; const AIsValid: Boolean;
+  const ASkipReason: string; ASelected: TPointSpillage;
+  const ASelectionReason: string);
+var
+  CandidateID, SelectedID: Integer;
+  CandidateDeviceUUID, CandidateError, SelectedError: string;
+begin
+  CandidateID := 0;
+  CandidateDeviceUUID := '';
+  CandidateError := '';
+  if ACandidate <> nil then
+  begin
+    CandidateID := ACandidate.ID;
+    CandidateDeviceUUID := Trim(ACandidate.DeviceUUID);
+    CandidateError := FormatResultErrorValue(ACandidate.Error);
+  end;
+
+  SelectedID := 0;
+  SelectedError := '';
+  if ASelected <> nil then
+  begin
+    SelectedID := ASelected.ID;
+    SelectedError := FormatResultErrorValue(ASelected.Error);
+  end;
+
+  ProtocolManager.AddMessage(pcProc, psForm, 'SummaryResultSelection',
+    'Выбор результата Summary с фильтрацией служебных значений',
+    Format('GroupName=%s; DeviceUUID=%s; CandidateSpillageID=%d; CandidateError=%s; IsValid=%s; SkipReason=%s; SelectedSpillageID=%d; SelectedError=%s; SelectionReason=%s',
+      [AGroupName, CandidateDeviceUUID, CandidateID, CandidateError,
+       BoolToStr(AIsValid, True), ASkipReason, SelectedID, SelectedError,
+       ASelectionReason]));
+end;
+
 function TFrameProceed.FormatMergedSummarySeriesResults(const AColumn: TProceedResultPointColumn;
   const ASpillages: TArray<TPointSpillage>; out ASelectedSpillages: TArray<TPointSpillage>): string;
 var
@@ -2432,7 +2504,7 @@ var
   PointCounters: TDictionary<string, Integer>;
   SeriesKeys: TList<Integer>;
   Spillage, CurrentBest: TPointSpillage;
-  PointKey, MembersText, SelectionReason: string;
+  PointKey, MembersText, SelectionReason, SkipReason: string;
   SeriesIndex, CurrentCount, I, MembersCount: Integer;
   SelectedCount: Integer;
 
@@ -2507,10 +2579,24 @@ begin
       AppendMember(MembersText, Spillage);
       SeriesMembers.AddOrSetValue(SeriesIndex, MembersText);
 
+      if not IsValidSummaryResultSpillage(Spillage, SkipReason) then
+      begin
+        LogSummaryResultSelection(AColumn.Header, Spillage, False, SkipReason,
+          nil, '');
+        Continue;
+      end;
+
       if (not SeriesBest.TryGetValue(SeriesIndex, CurrentBest)) or
          (Abs(Spillage.Error) < Abs(CurrentBest.Error)) or
          (SameValue(Abs(Spillage.Error), Abs(CurrentBest.Error), 1E-9) and (Spillage.ID >= CurrentBest.ID)) then
+      begin
         SeriesBest.AddOrSetValue(SeriesIndex, Spillage);
+        LogSummaryResultSelection(AColumn.Header, Spillage, True, '',
+          Spillage, 'MinimumAbsoluteError');
+      end
+      else
+        LogSummaryResultSelection(AColumn.Header, Spillage, True, '',
+          CurrentBest, 'MinimumAbsoluteError');
     end;
 
     SeriesKeys.Sort;
@@ -2715,17 +2801,29 @@ var
   function SelectBestSpillageByAbsoluteError(AItems: TList<TPointSpillage>): TPointSpillage;
   var
     Item: TPointSpillage;
+    SkipReason: string;
   begin
     Result := nil;
     if AItems = nil then
       Exit;
     for Item in AItems do
     begin
-      if Item = nil then
+      if not IsValidSummaryResultSpillage(Item, SkipReason) then
+      begin
+        LogSummaryResultSelection(GroupKey, Item, False, SkipReason, Result,
+          'MinimumAbsoluteError');
         Continue;
+      end;
       if (Result = nil) or (Abs(Item.Error) < Abs(Result.Error)) or
          (SameValue(Abs(Item.Error), Abs(Result.Error), 1E-9) and (Item.ID >= Result.ID)) then
+      begin
         Result := Item;
+        LogSummaryResultSelection(GroupKey, Item, True, '', Result,
+          'MinimumAbsoluteError');
+      end
+      else
+        LogSummaryResultSelection(GroupKey, Item, True, '', Result,
+          'MinimumAbsoluteError');
     end;
   end;
 
