@@ -35,9 +35,6 @@ object FrameProceed: TFrameProceed
           OnColumnMoved = GridDataPointsColumnMoved
           OnGetValue = GridDataPointsGetValue
           OnCellClick = GridDataPointsCellClick
-          OnMouseMove = GridDataPointsMouseMove
-          ParentShowHint = False
-          ShowHint = True
           Viewport.Width = 961.000000000000000000
           Viewport.Height = 611.000000000000000000
           object CheckColumnSpillageEnable: TCheckColumn
@@ -225,11 +222,8 @@ object FrameProceed: TFrameProceed
           OnColumnMoved = GridDataPointsColumnMoved
           OnSelChanged = GridResultsSelChanged
           OnGetValue = GridResultsGetValue
-          OnMouseMove = GridResultsMouseMove
-          ParentShowHint = False
-          ShowHint = True
-          Viewport.Width = 961.000000000000000000
-          Viewport.Height = 609.000000000000000000
+          Viewport.Width = 941.000000000000000000
+          Viewport.Height = 568.000000000000000000
           object StringColumnResultName: TStringColumn
             Header = #1048#1084#1103
             HeaderSettings.TextSettings.Trimming = Character
@@ -381,21 +375,21 @@ object FrameProceed: TFrameProceed
           TabPosition = PlatformDefault
           Sizes = (
             348s
-            604s
+            583s
             348s
-            604s
+            583s
             348s
-            604s
+            583s
             348s
-            604s)
+            583s)
           object TabItemSessionProperties: TTabItem
             CustomIcon = <
               item
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 71.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -405,7 +399,7 @@ object FrameProceed: TFrameProceed
             object LayoutSessionProperties: TLayout
               Align = Client
               Size.Width = 348.000000000000000000
-              Size.Height = 604.000000000000000000
+              Size.Height = 583.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
               object LabelCoefs: TLabel
@@ -455,8 +449,8 @@ object FrameProceed: TFrameProceed
               end>
             TextSettings.Trimming = None
             IsSelected = True
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 65.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -489,8 +483,8 @@ object FrameProceed: TFrameProceed
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 73.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -504,8 +498,8 @@ object FrameProceed: TFrameProceed
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 61.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -537,6 +531,7 @@ object FrameProceed: TFrameProceed
         Size.PlatformDefault = False
         StyleLookup = 'composetoolbutton'
         Text = #1042#1099#1075#1088#1091#1079#1080#1090#1100' '#1074#1099#1073#1088#1072#1085#1085#1099#1077' '#1076#1072#1085#1085#1099#1077' '#1074' Excel'
+        TextSettings.Trimming = None
         ParentShowHint = False
         ShowHint = True
         OnClick = ButtonExportExcelClick
@@ -546,7 +541,7 @@ object FrameProceed: TFrameProceed
         LineType = Right
         Margins.Top = 5.000000000000000000
         Margins.Bottom = 5.000000000000000000
-        Position.X = 505.000000000000000000
+        Position.X = 715.000000000000000000
         Position.Y = 5.000000000000000000
         Size.Width = 12.000000000000000000
         Size.Height = 22.000000000000000000
@@ -557,6 +552,7 @@ object FrameProceed: TFrameProceed
         Align = Left
         Padding.Left = 5.000000000000000000
         Padding.Right = 5.000000000000000000
+        Position.X = 210.000000000000000000
         Size.Width = 271.000000000000000000
         Size.Height = 32.000000000000000000
         Size.PlatformDefault = False
@@ -639,7 +635,7 @@ object FrameProceed: TFrameProceed
       end
       object Layout19: TLayout
         Align = Left
-        Position.X = 517.000000000000000000
+        Position.X = 727.000000000000000000
         Size.Width = 240.000000000000000000
         Size.Height = 32.000000000000000000
         Size.PlatformDefault = False
@@ -647,7 +643,7 @@ object FrameProceed: TFrameProceed
       end
       object Layout20: TLayout
         Align = Left
-        Position.X = 281.000000000000000000
+        Position.X = 491.000000000000000000
         Size.Width = 224.000000000000000000
         Size.Height = 32.000000000000000000
         Size.PlatformDefault = False
@@ -676,7 +672,7 @@ object FrameProceed: TFrameProceed
         LineType = Right
         Margins.Top = 5.000000000000000000
         Margins.Bottom = 5.000000000000000000
-        Position.X = 271.000000000000000000
+        Position.X = 481.000000000000000000
         Position.Y = 5.000000000000000000
         Size.Width = 10.000000000000000000
         Size.Height = 22.000000000000000000
