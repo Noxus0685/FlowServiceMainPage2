@@ -2350,6 +2350,11 @@ var
   begin
     Result := #948 + '(' + APointName + '), %';
   end;
+begin
+  for I := GridResults.ColumnCount - 1 downto 0 do
+    if (Trim(GridResults.Columns[I].Name) = '') or
+       SameText(GridResults.Columns[I].TagString, 'ProcessingDynamicPoint') then
+      GridResults.Columns[I].Free;
 
   procedure ApplyPointColumn(AColumn: TStringColumn; const AIndex: Integer);
   begin
