@@ -407,6 +407,7 @@ type
     function FindResultSpillageForPoint(ADevice: TDevice; APoint: TDevicePoint): TPointSpillage;
     function GetPointResultError(const ADevice: TDevice; const APoint: TDevicePoint): Double;
     function GetPointResultFlowLS(const ADevice: TDevice; const APoint: TDevicePoint): Double;
+    // Форматирует погрешность по настройкам ValueError активного рабочего стола.
     function FormatResultErrorValue(const AValue: Double): string;
     function GetPointResultColor(ADevice: TDevice; ADevicePoint: TDevicePoint;
       ASpillage: TPointSpillage): TAlphaColor;
@@ -2222,7 +2223,11 @@ end;
 
 function TFrameProceed.FormatResultErrorValue(const AValue: Double): string;
 begin
-  Result := FormatFloat('0.###', AValue);
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) and
+     (FActiveWorkTable.TableFlow.ValueError <> nil) then
+    Result := FActiveWorkTable.TableFlow.ValueError.GetStrNum(AValue)
+  else
+    Result := FloatToStr(AValue);
 end;
 
 function TFrameProceed.GetPointResultColor(ADevice: TDevice;
