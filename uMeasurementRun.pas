@@ -6331,6 +6331,7 @@ var
   TotalBefore: Integer;
   TotalAfter: Integer;
   PerDevice: TStringBuilder;
+  StopTimeValue: Double;
 begin
   FLastSaveMeasurementResultsCalled := True;
   FLastSaveMeasurementResultsResult := 'started';
@@ -6365,11 +6366,23 @@ begin
       if FWorkTable <> nil then
       begin
         FWorkTable.RecalculateAllMeterValues;
-        // Берем сохраненное  TimeResult
-       { if FWorkTable.ValueTime <> nil then
-          FWorkTable.TimeResult := FWorkTable.ValueTime.GetDoubleValue
-        else
-          FWorkTable.TimeResult := Point.LimitTime;}
+
+        StopTimeValue := GetCurrentStopTimeValue;
+        if StopTimeValue <= 0 then
+          StopTimeValue := FWorkTable.Time;
+        if (StopTimeValue <= 0) and (Point.LimitTime > 0) then
+          StopTimeValue := Point.LimitTime;
+
+        FWorkTable.TimeResult := StopTimeValue;
+        AddDiagnosticEvent(Format(
+          'SaveMeasurementResults time prepared; TimeResult=%.9f; ValueTime=%.9f; WorkTableTime=%.9f; LimitTime=%.9f; FinishedAt=%s',
+          [
+            FWorkTable.TimeResult,
+            GetCurrentStopTimeValue,
+            FWorkTable.Time,
+            Point.LimitTime,
+            DateTimeToStr(Point.DateTime)
+          ]));
       end;
 
       WorkTable.SaveMeasurementResults;
