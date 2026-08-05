@@ -503,22 +503,8 @@ begin
     GridResults.OnMouseMove := GridResultsMouseMove;
     GridResults.OnMouseUp := GridColumnLayoutMouseUp;
   end;
-  if ActionRemoveInvalidAndExcessMeasurements = nil then
-  begin
-    ActionRemoveInvalidAndExcessMeasurements := TAction.Create(Self);
-    ActionRemoveInvalidAndExcessMeasurements.Text := 'Удалить лишние измерения';
-    ActionRemoveInvalidAndExcessMeasurements.Hint := 'Удалить неподключённые измерения и лишние повторы по настройкам точек';
-    ActionRemoveInvalidAndExcessMeasurements.OnExecute := ActionRemoveInvalidAndExcessMeasurementsExecute;
-  end;
-
-  if ButtonRemoveInvalidAndExcessMeasurements = nil then
-  begin
-    ButtonRemoveInvalidAndExcessMeasurements := TButton.Create(Self);
-    ButtonRemoveInvalidAndExcessMeasurements.Parent := ToolBarDataPoints;
-    ButtonRemoveInvalidAndExcessMeasurements.Text := 'Удалить лишние измерения';
+  if ButtonRemoveInvalidAndExcessMeasurements <> nil then
     ButtonRemoveInvalidAndExcessMeasurements.Action := ActionRemoveInvalidAndExcessMeasurements;
-    ButtonRemoveInvalidAndExcessMeasurements.Width := 180;
-  end;
 
   if GridDataPoints <> nil then
   begin
