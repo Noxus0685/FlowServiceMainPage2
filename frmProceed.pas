@@ -50,6 +50,7 @@ uses
 type
   TProceedResultPointColumn = record
     Header: string;
+    Key: string;
     DeviceUUID: string;
     SourcePointUUID: string;
     ScenarioPoint: TDevicePoint;
@@ -1206,7 +1207,7 @@ end;
 procedure TFrameProceed.CaptureGridColumnsLayout(AGrid: TGrid;
   out AColumns: TArray<TGridColumnLayout>);
 var
-  I: Integer;
+  I, Count: Integer;
   Column: TColumn;
 begin
   SetLength(AColumns, 0);
@@ -1214,23 +1215,29 @@ begin
     Exit;
 
   SetLength(AColumns, AGrid.ColumnCount);
+  Count := 0;
   ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutSaveOrderBegin',
     'Начато сохранение порядка столбцов', 'GridName=' + AGrid.Name);
   for I := 0 to AGrid.ColumnCount - 1 do
   begin
     Column := AGrid.Columns[I];
-    AColumns[I].Name := Column.Name;
+    if (Trim(Column.Name) = '') or SameText(Column.TagString, 'ProcessingDynamicPoint') then
+      Continue;
+
+    AColumns[Count].Name := Column.Name;
     // TColumn.Index is updated by the standard FMX drag operation and is the
     // visual position. Columns[I] remains the grid's column collection lookup.
-    AColumns[I].Position := Column.Index;
-    AColumns[I].Width := Column.Width;
-    AColumns[I].Visible := Column.Visible;
+    AColumns[Count].Position := Column.Index;
+    AColumns[Count].Width := Column.Width;
+    AColumns[Count].Visible := Column.Visible;
     ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutSaved',
       'Сохранена раскладка столбца',
       Format('GridName=%s; ColumnName=%s; ColumnsIndex=%d; VisualIndex=%d; Position=%d; Width=%g; Visible=%s',
-        [AGrid.Name, Column.Name, I, Column.Index, AColumns[I].Position,
+        [AGrid.Name, Column.Name, I, Column.Index, AColumns[Count].Position,
          Column.Width, BoolToStr(Column.Visible, True)]));
+    Inc(Count);
   end;
+  SetLength(AColumns, Count);
 end;
 
 
@@ -1245,11 +1252,11 @@ begin
   if (AGrid = nil) or (Length(AColumns) = 0) then
     Exit;
 
-  // Work on a copy: the WorkTable array remains in its persisted form. FMX
-  // receives columns in ascending visual Position order.
   SortedColumns := Copy(AColumns, 0, Length(AColumns));
   for I := 1 to High(SortedColumns) do
   begin
+    if Trim(SortedColumns[I].Name) = '' then
+      Continue;
     Temp := SortedColumns[I];
     J := I - 1;
     while (J >= 0) and (SortedColumns[J].Position > Temp.Position) do
@@ -1265,9 +1272,9 @@ begin
   try
     for I := 0 to High(SortedColumns) do
     begin
+      if Trim(SortedColumns[I].Name) = '' then
+        Continue;
       Column := nil;
-      // Name is the persistent identity: the current index changes when a user
-      // moves a column and therefore cannot identify it on the next form open.
       for J := 0 to AGrid.ColumnCount - 1 do
         if SameText(AGrid.Columns[J].Name, SortedColumns[I].Name) then
         begin
@@ -1284,6 +1291,8 @@ begin
 
     for I := 0 to High(SortedColumns) do
     begin
+      if Trim(SortedColumns[I].Name) = '' then
+        Continue;
       TargetIndex := EnsureRange(SortedColumns[I].Position, 0,
         AGrid.ColumnCount - 1);
       Column := nil;
@@ -1296,9 +1305,6 @@ begin
       if Column = nil then
         Continue;
 
-      // Index is the standard FMX column move mechanism and triggers the grid
-      // model's normal reindexing. Suppress the resulting save callback while
-      // the complete saved order is still being restored.
       Column.Index := TargetIndex;
       ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutLoaded',
         'Загружена раскладка столбца',
@@ -2248,6 +2254,7 @@ var
   I, J: Integer;
   Merged: Boolean;
   WorkTableUUID: string;
+  PointKey: string;
 begin
   SetLength(FResultPointColumns, 0);
   Cols := TList<TProceedResultPointColumn>.Create;
@@ -2281,11 +2288,15 @@ begin
             begin
               Col := Default(TProceedResultPointColumn);
               if AMergePoints then
-                Col.ScenarioPoint := Point
+                begin
+                  Col.ScenarioPoint := Point;
+                  Col.Key := 'Point.' + Point.UUID;
+                end
               else
               begin
                 Col.DeviceUUID := Device.UUID;
                 Col.SourcePointUUID := Point.UUID;
+                Col.Key := 'Device.' + Device.UUID + '.Point.' + Point.UUID;
               end;
               if AMergePoints then
                 Col.Header := Trim(Point.Name)
@@ -2296,11 +2307,16 @@ begin
               Cols.Add(Col);
             end;
 
+            if AMergePoints then
+              PointKey := 'Point.' + Point.UUID
+            else
+              PointKey := 'Device.' + Device.UUID + '.Point.' + Point.UUID;
+
             ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingPointsContextPoint',
               'Точка контекста обработки',
-              Format('WorkTableUUID=%s; DeviceUUID=%s; DeviceName=%s; PointUUID=%s; PointName=%s; MergeEnabled=%s',
+              Format('WorkTableUUID=%s; DeviceUUID=%s; DeviceName=%s; PointUUID=%s; PointName=%s; PointKey=%s; MergeEnabled=%s',
                 [WorkTableUUID, Device.UUID, Device.Name, Point.UUID, Point.Name,
-                 BoolToStr(AMergePoints, True)]));
+                 PointKey, BoolToStr(AMergePoints, True)]));
           end;
 
     for I := 0 to Cols.Count - 1 do
@@ -2345,6 +2361,11 @@ var
     AColumn.Stored := True;
   end;
 begin
+  for I := GridResults.ColumnCount - 1 downto 0 do
+    if (Trim(GridResults.Columns[I].Name) = '') or
+       SameText(GridResults.Columns[I].TagString, 'ProcessingDynamicPoint') then
+      GridResults.Columns[I].Free;
+
   MaxPoints := Length(FResultPointColumns);
   if MaxPoints = 0 then
     for I := 0 to High(FCurrentResultRows) do
@@ -2363,6 +2384,7 @@ begin
     Col := TStringColumn.Create(GridResults);
     Col.Parent := GridResults;
     Col.Stored := False;
+    Col.TagString := 'ProcessingDynamicPoint';
     Col.Width := 125;
     Col.HeaderSettings.TextSettings.Trimming := TTextTrimming.Character;
     Col.HeaderSettings.TextSettings.WordWrap := False;
