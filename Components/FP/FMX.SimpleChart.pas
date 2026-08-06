@@ -669,7 +669,8 @@ begin
   // X Title
   if FXTitle <> '' then
   begin
-    textRect := TRectF.Create(plotRect.Left, Height - MarginBottom + FXTitleOffset, plotRect.Right, Height - 5 + FXTitleOffset);
+    textRect := TRectF.Create(plotRect.Left, Height - 22 + FXTitleOffset,
+      plotRect.Right, Height - 5 + FXTitleOffset);
     Canvas.FillText(textRect, FXTitle, False, 1, [], TTextAlign.Center, TTextAlign.Center);
   end;
 
@@ -732,15 +733,16 @@ begin
       Canvas.DrawLine(ScreenPt, PointF(PlotRect.Left, ScreenPt.Y), 1);
 
       Canvas.Fill.Color := Series.Color;
-      TextRect := RectF(ScreenPt.X - 32, PlotRect.Bottom - 18,
-        ScreenPt.X + 32, PlotRect.Bottom - 2);
+      // Подписи координат размещаются с внешней стороны осей.
+      TextRect := RectF(ScreenPt.X - 32, PlotRect.Bottom + 26,
+        ScreenPt.X + 32, PlotRect.Bottom + 42);
       Canvas.FillText(TextRect, FormatFloat('0.###', PointValue.X), False,
         1, [], TTextAlign.Center, TTextAlign.Center);
 
-      TextRect := RectF(PlotRect.Left + 2, ScreenPt.Y - 9,
-        PlotRect.Left + 52, ScreenPt.Y + 9);
+      TextRect := RectF(PlotRect.Left - 92, ScreenPt.Y - 9,
+        PlotRect.Left - 40, ScreenPt.Y + 9);
       Canvas.FillText(TextRect, FormatFloat('0.###', PointValue.Y), False,
-        1, [], TTextAlign.Leading, TTextAlign.Center);
+        1, [], TTextAlign.Trailing, TTextAlign.Center);
     end;
 
     Canvas.Fill.Color := Series.Color;
