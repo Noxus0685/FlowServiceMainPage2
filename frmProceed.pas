@@ -2060,24 +2060,26 @@ begin
 end;
 
 // Перестраивает график: исходные измерения рисуются маркерами,
-// усреднённая по оси Y погрешность — сглаженной линией без маркеров.
+// а зависимость средней погрешности от расхода — гиперболой Y = a + b / X.
 procedure TFrameProceed.UpdateSessionErrorChart;
 const
-  CCurvePointsPerInterval = 24;
+  CRegressionPointsPerInterval = 24;
 var
   Device, SelectedDevice: TDevice;
   Session: TSessionSpillage;
   Spillage: TPointSpillage;
-  RawPoints, AveragePoints, CurvePoints: TList<TPointF>;
+  RawPoints, AveragePoints: TList<TPointF>;
   Groups: TObjectDictionary<string, TList<TPointF>>;
   GroupPoints: TList<TPointF>;
   Pair: TPair<string, TList<TPointF>>;
   PointSeries, AverageSeries, LineSeries: TChartSeries;
   Sorter: IComparer<TPointF>;
-  P1, P2: TPointF;
+  P1: TPointF;
   GroupKey, LegendBase, FlowUnitName: string;
-  I, J, DeviceIndex: Integer;
-  SumX, SumY, X, Y, FlowValue, BaseFlowValue: Double;
+  I, J, DeviceIndex, RegressionPointCount: Integer;
+  SumX, SumY, SumZ, SumZZ, SumZY, Z, X, Y: Double;
+  RegressionA, RegressionB, RegressionDenominator: Double;
+  FlowValue, BaseFlowValue: Double;
   ChartMinX, ChartMaxX, ChartPaddingX: Double;
   UseVolumeFlow: Boolean;
 
@@ -2122,51 +2124,6 @@ var
       Groups.Add(GroupKey, GroupPoints);
     end;
     GroupPoints.Add(P1);
-  end;
-
-  // Рассчитывает Y по параболе через три соседние усреднённые точки.
-  function InterpolateCurveY(const AIntervalIndex: Integer;
-    const AX: Double): Double;
-  var
-    A, B, C, LeftPoint, RightPoint: TPointF;
-    D0, D1, D2: Double;
-  begin
-    LeftPoint := CurvePoints[AIntervalIndex];
-    RightPoint := CurvePoints[AIntervalIndex + 1];
-    if CurvePoints.Count < 3 then
-      Exit(LeftPoint.Y + (RightPoint.Y - LeftPoint.Y) *
-        ((AX - LeftPoint.X) / (RightPoint.X - LeftPoint.X)));
-
-    if AIntervalIndex = 0 then
-    begin
-      A := CurvePoints[0];
-      B := CurvePoints[1];
-      C := CurvePoints[2];
-    end
-    else if AIntervalIndex >= CurvePoints.Count - 2 then
-    begin
-      A := CurvePoints[CurvePoints.Count - 3];
-      B := CurvePoints[CurvePoints.Count - 2];
-      C := CurvePoints[CurvePoints.Count - 1];
-    end
-    else
-    begin
-      A := CurvePoints[AIntervalIndex - 1];
-      B := CurvePoints[AIntervalIndex];
-      C := CurvePoints[AIntervalIndex + 1];
-    end;
-
-    D0 := (A.X - B.X) * (A.X - C.X);
-    D1 := (B.X - A.X) * (B.X - C.X);
-    D2 := (C.X - A.X) * (C.X - B.X);
-    if SameValue(D0, 0.0) or SameValue(D1, 0.0) or
-       SameValue(D2, 0.0) then
-      Exit(LeftPoint.Y + (RightPoint.Y - LeftPoint.Y) *
-        ((AX - LeftPoint.X) / (RightPoint.X - LeftPoint.X)));
-
-    Result := A.Y * (AX - B.X) * (AX - C.X) / D0 +
-      B.Y * (AX - A.X) * (AX - C.X) / D1 +
-      C.Y * (AX - A.X) * (AX - B.X) / D2;
   end;
 
 begin
@@ -2229,7 +2186,6 @@ begin
 
         RawPoints := TList<TPointF>.Create;
         AveragePoints := TList<TPointF>.Create;
-        CurvePoints := TList<TPointF>.Create;
         Groups := TObjectDictionary<string, TList<TPointF>>.Create([doOwnsValues]);
         try
           if Device.Spillages <> nil then
@@ -2264,10 +2220,6 @@ begin
           end;
           AveragePoints.Sort(Sorter);
 
-          // Средняя линия проходит только через средние точки измерений.
-          for I := 0 to AveragePoints.Count - 1 do
-            CurvePoints.Add(AveragePoints[I]);
-
           LegendBase := Trim(Device.Name);
           if Trim(Device.SerialNumber) <> '' then
             LegendBase := LegendBase + ' [' + Trim(Device.SerialNumber) + ']';
@@ -2298,38 +2250,49 @@ begin
           LineSeries.ShowMarkers := False;
           LineSeries.Thickness := 2;
 
-          if CurvePoints.Count = 1 then
-            LineSeries.AddPoint(CurvePoints[0].X, CurvePoints[0].Y)
-          else if CurvePoints.Count > 1 then
+          // Строит гиперболическую регрессию Y = a + b / X методом
+          // наименьших квадратов по всем средним точкам прибора.
+          if AveragePoints.Count > 1 then
           begin
-            // Фиксированное число точек на интервал ограничивает нагрузку
-            // при очень близких значениях расхода.
-            for I := 0 to CurvePoints.Count - 2 do
+            SumZ := 0;
+            SumY := 0;
+            SumZZ := 0;
+            SumZY := 0;
+            for I := 0 to AveragePoints.Count - 1 do
             begin
-              P1 := CurvePoints[I];
-              P2 := CurvePoints[I + 1];
-              if SameValue(P1.X, P2.X) then
+              Z := 1 / AveragePoints[I].X;
+              SumZ := SumZ + Z;
+              SumY := SumY + AveragePoints[I].Y;
+              SumZZ := SumZZ + Z * Z;
+              SumZY := SumZY + Z * AveragePoints[I].Y;
+            end;
+
+            RegressionDenominator :=
+              AveragePoints.Count * SumZZ - Sqr(SumZ);
+            if not SameValue(RegressionDenominator, 0.0) then
+            begin
+              RegressionB :=
+                (AveragePoints.Count * SumZY - SumZ * SumY) /
+                RegressionDenominator;
+              RegressionA :=
+                (SumY - RegressionB * SumZ) / AveragePoints.Count;
+
+              // Линия ограничена фактическим диапазоном средних расходов.
+              RegressionPointCount := CRegressionPointsPerInterval *
+                (AveragePoints.Count - 1);
+              for I := 0 to RegressionPointCount do
               begin
-                if I = 0 then
-                  LineSeries.AddPoint(P1.X, P1.Y);
-                LineSeries.AddPoint(P2.X, P2.Y);
-                Continue;
-              end;
-              for J := 0 to CCurvePointsPerInterval - 1 do
-              begin
-                X := P1.X + (P2.X - P1.X) * J /
-                  CCurvePointsPerInterval;
-                Y := InterpolateCurveY(I, X);
+                X := AveragePoints[0].X +
+                  (AveragePoints[AveragePoints.Count - 1].X -
+                   AveragePoints[0].X) * I / RegressionPointCount;
+                Y := RegressionA + RegressionB / X;
                 LineSeries.AddPoint(X, Y);
               end;
             end;
-            P2 := CurvePoints[CurvePoints.Count - 1];
-            LineSeries.AddPoint(P2.X, P2.Y);
           end;
           Inc(DeviceIndex);
         finally
           Groups.Free;
-          CurvePoints.Free;
           AveragePoints.Free;
           RawPoints.Free;
         end;
