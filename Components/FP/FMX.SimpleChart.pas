@@ -21,6 +21,7 @@ type
     FThickness: Single;
     FShowMarkers: Boolean;
     FShowLine: Boolean;
+    FShowPointGuides: Boolean;
     FMarkerRadius: Single;
     FLegendName: string;
     FVisible: Boolean;
@@ -42,6 +43,8 @@ type
     property Thickness: Single read FThickness write SetThickness;
     property ShowMarkers: Boolean read FShowMarkers write SetShowMarkers;
     property ShowLine: Boolean read FShowLine write SetShowLine;
+    // Рисует проекции маркеров на оси и подписи координат.
+    property ShowPointGuides: Boolean read FShowPointGuides write FShowPointGuides;
     property MarkerRadius: Single read FMarkerRadius write SetMarkerRadius;
     property LegendName: string read FLegendName write SetLegendName;
     property Visible: Boolean read FVisible write SetVisible;
@@ -191,6 +194,7 @@ begin
   FThickness := 2;
   FShowMarkers := True;
   FShowLine := True;
+  FShowPointGuides := False;
   FMarkerRadius := 3;
   FLegendName := '';
   FVisible := True;
@@ -320,6 +324,7 @@ begin
     Result.Thickness := FSeries[0].Thickness;
     Result.ShowMarkers := FSeries[0].ShowMarkers;
     Result.ShowLine := FSeries[0].ShowLine;
+    Result.ShowPointGuides := FSeries[0].ShowPointGuides;
     Result.MarkerRadius := FSeries[0].MarkerRadius;
   end;
   FSeries.Add(Result);
@@ -700,19 +705,51 @@ end;
 // -----------------------------------------------------------------------------
 procedure TSimpleChart.DrawMarkersForSeries(Series: TChartSeries);
 var
-  i: Integer;
-  screenPt: TPointF;
+  I: Integer;
+  PointValue, ScreenPt: TPointF;
+  PlotRect, TextRect: TRectF;
+  GuideColor: TAlphaColor;
 begin
-  Canvas.Fill.Color := Series.Color;
-  Canvas.Stroke.Color := FAxisColor;
-  Canvas.Stroke.Thickness := 1;
-  for i := 0 to Series.Points.Count - 1 do
+  PlotRect := TRectF.Create(
+    MarginLeft,
+    MarginTop,
+    Width - MarginRight,
+    Height - MarginBottom
+  );
+
+  Canvas.Font.Size := 9;
+  for I := 0 to Series.Points.Count - 1 do
   begin
-    screenPt := WorldToScreen(Series.Points[i]);
-    Canvas.FillEllipse(RectF(screenPt.X - Series.MarkerRadius,
-                             screenPt.Y - Series.MarkerRadius,
-                             screenPt.X + Series.MarkerRadius,
-                             screenPt.Y + Series.MarkerRadius), 1);
+    PointValue := Series.Points[I];
+    ScreenPt := WorldToScreen(PointValue);
+
+    if Series.ShowPointGuides then
+    begin
+      GuideColor := (Series.Color and $00FFFFFF) or $60000000;
+      Canvas.Stroke.Color := GuideColor;
+      Canvas.Stroke.Thickness := 1;
+      Canvas.DrawLine(ScreenPt, PointF(ScreenPt.X, PlotRect.Bottom), 1);
+      Canvas.DrawLine(ScreenPt, PointF(PlotRect.Left, ScreenPt.Y), 1);
+
+      Canvas.Fill.Color := Series.Color;
+      TextRect := RectF(ScreenPt.X - 32, PlotRect.Bottom - 18,
+        ScreenPt.X + 32, PlotRect.Bottom - 2);
+      Canvas.FillText(TextRect, FormatFloat('0.###', PointValue.X), False,
+        1, [], TTextAlign.Center, TTextAlign.Center);
+
+      TextRect := RectF(PlotRect.Left + 2, ScreenPt.Y - 9,
+        PlotRect.Left + 52, ScreenPt.Y + 9);
+      Canvas.FillText(TextRect, FormatFloat('0.###', PointValue.Y), False,
+        1, [], TTextAlign.Leading, TTextAlign.Center);
+    end;
+
+    Canvas.Fill.Color := Series.Color;
+    Canvas.Stroke.Color := FAxisColor;
+    Canvas.Stroke.Thickness := 1;
+    Canvas.FillEllipse(RectF(ScreenPt.X - Series.MarkerRadius,
+                             ScreenPt.Y - Series.MarkerRadius,
+                             ScreenPt.X + Series.MarkerRadius,
+                             ScreenPt.Y + Series.MarkerRadius), 1);
   end;
 end;
 
