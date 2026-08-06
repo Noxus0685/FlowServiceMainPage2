@@ -55,6 +55,13 @@ type
   // Направление сортировки таблицы обработки.
   TGridSortDirection = (gsdNone, gsdAscending, gsdDescending);
 
+  // Хранит выбранный цвет и UUID прибора в динамическом пункте ПКМ графика.
+  TChartDeviceColorMenuItem = class(TMenuItem)
+  public
+    DeviceUUID: string;
+    NewColor: TAlphaColor;
+  end;
+
   TProceedResultPointColumn = record
     Header: string;
     DeviceUUID: string;
@@ -2349,13 +2356,23 @@ begin
   UpdateSessionErrorChart;
 end;
 
-// Формирует ПКМ: видимость и отдельные настройки цветов каждого прибора.
+// Формирует ПКМ: видимость и палитры цветов каждого прибора.
 procedure TFrameProceed.Chart1MouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+const
+  ColorNames: array[0..9] of string = ('Красный', 'Синий', 'Зелёный',
+    'Оранжевый', 'Фиолетовый', 'Бирюзовый', 'Жёлтый', 'Розовый',
+    'Серый', 'Чёрный');
+  Colors: array[0..9] of TAlphaColor = ($FFFF3030, $FF2878D0,
+    $FF20A050, $FFFF8C20, $FF8848C0, $FF20A8A8, $FFE0C020, $FFE85090,
+    $FF808080, $FF202020);
 var
   Device: TDevice;
   DeviceItem, VisibilityItem, PointColorItem, LineColorItem: TMenuItem;
+  ColorItem: TChartDeviceColorMenuItem;
+  PointColor, LineColor: TAlphaColor;
   ItemText: string;
+  I: Integer;
   P: TPointF;
 begin
   if (Button <> TMouseButton.mbRight) or not (Sender is TControl) or
@@ -2385,17 +2402,35 @@ begin
         VisibilityItem.OnClick := ChartDeviceVisibilityMenuClick;
         DeviceItem.AddObject(VisibilityItem);
 
+        PointColor := GetChartDeviceColor(Device, False, 0);
         PointColorItem := TMenuItem.Create(nil);
-        PointColorItem.Text := 'Цвет точек...';
-        PointColorItem.TagObject := Device;
-        PointColorItem.OnClick := ChartPointColorMenuClick;
+        PointColorItem.Text := 'Цвет точек';
         DeviceItem.AddObject(PointColorItem);
+        for I := Low(Colors) to High(Colors) do
+        begin
+          ColorItem := TChartDeviceColorMenuItem.Create(nil);
+          ColorItem.Text := ColorNames[I];
+          ColorItem.DeviceUUID := Device.UUID;
+          ColorItem.NewColor := Colors[I];
+          ColorItem.IsChecked := PointColor = Colors[I];
+          ColorItem.OnClick := ChartPointColorMenuClick;
+          PointColorItem.AddObject(ColorItem);
+        end;
 
+        LineColor := GetChartDeviceColor(Device, True, 0);
         LineColorItem := TMenuItem.Create(nil);
-        LineColorItem.Text := 'Цвет линии...';
-        LineColorItem.TagObject := Device;
-        LineColorItem.OnClick := ChartLineColorMenuClick;
+        LineColorItem.Text := 'Цвет линии';
         DeviceItem.AddObject(LineColorItem);
+        for I := Low(Colors) to High(Colors) do
+        begin
+          ColorItem := TChartDeviceColorMenuItem.Create(nil);
+          ColorItem.Text := ColorNames[I];
+          ColorItem.DeviceUUID := Device.UUID;
+          ColorItem.NewColor := Colors[I];
+          ColorItem.IsChecked := LineColor = Colors[I];
+          ColorItem.OnClick := ChartLineColorMenuClick;
+          LineColorItem.AddObject(ColorItem);
+        end;
       end;
 
   P := TControl(Sender).LocalToScreen(PointF(X, Y));
@@ -2423,52 +2458,30 @@ begin
   UpdateSessionErrorChart;
 end;
 
-// Выбирает цвет исходных точек прибора из ПКМ графика.
+// Применяет выбранный в палитре ПКМ цвет исходных точек прибора.
 procedure TFrameProceed.ChartPointColorMenuClick(Sender: TObject);
 var
-  Device: TDevice;
-  Dialog: TColorDialog;
+  Item: TChartDeviceColorMenuItem;
 begin
-  if not (Sender is TMenuItem) or
-     not (TMenuItem(Sender).TagObject is TDevice) then
+  if not (Sender is TChartDeviceColorMenuItem) then
     Exit;
 
-  Device := TDevice(TMenuItem(Sender).TagObject);
-  Dialog := TColorDialog.Create(Self);
-  try
-    Dialog.Color := GetChartDeviceColor(Device, False, 0);
-    if Dialog.Execute then
-    begin
-      FChartPointColors.AddOrSetValue(Device.UUID, Dialog.Color);
-      UpdateSessionErrorChart;
-    end;
-  finally
-    Dialog.Free;
-  end;
+  Item := TChartDeviceColorMenuItem(Sender);
+  FChartPointColors.AddOrSetValue(Item.DeviceUUID, Item.NewColor);
+  UpdateSessionErrorChart;
 end;
 
-// Выбирает цвет усреднённой линии прибора из ПКМ графика.
+// Применяет выбранный в палитре ПКМ цвет усреднённой линии прибора.
 procedure TFrameProceed.ChartLineColorMenuClick(Sender: TObject);
 var
-  Device: TDevice;
-  Dialog: TColorDialog;
+  Item: TChartDeviceColorMenuItem;
 begin
-  if not (Sender is TMenuItem) or
-     not (TMenuItem(Sender).TagObject is TDevice) then
+  if not (Sender is TChartDeviceColorMenuItem) then
     Exit;
 
-  Device := TDevice(TMenuItem(Sender).TagObject);
-  Dialog := TColorDialog.Create(Self);
-  try
-    Dialog.Color := GetChartDeviceColor(Device, True, 0);
-    if Dialog.Execute then
-    begin
-      FChartLineColors.AddOrSetValue(Device.UUID, Dialog.Color);
-      UpdateSessionErrorChart;
-    end;
-  finally
-    Dialog.Free;
-  end;
+  Item := TChartDeviceColorMenuItem(Sender);
+  FChartLineColors.AddOrSetValue(Item.DeviceUUID, Item.NewColor);
+  UpdateSessionErrorChart;
 end;
 
 procedure TFrameProceed.UpdateSessionItems;
