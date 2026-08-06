@@ -2060,10 +2060,10 @@ begin
 end;
 
 // Перестраивает график: исходные измерения рисуются маркерами,
-// а зависимость средней погрешности от расхода — гиперболой Y = a + b / X.
+// а линия проходит через средние точки кусочно-гиперболическими участками.
 procedure TFrameProceed.UpdateSessionErrorChart;
 const
-  CRegressionPointsPerInterval = 24;
+  CChartCurvePointsPerInterval = 24;
 var
   Device, SelectedDevice: TDevice;
   Session: TSessionSpillage;
@@ -2076,9 +2076,8 @@ var
   Sorter: IComparer<TPointF>;
   P1: TPointF;
   GroupKey, LegendBase, FlowUnitName: string;
-  I, J, DeviceIndex, RegressionPointCount: Integer;
-  SumX, SumY, SumZ, SumZZ, SumZY, Z, X, Y: Double;
-  RegressionA, RegressionB, RegressionDenominator: Double;
+  I, J, DeviceIndex: Integer;
+  SumX, SumY, Z, X, Y: Double;
   FlowValue, BaseFlowValue: Double;
   ChartMinX, ChartMaxX, ChartPaddingX: Double;
   UseVolumeFlow: Boolean;
@@ -2250,46 +2249,25 @@ begin
           LineSeries.ShowMarkers := False;
           LineSeries.Thickness := 2;
 
-          // Строит гиперболическую регрессию Y = a + b / X методом
-          // наименьших квадратов по всем средним точкам прибора.
-          if AveragePoints.Count > 1 then
-          begin
-            SumZ := 0;
-            SumY := 0;
-            SumZZ := 0;
-            SumZY := 0;
-            for I := 0 to AveragePoints.Count - 1 do
+          // Строит между соседними средними точками участки Y = a + b / X.
+          // Каждый участок точно проходит через обе ограничивающие точки.
+          for J := 0 to AveragePoints.Count - 2 do
+            for I := 0 to CChartCurvePointsPerInterval do
             begin
-              Z := 1 / AveragePoints[I].X;
-              SumZ := SumZ + Z;
-              SumY := SumY + AveragePoints[I].Y;
-              SumZZ := SumZZ + Z * Z;
-              SumZY := SumZY + Z * AveragePoints[I].Y;
+              if (J > 0) and (I = 0) then
+                Continue;
+              Z := 1 / AveragePoints[J].X +
+                (1 / AveragePoints[J + 1].X -
+                 1 / AveragePoints[J].X) *
+                I / CChartCurvePointsPerInterval;
+              if SameValue(Z, 0.0) then
+                Continue;
+              X := 1 / Z;
+              Y := AveragePoints[J].Y +
+                (AveragePoints[J + 1].Y - AveragePoints[J].Y) *
+                I / CChartCurvePointsPerInterval;
+              LineSeries.AddPoint(X, Y);
             end;
-
-            RegressionDenominator :=
-              AveragePoints.Count * SumZZ - Sqr(SumZ);
-            if not SameValue(RegressionDenominator, 0.0) then
-            begin
-              RegressionB :=
-                (AveragePoints.Count * SumZY - SumZ * SumY) /
-                RegressionDenominator;
-              RegressionA :=
-                (SumY - RegressionB * SumZ) / AveragePoints.Count;
-
-              // Линия ограничена фактическим диапазоном средних расходов.
-              RegressionPointCount := CRegressionPointsPerInterval *
-                (AveragePoints.Count - 1);
-              for I := 0 to RegressionPointCount do
-              begin
-                X := AveragePoints[0].X +
-                  (AveragePoints[AveragePoints.Count - 1].X -
-                   AveragePoints[0].X) * I / RegressionPointCount;
-                Y := RegressionA + RegressionB / X;
-                LineSeries.AddPoint(X, Y);
-              end;
-            end;
-          end;
           Inc(DeviceIndex);
         finally
           Groups.Free;
