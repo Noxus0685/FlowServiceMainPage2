@@ -2076,8 +2076,8 @@ var
   Sorter: IComparer<TPointF>;
   P1, P2: TPointF;
   GroupKey, LegendBase, FlowUnitName: string;
-  I, J, DeviceIndex, SameXCount: Integer;
-  SumY, X, Y, CurrentX, SameXSum, FlowValue, BaseFlowValue: Double;
+  I, J, DeviceIndex: Integer;
+  SumX, SumY, X, Y, FlowValue, BaseFlowValue: Double;
   ChartMinX, ChartMaxX, ChartPaddingX: Double;
   UseVolumeFlow: Boolean;
 
@@ -2111,7 +2111,9 @@ var
     RawPoints.Add(P1);
     ChartMinX := Min(ChartMinX, FlowValue);
     ChartMaxX := Max(ChartMaxX, FlowValue);
-    GroupKey := Trim(APoint.Name);
+    GroupKey := Trim(APoint.DeviceTypeUUID);
+    if GroupKey = '' then
+      GroupKey := Trim(APoint.Name);
     if GroupKey = '' then
       GroupKey := FormatFloat('0.############', FlowValue);
     if not Groups.TryGetValue(GroupKey, GroupPoints) then
@@ -2183,6 +2185,9 @@ begin
   ChartMinX := MaxDouble;
   ChartMaxX := -MaxDouble;
   Chart1.XTitle := 'Расход, ' + FlowUnitName;
+  // Внешние подписи координат размещаются в увеличенных полях осей.
+  Chart1.MarginLeft := 105;
+  Chart1.MarginBottom := 70;
   Chart1.BeginUpdate;
   try
     Chart1.ClearAllSeries;
@@ -2241,36 +2246,27 @@ begin
           end;
 
           RawPoints.Sort(Sorter);
+          // Для каждой измерительной точки усредняются обе координаты
+          // всех её повторов: расход X и погрешность Y.
           for Pair in Groups do
           begin
+            SumX := 0;
             SumY := 0;
             for J := 0 to Pair.Value.Count - 1 do
+            begin
+              SumX := SumX + Pair.Value[J].X;
               SumY := SumY + Pair.Value[J].Y;
+            end;
             if Pair.Value.Count > 0 then
-              for J := 0 to Pair.Value.Count - 1 do
-                AveragePoints.Add(PointF(Pair.Value[J].X,
-                  SumY / Pair.Value.Count));
+              AveragePoints.Add(PointF(
+                SumX / Pair.Value.Count,
+                SumY / Pair.Value.Count));
           end;
           AveragePoints.Sort(Sorter);
 
-          // Объединяем только совпадающие X; расход между группами не усредняется.
-          I := 0;
-          while I < AveragePoints.Count do
-          begin
-            CurrentX := AveragePoints[I].X;
-            SameXSum := 0;
-            SameXCount := 0;
-            J := I;
-            while (J < AveragePoints.Count) and
-                  SameValue(AveragePoints[J].X, CurrentX) do
-            begin
-              SameXSum := SameXSum + AveragePoints[J].Y;
-              Inc(SameXCount);
-              Inc(J);
-            end;
-            CurvePoints.Add(PointF(CurrentX, SameXSum / SameXCount));
-            I := J;
-          end;
+          // Средняя линия проходит только через средние точки измерений.
+          for I := 0 to AveragePoints.Count - 1 do
+            CurvePoints.Add(AveragePoints[I]);
 
           LegendBase := Trim(Device.Name);
           if Trim(Device.SerialNumber) <> '' then
@@ -2301,6 +2297,13 @@ begin
             begin
               P1 := CurvePoints[I];
               P2 := CurvePoints[I + 1];
+              if SameValue(P1.X, P2.X) then
+              begin
+                if I = 0 then
+                  LineSeries.AddPoint(P1.X, P1.Y);
+                LineSeries.AddPoint(P2.X, P2.Y);
+                Continue;
+              end;
               for J := 0 to CCurvePointsPerInterval - 1 do
               begin
                 X := P1.X + (P2.X - P1.X) * J /
