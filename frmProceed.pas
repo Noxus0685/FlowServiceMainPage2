@@ -3242,7 +3242,7 @@ var
   Definitions: TGridColumnDefinitions;
   Column: TColumn;
   I, PointIndex: Integer;
-  Header, Key: string;
+  Header: string;
 
   function FormatPointHeader(const APointName: string): string;
   begin
@@ -3258,15 +3258,18 @@ var
   end;
 
   procedure AddDynamicDefinitions;
+  var
+    DynamicPointIndex: Integer;
+    DynamicKey: string;
   begin
-    for PointIndex := 4 to High(FResultPointColumns) do
+    for DynamicPointIndex := 4 to High(FResultPointColumns) do
     begin
-      Key := 'point:' + FResultPointColumns[PointIndex].DeviceUUID + '|' +
-        FResultPointColumns[PointIndex].SourcePointUUID + '|' +
-        FResultPointColumns[PointIndex].EtalonUUID + '|' +
-        FloatToStr(FResultPointColumns[PointIndex].TargetFlow);
-      Definitions.Add(TGridColumnDefinition.Create(Key,
-        FormatPointHeader(FResultPointColumns[PointIndex].Header),
+      DynamicKey := 'point:' + FResultPointColumns[DynamicPointIndex].DeviceUUID + '|' +
+        FResultPointColumns[DynamicPointIndex].SourcePointUUID + '|' +
+        FResultPointColumns[DynamicPointIndex].EtalonUUID + '|' +
+        FloatToStr(FResultPointColumns[DynamicPointIndex].TargetFlow);
+      Definitions.Add(TGridColumnDefinition.Create(DynamicKey,
+        FormatPointHeader(FResultPointColumns[DynamicPointIndex].Header),
         TStringColumn, 125, True, True));
     end;
   end;
