@@ -2093,7 +2093,7 @@ var
   P1, P2: TPointF;
   GroupKey, LegendBase: string;
   I, J, DeviceIndex: Integer;
-  SumX, SumY, MinStep, StepX, InterpolatedY: Double;
+  SumY, MinStep, StepX, InterpolatedY: Double;
 
   procedure AddSpillagePoint(APoint: TPointSpillage);
   begin
@@ -2166,16 +2166,13 @@ begin
           RawPoints.Sort(Sorter);
           for Pair in Groups do
           begin
-            SumX := 0;
             SumY := 0;
             for J := 0 to Pair.Value.Count - 1 do
-            begin
-              SumX := SumX + Pair.Value[J].X;
               SumY := SumY + Pair.Value[J].Y;
-            end;
             if Pair.Value.Count > 0 then
-              AveragePoints.Add(PointF(SumX / Pair.Value.Count,
-                SumY / Pair.Value.Count));
+              for J := 0 to Pair.Value.Count - 1 do
+                AveragePoints.Add(PointF(Pair.Value[J].X,
+                  SumY / Pair.Value.Count));
           end;
           AveragePoints.Sort(Sorter);
 
