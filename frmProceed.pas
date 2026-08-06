@@ -161,12 +161,6 @@ type
     LabelCoefs: TLabel;
     LabelSessionDate: TLabel;
     Chart1: TSimpleChart;
-    LabelChartDevice: TLabel;
-    ComboBoxChartDevice: TComboBox;
-    LabelChartPointColor: TLabel;
-    ComboColorBoxChartPoints: TComboColorBox;
-    LabelChartLineColor: TLabel;
-    ComboColorBoxChartLine: TComboColorBox;
     LabelSessionActive: TLabel;
     TabItemCalculations: TTabItem;
     GridCoefs: TGrid;
@@ -359,13 +353,14 @@ type
     procedure UpdateGridDataPointsHeaders(QuantityDimName: string; FlowDimName: string);
     procedure SetSessionDim(UnitName: string; QuantityUnitName: string);
     procedure ComboBoxUnitsResultChange(Sender: TObject);
-    procedure ComboBoxChartDeviceChange(Sender: TObject);
-    // Формирует пункты ПКМ до его открытия и показывает меню по правому нажатию.
+    // Формирует пункты видимости и цветов приборов до открытия ПКМ графика.
     procedure Chart1MouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
     procedure ChartDeviceVisibilityMenuClick(Sender: TObject);
-    procedure ComboColorBoxChartPointsChange(Sender: TObject);
-    procedure ComboColorBoxChartLineChange(Sender: TObject);
+    // Открывает выбор цвета исходных точек выбранного в ПКМ прибора.
+    procedure ChartPointColorMenuClick(Sender: TObject);
+    // Открывает выбор цвета усреднённой линии выбранного в ПКМ прибора.
+    procedure ChartLineColorMenuClick(Sender: TObject);
     procedure UpdateCalibrCoefsFrame;
     procedure ResetPointDeleteConfirm;
     procedure InitCalibrCoefsFrame;
@@ -420,11 +415,8 @@ type
     FChartPointColors: TDictionary<string, TAlphaColor>;
     FChartLineColors: TDictionary<string, TAlphaColor>;
     FChartDeviceVisibility: TDictionary<string, Boolean>;
-    FChartColorUpdating: Boolean;
     // Перестраивает зависимости погрешности от расхода для текущих сессий приборов.
     procedure UpdateSessionErrorChart;
-    // Обновляет список приборов и выбранные пользовательские цвета графика.
-    procedure UpdateChartColorControls;
     function GetChartDeviceColor(ADevice: TDevice; const ALineColor: Boolean;
       const ADefaultIndex: Integer): TAlphaColor;
     // Возвращает сохранённую видимость прибора на графике.
@@ -494,6 +486,21 @@ begin
   Result := '';
 end;
 
+// Переводит базовый расход (л/с либо кг/с) в выбранную единицу графика.
+function ConvertBaseFlowToUnit(const AValue: Double;
+  const AUnit: string): Double;
+begin
+  if SameText(AUnit, 'л/мин') or SameText(AUnit, 'кг/мин') then
+    Exit(AValue * 60);
+  if SameText(AUnit, 'л/ч') or SameText(AUnit, 'кг/ч') then
+    Exit(AValue * 3600);
+  if SameText(AUnit, 'м3/мин') or SameText(AUnit, 'т/мин') then
+    Exit(AValue * 0.06);
+  if SameText(AUnit, 'м3/ч') or SameText(AUnit, 'т/ч') then
+    Exit(AValue * 3.6);
+  Result := AValue;
+end;
+
 function ResolveManagerWorkTable(AWorkTableManager: TWorkTableManager): TWorkTable;
 begin
   Result := nil;
@@ -557,12 +564,6 @@ begin
   if FChartDeviceVisibility = nil then
     FChartDeviceVisibility := TDictionary<string, Boolean>.Create;
 
-  if ComboBoxChartDevice <> nil then
-    ComboBoxChartDevice.OnChange := ComboBoxChartDeviceChange;
-  if ComboColorBoxChartPoints <> nil then
-    ComboColorBoxChartPoints.OnChange := ComboColorBoxChartPointsChange;
-  if ComboColorBoxChartLine <> nil then
-    ComboColorBoxChartLine.OnChange := ComboColorBoxChartLineChange;
   if Chart1 <> nil then
   begin
     Chart1.PopupMenu := nil;
@@ -2051,69 +2052,6 @@ begin
   end;
 end;
 
-// Обновляет список приборов и отображает сохранённые цвета выбранного прибора.
-procedure TFrameProceed.UpdateChartColorControls;
-var
-  Device, SelectedDevice: TDevice;
-  SelectedUUID, ItemText: string;
-  I, SelectedIndex: Integer;
-begin
-  if (ComboBoxChartDevice = nil) or (FProcessingDevices = nil) then
-    Exit;
-
-  SelectedUUID := '';
-  if (ComboBoxChartDevice.ItemIndex >= 0) and
-     (ComboBoxChartDevice.ItemIndex < ComboBoxChartDevice.Items.Count) and
-     (ComboBoxChartDevice.Items.Objects[ComboBoxChartDevice.ItemIndex] is TDevice) then
-    SelectedUUID := TDevice(
-      ComboBoxChartDevice.Items.Objects[ComboBoxChartDevice.ItemIndex]).UUID;
-
-  FChartColorUpdating := True;
-  try
-    ComboBoxChartDevice.Items.BeginUpdate;
-    try
-      ComboBoxChartDevice.Items.Clear;
-      SelectedIndex := -1;
-      I := 0;
-      for Device in FProcessingDevices do
-        if (Device <> nil) and (Device.State <> osDeleted) and
-           not IsProcessingDevicePendingRemoved(Device) then
-        begin
-          ItemText := Trim(Device.Name);
-          if Trim(Device.SerialNumber) <> '' then
-            ItemText := ItemText + ' [' + Trim(Device.SerialNumber) + ']';
-          ComboBoxChartDevice.Items.AddObject(ItemText, Device);
-          GetChartDeviceColor(Device, False, I);
-          GetChartDeviceColor(Device, True, I);
-          IsChartDeviceVisible(Device);
-          if SameText(Device.UUID, SelectedUUID) then
-            SelectedIndex := ComboBoxChartDevice.Items.Count - 1;
-          Inc(I);
-        end;
-    finally
-      ComboBoxChartDevice.Items.EndUpdate;
-    end;
-
-    if (SelectedIndex < 0) and (ComboBoxChartDevice.Items.Count > 0) then
-      SelectedIndex := 0;
-    ComboBoxChartDevice.ItemIndex := SelectedIndex;
-
-    SelectedDevice := nil;
-    if (SelectedIndex >= 0) and
-       (ComboBoxChartDevice.Items.Objects[SelectedIndex] is TDevice) then
-      SelectedDevice := TDevice(ComboBoxChartDevice.Items.Objects[SelectedIndex]);
-    if SelectedDevice <> nil then
-    begin
-      ComboColorBoxChartPoints.Color :=
-        GetChartDeviceColor(SelectedDevice, False, SelectedIndex);
-      ComboColorBoxChartLine.Color :=
-        GetChartDeviceColor(SelectedDevice, True, SelectedIndex);
-    end;
-  finally
-    FChartColorUpdating := False;
-  end;
-end;
-
 // Перестраивает график: исходные измерения рисуются маркерами,
 // усреднённая по оси Y погрешность — сглаженной линией без маркеров.
 procedure TFrameProceed.UpdateSessionErrorChart;
@@ -2132,7 +2070,7 @@ var
   P1, P2: TPointF;
   GroupKey, LegendBase, FlowUnitName: string;
   I, J, DeviceIndex, SameXCount: Integer;
-  SumY, X, Y, CurrentX, SameXSum, FlowValue: Double;
+  SumY, X, Y, CurrentX, SameXSum, FlowValue, BaseFlowValue: Double;
   ChartMinX, ChartMaxX, ChartPaddingX: Double;
   UseVolumeFlow: Boolean;
 
@@ -2144,48 +2082,20 @@ var
 
     if UseVolumeFlow then
     begin
-      FlowValue := APoint.EtalonVolumeFlow;
-      if (FlowValue <= 0) and (APoint.SpillTime > 0) then
-        FlowValue := APoint.EtalonVolume / APoint.SpillTime;
-      if FlowValue > 0 then
-      begin
-        if (FSessionEtalon <> nil) and
-           (FSessionEtalon.ValueVolumeFlow <> nil) then
-          FlowValue := FlowValue *
-            FSessionEtalon.ValueVolumeFlow.GetDimRate(FlowUnitName);
-      end
-      else
-      begin
-        FlowValue := APoint.QavgEtalon;
-        if (FActiveWorkTable <> nil) and
-           (FActiveWorkTable.TableFlow <> nil) and
-           (FActiveWorkTable.TableFlow.ValueFlow <> nil) then
-          FlowValue := FlowValue *
-            FActiveWorkTable.TableFlow.ValueFlow.GetDimRate(FlowUnitName);
-      end;
+      BaseFlowValue := APoint.EtalonVolumeFlow;
+      if (BaseFlowValue <= 0) and (APoint.SpillTime > 0) then
+        BaseFlowValue := APoint.EtalonVolume / APoint.SpillTime;
     end
     else
     begin
-      FlowValue := APoint.EtalonMassFlow;
-      if (FlowValue <= 0) and (APoint.SpillTime > 0) then
-        FlowValue := APoint.EtalonMass / APoint.SpillTime;
-      if FlowValue > 0 then
-      begin
-        if (FSessionEtalon <> nil) and
-           (FSessionEtalon.ValueMassFlow <> nil) then
-          FlowValue := FlowValue *
-            FSessionEtalon.ValueMassFlow.GetDimRate(FlowUnitName);
-      end
-      else
-      begin
-        FlowValue := APoint.QavgEtalon;
-        if (FActiveWorkTable <> nil) and
-           (FActiveWorkTable.TableFlow <> nil) and
-           (FActiveWorkTable.TableFlow.ValueFlow <> nil) then
-          FlowValue := FlowValue *
-            FActiveWorkTable.TableFlow.ValueFlow.GetDimRate(FlowUnitName);
-      end;
+      BaseFlowValue := APoint.EtalonMassFlow;
+      if (BaseFlowValue <= 0) and (APoint.SpillTime > 0) then
+        BaseFlowValue := APoint.EtalonMass / APoint.SpillTime;
     end;
+
+    if BaseFlowValue <= 0 then
+      BaseFlowValue := APoint.QavgEtalon;
+    FlowValue := ConvertBaseFlowToUnit(BaseFlowValue, FlowUnitName);
 
     if IsNan(FlowValue) or IsInfinite(FlowValue) or (FlowValue <= 0) then
       Exit;
@@ -2363,6 +2273,7 @@ begin
           PointSeries.Color := GetChartDeviceColor(Device, False, DeviceIndex);
           PointSeries.ShowLine := False;
           PointSeries.ShowMarkers := True;
+          PointSeries.ShowPointGuides := True;
           PointSeries.MarkerRadius := 4;
           for I := 0 to RawPoints.Count - 1 do
             PointSeries.AddPoint(RawPoints[I].X, RawPoints[I].Y);
@@ -2438,33 +2349,12 @@ begin
   UpdateSessionErrorChart;
 end;
 
-procedure TFrameProceed.ComboBoxChartDeviceChange(Sender: TObject);
-var
-  Device: TDevice;
-  Index: Integer;
-begin
-  if FChartColorUpdating or (ComboBoxChartDevice = nil) then
-    Exit;
-  Index := ComboBoxChartDevice.ItemIndex;
-  if (Index < 0) or (Index >= ComboBoxChartDevice.Items.Count) or
-     not (ComboBoxChartDevice.Items.Objects[Index] is TDevice) then
-    Exit;
-  Device := TDevice(ComboBoxChartDevice.Items.Objects[Index]);
-  FChartColorUpdating := True;
-  try
-    ComboColorBoxChartPoints.Color := GetChartDeviceColor(Device, False, Index);
-    ComboColorBoxChartLine.Color := GetChartDeviceColor(Device, True, Index);
-  finally
-    FChartColorUpdating := False;
-  end;
-end;
-
-// Формирует пункты ПКМ по тому же шаблону, что и вкладка «Графики».
+// Формирует ПКМ: видимость и отдельные настройки цветов каждого прибора.
 procedure TFrameProceed.Chart1MouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 var
   Device: TDevice;
-  Item: TMenuItem;
+  DeviceItem, VisibilityItem, PointColorItem, LineColorItem: TMenuItem;
   ItemText: string;
   P: TPointF;
 begin
@@ -2473,11 +2363,7 @@ begin
     Exit;
 
   while MenuItemChartDevices.ItemsCount > 0 do
-  begin
-    Item := TMenuItem(
-      MenuItemChartDevices.Items[MenuItemChartDevices.ItemsCount - 1]);
-    Item.Free;
-  end;
+    MenuItemChartDevices.Items[MenuItemChartDevices.ItemsCount - 1].Free;
 
   if FProcessingDevices <> nil then
     for Device in FProcessingDevices do
@@ -2488,12 +2374,28 @@ begin
         if Trim(Device.SerialNumber) <> '' then
           ItemText := ItemText + ' [' + Trim(Device.SerialNumber) + ']';
 
-        Item := TMenuItem.Create(nil);
-        Item.Text := ItemText;
-        Item.TagObject := Device;
-        Item.IsChecked := IsChartDeviceVisible(Device);
-        Item.OnClick := ChartDeviceVisibilityMenuClick;
-        MenuItemChartDevices.AddObject(Item);
+        DeviceItem := TMenuItem.Create(nil);
+        DeviceItem.Text := ItemText;
+        MenuItemChartDevices.AddObject(DeviceItem);
+
+        VisibilityItem := TMenuItem.Create(nil);
+        VisibilityItem.Text := 'Показывать';
+        VisibilityItem.TagObject := Device;
+        VisibilityItem.IsChecked := IsChartDeviceVisible(Device);
+        VisibilityItem.OnClick := ChartDeviceVisibilityMenuClick;
+        DeviceItem.AddObject(VisibilityItem);
+
+        PointColorItem := TMenuItem.Create(nil);
+        PointColorItem.Text := 'Цвет точек...';
+        PointColorItem.TagObject := Device;
+        PointColorItem.OnClick := ChartPointColorMenuClick;
+        DeviceItem.AddObject(PointColorItem);
+
+        LineColorItem := TMenuItem.Create(nil);
+        LineColorItem.Text := 'Цвет линии...';
+        LineColorItem.TagObject := Device;
+        LineColorItem.OnClick := ChartLineColorMenuClick;
+        DeviceItem.AddObject(LineColorItem);
       end;
 
   P := TControl(Sender).LocalToScreen(PointF(X, Y));
@@ -2521,36 +2423,52 @@ begin
   UpdateSessionErrorChart;
 end;
 
-procedure TFrameProceed.ComboColorBoxChartPointsChange(Sender: TObject);
+// Выбирает цвет исходных точек прибора из ПКМ графика.
+procedure TFrameProceed.ChartPointColorMenuClick(Sender: TObject);
 var
   Device: TDevice;
-  Index: Integer;
+  Dialog: TColorDialog;
 begin
-  if FChartColorUpdating or (ComboBoxChartDevice = nil) then
+  if not (Sender is TMenuItem) or
+     not (TMenuItem(Sender).TagObject is TDevice) then
     Exit;
-  Index := ComboBoxChartDevice.ItemIndex;
-  if (Index < 0) or (Index >= ComboBoxChartDevice.Items.Count) or
-     not (ComboBoxChartDevice.Items.Objects[Index] is TDevice) then
-    Exit;
-  Device := TDevice(ComboBoxChartDevice.Items.Objects[Index]);
-  FChartPointColors.AddOrSetValue(Device.UUID, ComboColorBoxChartPoints.Color);
-  UpdateSessionErrorChart;
+
+  Device := TDevice(TMenuItem(Sender).TagObject);
+  Dialog := TColorDialog.Create(Self);
+  try
+    Dialog.Color := GetChartDeviceColor(Device, False, 0);
+    if Dialog.Execute then
+    begin
+      FChartPointColors.AddOrSetValue(Device.UUID, Dialog.Color);
+      UpdateSessionErrorChart;
+    end;
+  finally
+    Dialog.Free;
+  end;
 end;
 
-procedure TFrameProceed.ComboColorBoxChartLineChange(Sender: TObject);
+// Выбирает цвет усреднённой линии прибора из ПКМ графика.
+procedure TFrameProceed.ChartLineColorMenuClick(Sender: TObject);
 var
   Device: TDevice;
-  Index: Integer;
+  Dialog: TColorDialog;
 begin
-  if FChartColorUpdating or (ComboBoxChartDevice = nil) then
+  if not (Sender is TMenuItem) or
+     not (TMenuItem(Sender).TagObject is TDevice) then
     Exit;
-  Index := ComboBoxChartDevice.ItemIndex;
-  if (Index < 0) or (Index >= ComboBoxChartDevice.Items.Count) or
-     not (ComboBoxChartDevice.Items.Objects[Index] is TDevice) then
-    Exit;
-  Device := TDevice(ComboBoxChartDevice.Items.Objects[Index]);
-  FChartLineColors.AddOrSetValue(Device.UUID, ComboColorBoxChartLine.Color);
-  UpdateSessionErrorChart;
+
+  Device := TDevice(TMenuItem(Sender).TagObject);
+  Dialog := TColorDialog.Create(Self);
+  try
+    Dialog.Color := GetChartDeviceColor(Device, True, 0);
+    if Dialog.Execute then
+    begin
+      FChartLineColors.AddOrSetValue(Device.UUID, Dialog.Color);
+      UpdateSessionErrorChart;
+    end;
+  finally
+    Dialog.Free;
+  end;
 end;
 
 procedure TFrameProceed.UpdateSessionItems;
@@ -2645,7 +2563,6 @@ begin
     else if Item.Text = 'прочее' then
       ShowOtherDevicesResults;
   end;
-  UpdateChartColorControls;
   UpdateSessionErrorChart;
   UpdateActionHints;
 end;
@@ -5100,7 +5017,6 @@ begin
     GridCoefs.RowCount := 0;
   if Chart1 <> nil then
     Chart1.ClearAllSeries;
-  UpdateChartColorControls;
 
   if FFrameCalibrCoefs <> nil then
     FFrameCalibrCoefs.Init(nil, cctMeterValueCoef, nil);
@@ -6752,7 +6668,7 @@ begin
   if (WorkTable = nil) or (WorkTable.TableFlow = nil) then
     Exit;
 
-  IsVolumeUnits := IsVolumeFlowUnit(WorkTable.FlowUnitName);
+  IsVolumeUnits := IsVolumeFlowUnit(FlowDimName);
 
   if IsVolumeUnits then
   begin
