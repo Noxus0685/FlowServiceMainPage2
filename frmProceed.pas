@@ -1453,8 +1453,9 @@ begin
     Exit;
 
   SetLength(AColumns, AGrid.ColumnCount);
-  ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutSaveOrderBegin',
-    'Начато сохранение порядка столбцов', 'GridName=' + AGrid.Name);
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutSaveOrderBegin',
+      'Начато сохранение порядка столбцов', 'GridName=' + AGrid.Name);
   for I := 0 to AGrid.ColumnCount - 1 do
   begin
     Column := AGrid.Columns[I];
@@ -1464,11 +1465,12 @@ begin
     AColumns[I].Position := Column.Index;
     AColumns[I].Width := Column.Width;
     AColumns[I].Visible := Column.Visible;
-    ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutSaved',
-      'Сохранена раскладка столбца',
-      Format('GridName=%s; ColumnName=%s; ColumnsIndex=%d; VisualIndex=%d; Position=%d; Width=%g; Visible=%s',
-        [AGrid.Name, Column.Name, I, Column.Index, AColumns[I].Position,
-         Column.Width, BoolToStr(Column.Visible, True)]));
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutSaved',
+        'Сохранена раскладка столбца',
+        Format('GridName=%s; ColumnName=%s; ColumnsIndex=%d; VisualIndex=%d; Position=%d; Width=%g; Visible=%s',
+          [AGrid.Name, Column.Name, I, Column.Index, AColumns[I].Position,
+           Column.Width, BoolToStr(Column.Visible, True)]));
   end;
 end;
 
@@ -1542,10 +1544,11 @@ begin
       // the complete saved order is still being restored.
       if Column.Index <> TargetIndex then
         Column.Index := TargetIndex;
-      ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutLoaded',
-        'Загружена раскладка столбца',
-        Format('GridName=%s; ColumnName=%s; SavedPosition=%d; AppliedPosition=%d',
-          [AGrid.Name, Column.Name, SortedColumns[I].Position, Column.Index]));
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutLoaded',
+          'Загружена раскладка столбца',
+          Format('GridName=%s; ColumnName=%s; SavedPosition=%d; AppliedPosition=%d',
+            [AGrid.Name, Column.Name, SortedColumns[I].Position, Column.Index]));
     end;
   finally
     AGrid.EndUpdate;
