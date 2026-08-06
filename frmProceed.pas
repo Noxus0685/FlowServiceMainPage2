@@ -2072,7 +2072,7 @@ var
   Groups: TObjectDictionary<string, TList<TPointF>>;
   GroupPoints: TList<TPointF>;
   Pair: TPair<string, TList<TPointF>>;
-  PointSeries, LineSeries: TChartSeries;
+  PointSeries, AverageSeries, LineSeries: TChartSeries;
   Sorter: IComparer<TPointF>;
   P1, P2: TPointF;
   GroupKey, LegendBase, FlowUnitName: string;
@@ -2276,10 +2276,21 @@ begin
           PointSeries.Color := GetChartDeviceColor(Device, False, DeviceIndex);
           PointSeries.ShowLine := False;
           PointSeries.ShowMarkers := True;
-          PointSeries.ShowPointGuides := True;
+          PointSeries.ShowPointGuides := False;
           PointSeries.MarkerRadius := 4;
           for I := 0 to RawPoints.Count - 1 do
             PointSeries.AddPoint(RawPoints[I].X, RawPoints[I].Y);
+
+          // Проекции и подписи координат отображаются только для средних
+          // точек, которые используются как узлы сглаженной линии.
+          AverageSeries := Chart1.AddSeries('');
+          AverageSeries.Color := GetChartDeviceColor(Device, True, DeviceIndex);
+          AverageSeries.ShowLine := False;
+          AverageSeries.ShowMarkers := True;
+          AverageSeries.ShowPointGuides := True;
+          AverageSeries.MarkerRadius := 5;
+          for I := 0 to AveragePoints.Count - 1 do
+            AverageSeries.AddPoint(AveragePoints[I].X, AveragePoints[I].Y);
 
           LineSeries := Chart1.AddSeries(LegendBase + ' — средняя линия');
           LineSeries.Color := GetChartDeviceColor(Device, True, DeviceIndex);
