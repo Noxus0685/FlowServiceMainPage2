@@ -54,8 +54,6 @@ type
   TFrameMRResults = class(TFrame, IEventObserver)
     GridMRResults: TGrid;
     StringColumnName: TStringColumn;
-    StringColumnPoint1: TStringColumn;
-    StringColumnPoint2: TStringColumn;
     StringColumnResult: TStringColumn;
     ToolBar: TToolBar;
     SpeedButton11: TSpeedButton;
