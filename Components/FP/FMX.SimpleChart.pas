@@ -786,23 +786,36 @@ end;
 
 procedure TSimpleChart.DrawLegend;
 var
-  I: Integer;
-  R: TRectF;
+  I, LegendRow: Integer;
+  R, MarkerRect: TRectF;
+  CenterY: Single;
 begin
-  Canvas.Fill.Color := FAxisColor;
   Canvas.Font.Size := 11;
+  LegendRow := 0;
   for I := 0 to FSeries.Count - 1 do
     if FSeries[I].Visible and (FSeries[I].LegendName <> '') then
     begin
-      R := RectF(Width - FMarginRight - 155, FMarginTop + I * 18,
-        Width - FMarginRight, FMarginTop + I * 18 + 16);
+      R := RectF(Width - FMarginRight - 155,
+        FMarginTop + LegendRow * 18, Width - FMarginRight,
+        FMarginTop + LegendRow * 18 + 16);
+      CenterY := R.CenterPoint.Y;
       Canvas.Stroke.Color := FSeries[I].Color;
       Canvas.Stroke.Thickness := 3;
-      Canvas.DrawLine(PointF(R.Left, R.CenterPoint.Y),
-        PointF(R.Left + 20, R.CenterPoint.Y), 1);
+      if FSeries[I].ShowLine then
+        Canvas.DrawLine(PointF(R.Left, CenterY),
+          PointF(R.Left + 20, CenterY), 1);
+      if FSeries[I].ShowMarkers then
+      begin
+        Canvas.Fill.Color := FSeries[I].Color;
+        MarkerRect := RectF(R.Left + 7, CenterY - 3,
+          R.Left + 13, CenterY + 3);
+        Canvas.FillEllipse(MarkerRect, 1);
+      end;
       R.Left := R.Left + 25;
+      Canvas.Fill.Color := FAxisColor;
       Canvas.FillText(R, FSeries[I].LegendName, False, 1, [],
         TTextAlign.Leading, TTextAlign.Center);
+      Inc(LegendRow);
     end;
 end;
 
