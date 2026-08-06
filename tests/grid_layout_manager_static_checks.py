@@ -98,3 +98,33 @@ def test_end_update_is_the_only_publication_point():
     assert 'ContentChanged' not in after_end_update
     assert 'InvalidateContentSize' not in after_end_update
     assert 'after Model.ContentChanged' not in apply
+
+
+def test_row_count_changes_are_centralized_in_layout_manager():
+    row_count_assignment = re.compile(r'\b\w+\.RowCount\s*:=')
+    application_sources = [
+        path for path in ROOT.glob('*.pas')
+        if path.name != 'uGridLayoutManager.pas'
+    ]
+    offenders = [
+        path.name for path in application_sources
+        if row_count_assignment.search(path.read_text(
+            encoding='utf-8-sig', errors='ignore'))
+    ]
+    assert offenders == []
+
+
+def test_set_row_count_preserves_widths_and_skips_empty_rebuild():
+    set_rows = method(
+        HELPER,
+        'class procedure TGridLayoutManager.SetRowCount',
+        'class function TGridLayoutManager.Apply',
+    )
+    empty_guard = set_rows.index(
+        'if (AGrid.RowCount = 0) and (NewRowCount = 0)')
+    begin_update = set_rows.index('AGrid.BeginUpdate')
+    assert empty_guard < begin_update
+    assert 'Widths[I] := Columns[I].Width' in set_rows
+    assert begin_update < set_rows.index('AGrid.EndUpdate;')
+    assert set_rows.index('AGrid.EndUpdate;') < set_rows.index(
+        'Columns[I].Width := Widths[I]')

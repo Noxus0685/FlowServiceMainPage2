@@ -49,6 +49,7 @@ uses
   uClasses,
   uDataManager,
   uDeviceClass,
+  uGridLayoutManager,
   uRepositories,
   uProtocols;
 
@@ -1487,24 +1488,16 @@ begin
       Inc(VisibleCount);
     end;
 
-  GridDiameters.BeginUpdate;
-  try
-    GridDiameters.RowCount := VisibleCount;
-
-    if VisibleCount <= 0 then
-      GridDiameters.Row := -1
-    else if PrevRow < 0 then
-      GridDiameters.Row := 0
-    else if PrevRow >= VisibleCount then
-      GridDiameters.Row := VisibleCount - 1
-    else
-      GridDiameters.Row := PrevRow;
-
-    GridDiameters.Selected := GridDiameters.Row;
-  finally
-    GridDiameters.EndUpdate;
-  end;
-  GridDiameters.Repaint;
+  TGridLayoutManager.SetRowCount(GridDiameters, VisibleCount);
+  if VisibleCount <= 0 then
+    GridDiameters.Row := -1
+  else if PrevRow < 0 then
+    GridDiameters.Row := 0
+  else if PrevRow >= VisibleCount then
+    GridDiameters.Row := VisibleCount - 1
+  else
+    GridDiameters.Row := PrevRow;
+  GridDiameters.Selected := GridDiameters.Row;
 
 end;
 
@@ -1582,12 +1575,7 @@ begin
     if (P <> nil) and (P.State <> osDeleted) then
       Inc(VisibleCount);
 
-  GridPoints.BeginUpdate;
-  try
-    GridPoints.RowCount := VisibleCount;
-  finally
-    GridPoints.EndUpdate;
-  end;
+  TGridLayoutManager.SetRowCount(GridPoints, VisibleCount);
 end;
 
 procedure TFormTypeEditor.UpdateCoefsGrid;
@@ -1595,12 +1583,8 @@ begin
   if FGridCoefs = nil then
     Exit;
 
-  FGridCoefs.BeginUpdate;
-  try
-    FGridCoefs.RowCount := FCalibrCoefItemsLocal.Count;
-  finally
-    FGridCoefs.EndUpdate;
-  end;
+  TGridLayoutManager.SetRowCount(FGridCoefs,
+    FCalibrCoefItemsLocal.Count);
 end;
 
 function TFormTypeEditor.GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;

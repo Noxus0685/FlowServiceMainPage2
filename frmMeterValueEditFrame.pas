@@ -28,6 +28,7 @@ uses
   System.Types,
   System.UITypes,
   uBaseProcedures,
+  uGridLayoutManager,
   uMeterValue, FMX.Grid.Style, FMX.ScrollBox, FMX.SimpleChart, uDebugLog;
 
 type
@@ -1321,14 +1322,10 @@ end;
 
 procedure TFrameMeterValueEdit.RefreshSamplesGrid(const AReload: Boolean);
 begin
-  GridSamples.BeginUpdate;
-  try
-    if AReload then
-      RefreshDisplayedSamples;
-    GridSamples.RowCount := Length(FDisplayedSamples);
-  finally
-    GridSamples.EndUpdate;
-  end;
+  if AReload then
+    RefreshDisplayedSamples;
+  TGridLayoutManager.SetRowCount(GridSamples,
+    Length(FDisplayedSamples));
 
   if GridSamples.Row >= Length(FDisplayedSamples) then
     GridSamples.Row := Length(FDisplayedSamples) - 1;

@@ -48,6 +48,10 @@ type
   public
     class function BuildSignature(const ADefinitions: TGridColumnDefinitions): string; static;
     class procedure CaptureWidths(AState: TGridLayoutState); static;
+    { Changes the FMX grid row count without allowing its layout pass to alter
+      column widths.  AForceRefresh recreates rows when their count is unchanged. }
+    class procedure SetRowCount(AGrid: TGrid; const ARowCount: Integer;
+      const AForceRefresh: Boolean = False); static;
     class function Apply(AGrid: TGrid; AState: TGridLayoutState;
       const ADefinitions: TGridColumnDefinitions;
       const AFactory: TGridColumnFactory;
@@ -116,6 +120,58 @@ begin
   for Pair in AState.FColumns do
     if Pair.Value <> nil then
       AState.FWidths.AddOrSetValue(Pair.Key, Pair.Value.Width);
+end;
+
+class procedure TGridLayoutManager.SetRowCount(AGrid: TGrid;
+  const ARowCount: Integer; const AForceRefresh: Boolean);
+var
+  Columns: TArray<TColumn>;
+  Widths: TArray<Single>;
+  I, NewRowCount: Integer;
+begin
+  if AGrid = nil then
+    Exit;
+
+  NewRowCount := Max(0, ARowCount);
+  { An empty grid has no rows to recreate.  Avoid even an empty
+    BeginUpdate/EndUpdate cycle during the first tab activation. }
+  if (AGrid.RowCount = 0) and (NewRowCount = 0) then
+  begin
+    AGrid.Repaint;
+    Exit;
+  end;
+  if (AGrid.RowCount = NewRowCount) and not AForceRefresh then
+  begin
+    AGrid.Repaint;
+    Exit;
+  end;
+
+  SetLength(Columns, AGrid.ColumnCount);
+  SetLength(Widths, AGrid.ColumnCount);
+  for I := 0 to AGrid.ColumnCount - 1 do
+  begin
+    Columns[I] := AGrid.Columns[I];
+    Widths[I] := Columns[I].Width;
+  end;
+
+  AGrid.BeginUpdate;
+  try
+    if AForceRefresh and (AGrid.RowCount <> 0) then
+      AGrid.RowCount := 0;
+    if AGrid.RowCount <> NewRowCount then
+      AGrid.RowCount := NewRowCount;
+  finally
+    AGrid.EndUpdate;
+  end;
+
+  { EndUpdate can rebuild the FMX presentation and change widths.  Restore the
+    exact column objects only after that rebuild has completed. }
+  for I := 0 to High(Columns) do
+    if (Columns[I] <> nil) and
+       (Abs(Columns[I].Width - Widths[I]) >= CWidthEpsilon) then
+      Columns[I].Width := Widths[I];
+
+  AGrid.Repaint;
 end;
 
 class function TGridLayoutManager.Apply(AGrid: TGrid;

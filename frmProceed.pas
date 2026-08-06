@@ -4232,7 +4232,8 @@ begin
     GridResults.EndUpdate;
   end;
 
-  GridResults.RowCount := Length(FCurrentResultRows);
+  TGridLayoutManager.SetRowCount(GridResults,
+    Length(FCurrentResultRows));
   ButtonExportExcel.Enabled := GridResults.RowCount > 0;
   if Length(FCurrentResultRows) = 0 then
     GridResults.Row := -1
@@ -4258,34 +4259,8 @@ begin
   LogProceedGridContext('Summary', nil, nil, GridResults.RowCount,
     VisibleColumnCount);
 end;
-procedure SaveGridColumnWidths(AGrid: TGrid; out AWidths: TArray<Single>);
-var
-  I: Integer;
-begin
-  SetLength(AWidths, 0);
-  if AGrid = nil then
-    Exit;
-
-  SetLength(AWidths, AGrid.ColumnCount);
-  for I := 0 to AGrid.ColumnCount - 1 do
-    AWidths[I] := AGrid.Columns[I].Width;
-end;
-
-procedure RestoreGridColumnWidths(AGrid: TGrid; const AWidths: TArray<Single>);
-var
-  I: Integer;
-begin
-  if AGrid = nil then
-    Exit;
-
-  for I := 0 to AGrid.ColumnCount - 1 do
-    if (I <= High(AWidths)) and (AWidths[I] > 0) then
-      AGrid.Columns[I].Width := AWidths[I];
-end;
-
 procedure TFrameProceed.UpdateGridDataPoints;
 var
-  ColumnWidths: TArray<Single>;
   I, Count: Integer;
 begin
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
@@ -4300,16 +4275,8 @@ begin
   SetLength(FCurrentSpillages, Count);
   SortProcessingDataByDate;
 
-  SaveGridColumnWidths(GridDataPoints, ColumnWidths);
-  GridDataPoints.BeginUpdate;
-  try
-    GridDataPoints.RowCount := 0;
-    GridDataPoints.RowCount := Length(FCurrentSpillages);
-    RestoreGridColumnWidths(GridDataPoints, ColumnWidths);
-    GridDataPoints.Repaint;
-  finally
-    GridDataPoints.EndUpdate;
-  end;
+  TGridLayoutManager.SetRowCount(GridDataPoints,
+    Length(FCurrentSpillages), True);
   GridResults.Visible := False;
   GridDataPoints.Visible := True;
   ButtonExportExcel.Enabled := GridDataPoints.RowCount > 0;
@@ -4981,11 +4948,11 @@ begin
     LabelSessionActive.Text := '';
 
   if GridResults <> nil then
-    GridResults.RowCount := 0;
+    TGridLayoutManager.SetRowCount(GridResults, 0);
   if GridDataPoints <> nil then
-    GridDataPoints.RowCount := 0;
+    TGridLayoutManager.SetRowCount(GridDataPoints, 0);
   if GridCoefs <> nil then
-    GridCoefs.RowCount := 0;
+    TGridLayoutManager.SetRowCount(GridCoefs, 0);
   if Chart1 <> nil then
     Chart1.ClearAllSeries;
 

@@ -30,6 +30,7 @@ uses
   uDebugLog,
   uDeviceClass,
   uFlowMeter,
+  uGridLayoutManager,
   uProtocols;
 
 type
@@ -309,13 +310,12 @@ procedure TFormMeterValues.UpdateStringGridDimensions;
 var
   I: Integer;
 begin
+  TGridLayoutManager.SetRowCount(StringGridDimensions,
+    MeterValue.Dimensions.Count, True);
   StringGridDimensions.BeginUpdate;
   try
-    StringGridDimensions.RowCount := 0;
-
     if MeterValue.Dimensions.Count > 0 then
     begin
-      StringGridDimensions.RowCount := MeterValue.Dimensions.Count;
       for I := 0 to MeterValue.Dimensions.Count - 1 do
       begin
         StringGridDimensions.Cells[0, I] := IntToStr(I + 1);
@@ -344,18 +344,24 @@ var
 begin
   Index := -1;
   StringGridCoefsData.Tag := 1;
+  FlowMeter := FindOwnerFlowMeter;
+  ReferenceTable := FindTableByType(FlowMeter, cctReference);
+  if (ReferenceTable <> nil) and (ReferenceTable.Items <> nil) then
+    TGridLayoutManager.SetRowCount(StringGridCoefsData,
+      ReferenceTable.Items.Count, True)
+  else if FlowMeter = nil then
+    TGridLayoutManager.SetRowCount(StringGridCoefsData,
+      MeterValue.Coefs.Count, True)
+  else
+    TGridLayoutManager.SetRowCount(StringGridCoefsData, 0, True);
+
   StringGridCoefsData.BeginUpdate;
   try
     StringColumnEtalon.Header := 'Эталон, ' + MeterValue.GetDimName;
     StringColumnValue.Header := 'Знач. прибора, ' + MeterValue.GetDimName;
 
-    StringGridCoefsData.RowCount := 0;
-
-    FlowMeter := FindOwnerFlowMeter;
-    ReferenceTable := FindTableByType(FlowMeter, cctReference);
     if (ReferenceTable <> nil) and (ReferenceTable.Items <> nil) then
     begin
-      StringGridCoefsData.RowCount := ReferenceTable.Items.Count;
       for I := 0 to ReferenceTable.Items.Count - 1 do
       begin
         ReferenceItem := ReferenceTable.Items[I];
@@ -372,7 +378,6 @@ begin
     end
     else if (FlowMeter = nil) and (MeterValue.Coefs.Count > 0) then
     begin
-      StringGridCoefsData.RowCount := MeterValue.Coefs.Count;
       for I := 0 to MeterValue.Coefs.Count - 1 do
       begin
         FCoef := MeterValue.Coefs[I];
@@ -423,12 +428,12 @@ procedure TFormMeterValues.UpdateStringGridCoefs;
 var
   I: Integer;
 begin
+  TGridLayoutManager.SetRowCount(StringGridCoefs,
+    MeterValue.Coefs.Count, True);
   StringGridCoefs.BeginUpdate;
   try
-    StringGridCoefs.RowCount := 0;
     if MeterValue.Coefs.Count > 0 then
     begin
-      StringGridCoefs.RowCount := MeterValue.Coefs.Count;
       for I := 0 to MeterValue.Coefs.Count - 1 do
       begin
         StringGridCoefs.Cells[0, I] := BoolToStr(MeterValue.Coefs[I].InUse, True);
@@ -900,14 +905,15 @@ var
   Item: TMeterValue;
 begin
   Index := -1;
+  if FFilteredValues <> nil then
+    TGridLayoutManager.SetRowCount(StringGridValuesList,
+      FFilteredValues.Count)
+  else
+    TGridLayoutManager.SetRowCount(StringGridValuesList, 0);
+
   StringGridValuesList.BeginUpdate;
   try
     StringGridValuesList.Tag := 1;
-    if FFilteredValues <> nil then
-      StringGridValuesList.RowCount := FFilteredValues.Count
-    else
-      StringGridValuesList.RowCount := 0;
-
     for I := 0 to StringGridValuesList.RowCount - 1 do
     begin
       Item := FFilteredValues[I];

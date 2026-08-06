@@ -18,6 +18,7 @@ uses
   System.SysUtils,
   System.Types,
   System.UITypes,
+  uGridLayoutManager,
   uMeterValue;
 
 type
@@ -209,10 +210,10 @@ var
   I: Integer;
 begin
   ApplyFilter;
+  TGridLayoutManager.SetRowCount(StringGridValuesList, FFilteredValues.Count);
   StringGridValuesList.BeginUpdate;
   try
     StringGridValuesList.Tag := 1;
-    StringGridValuesList.RowCount := FFilteredValues.Count;
     for I := 0 to FFilteredValues.Count - 1 do
     begin
       Item := FFilteredValues[I];

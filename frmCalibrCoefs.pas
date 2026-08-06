@@ -29,6 +29,7 @@ uses
   uClasses,
   uDeviceClass,
   uFlowMeter,
+  uGridLayoutManager,
   uMeterValue;
 
 type
@@ -534,12 +535,10 @@ end;
 
 procedure TFrameCalibrCoefs.UpdateGrid;
 begin
-   GridCoefs.RowCount := 0;
-
   if (FCurrentTable <> nil) and (FCurrentTable.Items <> nil) then
-        GridCoefs.RowCount := FCurrentTable.Items.Count;
-
-  GridCoefs.Repaint;
+    TGridLayoutManager.SetRowCount(GridCoefs, FCurrentTable.Items.Count, True)
+  else
+    TGridLayoutManager.SetRowCount(GridCoefs, 0, True);
 end;
 
 function TFrameCalibrCoefs.InitErrorPercent(AItem: TCalibrCoefItem): Double;

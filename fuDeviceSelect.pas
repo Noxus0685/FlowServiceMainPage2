@@ -51,6 +51,7 @@ uses
   uClasses,
   uDataManager,
   uDeviceClass,
+  uGridLayoutManager,
   uRepositories,
   uProtocols;
 
@@ -763,7 +764,7 @@ begin
   begin
     DebugLog('DBG 2012'#13#10'DeviceSelect.BuildTree before TreeViewDevices.Clear');
     TreeViewDevices.Clear;
-    GridDevices.RowCount := 0;
+    TGridLayoutManager.SetRowCount(GridDevices, 0);
     DebugLog('DBG 2013'#13#10'DeviceSelect.BuildTree EXIT');
     Exit;
   end;
@@ -1722,14 +1723,11 @@ begin
       if (FDevFilteredDevices = nil) or (FDevFilteredDevices.IndexOf(FCheckedDevices[I]) < 0) then
         FCheckedDevices.Delete(I);
 
-  GridDevices.BeginUpdate;
-  try
-    GridDevices.RowCount := 0;
-    if FDevFilteredDevices <> nil then
-      GridDevices.RowCount := FDevFilteredDevices.Count;
-  finally
-    GridDevices.EndUpdate;
-  end;
+  if FDevFilteredDevices <> nil then
+    TGridLayoutManager.SetRowCount(GridDevices,
+      FDevFilteredDevices.Count, True)
+  else
+    TGridLayoutManager.SetRowCount(GridDevices, 0, True);
 
   if (GridDevices.Row < 0) or (GridDevices.Row >= GridDevices.RowCount) then
     GridDevices.Row := -1;

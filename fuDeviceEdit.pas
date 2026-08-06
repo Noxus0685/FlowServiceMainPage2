@@ -41,6 +41,7 @@ uses
   uClasses,
   uDataManager,
   uDeviceClass,
+  uGridLayoutManager,
   uRepositories,
   uProtocols,
   uGridStabilityController,
@@ -1745,15 +1746,10 @@ begin
 
   Table := GetSelectedCalibrCoefTable;
 
-  FGridCoefs.BeginUpdate;
-  try
-    if Table <> nil then
-      FGridCoefs.RowCount := Table.Items.Count
-    else
-      FGridCoefs.RowCount := 0;
-  finally
-    FGridCoefs.EndUpdate;
-  end;
+  if Table <> nil then
+    TGridLayoutManager.SetRowCount(FGridCoefs, Table.Items.Count)
+  else
+    TGridLayoutManager.SetRowCount(FGridCoefs, 0);
 end;
 
 function TFormDeviceEditor.GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;
@@ -4333,28 +4329,23 @@ begin
 
   SortPoints;
 
-  GridPoints.BeginUpdate;
-  try
-    VisibleCount := 0;
+  VisibleCount := 0;
 
-    for i := 0 to FDevice.Points.Count - 1 do
-      if FDevice.Points[i].State <> osDeleted then
-        Inc(VisibleCount);
+  for i := 0 to FDevice.Points.Count - 1 do
+    if FDevice.Points[i].State <> osDeleted then
+      Inc(VisibleCount);
 
-    GridPoints.RowCount := VisibleCount;
+  TGridLayoutManager.SetRowCount(GridPoints, VisibleCount);
 
-    { корректировка текущей строки }
-    if GridPoints.Row >= GridPoints.RowCount then
-      GridPoints.Row := GridPoints.RowCount - 1;
+  { корректировка текущей строки }
+  if GridPoints.Row >= GridPoints.RowCount then
+    GridPoints.Row := GridPoints.RowCount - 1;
 
-    if GridPoints.RowCount = 0 then
-      GridPoints.Row := -1;
+  if GridPoints.RowCount = 0 then
+    GridPoints.Row := -1;
 
-  finally
-    GridPoints.EndUpdate;
-    if FGridPointsStability <> nil then
-      FGridPointsStability.Snapshot('after-EndUpdate');
-  end;
+  if FGridPointsStability <> nil then
+    FGridPointsStability.Snapshot('after-EndUpdate');
   if FGridPointsStability <> nil then
   begin
     FGridPointsStability.Snapshot('after-UpdatePointsGrid');

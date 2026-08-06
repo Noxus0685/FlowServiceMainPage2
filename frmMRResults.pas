@@ -799,19 +799,8 @@ begin
 end;
 
 procedure TFrameMRResults.RefreshRows;
-var
-  RowCount: Integer;
 begin
-  RowCount := 0;
-  RowCount := FRows.Count;
-
-  GridMRResults.BeginUpdate;
-  try
-    GridMRResults.RowCount := 0;
-    GridMRResults.RowCount := RowCount;
-  finally
-    GridMRResults.EndUpdate;
-  end;
+  TGridLayoutManager.SetRowCount(GridMRResults, FRows.Count, True);
 end;
 
 function TFrameMRResults.GetRowChannel(const ARow: Integer): TChannel;
