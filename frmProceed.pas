@@ -7,6 +7,7 @@ uses
   FMX.ActnList,
   FMX.Controls,
   FMX.Controls.Presentation,
+  FMX.Colors,
   FMX.Dialogs,
   FMX.Forms,
   FMX.Graphics,
@@ -160,6 +161,12 @@ type
     LabelCoefs: TLabel;
     LabelSessionDate: TLabel;
     Chart1: TSimpleChart;
+    LabelChartDevice: TLabel;
+    ComboBoxChartDevice: TComboBox;
+    LabelChartPointColor: TLabel;
+    ComboColorBoxChartPoints: TComboColorBox;
+    LabelChartLineColor: TLabel;
+    ComboColorBoxChartLine: TComboColorBox;
     LabelSessionActive: TLabel;
     TabItemCalculations: TTabItem;
     GridCoefs: TGrid;
@@ -349,6 +356,9 @@ type
     procedure GridDataPointsHeaderClick(Column: TColumn);
     procedure UpdateGridDataPointsHeaders(QuantityDimName: string; FlowDimName: string);
     procedure SetSessionDim(UnitName: string; QuantityUnitName: string);
+    procedure ComboBoxChartDeviceChange(Sender: TObject);
+    procedure ComboColorBoxChartPointsChange(Sender: TObject);
+    procedure ComboColorBoxChartLineChange(Sender: TObject);
     procedure UpdateCalibrCoefsFrame;
     procedure ResetPointDeleteConfirm;
     procedure InitCalibrCoefsFrame;
@@ -400,6 +410,15 @@ type
     // Текущая сортировка таблицы точек обработки.
     FGridDataPointsSortColumn: string;
     FGridDataPointsSortDirection: TGridSortDirection;
+    FChartPointColors: TDictionary<string, TAlphaColor>;
+    FChartLineColors: TDictionary<string, TAlphaColor>;
+    FChartColorUpdating: Boolean;
+    // Перестраивает зависимости погрешности от расхода для текущих сессий приборов.
+    procedure UpdateSessionErrorChart;
+    // Обновляет список приборов и выбранные пользовательские цвета графика.
+    procedure UpdateChartColorControls;
+    function GetChartDeviceColor(ADevice: TDevice; const ALineColor: Boolean;
+      const ADefaultIndex: Integer): TAlphaColor;
   public
     { Public declarations }
     procedure Initialize;
@@ -489,6 +508,8 @@ begin
   FreeAndNil(FManualProcessingDeviceUUIDs);
   FreeAndNil(FPendingRemovedProcessingUUIDs);
   FreeAndNil(FResultsGridLayoutState);
+  FreeAndNil(FChartPointColors);
+  FreeAndNil(FChartLineColors);
   inherited;
 end;
 
@@ -517,6 +538,24 @@ begin
     FPendingRemovedProcessingUUIDs := TStringList.Create;
     FPendingRemovedProcessingUUIDs.Sorted := False;
     FPendingRemovedProcessingUUIDs.Duplicates := dupIgnore;
+  end;
+  if FChartPointColors = nil then
+    FChartPointColors := TDictionary<string, TAlphaColor>.Create;
+  if FChartLineColors = nil then
+    FChartLineColors := TDictionary<string, TAlphaColor>.Create;
+
+  if ComboBoxChartDevice <> nil then
+    ComboBoxChartDevice.OnChange := ComboBoxChartDeviceChange;
+  if ComboColorBoxChartPoints <> nil then
+    ComboColorBoxChartPoints.OnChange := ComboColorBoxChartPointsChange;
+  if ComboColorBoxChartLine <> nil then
+    ComboColorBoxChartLine.OnChange := ComboColorBoxChartLineChange;
+  if Chart1 <> nil then
+  begin
+    Chart1.Title := 'Погрешность от расхода';
+    Chart1.XTitle := 'Расход';
+    Chart1.YTitle := 'Погрешность, %';
+    Chart1.ShowLegend := True;
   end;
 
   if GridResults <> nil then
@@ -577,6 +616,7 @@ begin
   SyncProcessingDevicesWithNewPoints;
   InitCalibrCoefsFrame;
   RefreshResultsTab;
+  UpdateSessionErrorChart;
   UpdateActionHints;
 end;
 
@@ -1940,6 +1980,318 @@ begin
   Result := 'Сессия ' + DateOpenStr + '-' + DateCloseStr;
 end;
 
+
+const
+  CProceedChartPointColors: array[0..7] of TAlphaColor = (
+    $FF1F77B4, $FFD62728, $FF2CA02C, $FFFF7F0E,
+    $FF9467BD, $FF17BECF, $FF8C564B, $FFE377C2);
+  CProceedChartLineColors: array[0..7] of TAlphaColor = (
+    $FF0B3D91, $FF8B0000, $FF006400, $FFB34700,
+    $FF4B0082, $FF007C7C, $FF5C2E16, $FFA00068);
+
+function TFrameProceed.GetChartDeviceColor(ADevice: TDevice;
+  const ALineColor: Boolean; const ADefaultIndex: Integer): TAlphaColor;
+var
+  Key: string;
+  PaletteIndex: Integer;
+begin
+  PaletteIndex := ADefaultIndex mod Length(CProceedChartPointColors);
+  if ADevice = nil then
+    Exit(CProceedChartPointColors[PaletteIndex]);
+
+  Key := Trim(ADevice.UUID);
+  if ALineColor then
+  begin
+    if not FChartLineColors.TryGetValue(Key, Result) then
+    begin
+      Result := CProceedChartLineColors[PaletteIndex];
+      FChartLineColors.AddOrSetValue(Key, Result);
+    end;
+  end
+  else if not FChartPointColors.TryGetValue(Key, Result) then
+  begin
+    Result := CProceedChartPointColors[PaletteIndex];
+    FChartPointColors.AddOrSetValue(Key, Result);
+  end;
+end;
+
+// Обновляет список приборов и отображает сохранённые цвета выбранного прибора.
+procedure TFrameProceed.UpdateChartColorControls;
+var
+  Device, SelectedDevice: TDevice;
+  SelectedUUID, ItemText: string;
+  I, SelectedIndex: Integer;
+begin
+  if (ComboBoxChartDevice = nil) or (FProcessingDevices = nil) then
+    Exit;
+
+  SelectedUUID := '';
+  if (ComboBoxChartDevice.ItemIndex >= 0) and
+     (ComboBoxChartDevice.ItemIndex < ComboBoxChartDevice.Items.Count) and
+     (ComboBoxChartDevice.Items.Objects[ComboBoxChartDevice.ItemIndex] is TDevice) then
+    SelectedUUID := TDevice(
+      ComboBoxChartDevice.Items.Objects[ComboBoxChartDevice.ItemIndex]).UUID;
+
+  FChartColorUpdating := True;
+  try
+    ComboBoxChartDevice.Items.BeginUpdate;
+    try
+      ComboBoxChartDevice.Items.Clear;
+      SelectedIndex := -1;
+      I := 0;
+      for Device in FProcessingDevices do
+        if (Device <> nil) and (Device.State <> osDeleted) and
+           not IsProcessingDevicePendingRemoved(Device) then
+        begin
+          ItemText := Trim(Device.Name);
+          if Trim(Device.SerialNumber) <> '' then
+            ItemText := ItemText + ' [' + Trim(Device.SerialNumber) + ']';
+          ComboBoxChartDevice.Items.AddObject(ItemText, Device);
+          GetChartDeviceColor(Device, False, I);
+          GetChartDeviceColor(Device, True, I);
+          if SameText(Device.UUID, SelectedUUID) then
+            SelectedIndex := ComboBoxChartDevice.Items.Count - 1;
+          Inc(I);
+        end;
+    finally
+      ComboBoxChartDevice.Items.EndUpdate;
+    end;
+
+    if (SelectedIndex < 0) and (ComboBoxChartDevice.Items.Count > 0) then
+      SelectedIndex := 0;
+    ComboBoxChartDevice.ItemIndex := SelectedIndex;
+
+    SelectedDevice := nil;
+    if (SelectedIndex >= 0) and
+       (ComboBoxChartDevice.Items.Objects[SelectedIndex] is TDevice) then
+      SelectedDevice := TDevice(ComboBoxChartDevice.Items.Objects[SelectedIndex]);
+    if SelectedDevice <> nil then
+    begin
+      ComboColorBoxChartPoints.Color :=
+        GetChartDeviceColor(SelectedDevice, False, SelectedIndex);
+      ComboColorBoxChartLine.Color :=
+        GetChartDeviceColor(SelectedDevice, True, SelectedIndex);
+    end;
+  finally
+    FChartColorUpdating := False;
+  end;
+end;
+
+// Перестраивает график: исходные измерения рисуются маркерами,
+// усреднённая по повторениям погрешность — линией без маркеров.
+procedure TFrameProceed.UpdateSessionErrorChart;
+var
+  Device, SelectedDevice: TDevice;
+  Session: TSessionSpillage;
+  Spillage: TPointSpillage;
+  RawPoints, AveragePoints: TList<TPointF>;
+  Groups: TObjectDictionary<string, TList<TPointF>>;
+  GroupPoints: TList<TPointF>;
+  Pair: TPair<string, TList<TPointF>>;
+  PointSeries, LineSeries: TChartSeries;
+  Sorter: IComparer<TPointF>;
+  P1, P2: TPointF;
+  GroupKey, LegendBase: string;
+  I, J, DeviceIndex: Integer;
+  SumX, SumY, MinStep, StepX, InterpolatedY: Double;
+
+  procedure AddSpillagePoint(APoint: TPointSpillage);
+  begin
+    if (APoint = nil) or (APoint.State = osDeleted) or not APoint.Enabled or
+       (APoint.QavgEtalon <= 0) or not IsResultErrorValid(APoint.Error) then
+      Exit;
+
+    P1 := PointF(APoint.QavgEtalon, APoint.Error);
+    RawPoints.Add(P1);
+    GroupKey := Trim(APoint.Name);
+    if GroupKey = '' then
+      GroupKey := FormatFloat('0.############', APoint.QavgEtalon);
+    if not Groups.TryGetValue(GroupKey, GroupPoints) then
+    begin
+      GroupPoints := TList<TPointF>.Create;
+      Groups.Add(GroupKey, GroupPoints);
+    end;
+    GroupPoints.Add(P1);
+  end;
+
+begin
+  if Chart1 = nil then
+    Exit;
+
+  UpdateChartColorControls;
+  Chart1.BeginUpdate;
+  try
+    Chart1.ClearAllSeries;
+    SelectedDevice := ResolveSelectedDevice;
+    DeviceIndex := 0;
+    Sorter := TComparer<TPointF>.Construct(
+      function(const Left, Right: TPointF): Integer
+      begin
+        if Left.X < Right.X then
+          Result := -1
+        else if Left.X > Right.X then
+          Result := 1
+        else
+          Result := 0;
+      end);
+
+    if FProcessingDevices <> nil then
+      for Device in FProcessingDevices do
+      begin
+        if (Device = nil) or (Device.State = osDeleted) or
+           IsProcessingDevicePendingRemoved(Device) then
+          Continue;
+
+        if (Device = SelectedDevice) and (FCurrentSession <> nil) then
+          Session := FCurrentSession
+        else
+          Session := GetActiveVisibleSession(Device);
+        if Session = nil then
+          Continue;
+
+        RawPoints := TList<TPointF>.Create;
+        AveragePoints := TList<TPointF>.Create;
+        Groups := TObjectDictionary<string, TList<TPointF>>.Create([doOwnsValues]);
+        try
+          if Device.Spillages <> nil then
+            for Spillage in Device.Spillages do
+              if (Spillage <> nil) and (Spillage.SessionID = Session.ID) then
+                AddSpillagePoint(Spillage);
+          if (RawPoints.Count = 0) and (Session.Spillages <> nil) then
+            for Spillage in Session.Spillages do
+              AddSpillagePoint(Spillage);
+          if RawPoints.Count = 0 then
+            Continue;
+
+          RawPoints.Sort(Sorter);
+          for Pair in Groups do
+          begin
+            SumX := 0;
+            SumY := 0;
+            for J := 0 to Pair.Value.Count - 1 do
+            begin
+              SumX := SumX + Pair.Value[J].X;
+              SumY := SumY + Pair.Value[J].Y;
+            end;
+            if Pair.Value.Count > 0 then
+              AveragePoints.Add(PointF(SumX / Pair.Value.Count,
+                SumY / Pair.Value.Count));
+          end;
+          AveragePoints.Sort(Sorter);
+
+          LegendBase := Trim(Device.Name);
+          if Trim(Device.SerialNumber) <> '' then
+            LegendBase := LegendBase + ' [' + Trim(Device.SerialNumber) + ']';
+
+          PointSeries := Chart1.AddSeries(LegendBase + ' — точки');
+          PointSeries.Color := GetChartDeviceColor(Device, False, DeviceIndex);
+          PointSeries.ShowLine := False;
+          PointSeries.ShowMarkers := True;
+          PointSeries.MarkerRadius := 4;
+          for I := 0 to RawPoints.Count - 1 do
+            PointSeries.AddPoint(RawPoints[I].X, RawPoints[I].Y);
+
+          LineSeries := Chart1.AddSeries(LegendBase + ' — среднее');
+          LineSeries.Color := GetChartDeviceColor(Device, True, DeviceIndex);
+          LineSeries.ShowLine := True;
+          LineSeries.ShowMarkers := False;
+          LineSeries.Thickness := 2;
+
+          MinStep := MaxDouble;
+          for I := 1 to AveragePoints.Count - 1 do
+            if (AveragePoints[I].X - AveragePoints[I - 1].X > 0) and
+               (AveragePoints[I].X - AveragePoints[I - 1].X < MinStep) then
+              MinStep := AveragePoints[I].X - AveragePoints[I - 1].X;
+
+          if AveragePoints.Count = 1 then
+            LineSeries.AddPoint(AveragePoints[0].X, AveragePoints[0].Y)
+          else if AveragePoints.Count > 1 then
+          begin
+            if SameValue(MinStep, MaxDouble) or (MinStep <= 0) then
+              MinStep := AveragePoints[AveragePoints.Count - 1].X -
+                AveragePoints[0].X;
+            for I := 0 to AveragePoints.Count - 2 do
+            begin
+              P1 := AveragePoints[I];
+              P2 := AveragePoints[I + 1];
+              LineSeries.AddPoint(P1.X, P1.Y);
+              StepX := P1.X + MinStep;
+              while StepX < P2.X - MinStep / 1000 do
+              begin
+                InterpolatedY := P1.Y + (P2.Y - P1.Y) *
+                  ((StepX - P1.X) / (P2.X - P1.X));
+                LineSeries.AddPoint(StepX, InterpolatedY);
+                StepX := StepX + MinStep;
+              end;
+            end;
+            P2 := AveragePoints[AveragePoints.Count - 1];
+            LineSeries.AddPoint(P2.X, P2.Y);
+          end;
+          Inc(DeviceIndex);
+        finally
+          Groups.Free;
+          AveragePoints.Free;
+          RawPoints.Free;
+        end;
+      end;
+  finally
+    Chart1.EndUpdate;
+  end;
+end;
+
+procedure TFrameProceed.ComboBoxChartDeviceChange(Sender: TObject);
+var
+  Device: TDevice;
+  Index: Integer;
+begin
+  if FChartColorUpdating or (ComboBoxChartDevice = nil) then
+    Exit;
+  Index := ComboBoxChartDevice.ItemIndex;
+  if (Index < 0) or (Index >= ComboBoxChartDevice.Items.Count) or
+     not (ComboBoxChartDevice.Items.Objects[Index] is TDevice) then
+    Exit;
+  Device := TDevice(ComboBoxChartDevice.Items.Objects[Index]);
+  FChartColorUpdating := True;
+  try
+    ComboColorBoxChartPoints.Color := GetChartDeviceColor(Device, False, Index);
+    ComboColorBoxChartLine.Color := GetChartDeviceColor(Device, True, Index);
+  finally
+    FChartColorUpdating := False;
+  end;
+end;
+
+procedure TFrameProceed.ComboColorBoxChartPointsChange(Sender: TObject);
+var
+  Device: TDevice;
+  Index: Integer;
+begin
+  if FChartColorUpdating or (ComboBoxChartDevice = nil) then
+    Exit;
+  Index := ComboBoxChartDevice.ItemIndex;
+  if (Index < 0) or (Index >= ComboBoxChartDevice.Items.Count) or
+     not (ComboBoxChartDevice.Items.Objects[Index] is TDevice) then
+    Exit;
+  Device := TDevice(ComboBoxChartDevice.Items.Objects[Index]);
+  FChartPointColors.AddOrSetValue(Device.UUID, ComboColorBoxChartPoints.Color);
+  UpdateSessionErrorChart;
+end;
+
+procedure TFrameProceed.ComboColorBoxChartLineChange(Sender: TObject);
+var
+  Device: TDevice;
+  Index: Integer;
+begin
+  if FChartColorUpdating or (ComboBoxChartDevice = nil) then
+    Exit;
+  Index := ComboBoxChartDevice.ItemIndex;
+  if (Index < 0) or (Index >= ComboBoxChartDevice.Items.Count) or
+     not (ComboBoxChartDevice.Items.Objects[Index] is TDevice) then
+    Exit;
+  Device := TDevice(ComboBoxChartDevice.Items.Objects[Index]);
+  FChartLineColors.AddOrSetValue(Device.UUID, ComboColorBoxChartLine.Color);
+  UpdateSessionErrorChart;
+end;
+
 procedure TFrameProceed.UpdateSessionItems;
 var
   Item: TTreeViewItem;
@@ -2032,6 +2384,7 @@ begin
     else if Item.Text = 'прочее' then
       ShowOtherDevicesResults;
   end;
+  UpdateSessionErrorChart;
   UpdateActionHints;
 end;
 
@@ -4483,6 +4836,9 @@ begin
     GridDataPoints.RowCount := 0;
   if GridCoefs <> nil then
     GridCoefs.RowCount := 0;
+  if Chart1 <> nil then
+    Chart1.ClearAllSeries;
+  UpdateChartColorControls;
 
   if FFrameCalibrCoefs <> nil then
     FFrameCalibrCoefs.Init(nil, cctMeterValueCoef, nil);
