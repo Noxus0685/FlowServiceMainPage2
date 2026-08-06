@@ -46,7 +46,8 @@ uses
   uProtocols,
   uWorkTable,
   uMKSDebug,
-  uMeasurementRun;
+  uMeasurementRun,
+  uGridLayoutManager;
 
 type
   // Направление сортировки таблицы обработки.
@@ -260,6 +261,8 @@ type
     // Принудительно синхронизирует видимость статических и динамических point-колонок GridResults с FResultPointColumns после построения и после загрузки layout.
     procedure NormalizeResultsPointColumnsVisibility;
     procedure UpdateResultsPointColumns;
+    function CreateResultsGridColumn(AOwner: TComponent;
+      ADefinition: TGridColumnDefinition): TColumn;
     function FindResultPointForColumn(ADevice: TDevice; const AColumn: TProceedResultPointColumn): TDevicePoint;
     // Проверяет принадлежность сохранённой проливки merged-колонке Summary по расходу и признакам эталона; не зависит от TMeasurementRun.Points.
     function IsProcessingSpillageInMergedColumn(ASpillage: TPointSpillage; const AColumn: TProceedResultPointColumn): Boolean;
@@ -392,6 +395,7 @@ type
     FLastDataPointsHintRow: Integer;
     FLastDataPointsHintCol: Integer;
     FApplyingGridColumnsLayout: Boolean;
+    FResultsGridLayoutState: TGridLayoutState;
     // Текущая сортировка таблицы точек обработки.
     FGridDataPointsSortColumn: string;
     FGridDataPointsSortDirection: TGridSortDirection;
@@ -483,6 +487,7 @@ begin
   FreeAndNil(FProcessingDevices);
   FreeAndNil(FManualProcessingDeviceUUIDs);
   FreeAndNil(FPendingRemovedProcessingUUIDs);
+  FreeAndNil(FResultsGridLayoutState);
   inherited;
 end;
 
@@ -490,6 +495,8 @@ procedure TFrameProceed.Initialize;
 var
   UnitName: string;
 begin
+  if FResultsGridLayoutState = nil then
+    FResultsGridLayoutState := TGridLayoutState.Create;
   FWorkTableManager := WorkTableManager;
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
 
@@ -3232,23 +3239,14 @@ end;
 
 procedure TFrameProceed.UpdateResultsPointColumns;
 var
-  PointColumnCount, StaticPointColumnCount, DynamicPointColumnCount, I: Integer;
-  Col: TStringColumn;
+  Definitions: TGridColumnDefinitions;
+  Column: TColumn;
+  I, PointIndex: Integer;
+  Header, Key: string;
 
   function FormatPointHeader(const APointName: string): string;
   begin
     Result := #948 + '(' + APointName + '), %';
-  end;
-
-  procedure ApplyPointColumn(AColumn: TStringColumn; const AIndex: Integer);
-  begin
-    if AColumn = nil then
-      Exit;
-    AColumn.Visible := AIndex < PointColumnCount;
-    if AColumn.Visible then
-      AColumn.Header := FormatPointHeader(FResultPointColumns[AIndex].Header);
-    AColumn.HeaderSettings.TextSettings.WordWrap := False;
-    AColumn.Stored := True;
   end;
 
   function IsDynamicPointColumn(AColumn: TColumn): Boolean;
@@ -3258,43 +3256,80 @@ var
        SameText(Copy(AColumn.Name, 1, Length('ProcessingPointColumn')), 'ProcessingPointColumn')) and
       (AColumn <> StringColumnResult) and (AColumn <> StringColumnResultComment);
   end;
-begin
-  PointColumnCount := Length(FResultPointColumns);
-  StaticPointColumnCount := Min(PointColumnCount, 4);
-  DynamicPointColumnCount := Max(PointColumnCount - 4, 0);
 
-  for I := GridResults.ColumnCount - 1 downto 0 do
-    if IsDynamicPointColumn(GridResults.Columns[I]) then
-      GridResults.Columns[I].Free;
-
-  ApplyPointColumn(StringColumnPointNum1, 0);
-  ApplyPointColumn(StringColumnPointNum2, 1);
-  ApplyPointColumn(StringColumnPointNum3, 2);
-  ApplyPointColumn(StringColumnPointNum4, 3);
-
-  for I := 4 to 4 + DynamicPointColumnCount - 1 do
+  procedure AddDynamicDefinitions;
   begin
-    Col := TStringColumn.Create(GridResults);
-    Col.Parent := GridResults;
-    Col.Name := Format('ProcessingPointColumn%d', [I + 1]);
-    Col.Tag := I;
-    Col.TagString := 'ProcessingDynamicPoint';
-    Col.Stored := False;
-    Col.Width := 125;
-    Col.HeaderSettings.TextSettings.Trimming := TTextTrimming.Character;
-    Col.HeaderSettings.TextSettings.WordWrap := False;
-    Col.HeaderSettings.TextSettings.HorzAlign := TTextAlign.Center;
-    Col.Header := FormatPointHeader(FResultPointColumns[I].Header);
-    Col.Index := StringColumnResult.Index;
+    for PointIndex := 4 to High(FResultPointColumns) do
+    begin
+      Key := 'point:' + FResultPointColumns[PointIndex].DeviceUUID + '|' +
+        FResultPointColumns[PointIndex].SourcePointUUID + '|' +
+        FResultPointColumns[PointIndex].EtalonUUID + '|' +
+        FloatToStr(FResultPointColumns[PointIndex].TargetFlow);
+      Definitions.Add(TGridColumnDefinition.Create(Key,
+        FormatPointHeader(FResultPointColumns[PointIndex].Header),
+        TStringColumn, 125, True, True));
+    end;
   end;
+begin
+  if FResultsGridLayoutState = nil then
+    FResultsGridLayoutState := TGridLayoutState.Create;
+  Definitions := TGridColumnDefinitions.Create(True);
+  try
+    { Describe the complete visual structure, but mark resource columns as
+      existing: the helper owns and recreates dynamic point columns only. }
+    for I := 0 to GridResults.ColumnCount - 1 do
+    begin
+      Column := GridResults.Columns[I];
+      if IsDynamicPointColumn(Column) then
+        Continue;
+      if Column = StringColumnResult then
+        AddDynamicDefinitions;
 
-  if StaticPointColumnCount > 0 then
-    StringColumnResult.Index := GridResults.ColumnCount - 2
-  else
-    StringColumnResult.Index := StringColumnResultSerial.Index + 1;
-  StringColumnResultComment.Index := StringColumnResult.Index + 1;
+      Header := Column.Header;
+      PointIndex := -1;
+      if Column = StringColumnPointNum1 then PointIndex := 0
+      else if Column = StringColumnPointNum2 then PointIndex := 1
+      else if Column = StringColumnPointNum3 then PointIndex := 2
+      else if Column = StringColumnPointNum4 then PointIndex := 3;
+      if (PointIndex >= 0) and (PointIndex < Length(FResultPointColumns)) then
+        Header := FormatPointHeader(FResultPointColumns[PointIndex].Header);
+      Definitions.Add(TGridColumnDefinition.Create('fixed:' + Column.Name,
+        Header, Column.ClassType, Column.Width, Column.ReadOnly,
+        (PointIndex < 0) or (PointIndex < Length(FResultPointColumns)), Column));
+    end;
 
-  NormalizeResultsPointColumnsVisibility;
+    if TGridLayoutManager.Apply(GridResults, FResultsGridLayoutState,
+      Definitions, CreateResultsGridColumn) then
+      NormalizeResultsPointColumnsVisibility;
+  finally
+    Definitions.Free;
+  end;
+end;
+
+function TFrameProceed.CreateResultsGridColumn(AOwner: TComponent;
+  ADefinition: TGridColumnDefinition): TColumn;
+var
+  I: Integer;
+  Key: string;
+begin
+  Result := TStringColumn.Create(AOwner);
+  for I := 4 to High(FResultPointColumns) do
+  begin
+    Key := 'point:' + FResultPointColumns[I].DeviceUUID + '|' +
+      FResultPointColumns[I].SourcePointUUID + '|' +
+      FResultPointColumns[I].EtalonUUID + '|' +
+      FloatToStr(FResultPointColumns[I].TargetFlow);
+    if Key = ADefinition.Key then
+    begin
+      Result.Tag := I;
+      Break;
+    end;
+  end;
+  Result.Name := 'ProcessingPointColumn' + IntToStr(Result.Tag + 1);
+  Result.TagString := 'ProcessingDynamicPoint';
+  Result.HeaderSettings.TextSettings.Trimming := TTextTrimming.Character;
+  Result.HeaderSettings.TextSettings.WordWrap := False;
+  Result.HeaderSettings.TextSettings.HorzAlign := TTextAlign.Center;
 end;
 
 function TFrameProceed.FindResultSpillageForPoint(ADevice: TDevice;
