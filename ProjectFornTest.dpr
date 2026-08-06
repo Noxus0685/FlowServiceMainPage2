@@ -37,6 +37,7 @@ uses
   uOpenXmlXlsx in 'uOpenXmlXlsx.pas',
   uResultsXlsxExporter in 'uResultsXlsxExporter.pas',
   uGridXlsxExporter in 'uGridXlsxExporter.pas',
+  uGridLayoutManager in 'uGridLayoutManager.pas',
   uTable_Data in 'uTable_Data.pas' {TableDM: TDataModule},
   uWorkTable in 'uWorkTable.pas',
   frmChannelProperties in 'frmChannelProperties.pas' {FrameChannelProperties: TFrame},
