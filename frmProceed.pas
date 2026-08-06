@@ -213,6 +213,8 @@ type
     MenuItemGridDataPointsClose: TMenuItem;
     MenuItemGridDataPointsColumns: TMenuItem;
     PopupMenuGridResults: TPopupMenu;
+    PopupMenuChart: TPopupMenu;
+    MenuItemChartDevices: TMenuItem;
     MenuItemGridResultsDelete: TMenuItem;
     MenuItemGridResultsClear: TMenuItem;
     MenuItemGridResultsClose: TMenuItem;
@@ -419,7 +421,6 @@ type
     FChartLineColors: TDictionary<string, TAlphaColor>;
     FChartDeviceVisibility: TDictionary<string, Boolean>;
     FChartColorUpdating: Boolean;
-    FChartPopupMenu: TPopupMenu;
     // Перестраивает зависимости погрешности от расхода для текущих сессий приборов.
     procedure UpdateSessionErrorChart;
     // Обновляет список приборов и выбранные пользовательские цвета графика.
@@ -520,7 +521,6 @@ begin
   FreeAndNil(FChartPointColors);
   FreeAndNil(FChartLineColors);
   FreeAndNil(FChartDeviceVisibility);
-  FreeAndNil(FChartPopupMenu);
   inherited;
 end;
 
@@ -563,8 +563,6 @@ begin
     ComboColorBoxChartPoints.OnChange := ComboColorBoxChartPointsChange;
   if ComboColorBoxChartLine <> nil then
     ComboColorBoxChartLine.OnChange := ComboColorBoxChartLineChange;
-  if FChartPopupMenu = nil then
-    FChartPopupMenu := TPopupMenu.Create(Self);
   if Chart1 <> nil then
   begin
     Chart1.PopupMenu := nil;
@@ -2147,18 +2145,46 @@ var
     if UseVolumeFlow then
     begin
       FlowValue := APoint.EtalonVolumeFlow;
-      if (FSessionEtalon <> nil) and
-         (FSessionEtalon.ValueVolumeFlow <> nil) then
-        FlowValue := FlowValue *
-          FSessionEtalon.ValueVolumeFlow.GetDimRate(FlowUnitName);
+      if (FlowValue <= 0) and (APoint.SpillTime > 0) then
+        FlowValue := APoint.EtalonVolume / APoint.SpillTime;
+      if FlowValue > 0 then
+      begin
+        if (FSessionEtalon <> nil) and
+           (FSessionEtalon.ValueVolumeFlow <> nil) then
+          FlowValue := FlowValue *
+            FSessionEtalon.ValueVolumeFlow.GetDimRate(FlowUnitName);
+      end
+      else
+      begin
+        FlowValue := APoint.QavgEtalon;
+        if (FActiveWorkTable <> nil) and
+           (FActiveWorkTable.TableFlow <> nil) and
+           (FActiveWorkTable.TableFlow.ValueFlow <> nil) then
+          FlowValue := FlowValue *
+            FActiveWorkTable.TableFlow.ValueFlow.GetDimRate(FlowUnitName);
+      end;
     end
     else
     begin
       FlowValue := APoint.EtalonMassFlow;
-      if (FSessionEtalon <> nil) and
-         (FSessionEtalon.ValueMassFlow <> nil) then
-        FlowValue := FlowValue *
-          FSessionEtalon.ValueMassFlow.GetDimRate(FlowUnitName);
+      if (FlowValue <= 0) and (APoint.SpillTime > 0) then
+        FlowValue := APoint.EtalonMass / APoint.SpillTime;
+      if FlowValue > 0 then
+      begin
+        if (FSessionEtalon <> nil) and
+           (FSessionEtalon.ValueMassFlow <> nil) then
+          FlowValue := FlowValue *
+            FSessionEtalon.ValueMassFlow.GetDimRate(FlowUnitName);
+      end
+      else
+      begin
+        FlowValue := APoint.QavgEtalon;
+        if (FActiveWorkTable <> nil) and
+           (FActiveWorkTable.TableFlow <> nil) and
+           (FActiveWorkTable.TableFlow.ValueFlow <> nil) then
+          FlowValue := FlowValue *
+            FActiveWorkTable.TableFlow.ValueFlow.GetDimRate(FlowUnitName);
+      end;
     end;
 
     if IsNan(FlowValue) or IsInfinite(FlowValue) or (FlowValue <= 0) then
@@ -2433,7 +2459,7 @@ begin
   end;
 end;
 
-// Формирует в контекстном меню графика независимые переключатели приборов.
+// Формирует пункты ПКМ по тому же шаблону, что и вкладка «Графики».
 procedure TFrameProceed.Chart1MouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 var
@@ -2443,12 +2469,15 @@ var
   P: TPointF;
 begin
   if (Button <> TMouseButton.mbRight) or not (Sender is TControl) or
-     (FChartPopupMenu = nil) then
+     (PopupMenuChart = nil) or (MenuItemChartDevices = nil) then
     Exit;
 
-  // Меню формируется до Popup: FMX не изменяет дочерние пункты уже открываемого меню.
-  while FChartPopupMenu.ChildrenCount > 0 do
-    FChartPopupMenu.Children[0].Free;
+  while MenuItemChartDevices.ItemsCount > 0 do
+  begin
+    Item := TMenuItem(
+      MenuItemChartDevices.Items[MenuItemChartDevices.ItemsCount - 1]);
+    Item.Free;
+  end;
 
   if FProcessingDevices <> nil then
     for Device in FProcessingDevices do
@@ -2459,16 +2488,16 @@ begin
         if Trim(Device.SerialNumber) <> '' then
           ItemText := ItemText + ' [' + Trim(Device.SerialNumber) + ']';
 
-        Item := TMenuItem.Create(FChartPopupMenu);
+        Item := TMenuItem.Create(nil);
         Item.Text := ItemText;
         Item.TagObject := Device;
         Item.IsChecked := IsChartDeviceVisible(Device);
         Item.OnClick := ChartDeviceVisibilityMenuClick;
-        FChartPopupMenu.AddObject(Item);
+        MenuItemChartDevices.AddObject(Item);
       end;
 
   P := TControl(Sender).LocalToScreen(PointF(X, Y));
-  FChartPopupMenu.Popup(P.X, P.Y);
+  PopupMenuChart.Popup(P.X, P.Y);
 end;
 
 // Переключает видимость серий независимо от состояния Enabled прибора.
