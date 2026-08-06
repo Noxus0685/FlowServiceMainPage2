@@ -407,7 +407,9 @@ type
     function FindResultSpillageForPoint(ADevice: TDevice; APoint: TDevicePoint): TPointSpillage;
     function GetPointResultError(const ADevice: TDevice; const APoint: TDevicePoint): Double;
     function GetPointResultFlowLS(const ADevice: TDevice; const APoint: TDevicePoint): Double;
-    // Форматирует погрешность по настройкам ValueError активного рабочего стола.
+    // Проверяет, содержит ли результат рассчитанную конечную погрешность.
+    function IsResultErrorValid(const AValue: Double): Boolean;
+    // Форматирует рассчитанную погрешность штатным GetStrNum прибора.
     function FormatResultErrorValue(const AValue: Double): string;
     function GetPointResultColor(ADevice: TDevice; ADevicePoint: TDevicePoint;
       ASpillage: TPointSpillage): TAlphaColor;
@@ -2221,13 +2223,21 @@ begin
       [AContext, DeviceUUID, SessionID, ARows, AColumns]));
 end;
 
+function TFrameProceed.IsResultErrorValid(const AValue: Double): Boolean;
+begin
+  Result := not IsNan(AValue) and not IsInfinite(AValue) and
+    (Abs(AValue) < MaxDouble);
+end;
+
 function TFrameProceed.FormatResultErrorValue(const AValue: Double): string;
 begin
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) and
-     (FActiveWorkTable.TableFlow.ValueError <> nil) then
-    Result := FActiveWorkTable.TableFlow.ValueError.GetStrNum(AValue)
+  if not IsResultErrorValid(AValue) then
+    Exit('-');
+
+  if (FSessionDevice <> nil) and (FSessionDevice.ValueError <> nil) then
+    Result := FSessionDevice.ValueError.GetStrNum(AValue)
   else
-    Result := FloatToStr(AValue);
+    Result := '-';
 end;
 
 function TFrameProceed.GetPointResultColor(ADevice: TDevice;
@@ -2273,7 +2283,7 @@ begin
       if Point = nil then
         Continue;
       Spillage := FindResultSpillageForPoint(ADevice, Point);
-      if Spillage = nil then
+      if (Spillage = nil) or not IsResultErrorValid(Spillage.Error) then
         Continue;
       Inc(FoundPointsCount);
       if Spillage.Validation = vsInvalid then
@@ -2406,6 +2416,7 @@ end;
 function TFrameProceed.IsProcessingSpillageInMergedColumn(ASpillage: TPointSpillage;
   const AColumn: TProceedResultPointColumn): Boolean;
 var
+  Device: TDevice;
   PointMinQ, PointMaxQ, PointDeltaQ: Double;
   NewCommonMinQ, NewCommonMaxQ, IntersectionQ, ControlDeltaQ: Double;
 begin
@@ -2413,8 +2424,14 @@ begin
   if (ASpillage = nil) or (ASpillage.State = osDeleted) or (not ASpillage.Enabled) or
      (not AColumn.EtalonRangeValid) then
     Exit;
+
+  Device := FindProcessingDeviceByUUID(ASpillage.DeviceUUID);
+  if (Device = nil) or IsNan(Device.Error) or IsInfinite(Device.Error) or
+     (Device.Error <= 0) then
+    Exit;
+
   if not CalculatePointFlowRange(ASpillage.QavgEtalon,
-    ASpillage.Error, PointMinQ, PointMaxQ, PointDeltaQ) then
+    Device.Error, PointMinQ, PointMaxQ, PointDeltaQ) then
     Exit;
   Result := TryMergePointRanges(AColumn.CommonMinQ,
     AColumn.CommonMaxQ, AColumn.MinEtalonDeltaQ, PointMinQ, PointMaxQ,
@@ -2457,8 +2474,7 @@ begin
     ASkipReason := 'MeasurementNotCompleted';
     Exit;
   end;
-  if IsNan(ASpillage.Error) or IsInfinite(ASpillage.Error) or
-     (Abs(ASpillage.Error) >= MaxDouble) then
+  if not IsResultErrorValid(ASpillage.Error) then
   begin
     ASkipReason := 'InvalidDoubleValue';
     Exit;
@@ -2712,6 +2728,7 @@ var
   begin
     Result := (ASpillage <> nil) and (ASpillage.State <> osDeleted) and
       ASpillage.Enabled and (ASpillage.Validation = vsValid) and
+      IsResultErrorValid(ASpillage.Error) and
       (not IsNan(ASpillage.QavgEtalon)) and (not IsInfinite(ASpillage.QavgEtalon));
   end;
 
@@ -2914,6 +2931,7 @@ var
   begin
     Result := (ASpillage <> nil) and (ASpillage.State <> osDeleted) and
       ASpillage.Enabled and (ASpillage.Validation = vsValid) and
+      IsResultErrorValid(ASpillage.Error) and
       (not IsNan(ASpillage.QavgEtalon)) and (not IsInfinite(ASpillage.QavgEtalon));
   end;
 
@@ -2971,21 +2989,15 @@ var
       AKeys := AKeys + Key;
   end;
 
-  function SpillagePointErrorPercent(AOwnerDevice: TDevice; ASpillage: TPointSpillage): Double;
-  var
-    MatchedPoint: TDevicePoint;
+  function SpillagePointErrorPercent(AOwnerDevice: TDevice;
+    ASpillage: TPointSpillage): Double;
   begin
     Result := NaN;
-    if (AOwnerDevice <> nil) and (ASpillage <> nil) then
-    begin
-      MatchedPoint := AOwnerDevice.FindMatchedDevicePointForSpillage(ASpillage);
-      if (MatchedPoint <> nil) and (not IsNan(MatchedPoint.Error)) and
-         (not IsInfinite(MatchedPoint.Error)) and (MatchedPoint.Error > 0) then
-        Exit(MatchedPoint.Error);
-    end;
-    if (ASpillage <> nil) and (not IsNan(ASpillage.Error)) and
-       (not IsInfinite(ASpillage.Error)) and (ASpillage.Error > 0) then
-      Result := ASpillage.Error;
+    if (AOwnerDevice <> nil) and (ASpillage <> nil) and
+       (not IsNan(AOwnerDevice.Error)) and
+       (not IsInfinite(AOwnerDevice.Error)) and
+       (AOwnerDevice.Error > 0) then
+      Result := AOwnerDevice.Error;
   end;
 
 begin
@@ -3334,7 +3346,8 @@ var
 begin
   Result := NaN;
   Spillage := FindResultSpillageForPoint(ADevice, APoint);
-  if (Spillage <> nil) and (Spillage.State <> osDeleted) and Spillage.Enabled then
+  if (Spillage <> nil) and (Spillage.State <> osDeleted) and Spillage.Enabled and
+     IsResultErrorValid(Spillage.Error) then
     Result := Spillage.Error;
 end;
 
@@ -3449,6 +3462,12 @@ begin
         Row.DeviceType := Device.DeviceTypeName;
         Row.Serial := Device.SerialNumber;
         Row.DeviceUUID := Device.UUID;
+
+        if FSessionDevice <> nil then
+        begin
+          FSessionDevice.Device := Device;
+          FSessionDevice.ApplyError;
+        end;
 
         FoundPointsCount := 0;
         RequiredPointsCount := 0;
@@ -5817,12 +5836,7 @@ begin
       Value := FloatToStr(P.DeviceVolumeFlow);
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageError then
-  begin
-    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
-      Value := FActiveWorkTable.TableFlow.ValueError.GetStrNum(P.Error)
-    else
-      Value := FloatToStr(P.Error);
-  end
+    Value := FormatResultErrorValue(P.Error)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageValid then
     Value := BuildSpillageStatusText(P)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageComment then
