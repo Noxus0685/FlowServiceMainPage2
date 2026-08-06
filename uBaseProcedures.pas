@@ -151,6 +151,21 @@ type
     mptsSkipped = 19
   );
 
+   // Этапы самостоятельной настройки линии без выхода на расход.
+  EHydraulicLineSetupStage = (
+    hlssNone,
+    hlssValidation,
+    hlssBuildCommandPlan,
+    hlssSetPneumaticValves,
+    hlssSetElectricValves,
+    hlssSetPumpFrequency,
+    hlssStartRegulatingPumps,
+    hlssStartUnregulatedPumps,
+    hlssFinalValidation,
+    hlssCompleted
+  );
+
+
   /// <summary>One physical-value sample stored by TMeterValue for stability analysis.</summary>
   TMeterValueSample = record
     /// <summary>Monotonic timestamp in milliseconds; used for intervals and never based on wall-clock time.</summary>
