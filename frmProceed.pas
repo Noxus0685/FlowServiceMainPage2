@@ -358,7 +358,9 @@ type
     procedure SetSessionDim(UnitName: string; QuantityUnitName: string);
     procedure ComboBoxUnitsResultChange(Sender: TObject);
     procedure ComboBoxChartDeviceChange(Sender: TObject);
-    procedure PopupMenuChartPopup(Sender: TObject);
+    // Формирует пункты ПКМ до его открытия и показывает меню по правому нажатию.
+    procedure Chart1MouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure ChartDeviceVisibilityMenuClick(Sender: TObject);
     procedure ComboColorBoxChartPointsChange(Sender: TObject);
     procedure ComboColorBoxChartLineChange(Sender: TObject);
@@ -562,13 +564,11 @@ begin
   if ComboColorBoxChartLine <> nil then
     ComboColorBoxChartLine.OnChange := ComboColorBoxChartLineChange;
   if FChartPopupMenu = nil then
-  begin
     FChartPopupMenu := TPopupMenu.Create(Self);
-    FChartPopupMenu.OnPopup := PopupMenuChartPopup;
-  end;
   if Chart1 <> nil then
   begin
-    Chart1.PopupMenu := FChartPopupMenu;
+    Chart1.PopupMenu := nil;
+    Chart1.OnMouseDown := Chart1MouseDown;
     Chart1.Title := 'Погрешность от расхода';
     Chart1.XTitle := 'Расход';
     Chart1.YTitle := 'Погрешность, %';
@@ -2434,36 +2434,41 @@ begin
 end;
 
 // Формирует в контекстном меню графика независимые переключатели приборов.
-procedure TFrameProceed.PopupMenuChartPopup(Sender: TObject);
+procedure TFrameProceed.Chart1MouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 var
   Device: TDevice;
   Item: TMenuItem;
   ItemText: string;
+  P: TPointF;
 begin
-  if FChartPopupMenu = nil then
+  if (Button <> TMouseButton.mbRight) or not (Sender is TControl) or
+     (FChartPopupMenu = nil) then
     Exit;
 
+  // Меню формируется до Popup: FMX не изменяет дочерние пункты уже открываемого меню.
   while FChartPopupMenu.ChildrenCount > 0 do
     FChartPopupMenu.Children[0].Free;
 
-  if FProcessingDevices = nil then
-    Exit;
+  if FProcessingDevices <> nil then
+    for Device in FProcessingDevices do
+      if (Device <> nil) and (Device.State <> osDeleted) and
+         not IsProcessingDevicePendingRemoved(Device) then
+      begin
+        ItemText := Trim(Device.Name);
+        if Trim(Device.SerialNumber) <> '' then
+          ItemText := ItemText + ' [' + Trim(Device.SerialNumber) + ']';
 
-  for Device in FProcessingDevices do
-    if (Device <> nil) and (Device.State <> osDeleted) and
-       not IsProcessingDevicePendingRemoved(Device) then
-    begin
-      ItemText := Trim(Device.Name);
-      if Trim(Device.SerialNumber) <> '' then
-        ItemText := ItemText + ' [' + Trim(Device.SerialNumber) + ']';
+        Item := TMenuItem.Create(FChartPopupMenu);
+        Item.Text := ItemText;
+        Item.TagObject := Device;
+        Item.IsChecked := IsChartDeviceVisible(Device);
+        Item.OnClick := ChartDeviceVisibilityMenuClick;
+        FChartPopupMenu.AddObject(Item);
+      end;
 
-      Item := TMenuItem.Create(FChartPopupMenu);
-      Item.Text := ItemText;
-      Item.TagObject := Device;
-      Item.IsChecked := IsChartDeviceVisible(Device);
-      Item.OnClick := ChartDeviceVisibilityMenuClick;
-      FChartPopupMenu.AddObject(Item);
-    end;
+  P := TControl(Sender).LocalToScreen(PointF(X, Y));
+  FChartPopupMenu.Popup(P.X, P.Y);
 end;
 
 // Переключает видимость серий независимо от состояния Enabled прибора.
