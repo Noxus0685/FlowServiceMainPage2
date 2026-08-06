@@ -19,7 +19,7 @@ type
     model to recalculate layout. Call it at meaningful update boundaries. }
   TGridStabilityController = class(TComponent)
   private
-    FGrid: TGrid;
+    FGrid: TCustomGrid;
     FFormName: string;
     FColumns: TDictionary<string, TGridColumnSnapshot>;
     FGridWidth: Single;
@@ -30,7 +30,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    procedure Attach(AGrid: TGrid; const AFormName: string);
+    procedure Attach(AGrid: TCustomGrid; const AFormName: string);
     procedure Snapshot(const AContext: string);
     function StructureChanged: Boolean;
     property StructuralSignature: string read FStructuralSignature;
@@ -58,7 +58,7 @@ begin
   inherited;
 end;
 
-procedure TGridStabilityController.Attach(AGrid: TGrid;
+procedure TGridStabilityController.Attach(AGrid: TCustomGrid;
   const AFormName: string);
 begin
   FGrid := AGrid;
