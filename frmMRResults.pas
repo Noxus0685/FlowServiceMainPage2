@@ -3,6 +3,7 @@
 interface
 
 uses
+  uGridStabilityRegistry,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Dialogs,
@@ -200,6 +201,7 @@ end;
 constructor TFrameMRResults.Create(AOwner: TComponent);
 begin
   inherited;
+  RegisterStableGrid(Self, GridMRResults, Name);
   FPointColumns := TObjectList<TStringColumn>.Create(False);
   FDisplayPoints := TObjectList<TDisplayPointGroup>.Create(True);
   FRows := TList<TChannel>.Create;

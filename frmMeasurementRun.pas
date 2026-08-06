@@ -3,6 +3,7 @@
 interface
 
 uses
+  uGridStabilityRegistry,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Forms,
@@ -143,6 +144,7 @@ implementation
 constructor TFrameMeasurementRun.Create(AOwner: TComponent);
 begin
   inherited;
+  RegisterStableGrid(Self, GridMeasurmentRun, Name);
   FInvalidPointIndexes := TList<Integer>.Create;
   FSubscribedMeasurementRun := nil;
   GridMeasurmentRun.ShowHint := True;

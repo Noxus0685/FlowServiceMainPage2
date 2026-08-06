@@ -3,6 +3,7 @@
 interface
 
 uses
+  uGridStabilityRegistry,
   FMX.ActnList,
   FMX.Controls,
   FMX.Controls.Presentation,
@@ -1313,6 +1314,7 @@ end;
 
 procedure TFormTypeSelect.FormCreate(Sender: TObject);
 begin
+  RegisterStableGrid(Self, GridTypes, Name);
 
    FSortColumn := -1;
    FSortAscending := True;

@@ -3,6 +3,7 @@
 interface
 
 uses
+  uGridStabilityRegistry,
   FMX.ActnList,
   FMX.Colors,
   FMX.ComboEdit,
@@ -2456,6 +2457,8 @@ var
   LayoutOrder: string;
 
 begin
+  RegisterStableGrid(Self, GridDevices, Name);
+  RegisterStableGrid(Self, GridEtalons, Name);
   EnsureFlowGraphDictionaries;
   if ButtonClearFlowGraphs <> nil then
     ButtonClearFlowGraphs.OnClick := ButtonClearFlowGraphsClick;
@@ -3582,10 +3585,14 @@ begin
       if Column = nil then
         Continue;
 
-      Column.Visible := AColumns[I].Visible;
-      if AColumns[I].Width > 0 then
+      if Column.Visible <> AColumns[I].Visible then
+        Column.Visible := AColumns[I].Visible;
+      if (AColumns[I].Width > 0) and
+         (Abs(Column.Width - AColumns[I].Width) > 0.01) then
         Column.Width := AColumns[I].Width;
-      if (AColumns[I].Position >= 0) and (AColumns[I].Position < AGrid.ColumnCount) then
+      if (AColumns[I].Position >= 0) and
+         (AColumns[I].Position < AGrid.ColumnCount) and
+         (Column.Index <> AColumns[I].Position) then
         Column.Index := AColumns[I].Position;
     end;
   finally
@@ -8194,6 +8201,7 @@ begin
   FAutoTestStatusLabel.Text := 'Тест не запускался';
 
   GridAutoTestNumbers := TGrid.Create(Self);
+  RegisterStableGrid(Self, GridAutoTestNumbers, Name);
   GridAutoTestNumbers.Parent := Layout;
   GridAutoTestNumbers.Align := TAlignLayout.Top;
   GridAutoTestNumbers.Height := 220;
@@ -8218,6 +8226,7 @@ begin
   AddStringColumn(GridAutoTestNumbers, 'Причина', 300);
 
   GridAutoTestResults := TGrid.Create(Self);
+  RegisterStableGrid(Self, GridAutoTestResults, Name);
   GridAutoTestResults.Parent := Layout;
   GridAutoTestResults.Align := TAlignLayout.Top;
   GridAutoTestResults.Height := 260;
