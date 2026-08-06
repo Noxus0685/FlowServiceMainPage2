@@ -20,6 +20,7 @@ type
     FColor: TAlphaColor;
     FThickness: Single;
     FShowMarkers: Boolean;
+    FShowLine: Boolean;
     FMarkerRadius: Single;
     FLegendName: string;
     FVisible: Boolean;
@@ -27,6 +28,7 @@ type
     procedure SetColor(const Value: TAlphaColor);
     procedure SetThickness(const Value: Single);
     procedure SetShowMarkers(const Value: Boolean);
+    procedure SetShowLine(const Value: Boolean);
     procedure SetMarkerRadius(const Value: Single);
     procedure SetLegendName(const Value: string);
     procedure SetVisible(const Value: Boolean);
@@ -39,6 +41,7 @@ type
     property Color: TAlphaColor read FColor write SetColor;
     property Thickness: Single read FThickness write SetThickness;
     property ShowMarkers: Boolean read FShowMarkers write SetShowMarkers;
+    property ShowLine: Boolean read FShowLine write SetShowLine;
     property MarkerRadius: Single read FMarkerRadius write SetMarkerRadius;
     property LegendName: string read FLegendName write SetLegendName;
     property Visible: Boolean read FVisible write SetVisible;
@@ -187,6 +190,7 @@ begin
   FColor := $FF0000FF;   // синий
   FThickness := 2;
   FShowMarkers := True;
+  FShowLine := True;
   FMarkerRadius := 3;
   FLegendName := '';
   FVisible := True;
@@ -228,6 +232,13 @@ procedure TChartSeries.SetShowMarkers(const Value: Boolean);
 begin
   if FShowMarkers <> Value then
     FShowMarkers := Value;
+end;
+
+// Включает или отключает соединяющую линию серии независимо от маркеров.
+procedure TChartSeries.SetShowLine(const Value: Boolean);
+begin
+  if FShowLine <> Value then
+    FShowLine := Value;
 end;
 
 procedure TChartSeries.SetMarkerRadius(const Value: Single);
@@ -308,11 +319,15 @@ begin
     Result.Color := FSeries[0].Color;
     Result.Thickness := FSeries[0].Thickness;
     Result.ShowMarkers := FSeries[0].ShowMarkers;
+    Result.ShowLine := FSeries[0].ShowLine;
     Result.MarkerRadius := FSeries[0].MarkerRadius;
   end;
   FSeries.Add(Result);
-  UpdateRanges;
-  Repaint;
+  if not FUpdating then
+  begin
+    UpdateRanges;
+    Repaint;
+  end;
 end;
 
 procedure TSimpleChart.RemoveSeries(Index: Integer);
@@ -330,8 +345,11 @@ end;
 procedure TSimpleChart.ClearAllSeries;
 begin
   FSeries.Clear;
-  UpdateRanges;
-  Repaint;
+  if not FUpdating then
+  begin
+    UpdateRanges;
+    Repaint;
+  end;
 end;
 
 function TSimpleChart.GetSeries(Index: Integer): TChartSeries;
@@ -712,34 +730,36 @@ begin
   for i := 0 to FSeries.Count - 1 do
   begin
     series := FSeries[i];
-    if not series.Visible then Continue;
-    if series.Points.Count <= 1 then Continue;
+    if not series.Visible then
+      Continue;
+    if series.Points.Count = 0 then
+      Continue;
 
     SetLength(screenPoints, series.Points.Count);
     for j := 0 to series.Points.Count - 1 do
       screenPoints[j] := WorldToScreen(series.Points[j]);
 
-    Canvas.Stroke.Color := series.Color;
-    Canvas.Stroke.Thickness := series.Thickness;
-    Canvas.Stroke.Kind := TBrushKind.Solid;
-
-    for j := 0 to Length(screenPoints) - 2 do
-      if series.LineStyle = clsSolid then
-        Canvas.DrawLine(screenPoints[j], screenPoints[j+1], 1)
-      else
-      begin
-        { FMX has no portable dashed stroke.  Split each segment into short
-          strokes, which keeps the style consistent on every backend. }
-        Delta := screenPoints[j + 1] - screenPoints[j];
-        LengthPx := Sqrt(Sqr(Delta.X) + Sqr(Delta.Y));
-        DashPos := 0;
-        while (LengthPx > 0) and (DashPos < LengthPx) do
+    if series.ShowLine and (Length(screenPoints) > 1) then
+    begin
+      Canvas.Stroke.Color := series.Color;
+      Canvas.Stroke.Thickness := series.Thickness;
+      Canvas.Stroke.Kind := TBrushKind.Solid;
+      for j := 0 to Length(screenPoints) - 2 do
+        if series.LineStyle = clsSolid then
+          Canvas.DrawLine(screenPoints[j], screenPoints[j+1], 1)
+        else
         begin
-          Canvas.DrawLine(screenPoints[j] + Delta * (DashPos / LengthPx),
-            screenPoints[j] + Delta * (Min(DashPos + 6, LengthPx) / LengthPx), 1);
-          DashPos := DashPos + 10;
+          Delta := screenPoints[j + 1] - screenPoints[j];
+          LengthPx := Sqrt(Sqr(Delta.X) + Sqr(Delta.Y));
+          DashPos := 0;
+          while (LengthPx > 0) and (DashPos < LengthPx) do
+          begin
+            Canvas.DrawLine(screenPoints[j] + Delta * (DashPos / LengthPx),
+              screenPoints[j] + Delta * (Min(DashPos + 6, LengthPx) / LengthPx), 1);
+            DashPos := DashPos + 10;
+          end;
         end;
-      end;
+    end;
 
     if series.ShowMarkers then
       DrawMarkersForSeries(series);
