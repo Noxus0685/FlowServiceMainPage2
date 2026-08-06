@@ -163,7 +163,6 @@ type
     Chart1: TSimpleChart;
     LabelChartDevice: TLabel;
     ComboBoxChartDevice: TComboBox;
-    CheckBoxChartDeviceVisible: TCheckBox;
     LabelChartPointColor: TLabel;
     ComboColorBoxChartPoints: TComboColorBox;
     LabelChartLineColor: TLabel;
@@ -357,8 +356,10 @@ type
     procedure GridDataPointsHeaderClick(Column: TColumn);
     procedure UpdateGridDataPointsHeaders(QuantityDimName: string; FlowDimName: string);
     procedure SetSessionDim(UnitName: string; QuantityUnitName: string);
+    procedure ComboBoxUnitsResultChange(Sender: TObject);
     procedure ComboBoxChartDeviceChange(Sender: TObject);
-    procedure CheckBoxChartDeviceVisibleChange(Sender: TObject);
+    procedure PopupMenuChartPopup(Sender: TObject);
+    procedure ChartDeviceVisibilityMenuClick(Sender: TObject);
     procedure ComboColorBoxChartPointsChange(Sender: TObject);
     procedure ComboColorBoxChartLineChange(Sender: TObject);
     procedure UpdateCalibrCoefsFrame;
@@ -416,6 +417,7 @@ type
     FChartLineColors: TDictionary<string, TAlphaColor>;
     FChartDeviceVisibility: TDictionary<string, Boolean>;
     FChartColorUpdating: Boolean;
+    FChartPopupMenu: TPopupMenu;
     // Перестраивает зависимости погрешности от расхода для текущих сессий приборов.
     procedure UpdateSessionErrorChart;
     // Обновляет список приборов и выбранные пользовательские цвета графика.
@@ -516,6 +518,7 @@ begin
   FreeAndNil(FChartPointColors);
   FreeAndNil(FChartLineColors);
   FreeAndNil(FChartDeviceVisibility);
+  FreeAndNil(FChartPopupMenu);
   inherited;
 end;
 
@@ -554,16 +557,20 @@ begin
 
   if ComboBoxChartDevice <> nil then
     ComboBoxChartDevice.OnChange := ComboBoxChartDeviceChange;
-  if CheckBoxChartDeviceVisible <> nil then
-    CheckBoxChartDeviceVisible.OnChange := CheckBoxChartDeviceVisibleChange;
   if ComboColorBoxChartPoints <> nil then
     ComboColorBoxChartPoints.OnChange := ComboColorBoxChartPointsChange;
   if ComboColorBoxChartLine <> nil then
     ComboColorBoxChartLine.OnChange := ComboColorBoxChartLineChange;
+  if FChartPopupMenu = nil then
+  begin
+    FChartPopupMenu := TPopupMenu.Create(Self);
+    FChartPopupMenu.OnPopup := PopupMenuChartPopup;
+  end;
   if Chart1 <> nil then
   begin
+    Chart1.PopupMenu := FChartPopupMenu;
     Chart1.Title := 'Погрешность от расхода';
-    Chart1.XTitle := 'Расход, л/с';
+    Chart1.XTitle := 'Расход';
     Chart1.YTitle := 'Погрешность, %';
     Chart1.ShowLegend := True;
   end;
@@ -620,6 +627,7 @@ begin
     ComboBoxUnitsResult.ItemIndex := 4
   else if ComboBoxUnitsResult.Items.Count > 0 then
     ComboBoxUnitsResult.ItemIndex := 0;
+  ComboBoxUnitsResult.OnChange := ComboBoxUnitsResultChange;
 
   LoadProcessingDevices;
   LoadManualProcessingDevices;
@@ -2102,12 +2110,7 @@ begin
         GetChartDeviceColor(SelectedDevice, False, SelectedIndex);
       ComboColorBoxChartLine.Color :=
         GetChartDeviceColor(SelectedDevice, True, SelectedIndex);
-      if CheckBoxChartDeviceVisible <> nil then
-        CheckBoxChartDeviceVisible.IsChecked :=
-          IsChartDeviceVisible(SelectedDevice);
-    end
-    else if CheckBoxChartDeviceVisible <> nil then
-      CheckBoxChartDeviceVisible.IsChecked := False;
+    end;
   finally
     FChartColorUpdating := False;
   end;
@@ -2117,7 +2120,7 @@ end;
 // усреднённая по оси Y погрешность — сглаженной линией без маркеров.
 procedure TFrameProceed.UpdateSessionErrorChart;
 const
-  CCurvePointsPerMinStep = 32;
+  CCurvePointsPerInterval = 24;
 var
   Device, SelectedDevice: TDevice;
   Session: TSessionSpillage;
@@ -2129,21 +2132,45 @@ var
   PointSeries, LineSeries: TChartSeries;
   Sorter: IComparer<TPointF>;
   P1, P2: TPointF;
-  GroupKey, LegendBase: string;
-  I, J, DeviceIndex, SameXCount, SampleCount: Integer;
-  SumY, MinStep, CurveStep, X, Y, CurrentX, SameXSum: Double;
+  GroupKey, LegendBase, FlowUnitName: string;
+  I, J, DeviceIndex, SameXCount: Integer;
+  SumY, X, Y, CurrentX, SameXSum, FlowValue: Double;
+  ChartMinX, ChartMaxX, ChartPaddingX: Double;
+  UseVolumeFlow: Boolean;
 
   procedure AddSpillagePoint(APoint: TPointSpillage);
   begin
     if (APoint = nil) or (APoint.State = osDeleted) or not APoint.Enabled or
-       (APoint.QavgEtalon <= 0) or not IsResultErrorValid(APoint.Error) then
+       not IsResultErrorValid(APoint.Error) then
       Exit;
 
-    P1 := PointF(APoint.QavgEtalon, APoint.Error);
+    if UseVolumeFlow then
+    begin
+      FlowValue := APoint.EtalonVolumeFlow;
+      if (FSessionEtalon <> nil) and
+         (FSessionEtalon.ValueVolumeFlow <> nil) then
+        FlowValue := FlowValue *
+          FSessionEtalon.ValueVolumeFlow.GetDimRate(FlowUnitName);
+    end
+    else
+    begin
+      FlowValue := APoint.EtalonMassFlow;
+      if (FSessionEtalon <> nil) and
+         (FSessionEtalon.ValueMassFlow <> nil) then
+        FlowValue := FlowValue *
+          FSessionEtalon.ValueMassFlow.GetDimRate(FlowUnitName);
+    end;
+
+    if IsNan(FlowValue) or IsInfinite(FlowValue) or (FlowValue <= 0) then
+      Exit;
+
+    P1 := PointF(FlowValue, APoint.Error);
     RawPoints.Add(P1);
+    ChartMinX := Min(ChartMinX, FlowValue);
+    ChartMaxX := Max(ChartMaxX, FlowValue);
     GroupKey := Trim(APoint.Name);
     if GroupKey = '' then
-      GroupKey := FormatFloat('0.############', APoint.QavgEtalon);
+      GroupKey := FormatFloat('0.############', FlowValue);
     if not Groups.TryGetValue(GroupKey, GroupPoints) then
     begin
       GroupPoints := TList<TPointF>.Create;
@@ -2201,7 +2228,18 @@ begin
   if Chart1 = nil then
     Exit;
 
-  UpdateChartColorControls;
+  FlowUnitName := '';
+  if ComboBoxUnitsResult <> nil then
+    FlowUnitName := Trim(ComboBoxUnitsResult.Text);
+  if (FlowUnitName = '') and (FActiveWorkTable <> nil) then
+    FlowUnitName := Trim(FActiveWorkTable.FlowUnitName);
+  if FlowUnitName = '' then
+    FlowUnitName := 'л/с';
+
+  UseVolumeFlow := IsVolumeFlowUnit(FlowUnitName);
+  ChartMinX := MaxDouble;
+  ChartMaxX := -MaxDouble;
+  Chart1.XTitle := 'Расход, ' + FlowUnitName;
   Chart1.BeginUpdate;
   try
     Chart1.ClearAllSeries;
@@ -2309,28 +2347,20 @@ begin
           LineSeries.ShowMarkers := False;
           LineSeries.Thickness := 2;
 
-          MinStep := MaxDouble;
-          for I := 1 to CurvePoints.Count - 1 do
-            if (CurvePoints[I].X - CurvePoints[I - 1].X > 0) and
-               (CurvePoints[I].X - CurvePoints[I - 1].X < MinStep) then
-              MinStep := CurvePoints[I].X - CurvePoints[I - 1].X;
-
           if CurvePoints.Count = 1 then
             LineSeries.AddPoint(CurvePoints[0].X, CurvePoints[0].Y)
           else if CurvePoints.Count > 1 then
           begin
-            if SameValue(MinStep, MaxDouble) or (MinStep <= 0) then
-              MinStep := CurvePoints[CurvePoints.Count - 1].X -
-                CurvePoints[0].X;
-            CurveStep := MinStep / CCurvePointsPerMinStep;
+            // Фиксированное число точек на интервал ограничивает нагрузку
+            // при очень близких значениях расхода.
             for I := 0 to CurvePoints.Count - 2 do
             begin
               P1 := CurvePoints[I];
               P2 := CurvePoints[I + 1];
-              SampleCount := Max(2, Integer(Ceil((P2.X - P1.X) / CurveStep)));
-              for J := 0 to SampleCount - 1 do
+              for J := 0 to CCurvePointsPerInterval - 1 do
               begin
-                X := P1.X + (P2.X - P1.X) * J / SampleCount;
+                X := P1.X + (P2.X - P1.X) * J /
+                  CCurvePointsPerInterval;
                 Y := InterpolateCurveY(I, X);
                 LineSeries.AddPoint(X, Y);
               end;
@@ -2347,8 +2377,39 @@ begin
         end;
       end;
   finally
+    if (ChartMinX <> MaxDouble) and (ChartMaxX <> -MaxDouble) then
+    begin
+      Chart1.AutoRangeX := False;
+      if SameValue(ChartMinX, ChartMaxX) then
+        ChartPaddingX := Max(Abs(ChartMaxX) * 0.1, 1.0)
+      else
+        ChartPaddingX := (ChartMaxX - ChartMinX) * 0.1;
+      Chart1.XMin := ChartMinX;
+      Chart1.XMax := ChartMaxX + ChartPaddingX;
+    end
+    else
+      Chart1.AutoRangeX := True;
     Chart1.EndUpdate;
   end;
+end;
+
+// Применяет выбранную единицу расхода к таблице и графику текущей сессии.
+procedure TFrameProceed.ComboBoxUnitsResultChange(Sender: TObject);
+var
+  UnitName, QuantityUnitName: string;
+begin
+  if ComboBoxUnitsResult = nil then
+    Exit;
+
+  UnitName := Trim(ComboBoxUnitsResult.Text);
+  if UnitName = '' then
+    Exit;
+
+  QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
+  SetSessionDim(UnitName, QuantityUnitName);
+  UpdateGridDataPointsHeaders(QuantityUnitName, UnitName);
+  UpdateGridDataPoints;
+  UpdateSessionErrorChart;
 end;
 
 procedure TFrameProceed.ComboBoxChartDeviceChange(Sender: TObject);
@@ -2372,24 +2433,57 @@ begin
   end;
 end;
 
-// Включает или отключает обе серии выбранного прибора.
-procedure TFrameProceed.CheckBoxChartDeviceVisibleChange(Sender: TObject);
+// Формирует в контекстном меню графика независимые переключатели приборов.
+procedure TFrameProceed.PopupMenuChartPopup(Sender: TObject);
 var
   Device: TDevice;
-  Index: Integer;
+  Item: TMenuItem;
+  ItemText: string;
 begin
-  if FChartColorUpdating or (ComboBoxChartDevice = nil) or
-     (CheckBoxChartDeviceVisible = nil) then
+  if FChartPopupMenu = nil then
     Exit;
 
-  Index := ComboBoxChartDevice.ItemIndex;
-  if (Index < 0) or (Index >= ComboBoxChartDevice.Items.Count) or
-     not (ComboBoxChartDevice.Items.Objects[Index] is TDevice) then
+  while FChartPopupMenu.ChildrenCount > 0 do
+    FChartPopupMenu.Children[0].Free;
+
+  if FProcessingDevices = nil then
     Exit;
 
-  Device := TDevice(ComboBoxChartDevice.Items.Objects[Index]);
-  FChartDeviceVisibility.AddOrSetValue(Device.UUID,
-    CheckBoxChartDeviceVisible.IsChecked);
+  for Device in FProcessingDevices do
+    if (Device <> nil) and (Device.State <> osDeleted) and
+       not IsProcessingDevicePendingRemoved(Device) then
+    begin
+      ItemText := Trim(Device.Name);
+      if Trim(Device.SerialNumber) <> '' then
+        ItemText := ItemText + ' [' + Trim(Device.SerialNumber) + ']';
+
+      Item := TMenuItem.Create(FChartPopupMenu);
+      Item.Text := ItemText;
+      Item.TagObject := Device;
+      Item.IsChecked := IsChartDeviceVisible(Device);
+      Item.OnClick := ChartDeviceVisibilityMenuClick;
+      FChartPopupMenu.AddObject(Item);
+    end;
+end;
+
+// Переключает видимость серий независимо от состояния Enabled прибора.
+procedure TFrameProceed.ChartDeviceVisibilityMenuClick(Sender: TObject);
+var
+  Device: TDevice;
+  Item: TMenuItem;
+  NewVisible: Boolean;
+begin
+  if not (Sender is TMenuItem) then
+    Exit;
+
+  Item := TMenuItem(Sender);
+  if not (Item.TagObject is TDevice) then
+    Exit;
+
+  Device := TDevice(Item.TagObject);
+  NewVisible := not IsChartDeviceVisible(Device);
+  FChartDeviceVisibility.AddOrSetValue(Device.UUID, NewVisible);
+  Item.IsChecked := NewVisible;
   UpdateSessionErrorChart;
 end;
 
@@ -2517,6 +2611,7 @@ begin
     else if Item.Text = 'прочее' then
       ShowOtherDevicesResults;
   end;
+  UpdateChartColorControls;
   UpdateSessionErrorChart;
   UpdateActionHints;
 end;
