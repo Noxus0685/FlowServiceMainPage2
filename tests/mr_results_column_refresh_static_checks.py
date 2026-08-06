@@ -35,25 +35,18 @@ def test_measurement_notification_is_content_only():
         assert operation in notify_body
 
 
-def test_column_builder_has_no_op_structure_guard_and_atomic_rebuild():
+def test_column_builder_delegates_atomic_rebuild_to_layout_manager():
     body = procedure_body("BuildColumns")
-    guard = body.index("RequiredSignature = FColumnStructureSignature")
-    mutation = body.index("GridMRResults.BeginUpdate")
-    assert guard < mutation
-    assert body.count("GridMRResults.BeginUpdate") == 1
-    assert body.count("GridMRResults.EndUpdate") == 1
+    assert body.count("TGridLayoutManager.Apply") == 1
     assert "GetDisplayPointKey" in body
-    assert "Widths.TryGetValue" in body
-    assert "GridMRResults.Model.BeginUpdate" in body
-    assert "GridMRResults.Model.ContentChanged" in body
+    assert "GridMRResults.BeginUpdate" not in body
+    assert "GridMRResults.EndUpdate" not in body
+    assert "GridMRResults.Model.ContentChanged" not in body
+    assert "GridMRResults.Model.InvalidateContentSize" not in body
 
 
 def test_other_dynamic_grid_rebuild_sites_are_explicitly_audited():
-    """The repository-wide search currently has one other dynamic grid owner.
-
-    Its rebuild is UpdateResultsPointColumns, not a periodic UpdateUI/OnNotify
-    path; keeping this assertion makes any new recreation site fail review.
-    """
+    """Dynamic column ownership is centralized in the layout manager."""
     sources = Path(__file__).parents[1].glob("*.pas")
     recreation_sites = {
         path.name
@@ -62,4 +55,9 @@ def test_other_dynamic_grid_rebuild_sites_are_explicitly_audited():
             encoding="utf-8-sig", errors="ignore"
         )
     }
-    assert recreation_sites == {"frmProceed.pas"}
+    assert recreation_sites == set()
+
+    proceed = (Path(__file__).parents[1] / "frmProceed.pas").read_text(
+        encoding="utf-8-sig"
+    )
+    assert "TGridLayoutManager.Apply(GridResults" in proceed

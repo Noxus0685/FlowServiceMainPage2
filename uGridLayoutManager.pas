@@ -47,6 +47,7 @@ type
   TGridLayoutManager = class
   public
     class function BuildSignature(const ADefinitions: TGridColumnDefinitions): string; static;
+    class procedure CaptureWidths(AState: TGridLayoutState); static;
     class function Apply(AGrid: TGrid; AState: TGridLayoutState;
       const ADefinitions: TGridColumnDefinitions;
       const AFactory: TGridColumnFactory;
@@ -101,6 +102,20 @@ begin
       IntToStr(Length(Definition.Header)) + ':' + Definition.Header + '|' +
       Definition.ColumnClass.ClassName + '|' + BoolToStr(Definition.ReadOnly, True) +
       '|' + BoolToStr(Definition.Visible, True) + #10;
+end;
+
+class procedure TGridLayoutManager.CaptureWidths(AState: TGridLayoutState);
+var
+  Pair: TPair<string, TColumn>;
+begin
+  if AState = nil then
+    Exit;
+
+  { Capture only at an explicit, trusted boundary.  In particular, never feed
+    widths produced by the FMX layout pass after EndUpdate back into state. }
+  for Pair in AState.FColumns do
+    if Pair.Value <> nil then
+      AState.FWidths.AddOrSetValue(Pair.Key, Pair.Value.Width);
 end;
 
 class function TGridLayoutManager.Apply(AGrid: TGrid;
@@ -190,12 +205,9 @@ begin
 
   AState.FApplying := True;
   try
-    { This is the sole width snapshot.  It must precede every structural or
-      model mutation; in particular, layout-generated widths are never copied
-      back after EndUpdate/ContentChanged. }
-    for Pair in AState.FColumns do
-      if Pair.Value <> nil then
-        AState.FWidths.AddOrSetValue(Pair.Key, Pair.Value.Width);
+    { A changed signature confirms that a structural rebuild is about to run,
+      so the current user-visible widths form a trustworthy snapshot. }
+    CaptureWidths(AState);
     OldColumns := AState.FColumns.ToArray;
 
     for Definition in ADefinitions do
@@ -224,6 +236,14 @@ begin
         if Column = nil then
           Column := OldColumnForKey(Key);
         IsNewColumn := Column = nil;
+        if (not IsNewColumn) and (Definition.ExistingColumn = nil) and
+           (Column.ClassType <> Definition.ColumnClass) then
+        begin
+          if Column.Owner = AGrid then
+            Column.Free;
+          Column := nil;
+          IsNewColumn := True;
+        end;
         if IsNewColumn then
         begin
           if not Assigned(AFactory) then
@@ -245,15 +265,18 @@ begin
         if Column.Visible <> Definition.Visible then
           Column.Visible := Definition.Visible;
 
-        { Existing columns keep their width.  Only a factory-created column
-          receives either its pre-structure snapshot or its initial width. }
-        if IsNewColumn then
+        { During a real rebuild, restore a trusted pre-rebuild width if FMX
+          changed an existing column while applying Parent/Index.  A replacement
+          column uses the same stable-key snapshot, or its declared initial
+          width when that key has never existed. }
+        if AState.FWidths.TryGetValue(Key, SavedWidth) then
         begin
-          if not AState.FWidths.TryGetValue(Key, SavedWidth) then
-            SavedWidth := Definition.InitialWidth;
           if Abs(Column.Width - SavedWidth) >= CWidthEpsilon then
             Column.Width := SavedWidth;
         end;
+        if IsNewColumn and not AState.FWidths.ContainsKey(Key) and
+           (Abs(Column.Width - Definition.InitialWidth) >= CWidthEpsilon) then
+          Column.Width := Definition.InitialWidth;
         LogColumn('after Width', Key, Column,
           AState.FWidths.TryGetValue(Key, SavedWidth), SavedWidth);
 
@@ -274,16 +297,6 @@ begin
         AState.FWidths.TryGetValue(Definition.Key, SavedWidth), SavedWidth);
     end;
 
-    { Diagnostic variant: notify through ContentChanged only.  Keeping this
-      separate from InvalidateContentSize makes any forced model layout visible
-      in the phase logs instead of combining two possible triggers. }
-    AGrid.Model.ContentChanged;
-    for Definition in ADefinitions do
-    begin
-      Column := AState.FColumns[Definition.Key];
-      LogColumn('after Model.ContentChanged', Definition.Key, Column,
-        AState.FWidths.TryGetValue(Definition.Key, SavedWidth), SavedWidth);
-    end;
     AState.FLastSignature := Signature;
     Result := True;
   finally

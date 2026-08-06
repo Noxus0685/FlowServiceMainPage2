@@ -15,8 +15,7 @@ def method(text, signature, next_signature):
 def test_equal_signature_is_a_strict_no_op_before_fmx_mutation():
     apply = method(HELPER, 'class function TGridLayoutManager.Apply', 'end.\n')
     guard = apply.index('if Signature = AState.FLastSignature')
-    for mutation in ('AGrid.BeginUpdate', '.Parent :=', '.Index :=', '.Width :=',
-                     'AGrid.Model.ContentChanged'):
+    for mutation in ('AGrid.BeginUpdate', '.Parent :=', '.Index :=', '.Width :='):
         assert guard < apply.index(mutation)
     assert 'Exit(False)' in apply[guard:apply.index('AGrid.BeginUpdate')]
 
@@ -71,10 +70,13 @@ def test_structural_mutations_are_conditional_and_width_snapshot_is_before_updat
     assert 'if Column.Parent <> AGrid then' in apply
     assert 'if Abs(Column.Width - SavedWidth) >= CWidthEpsilon then' in apply
     assert 'if Column.Index <> DesiredIndex then' in apply
-    snapshot = apply.index('AState.FWidths.AddOrSetValue')
+    snapshot = apply.index('CaptureWidths(AState)')
     assert snapshot < apply.index('AGrid.BeginUpdate')
-    assert apply.count('AState.FWidths.AddOrSetValue') == 1
-    assert apply.index('if IsNewColumn then') < apply.index('Column.Width :=')
+    assert 'AState.FWidths.AddOrSetValue' not in apply
+    capture = method(HELPER, 'class procedure TGridLayoutManager.CaptureWidths',
+                     'class function TGridLayoutManager.Apply')
+    assert capture.count('AState.FWidths.AddOrSetValue') == 1
+    assert 'if IsNewColumn and not AState.FWidths.ContainsKey(Key)' in apply
 
 
 def test_apply_reentrancy_and_diagnostics_are_present():
@@ -83,9 +85,16 @@ def test_apply_reentrancy_and_diagnostics_are_present():
     assert 'AState.FApplying := True' in apply
     assert 'AState.FApplying := False' in apply
     for stage in ('before BeginUpdate', 'after Parent', 'after Width',
-                  'after Index', 'after EndUpdate',
-                  'after Model.ContentChanged'):
+                  'after Index', 'after EndUpdate'):
         assert stage in apply
     assert 'AStructureContext' in apply
     assert 'FApplyCount' in apply
     assert 'AGrid.Model.InvalidateContentSize' not in apply
+
+
+def test_end_update_is_the_only_publication_point():
+    apply = method(HELPER, 'class function TGridLayoutManager.Apply', 'end.\n')
+    after_end_update = apply[apply.index('AGrid.EndUpdate;') + len('AGrid.EndUpdate;'):]
+    assert 'ContentChanged' not in after_end_update
+    assert 'InvalidateContentSize' not in after_end_update
+    assert 'after Model.ContentChanged' not in apply
