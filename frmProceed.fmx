@@ -433,7 +433,7 @@ object FrameProceed: TFrameProceed
               end
               object Chart1: TSimpleChart
                 Align = Client
-                Margins.Top = 155.000000000000000000
+                Margins.Top = 130.000000000000000000
                 Margins.Bottom = 5.000000000000000000
                 XMax = 100.000000000000000000
                 YMax = 100.000000000000000000
@@ -467,16 +467,6 @@ object FrameProceed: TFrameProceed
                 Size.Height = 24.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 5
-              end
-              object CheckBoxChartDeviceVisible: TCheckBox
-                Position.X = 10.000000000000000000
-                Position.Y = 126.000000000000000000
-                Size.Width = 145.000000000000000000
-                Size.Height = 22.000000000000000000
-                Size.PlatformDefault = False
-                IsChecked = True
-                Text = #1055#1086#1082#1072#1079#1099#1074#1072#1090#1100#32#1087#1088#1080#1073#1086#1088
-                TabOrder = 10
               end
               object LabelChartPointColor: TLabel
                 Position.X = 163.000000000000000000
