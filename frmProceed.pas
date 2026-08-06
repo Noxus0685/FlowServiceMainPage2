@@ -163,6 +163,7 @@ type
     Chart1: TSimpleChart;
     LabelChartDevice: TLabel;
     ComboBoxChartDevice: TComboBox;
+    CheckBoxChartDeviceVisible: TCheckBox;
     LabelChartPointColor: TLabel;
     ComboColorBoxChartPoints: TComboColorBox;
     LabelChartLineColor: TLabel;
@@ -357,6 +358,7 @@ type
     procedure UpdateGridDataPointsHeaders(QuantityDimName: string; FlowDimName: string);
     procedure SetSessionDim(UnitName: string; QuantityUnitName: string);
     procedure ComboBoxChartDeviceChange(Sender: TObject);
+    procedure CheckBoxChartDeviceVisibleChange(Sender: TObject);
     procedure ComboColorBoxChartPointsChange(Sender: TObject);
     procedure ComboColorBoxChartLineChange(Sender: TObject);
     procedure UpdateCalibrCoefsFrame;
@@ -412,6 +414,7 @@ type
     FGridDataPointsSortDirection: TGridSortDirection;
     FChartPointColors: TDictionary<string, TAlphaColor>;
     FChartLineColors: TDictionary<string, TAlphaColor>;
+    FChartDeviceVisibility: TDictionary<string, Boolean>;
     FChartColorUpdating: Boolean;
     // Перестраивает зависимости погрешности от расхода для текущих сессий приборов.
     procedure UpdateSessionErrorChart;
@@ -419,6 +422,8 @@ type
     procedure UpdateChartColorControls;
     function GetChartDeviceColor(ADevice: TDevice; const ALineColor: Boolean;
       const ADefaultIndex: Integer): TAlphaColor;
+    // Возвращает сохранённую видимость прибора на графике.
+    function IsChartDeviceVisible(ADevice: TDevice): Boolean;
   public
     { Public declarations }
     procedure Initialize;
@@ -510,6 +515,7 @@ begin
   FreeAndNil(FResultsGridLayoutState);
   FreeAndNil(FChartPointColors);
   FreeAndNil(FChartLineColors);
+  FreeAndNil(FChartDeviceVisibility);
   inherited;
 end;
 
@@ -543,9 +549,13 @@ begin
     FChartPointColors := TDictionary<string, TAlphaColor>.Create;
   if FChartLineColors = nil then
     FChartLineColors := TDictionary<string, TAlphaColor>.Create;
+  if FChartDeviceVisibility = nil then
+    FChartDeviceVisibility := TDictionary<string, Boolean>.Create;
 
   if ComboBoxChartDevice <> nil then
     ComboBoxChartDevice.OnChange := ComboBoxChartDeviceChange;
+  if CheckBoxChartDeviceVisible <> nil then
+    CheckBoxChartDeviceVisible.OnChange := CheckBoxChartDeviceVisibleChange;
   if ComboColorBoxChartPoints <> nil then
     ComboColorBoxChartPoints.OnChange := ComboColorBoxChartPointsChange;
   if ComboColorBoxChartLine <> nil then
@@ -553,7 +563,7 @@ begin
   if Chart1 <> nil then
   begin
     Chart1.Title := 'Погрешность от расхода';
-    Chart1.XTitle := 'Расход';
+    Chart1.XTitle := 'Расход, л/с';
     Chart1.YTitle := 'Погрешность, %';
     Chart1.ShowLegend := True;
   end;
@@ -2015,6 +2025,26 @@ begin
   end;
 end;
 
+// Возвращает сохранённую видимость прибора на графике.
+function TFrameProceed.IsChartDeviceVisible(ADevice: TDevice): Boolean;
+var
+  Key: string;
+begin
+  Result := True;
+  if (ADevice = nil) or (FChartDeviceVisibility = nil) then
+    Exit;
+
+  Key := Trim(ADevice.UUID);
+  if Key = '' then
+    Exit;
+
+  if not FChartDeviceVisibility.TryGetValue(Key, Result) then
+  begin
+    Result := True;
+    FChartDeviceVisibility.AddOrSetValue(Key, Result);
+  end;
+end;
+
 // Обновляет список приборов и отображает сохранённые цвета выбранного прибора.
 procedure TFrameProceed.UpdateChartColorControls;
 var
@@ -2049,6 +2079,7 @@ begin
           ComboBoxChartDevice.Items.AddObject(ItemText, Device);
           GetChartDeviceColor(Device, False, I);
           GetChartDeviceColor(Device, True, I);
+          IsChartDeviceVisible(Device);
           if SameText(Device.UUID, SelectedUUID) then
             SelectedIndex := ComboBoxChartDevice.Items.Count - 1;
           Inc(I);
@@ -2071,20 +2102,27 @@ begin
         GetChartDeviceColor(SelectedDevice, False, SelectedIndex);
       ComboColorBoxChartLine.Color :=
         GetChartDeviceColor(SelectedDevice, True, SelectedIndex);
-    end;
+      if CheckBoxChartDeviceVisible <> nil then
+        CheckBoxChartDeviceVisible.IsChecked :=
+          IsChartDeviceVisible(SelectedDevice);
+    end
+    else if CheckBoxChartDeviceVisible <> nil then
+      CheckBoxChartDeviceVisible.IsChecked := False;
   finally
     FChartColorUpdating := False;
   end;
 end;
 
 // Перестраивает график: исходные измерения рисуются маркерами,
-// усреднённая по повторениям погрешность — линией без маркеров.
+// усреднённая по оси Y погрешность — сглаженной линией без маркеров.
 procedure TFrameProceed.UpdateSessionErrorChart;
+const
+  CCurvePointsPerMinStep = 32;
 var
   Device, SelectedDevice: TDevice;
   Session: TSessionSpillage;
   Spillage: TPointSpillage;
-  RawPoints, AveragePoints: TList<TPointF>;
+  RawPoints, AveragePoints, CurvePoints: TList<TPointF>;
   Groups: TObjectDictionary<string, TList<TPointF>>;
   GroupPoints: TList<TPointF>;
   Pair: TPair<string, TList<TPointF>>;
@@ -2092,8 +2130,8 @@ var
   Sorter: IComparer<TPointF>;
   P1, P2: TPointF;
   GroupKey, LegendBase: string;
-  I, J, DeviceIndex: Integer;
-  SumY, MinStep, StepX, InterpolatedY: Double;
+  I, J, DeviceIndex, SameXCount, SampleCount: Integer;
+  SumY, MinStep, CurveStep, X, Y, CurrentX, SameXSum: Double;
 
   procedure AddSpillagePoint(APoint: TPointSpillage);
   begin
@@ -2112,6 +2150,51 @@ var
       Groups.Add(GroupKey, GroupPoints);
     end;
     GroupPoints.Add(P1);
+  end;
+
+  // Рассчитывает Y по параболе через три соседние усреднённые точки.
+  function InterpolateCurveY(const AIntervalIndex: Integer;
+    const AX: Double): Double;
+  var
+    A, B, C, LeftPoint, RightPoint: TPointF;
+    D0, D1, D2: Double;
+  begin
+    LeftPoint := CurvePoints[AIntervalIndex];
+    RightPoint := CurvePoints[AIntervalIndex + 1];
+    if CurvePoints.Count < 3 then
+      Exit(LeftPoint.Y + (RightPoint.Y - LeftPoint.Y) *
+        ((AX - LeftPoint.X) / (RightPoint.X - LeftPoint.X)));
+
+    if AIntervalIndex = 0 then
+    begin
+      A := CurvePoints[0];
+      B := CurvePoints[1];
+      C := CurvePoints[2];
+    end
+    else if AIntervalIndex >= CurvePoints.Count - 2 then
+    begin
+      A := CurvePoints[CurvePoints.Count - 3];
+      B := CurvePoints[CurvePoints.Count - 2];
+      C := CurvePoints[CurvePoints.Count - 1];
+    end
+    else
+    begin
+      A := CurvePoints[AIntervalIndex - 1];
+      B := CurvePoints[AIntervalIndex];
+      C := CurvePoints[AIntervalIndex + 1];
+    end;
+
+    D0 := (A.X - B.X) * (A.X - C.X);
+    D1 := (B.X - A.X) * (B.X - C.X);
+    D2 := (C.X - A.X) * (C.X - B.X);
+    if SameValue(D0, 0.0) or SameValue(D1, 0.0) or
+       SameValue(D2, 0.0) then
+      Exit(LeftPoint.Y + (RightPoint.Y - LeftPoint.Y) *
+        ((AX - LeftPoint.X) / (RightPoint.X - LeftPoint.X)));
+
+    Result := A.Y * (AX - B.X) * (AX - C.X) / D0 +
+      B.Y * (AX - A.X) * (AX - C.X) / D1 +
+      C.Y * (AX - A.X) * (AX - B.X) / D2;
   end;
 
 begin
@@ -2142,15 +2225,25 @@ begin
            IsProcessingDevicePendingRemoved(Device) then
           Continue;
 
+        if not IsChartDeviceVisible(Device) then
+        begin
+          Inc(DeviceIndex);
+          Continue;
+        end;
+
         if (Device = SelectedDevice) and (FCurrentSession <> nil) then
           Session := FCurrentSession
         else
           Session := GetActiveVisibleSession(Device);
         if Session = nil then
+        begin
+          Inc(DeviceIndex);
           Continue;
+        end;
 
         RawPoints := TList<TPointF>.Create;
         AveragePoints := TList<TPointF>.Create;
+        CurvePoints := TList<TPointF>.Create;
         Groups := TObjectDictionary<string, TList<TPointF>>.Create([doOwnsValues]);
         try
           if Device.Spillages <> nil then
@@ -2161,7 +2254,10 @@ begin
             for Spillage in Session.Spillages do
               AddSpillagePoint(Spillage);
           if RawPoints.Count = 0 then
+          begin
+            Inc(DeviceIndex);
             Continue;
+          end;
 
           RawPoints.Sort(Sorter);
           for Pair in Groups do
@@ -2176,6 +2272,25 @@ begin
           end;
           AveragePoints.Sort(Sorter);
 
+          // Объединяем только совпадающие X; расход между группами не усредняется.
+          I := 0;
+          while I < AveragePoints.Count do
+          begin
+            CurrentX := AveragePoints[I].X;
+            SameXSum := 0;
+            SameXCount := 0;
+            J := I;
+            while (J < AveragePoints.Count) and
+                  SameValue(AveragePoints[J].X, CurrentX) do
+            begin
+              SameXSum := SameXSum + AveragePoints[J].Y;
+              Inc(SameXCount);
+              Inc(J);
+            end;
+            CurvePoints.Add(PointF(CurrentX, SameXSum / SameXCount));
+            I := J;
+          end;
+
           LegendBase := Trim(Device.Name);
           if Trim(Device.SerialNumber) <> '' then
             LegendBase := LegendBase + ' [' + Trim(Device.SerialNumber) + ']';
@@ -2188,45 +2303,45 @@ begin
           for I := 0 to RawPoints.Count - 1 do
             PointSeries.AddPoint(RawPoints[I].X, RawPoints[I].Y);
 
-          LineSeries := Chart1.AddSeries(LegendBase + ' — среднее');
+          LineSeries := Chart1.AddSeries(LegendBase + ' — средняя линия');
           LineSeries.Color := GetChartDeviceColor(Device, True, DeviceIndex);
           LineSeries.ShowLine := True;
           LineSeries.ShowMarkers := False;
           LineSeries.Thickness := 2;
 
           MinStep := MaxDouble;
-          for I := 1 to AveragePoints.Count - 1 do
-            if (AveragePoints[I].X - AveragePoints[I - 1].X > 0) and
-               (AveragePoints[I].X - AveragePoints[I - 1].X < MinStep) then
-              MinStep := AveragePoints[I].X - AveragePoints[I - 1].X;
+          for I := 1 to CurvePoints.Count - 1 do
+            if (CurvePoints[I].X - CurvePoints[I - 1].X > 0) and
+               (CurvePoints[I].X - CurvePoints[I - 1].X < MinStep) then
+              MinStep := CurvePoints[I].X - CurvePoints[I - 1].X;
 
-          if AveragePoints.Count = 1 then
-            LineSeries.AddPoint(AveragePoints[0].X, AveragePoints[0].Y)
-          else if AveragePoints.Count > 1 then
+          if CurvePoints.Count = 1 then
+            LineSeries.AddPoint(CurvePoints[0].X, CurvePoints[0].Y)
+          else if CurvePoints.Count > 1 then
           begin
             if SameValue(MinStep, MaxDouble) or (MinStep <= 0) then
-              MinStep := AveragePoints[AveragePoints.Count - 1].X -
-                AveragePoints[0].X;
-            for I := 0 to AveragePoints.Count - 2 do
+              MinStep := CurvePoints[CurvePoints.Count - 1].X -
+                CurvePoints[0].X;
+            CurveStep := MinStep / CCurvePointsPerMinStep;
+            for I := 0 to CurvePoints.Count - 2 do
             begin
-              P1 := AveragePoints[I];
-              P2 := AveragePoints[I + 1];
-              LineSeries.AddPoint(P1.X, P1.Y);
-              StepX := P1.X + MinStep;
-              while StepX < P2.X - MinStep / 1000 do
+              P1 := CurvePoints[I];
+              P2 := CurvePoints[I + 1];
+              SampleCount := Max(2, Integer(Ceil((P2.X - P1.X) / CurveStep)));
+              for J := 0 to SampleCount - 1 do
               begin
-                InterpolatedY := P1.Y + (P2.Y - P1.Y) *
-                  ((StepX - P1.X) / (P2.X - P1.X));
-                LineSeries.AddPoint(StepX, InterpolatedY);
-                StepX := StepX + MinStep;
+                X := P1.X + (P2.X - P1.X) * J / SampleCount;
+                Y := InterpolateCurveY(I, X);
+                LineSeries.AddPoint(X, Y);
               end;
             end;
-            P2 := AveragePoints[AveragePoints.Count - 1];
+            P2 := CurvePoints[CurvePoints.Count - 1];
             LineSeries.AddPoint(P2.X, P2.Y);
           end;
           Inc(DeviceIndex);
         finally
           Groups.Free;
+          CurvePoints.Free;
           AveragePoints.Free;
           RawPoints.Free;
         end;
@@ -2255,6 +2370,27 @@ begin
   finally
     FChartColorUpdating := False;
   end;
+end;
+
+// Включает или отключает обе серии выбранного прибора.
+procedure TFrameProceed.CheckBoxChartDeviceVisibleChange(Sender: TObject);
+var
+  Device: TDevice;
+  Index: Integer;
+begin
+  if FChartColorUpdating or (ComboBoxChartDevice = nil) or
+     (CheckBoxChartDeviceVisible = nil) then
+    Exit;
+
+  Index := ComboBoxChartDevice.ItemIndex;
+  if (Index < 0) or (Index >= ComboBoxChartDevice.Items.Count) or
+     not (ComboBoxChartDevice.Items.Objects[Index] is TDevice) then
+    Exit;
+
+  Device := TDevice(ComboBoxChartDevice.Items.Objects[Index]);
+  FChartDeviceVisibility.AddOrSetValue(Device.UUID,
+    CheckBoxChartDeviceVisible.IsChecked);
+  UpdateSessionErrorChart;
 end;
 
 procedure TFrameProceed.ComboColorBoxChartPointsChange(Sender: TObject);
