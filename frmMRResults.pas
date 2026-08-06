@@ -80,6 +80,7 @@ type
     FRows: TList<TChannel>;
     FProceed: TObject;
     FRefreshing: Boolean;
+    FColumnStructureSignature: string;
 
     function GetMeasurementRun: TMeasurementRun;
     procedure SetActiveWorkTable(const Value: TWorkTable);
@@ -87,6 +88,8 @@ type
     procedure DetachMeasurementRun;
 
     procedure BuildColumns;
+    function GetDisplayPointKey(AGroup: TDisplayPointGroup): string;
+    function GetColumnStructureSignature: string;
     function HasCurrentMeasurementPoints: Boolean;
     procedure BuildRows;
     procedure RefreshRows;
@@ -539,8 +542,15 @@ end;
 
 procedure TFrameMRResults.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
 begin
-  if Sender is TMeasurementRun then
-    UpdateUI;
+  if (Sender is TMeasurementRun) and not FRefreshing then
+  begin
+    { Measurement notifications normally only change cell values and states.
+      Keeping the existing TColumn instances also keeps user column widths. }
+    BuildRows;
+    RefreshRows;
+    GridMRResults.Repaint;
+    ButtonExportExcel.Enabled := (FRows.Count > 0) and HasExportableResults;
+  end;
 end;
 
 procedure TFrameMRResults.UpdateUI;
@@ -563,11 +573,7 @@ begin
   FRefreshing := True;
   try
     if FProceed is TFrameProceed then TFrameProceed(FProceed).RefreshResultsTab;
-    BuildRows;
-    BuildColumns;
-    RefreshRows;
     UpdateUI;
-    GridMRResults.Repaint;
   finally
     FRefreshing := False;
   end;
@@ -598,42 +604,116 @@ var
   I: Integer;
   Col: TStringColumn;
   Group: TDisplayPointGroup;
+  RequiredDisplayPoints, PreviousDisplayPoints: TObjectList<TDisplayPointGroup>;
+  RequiredSignature, Key: string;
+  Widths: TDictionary<string, Single>;
+  SavedWidth: Single;
 begin
-  FPointColumns.Clear;
-  FDisplayPoints.Clear;
-
-  GridMRResults.BeginUpdate;
+  { Build the desired model away from the live grid.  This is intentionally
+    done before touching Parent/Index or freeing a column. }
+  RequiredDisplayPoints := TObjectList<TDisplayPointGroup>.Create(True);
+  PreviousDisplayPoints := FDisplayPoints;
+  FDisplayPoints := RequiredDisplayPoints;
   try
-    while GridMRResults.ColumnCount > 2 do
-      if (GridMRResults.Columns[1] <> StringColumnResult) then
-        GridMRResults.Columns[1].Free
-      else
-        Break;
-
-    StringColumnName.Index := 0;
-    StringColumnResult.Index := GridMRResults.ColumnCount - 1;
-    if not HasCurrentMeasurementPoints then Exit;
-
-    for I := 0 to MeasurementRun.Points.Count - 1 do
-      if (MeasurementRun.Points[I] <> nil) and MeasurementRun.Points[I].Enabled then
-        AddScenarioDisplayPoint(MeasurementRun.Points[I]);
+    if HasCurrentMeasurementPoints then
+      for I := 0 to MeasurementRun.Points.Count - 1 do
+        if (MeasurementRun.Points[I] <> nil) and MeasurementRun.Points[I].Enabled then
+          AddScenarioDisplayPoint(MeasurementRun.Points[I]);
     MakeDisplayHeadersUnique;
-    for Group in FDisplayPoints do
-    begin
-      Col := TStringColumn.Create(GridMRResults);
-      Col.Parent := GridMRResults;
-      Col.HeaderSettings.TextSettings.WordWrap := False;
-      Col.Stored := False;
-      Col.Width := 130;
-      Col.Header := Group.Header;
-      Col.Index := GridMRResults.ColumnCount - 1;
-      FPointColumns.Add(Col);
-    end;
-    StringColumnResult.Index := GridMRResults.ColumnCount - 1;
+    RequiredSignature := GetColumnStructureSignature;
   finally
-    GridMRResults.EndUpdate;
+    FDisplayPoints := PreviousDisplayPoints;
   end;
-  SetGridReadOnly(GridMRResults);
+
+  if RequiredSignature = FColumnStructureSignature then
+  begin
+    RequiredDisplayPoints.Free;
+    Exit;
+  end;
+
+  Widths := TDictionary<string, Single>.Create;
+  try
+    Widths.AddOrSetValue('fixed:name', StringColumnName.Width);
+    Widths.AddOrSetValue('fixed:result', StringColumnResult.Width);
+    for I := 0 to Min(FPointColumns.Count, FDisplayPoints.Count) - 1 do
+      Widths.AddOrSetValue(GetDisplayPointKey(FDisplayPoints[I]), FPointColumns[I].Width);
+
+    GridMRResults.BeginUpdate;
+    try
+      FPointColumns.Clear;
+      while GridMRResults.ColumnCount > 2 do
+        if (GridMRResults.Columns[1] <> StringColumnResult) then
+          GridMRResults.Columns[1].Free
+        else
+          Break;
+
+      StringColumnName.Index := 0;
+      StringColumnResult.Index := GridMRResults.ColumnCount - 1;
+      if Widths.ContainsKey('fixed:name') then
+        StringColumnName.Width := Widths['fixed:name'];
+      if Widths.ContainsKey('fixed:result') then
+        StringColumnResult.Width := Widths['fixed:result'];
+
+      for Group in RequiredDisplayPoints do
+      begin
+        Col := TStringColumn.Create(GridMRResults);
+        Col.Parent := GridMRResults;
+        Col.HeaderSettings.TextSettings.WordWrap := False;
+        Col.Stored := False;
+        Key := GetDisplayPointKey(Group);
+        if Widths.TryGetValue(Key, SavedWidth) then
+          Col.Width := SavedWidth
+        else
+          Col.Width := 130;
+        Col.Header := Group.Header;
+        Col.Index := GridMRResults.ColumnCount - 1;
+        FPointColumns.Add(Col);
+      end;
+      StringColumnResult.Index := GridMRResults.ColumnCount - 1;
+      FDisplayPoints.Free;
+      FDisplayPoints := RequiredDisplayPoints;
+      RequiredDisplayPoints := nil;
+      FColumnStructureSignature := RequiredSignature;
+    finally
+      GridMRResults.EndUpdate;
+    end;
+    { FMX keeps a separate model/presentation cache.  Synchronize it only
+      after the atomic component update has completed. }
+    GridMRResults.Model.BeginUpdate;
+    try
+      GridMRResults.Model.InvalidateContentSize;
+      GridMRResults.Model.ContentChanged;
+    finally
+      GridMRResults.Model.EndUpdate;
+    end;
+    SetGridReadOnly(GridMRResults);
+  finally
+    Widths.Free;
+    RequiredDisplayPoints.Free;
+  end;
+end;
+
+function TFrameMRResults.GetDisplayPointKey(AGroup: TDisplayPointGroup): string;
+var
+  Participant: TDisplayPointParticipant;
+begin
+  Result := 'point:';
+  if AGroup = nil then Exit;
+  if AGroup.ScenarioPoint <> nil then
+    Result := Result + 'scenario=' + AGroup.ScenarioPoint.UUID;
+  for Participant in AGroup.Participants do
+    Result := Result + '|participant=' + Participant.DeviceUUID + ':' +
+      Participant.DeviceChannelUUID + ':' + Participant.SourcePointUUID;
+end;
+
+function TFrameMRResults.GetColumnStructureSignature: string;
+var
+  Group: TDisplayPointGroup;
+begin
+  Result := 'table=' + IntToHex(NativeInt(Pointer(FActiveWorkTable)),
+    SizeOf(Pointer) * 2);
+  for Group in FDisplayPoints do
+    Result := Result + #10 + GetDisplayPointKey(Group);
 end;
 
 function TFrameMRResults.HasCurrentMeasurementPoints: Boolean;
