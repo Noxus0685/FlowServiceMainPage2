@@ -3,6 +3,7 @@
 interface
 
 uses
+  uGridStabilityRegistry,
   FMX.ComboEdit,
   FMX.ActnList,
   FMX.Controls,
@@ -762,6 +763,8 @@ end;
 
  begin
    inherited Create(AOwner);
+   RegisterStableGrid(Self, GridPoints, Name);
+   RegisterStableGrid(Self, GridDiameters, Name);
    FDiameterQ2 := TDictionary<Integer, Double>.Create;
    FDiameterQ4 := TDictionary<Integer, Double>.Create;
    TabItemCoefs.Visible := False;
@@ -1079,6 +1082,7 @@ begin
   FButtonCoefClear.OnClick := ButtonCoefClearClick;
 
   FGridCoefs := TGrid.Create(TabItemCoefs);
+  RegisterStableGrid(Self, FGridCoefs, Name);
   FGridCoefs.Parent := TabItemCoefs;
   FGridCoefs.Align := TAlignLayout.Client;
   FGridCoefs.Options := FGridCoefs.Options + [TGridOption.Editing];

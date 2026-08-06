@@ -3,6 +3,7 @@
 interface
 
 uses
+  uGridStabilityRegistry,
   FMX.ActnList,
   FMX.Controls,
   FMX.Controls.Presentation,
@@ -285,6 +286,7 @@ end;
 constructor TFormDeviceSelect.Create(AOwner: TComponent);
 begin
   inherited;
+  RegisterStableGrid(Self, GridDevices, Name);
   FDeletedDeviceUUIDs := TStringList.Create;
   FDeletedDeviceUUIDs.Duplicates := dupIgnore;
   FDeletedDeviceUUIDs.CaseSensitive := False;

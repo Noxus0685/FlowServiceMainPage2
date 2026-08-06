@@ -3,6 +3,7 @@
 interface
 
 uses
+  uGridStabilityRegistry,
   FMX.ActnList,
   FMX.Controls,
   FMX.Controls.Presentation,
@@ -495,6 +496,9 @@ procedure TFrameProceed.Initialize;
 var
   UnitName: string;
 begin
+  RegisterStableGrid(Self, GridResults, Name);
+  RegisterStableGrid(Self, GridDataPoints, Name);
+  RegisterStableGrid(Self, GridCoefs, Name);
   if FResultsGridLayoutState = nil then
     FResultsGridLayoutState := TGridLayoutState.Create;
   FWorkTableManager := WorkTableManager;
@@ -1448,8 +1452,10 @@ begin
       if Column = nil then
         Continue;
 
-      Column.Visible := SortedColumns[I].Visible;
-      if SortedColumns[I].Width > 0 then
+      if Column.Visible <> SortedColumns[I].Visible then
+        Column.Visible := SortedColumns[I].Visible;
+      if (SortedColumns[I].Width > 0) and
+         (Abs(Column.Width - SortedColumns[I].Width) > 0.01) then
         Column.Width := SortedColumns[I].Width;
     end;
 
@@ -1470,7 +1476,8 @@ begin
       // Index is the standard FMX column move mechanism and triggers the grid
       // model's normal reindexing. Suppress the resulting save callback while
       // the complete saved order is still being restored.
-      Column.Index := TargetIndex;
+      if Column.Index <> TargetIndex then
+        Column.Index := TargetIndex;
       ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutLoaded',
         'Загружена раскладка столбца',
         Format('GridName=%s; ColumnName=%s; SavedPosition=%d; AppliedPosition=%d',
