@@ -432,6 +432,9 @@ object FrameProceed: TFrameProceed
                 TabOrder = 0
               end
               object Chart1: TSimpleChart
+                Align = Client
+                Margins.Top = 130.000000000000000000
+                Margins.Bottom = 5.000000000000000000
                 XMax = 100.000000000000000000
                 YMax = 100.000000000000000000
                 LineColor = claBlue
@@ -447,6 +450,57 @@ object FrameProceed: TFrameProceed
                 MarginBottom = 40.000000000000000000
                 XTitleOffset = 5.000000000000000000
                 YTitleOffset = 30.000000000000000000
+              end
+              object LabelChartDevice: TLabel
+                Position.X = 10.000000000000000000
+                Position.Y = 78.000000000000000000
+                Size.Width = 145.000000000000000000
+                Size.Height = 18.000000000000000000
+                Size.PlatformDefault = False
+                Text = #1055#1088#1080#1073#1086#1088
+                TabOrder = 4
+              end
+              object ComboBoxChartDevice: TComboBox
+                Position.X = 10.000000000000000000
+                Position.Y = 98.000000000000000000
+                Size.Width = 145.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 5
+              end
+              object LabelChartPointColor: TLabel
+                Position.X = 163.000000000000000000
+                Position.Y = 78.000000000000000000
+                Size.Width = 82.000000000000000000
+                Size.Height = 18.000000000000000000
+                Size.PlatformDefault = False
+                Text = #1058#1086#1095#1082#1080
+                TabOrder = 6
+              end
+              object ComboColorBoxChartPoints: TComboColorBox
+                Position.X = 163.000000000000000000
+                Position.Y = 98.000000000000000000
+                Size.Width = 82.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 7
+              end
+              object LabelChartLineColor: TLabel
+                Position.X = 253.000000000000000000
+                Position.Y = 78.000000000000000000
+                Size.Width = 82.000000000000000000
+                Size.Height = 18.000000000000000000
+                Size.PlatformDefault = False
+                Text = #1051#1080#1085#1080#1103
+                TabOrder = 8
+              end
+              object ComboColorBoxChartLine: TComboColorBox
+                Position.X = 253.000000000000000000
+                Position.Y = 98.000000000000000000
+                Size.Width = 82.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 9
               end
               object LabelSessionActive: TLabel
                 Position.X = 16.000000000000000000
