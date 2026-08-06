@@ -3,6 +3,7 @@
 interface
 
 uses
+  uGridStabilityRegistry,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Forms,
@@ -143,6 +144,7 @@ implementation
 constructor TFrameMeasurementRun.Create(AOwner: TComponent);
 begin
   inherited;
+  RegisterStableGrid(Self, GridMeasurmentRun, Name);
   FInvalidPointIndexes := TList<Integer>.Create;
   FSubscribedMeasurementRun := nil;
   GridMeasurmentRun.ShowHint := True;
@@ -174,7 +176,10 @@ begin
     FActiveWorkTable := Value;
     FInvalidPointIndexes.Clear;
   end;
+  LoadMergePointsSetting;
   EnsureMeasurementRunSubscription;
+  if MeasurementRun <> nil then
+    MeasurementRun.MergePoints := CheckBoxMergePoints.IsChecked;
   UpdateGridMRHeaders;
   UpdateUI;
 end;
@@ -970,6 +975,8 @@ procedure TFrameMeasurementRun.CheckBoxMergePointsChange(Sender: TObject);
 begin
   if MeasurementRun = nil then Exit;
   MeasurementRun.MergePoints := CheckBoxMergePoints.IsChecked;
+  if FActiveWorkTable <> nil then
+    FActiveWorkTable.MergeMeasurementPoints := CheckBoxMergePoints.IsChecked;
   SaveMergePointsSetting;
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementPointMergeModeChanged', 'Изменён режим объединения точек',
     'Enabled=' + BoolToStr(CheckBoxMergePoints.IsChecked, True));
@@ -981,20 +988,44 @@ begin
 end;
 
 procedure TFrameMeasurementRun.LoadMergePointsSetting;
-var Ini: TIniFile; FileName: string;
+var Ini: TIniFile; FileName, Section: string;
 begin
   CheckBoxMergePoints.IsChecked := True;
+  if FActiveWorkTable <> nil then
+    CheckBoxMergePoints.IsChecked := FActiveWorkTable.MergeMeasurementPoints;
+
   FileName := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'MeasurementRun.ini');
   if not FileExists(FileName) then Exit;
-  Ini := TIniFile.Create(FileName); try CheckBoxMergePoints.IsChecked := Ini.ReadBool('Points', 'MergePoints', True); finally Ini.Free; end;
+  Ini := TIniFile.Create(FileName);
+  try
+    if (FActiveWorkTable <> nil) and (Trim(FActiveWorkTable.UUID) <> '') then
+    begin
+      Section := 'Points.' + FActiveWorkTable.UUID;
+      CheckBoxMergePoints.IsChecked := Ini.ReadBool(Section, 'MergePoints', CheckBoxMergePoints.IsChecked);
+      FActiveWorkTable.MergeMeasurementPoints := CheckBoxMergePoints.IsChecked;
+    end
+    else
+      CheckBoxMergePoints.IsChecked := Ini.ReadBool('Points', 'MergePoints', CheckBoxMergePoints.IsChecked);
+  finally
+    Ini.Free;
+  end;
 end;
 
 procedure TFrameMeasurementRun.SaveMergePointsSetting;
-var Ini: TIniFile; FileName: string;
+var Ini: TIniFile; FileName, Section: string;
 begin
   FileName := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'MeasurementRun.ini');
   ForceDirectories(ExtractFilePath(FileName)); Ini := TIniFile.Create(FileName);
-  try Ini.WriteBool('Points', 'MergePoints', CheckBoxMergePoints.IsChecked); finally Ini.Free; end;
+  try
+    if (FActiveWorkTable <> nil) and (Trim(FActiveWorkTable.UUID) <> '') then
+    begin
+      Section := 'Points.' + FActiveWorkTable.UUID;
+      Ini.WriteBool(Section, 'MergePoints', CheckBoxMergePoints.IsChecked);
+      FActiveWorkTable.MergeMeasurementPoints := CheckBoxMergePoints.IsChecked;
+    end
+    else
+      Ini.WriteBool('Points', 'MergePoints', CheckBoxMergePoints.IsChecked);
+  finally Ini.Free; end;
 end;
 
 

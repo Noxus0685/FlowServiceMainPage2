@@ -49,4 +49,32 @@ def test_columns_menu_uses_logical_items_not_fmx_style_children():
 
 
 def test_release_version():
-    assert "APP_VERSION = '1.0.63'" in VERSION
+    assert "APP_VERSION = '1.0.65'" in VERSION
+
+
+def test_results_point_columns_are_normalized_after_layout():
+    update = body("UpdateResultsPointColumns")
+    normalize = body("NormalizeResultsPointColumnsVisibility")
+    results = body("UpdateGridResults")
+    assert "PointColumnCount := Length(FResultPointColumns)" in update
+    assert "StaticPointColumnCount := Min(PointColumnCount, 4)" in update
+    assert "DynamicPointColumnCount := Max(PointColumnCount - 4, 0)" in update
+    assert "StringColumnPointNum4, 3" in update
+    assert "ProcessingDynamicPoint" in update
+    assert "NormalizeResultsPointColumnsVisibility" in update
+    assert "SetStaticPointColumnVisibility(StringColumnPointNum4, 3)" in normalize
+    assert "HiddenStaticColumns" in normalize
+    assert "ProcessingResultColumnsNormalized" in normalize
+    assert "ApplyGridColumnsLayout(GridResults" in results
+    assert "NormalizeResultsPointColumnsVisibility" in results
+
+
+def test_results_grid_dynamic_point_access_uses_column_tags():
+    get_value = body("GridResultsGetValue")
+    draw = body("GridResultsDrawColumnCell")
+    assert "not GridResults.Columns[ACol].Visible" in get_value
+    assert "SameText(GridResults.Columns[ACol].TagString, 'ProcessingDynamicPoint')" in get_value
+    assert "PointIdx := GridResults.Columns[ACol].Tag" in get_value
+    assert "not Column.Visible" in draw
+    assert "SameText(Column.TagString, 'ProcessingDynamicPoint')" in draw
+    assert "PointIdx := Column.Tag" in draw

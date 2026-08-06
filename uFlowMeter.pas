@@ -1809,6 +1809,8 @@ begin
     ValueMassFlow.Error := DeviceError;
   if ValueVolumeFlow <> nil then
     ValueVolumeFlow.Error := DeviceError;
+  if ValueError <> nil then
+    ValueError.Error := DeviceError;
 end;
 
 procedure TFlowMeter.ApplyCalibrCoefsToValue(ATable: TCalibrCoefTable);

@@ -5928,6 +5928,10 @@ begin
   if (ASpillage = nil) or (FDM = nil) then Exit;
   if ASpillage.State = osClean then Exit(True);
 
+  LogMKS('DBG SP 8010', 'SAVE SPILLAGE',
+    Format('ID=%d; Name=%s; SpillTime=%.9f',
+      [ASpillage.ID, ASpillage.Name, ASpillage.SpillTime]));
+
   Q := FDM.CreateQuery;
   try
     case ASpillage.State of

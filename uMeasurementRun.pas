@@ -132,6 +132,29 @@ uses
   uRepositories,
   uWorkTable;
 
+// Рассчитывает диапазон расхода поверочной точки с учетом погрешности.
+function CalculatePointFlowRange(
+  AQ: Double;
+  AErrorPercent: Double;
+  out AMinQ: Double;
+  out AMaxQ: Double;
+  out ADeltaQ: Double
+): Boolean;
+
+// Проверяет возможность объединения двух поверочных точек по пересечению диапазонов расхода.
+function TryMergePointRanges(
+  ACurrentMinQ,
+  ACurrentMaxQ,
+  ACurrentDeltaQ,
+  ANewMinQ,
+  ANewMaxQ,
+  ANewDeltaQ: Double;
+  out ANewCommonMinQ,
+  ANewCommonMaxQ,
+  AIntersectionQ,
+  AControlDeltaQ: Double
+): Boolean;
+
 type
 
   TMeasurementRunStateChangedEvent = procedure(ASender: TObject; AState: EMeasurementState) of object;
@@ -575,6 +598,54 @@ function AccuracyToRange(const AAccuracy: string; out AMin, AMax: Double): Boole
 
 implementation
 
+const
+  MeasurementPointRangeFloatTolerance = 1E-9;
+
+function CalculatePointFlowRange(AQ, AErrorPercent: Double; out AMinQ,
+  AMaxQ, ADeltaQ: Double): Boolean;
+begin
+  ADeltaQ := 0;
+  AMinQ := AQ;
+  AMaxQ := AQ;
+  Result := (not IsNan(AErrorPercent)) and
+    (not IsInfinite(AErrorPercent)) and (AErrorPercent > 0) and
+    (not IsNan(AQ)) and (not IsInfinite(AQ));
+  if not Result then
+    Exit;
+
+  ADeltaQ := Abs(AQ) * AErrorPercent / 100;
+  Result := (ADeltaQ > 0) and (not IsNan(ADeltaQ)) and (not IsInfinite(ADeltaQ));
+  if Result then
+  begin
+    AMinQ := AQ - ADeltaQ;
+    AMaxQ := AQ + ADeltaQ;
+  end;
+end;
+
+function TryMergePointRanges(ACurrentMinQ, ACurrentMaxQ, ACurrentDeltaQ,
+  ANewMinQ, ANewMaxQ, ANewDeltaQ: Double; out ANewCommonMinQ,
+  ANewCommonMaxQ, AIntersectionQ, AControlDeltaQ: Double): Boolean;
+begin
+  ANewCommonMinQ := Max(ACurrentMinQ, ANewMinQ);
+  ANewCommonMaxQ := Min(ACurrentMaxQ, ANewMaxQ);
+  AIntersectionQ := ANewCommonMaxQ - ANewCommonMinQ;
+  AControlDeltaQ := Min(ACurrentDeltaQ, ANewDeltaQ);
+  Result := (AIntersectionQ > MeasurementPointRangeFloatTolerance) and
+    (AIntersectionQ + MeasurementPointRangeFloatTolerance >= AControlDeltaQ);
+end;
+
+function ArePointFlowsEquivalent(AQ1, AError1, AQ2, AError2: Double): Boolean;
+var
+  MinQ1, MaxQ1, DeltaQ1: Double;
+  MinQ2, MaxQ2, DeltaQ2: Double;
+  CommonMinQ, CommonMaxQ, IntersectionQ, ControlDeltaQ: Double;
+begin
+  Result := CalculatePointFlowRange(AQ1, AError1, MinQ1, MaxQ1, DeltaQ1) and
+    CalculatePointFlowRange(AQ2, AError2, MinQ2, MaxQ2, DeltaQ2) and
+    TryMergePointRanges(MinQ1, MaxQ1, DeltaQ1, MinQ2, MaxQ2, DeltaQ2,
+      CommonMinQ, CommonMaxQ, IntersectionQ, ControlDeltaQ);
+end;
+
 function TMeasurementRun.GetStage: EMeasurementState;
 begin
   Result := FCurrentStage;
@@ -893,17 +964,15 @@ end;
 
 class function TMeasurementRun.IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean;
 begin
-  Result := (AP1 <> nil) and (AP2 <> nil)
-    and IsFlowFit(AP1.Q, AP1.FlowAccuracy, AP2.Q)
-    and IsTemperatureFit(AP1.Temp, AP1.TempAccuracy, AP2.Temp);
+  Result := (AP1 <> nil) and (AP2 <> nil) and
+    ArePointFlowsEquivalent(AP1.Q, AP1.Error, AP2.Q, AP2.Error);
 end;
 
 class function TMeasurementRun.IsPointEquivalent(AP1: TDevicePoint; AP2: TPointSpillage): Boolean;
-
 begin
-  Result := (AP1 <> nil) and (AP2 <> nil)
-    and IsFlowFit(AP1.Q, AP1.FlowAccuracy, AP2.QavgEtalon)
-    and IsTemperatureFit(AP1.Temp, AP1.TempAccuracy, AP2.AvgTemperature);
+  Result := (AP1 <> nil) and (AP2 <> nil) and
+    ArePointFlowsEquivalent(AP1.Q, AP1.Error,
+      AP2.QavgEtalon, AP2.Error);
 end;
 
 procedure MergePointParams(ATarget, ASource: TDevicePoint);
@@ -3679,39 +3748,6 @@ var
     Result := Max(1E-6, Max(Abs(AQ1), Abs(AQ2)) * 1E-4);
   end;
 
-  function CalculatePointEtalonRange(const APointQ, AEtalonErrorPercent: Double;
-    out ADeltaQ, AMinQ, AMaxQ: Double): Boolean;
-  begin
-    ADeltaQ := 0;
-    AMinQ := APointQ;
-    AMaxQ := APointQ;
-    Result := (not IsNan(AEtalonErrorPercent)) and
-      (not IsInfinite(AEtalonErrorPercent)) and (AEtalonErrorPercent > 0) and
-      (not IsNan(APointQ)) and (not IsInfinite(APointQ));
-    if not Result then
-      Exit;
-    ADeltaQ := Abs(APointQ) * AEtalonErrorPercent / 100;
-    Result := (ADeltaQ > 0) and (not IsNan(ADeltaQ)) and (not IsInfinite(ADeltaQ));
-    if Result then
-    begin
-      AMinQ := APointQ - ADeltaQ;
-      AMaxQ := APointQ + ADeltaQ;
-    end;
-  end;
-
-  function TryCalculateMergedRange(APoint: TDevicePoint;
-    const APointMinQ, APointMaxQ, APointEtalonDeltaQ: Double;
-    out ANewMinQ, ANewMaxQ, AIntersectionQ, AControlDeltaQ: Double): Boolean;
-  begin
-    ANewMinQ := Max(APoint.CommonMinQ, APointMinQ);
-    ANewMaxQ := Min(APoint.CommonMaxQ, APointMaxQ);
-    AIntersectionQ := ANewMaxQ - ANewMinQ;
-    AControlDeltaQ := Min(APoint.MinEtalonDeltaQ, APointEtalonDeltaQ);
-    Result := APoint.EtalonRangeValid and
-      (AIntersectionQ > FloatTolerance) and
-      (AIntersectionQ + FloatTolerance >= AControlDeltaQ);
-  end;
-
   function PtrText(AObject: TObject): string;
   begin
     if AObject = nil then
@@ -4035,8 +4071,8 @@ begin
       Participant.SourcePauseSec := SourcePoint.Pause;
 
       EtalonErrorPercent := SourcePoint.Error;
-      if not CalculatePointEtalonRange(TargetQLS, EtalonErrorPercent,
-        EtalonDeltaQ, PointMinQ, PointMaxQ) then
+      if not CalculatePointFlowRange(TargetQLS, EtalonErrorPercent,
+        PointMinQ, PointMaxQ, EtalonDeltaQ) then
         MergeReason := 'InvalidEtalonError'
       else
         MergeReason := '';
@@ -4065,9 +4101,11 @@ begin
           NewCommonMinQ := 0; NewCommonMaxQ := 0; IntersectionDeltaQ := 0; ControlEtalonDeltaQ := 0;
           Reason := 'InvalidEtalonError';
         end
-        else if TryCalculateMergedRange(SessionPoint, PointMinQ, PointMaxQ,
-          EtalonDeltaQ, NewCommonMinQ, NewCommonMaxQ, IntersectionDeltaQ,
-          ControlEtalonDeltaQ) then
+        else if SessionPoint.EtalonRangeValid and
+          TryMergePointRanges(SessionPoint.CommonMinQ,
+            SessionPoint.CommonMaxQ, SessionPoint.MinEtalonDeltaQ, PointMinQ,
+            PointMaxQ, EtalonDeltaQ, NewCommonMinQ, NewCommonMaxQ,
+            IntersectionDeltaQ, ControlEtalonDeltaQ) then
           Reason := 'MergedByCommonRange'
         else if not SessionPoint.EtalonRangeValid then
           Reason := 'InvalidEtalonError'
@@ -4082,6 +4120,12 @@ begin
            SessionPoint.CommonMinQ, SessionPoint.CommonMaxQ, PointMinQ, PointMaxQ,
            NewCommonMinQ, NewCommonMaxQ, IntersectionDeltaQ, SessionPoint.MinEtalonDeltaQ,
            EtalonDeltaQ, ControlEtalonDeltaQ, BoolText(Reason = 'MergedByCommonRange'), Reason]));
+        ProtocolManager.AddMessage(pcProc, psMeasurement, 'MeasurementPointMergeMath',
+          'Проверка математики объединения поверочных точек',
+          Format('Point1Q=%.6f; Point2Q=%.6f; Point1Range=[%.6f..%.6f]; Point2Range=[%.6f..%.6f]; Intersection=%.6f; ControlDelta=%.6f; Result=%s',
+            [SessionPoint.Q, TargetQLS, SessionPoint.CommonMinQ,
+             SessionPoint.CommonMaxQ, PointMinQ, PointMaxQ, IntersectionDeltaQ,
+             ControlEtalonDeltaQ, BoolText(Reason = 'MergedByCommonRange')]));
         if Reason = 'MergedByCommonRange' then
         begin
           CandidateDistance := Abs(SessionPoint.Q - TargetQLS);
@@ -6331,6 +6375,7 @@ var
   TotalBefore: Integer;
   TotalAfter: Integer;
   PerDevice: TStringBuilder;
+  StopTimeValue: Double;
 begin
   FLastSaveMeasurementResultsCalled := True;
   FLastSaveMeasurementResultsResult := 'started';
@@ -6365,11 +6410,23 @@ begin
       if FWorkTable <> nil then
       begin
         FWorkTable.RecalculateAllMeterValues;
-        // Берем сохраненное  TimeResult
-       { if FWorkTable.ValueTime <> nil then
-          FWorkTable.TimeResult := FWorkTable.ValueTime.GetDoubleValue
-        else
-          FWorkTable.TimeResult := Point.LimitTime;}
+
+        StopTimeValue := GetCurrentStopTimeValue;
+        if StopTimeValue <= 0 then
+          StopTimeValue := FWorkTable.Time;
+        if (StopTimeValue <= 0) and (Point.LimitTime > 0) then
+          StopTimeValue := Point.LimitTime;
+
+        FWorkTable.TimeResult := StopTimeValue;
+        AddDiagnosticEvent(Format(
+          'SaveMeasurementResults time prepared; TimeResult=%.9f; ValueTime=%.9f; WorkTableTime=%.9f; LimitTime=%.9f; FinishedAt=%s',
+          [
+            FWorkTable.TimeResult,
+            GetCurrentStopTimeValue,
+            FWorkTable.Time,
+            Point.LimitTime,
+            DateTimeToStr(Point.DateTime)
+          ]));
       end;
 
       WorkTable.SaveMeasurementResults;

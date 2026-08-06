@@ -3,6 +3,7 @@
 interface
 
 uses
+  uGridStabilityRegistry,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Dialogs,
@@ -29,6 +30,7 @@ uses
   uMeasurementRun,
   uObservable,
   uResultsXlsxExporter,
+  uGridLayoutManager,
   uWorkTable;
 
 type
@@ -53,8 +55,6 @@ type
   TFrameMRResults = class(TFrame, IEventObserver)
     GridMRResults: TGrid;
     StringColumnName: TStringColumn;
-    StringColumnPoint1: TStringColumn;
-    StringColumnPoint2: TStringColumn;
     StringColumnResult: TStringColumn;
     ToolBar: TToolBar;
     SpeedButton11: TSpeedButton;
@@ -80,6 +80,7 @@ type
     FRows: TList<TChannel>;
     FProceed: TObject;
     FRefreshing: Boolean;
+    FGridLayoutState: TGridLayoutState;
 
     function GetMeasurementRun: TMeasurementRun;
     procedure SetActiveWorkTable(const Value: TWorkTable);
@@ -87,6 +88,9 @@ type
     procedure DetachMeasurementRun;
 
     procedure BuildColumns;
+    function CreateGridColumn(AOwner: TComponent;
+      ADefinition: TGridColumnDefinition): TColumn;
+    function GetDisplayPointKey(AGroup: TDisplayPointGroup): string;
     function HasCurrentMeasurementPoints: Boolean;
     procedure BuildRows;
     procedure RefreshRows;
@@ -197,9 +201,11 @@ end;
 constructor TFrameMRResults.Create(AOwner: TComponent);
 begin
   inherited;
+  RegisterStableGrid(Self, GridMRResults, Name);
   FPointColumns := TObjectList<TStringColumn>.Create(False);
   FDisplayPoints := TObjectList<TDisplayPointGroup>.Create(True);
   FRows := TList<TChannel>.Create;
+  FGridLayoutState := TGridLayoutState.Create;
 
   GridMRResults.OnGetValue := GridMRResultsGetValue;
   GridMRResults.OnDrawColumnCell := GridMRResultsDrawColumnCell;
@@ -214,6 +220,7 @@ begin
   FreeAndNil(FRows);
   FreeAndNil(FDisplayPoints);
   FreeAndNil(FPointColumns);
+  FreeAndNil(FGridLayoutState);
   inherited;
 end;
 
@@ -539,8 +546,15 @@ end;
 
 procedure TFrameMRResults.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
 begin
-  if Sender is TMeasurementRun then
-    UpdateUI;
+  if (Sender is TMeasurementRun) and not FRefreshing then
+  begin
+    { Measurement notifications normally only change cell values and states.
+      Keeping the existing TColumn instances also keeps user column widths. }
+    BuildRows;
+    RefreshRows;
+    GridMRResults.Repaint;
+    ButtonExportExcel.Enabled := (FRows.Count > 0) and HasExportableResults;
+  end;
 end;
 
 procedure TFrameMRResults.UpdateUI;
@@ -563,11 +577,7 @@ begin
   FRefreshing := True;
   try
     if FProceed is TFrameProceed then TFrameProceed(FProceed).RefreshResultsTab;
-    BuildRows;
-    BuildColumns;
-    RefreshRows;
     UpdateUI;
-    GridMRResults.Repaint;
   finally
     FRefreshing := False;
   end;
@@ -596,44 +606,73 @@ end;
 procedure TFrameMRResults.BuildColumns;
 var
   I: Integer;
-  Col: TStringColumn;
   Group: TDisplayPointGroup;
+  RequiredDisplayPoints, PreviousDisplayPoints: TObjectList<TDisplayPointGroup>;
+  Definitions: TGridColumnDefinitions;
 begin
-  FPointColumns.Clear;
-  FDisplayPoints.Clear;
-
-  GridMRResults.BeginUpdate;
+  { Build the desired model away from the live grid.  This is intentionally
+    done before touching Parent/Index or freeing a column. }
+  RequiredDisplayPoints := TObjectList<TDisplayPointGroup>.Create(True);
+  PreviousDisplayPoints := FDisplayPoints;
+  FDisplayPoints := RequiredDisplayPoints;
   try
-    while GridMRResults.ColumnCount > 2 do
-      if (GridMRResults.Columns[1] <> StringColumnResult) then
-        GridMRResults.Columns[1].Free
-      else
-        Break;
-
-    StringColumnName.Index := 0;
-    StringColumnResult.Index := GridMRResults.ColumnCount - 1;
-    if not HasCurrentMeasurementPoints then Exit;
-
-    for I := 0 to MeasurementRun.Points.Count - 1 do
-      if (MeasurementRun.Points[I] <> nil) and MeasurementRun.Points[I].Enabled then
-        AddScenarioDisplayPoint(MeasurementRun.Points[I]);
+    if HasCurrentMeasurementPoints then
+      for I := 0 to MeasurementRun.Points.Count - 1 do
+        if (MeasurementRun.Points[I] <> nil) and MeasurementRun.Points[I].Enabled then
+          AddScenarioDisplayPoint(MeasurementRun.Points[I]);
     MakeDisplayHeadersUnique;
-    for Group in FDisplayPoints do
-    begin
-      Col := TStringColumn.Create(GridMRResults);
-      Col.Parent := GridMRResults;
-      Col.HeaderSettings.TextSettings.WordWrap := False;
-      Col.Stored := False;
-      Col.Width := 130;
-      Col.Header := Group.Header;
-      Col.Index := GridMRResults.ColumnCount - 1;
-      FPointColumns.Add(Col);
-    end;
-    StringColumnResult.Index := GridMRResults.ColumnCount - 1;
   finally
-    GridMRResults.EndUpdate;
+    FDisplayPoints := PreviousDisplayPoints;
   end;
-  SetGridReadOnly(GridMRResults);
+
+  Definitions := TGridColumnDefinitions.Create(True);
+  try
+    Definitions.Add(TGridColumnDefinition.Create('fixed:name',
+      StringColumnName.Header, TStringColumn, StringColumnName.Width, True,
+      StringColumnName.Visible, StringColumnName));
+    for Group in RequiredDisplayPoints do
+      Definitions.Add(TGridColumnDefinition.Create(GetDisplayPointKey(Group),
+        Group.Header, TStringColumn, 130, True, True));
+    Definitions.Add(TGridColumnDefinition.Create('fixed:result',
+      StringColumnResult.Header, TStringColumn, StringColumnResult.Width, True,
+      StringColumnResult.Visible, StringColumnResult));
+
+    if TGridLayoutManager.Apply(GridMRResults, FGridLayoutState, Definitions,
+      CreateGridColumn, 'table=' + IntToHex(NativeInt(Pointer(FActiveWorkTable)),
+        SizeOf(Pointer) * 2)) then
+    begin
+      FPointColumns.Clear;
+      for I := 1 to GridMRResults.ColumnCount - 2 do
+        FPointColumns.Add(TStringColumn(GridMRResults.Columns[I]));
+      FDisplayPoints.Free;
+      FDisplayPoints := RequiredDisplayPoints;
+      RequiredDisplayPoints := nil;
+      SetGridReadOnly(GridMRResults);
+    end;
+  finally
+    Definitions.Free;
+    RequiredDisplayPoints.Free;
+  end;
+end;
+
+function TFrameMRResults.CreateGridColumn(AOwner: TComponent;
+  ADefinition: TGridColumnDefinition): TColumn;
+begin
+  Result := TStringColumn.Create(AOwner);
+  Result.HeaderSettings.TextSettings.WordWrap := False;
+end;
+
+function TFrameMRResults.GetDisplayPointKey(AGroup: TDisplayPointGroup): string;
+var
+  Participant: TDisplayPointParticipant;
+begin
+  Result := 'point:';
+  if AGroup = nil then Exit;
+  if AGroup.ScenarioPoint <> nil then
+    Result := Result + 'scenario=' + AGroup.ScenarioPoint.UUID;
+  for Participant in AGroup.Participants do
+    Result := Result + '|participant=' + Participant.DeviceUUID + ':' +
+      Participant.DeviceChannelUUID + ':' + Participant.SourcePointUUID;
 end;
 
 function TFrameMRResults.HasCurrentMeasurementPoints: Boolean;
