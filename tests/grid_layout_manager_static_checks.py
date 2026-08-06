@@ -16,7 +16,7 @@ def test_equal_signature_is_a_strict_no_op_before_fmx_mutation():
     apply = method(HELPER, 'class function TGridLayoutManager.Apply', 'end.\n')
     guard = apply.index('if Signature = AState.FLastSignature')
     for mutation in ('AGrid.BeginUpdate', '.Parent :=', '.Index :=', '.Width :=',
-                     'AGrid.Model.BeginUpdate'):
+                     'AGrid.Model.ContentChanged'):
         assert guard < apply.index(mutation)
     assert 'Exit(False)' in apply[guard:apply.index('AGrid.BeginUpdate')]
 
@@ -54,3 +54,38 @@ def test_no_structural_helper_in_notification_or_timer_handlers():
                            RESULTS + '\n' + PROCEED, re.I | re.S)
     for match in frequent:
         assert 'TGridLayoutManager.Apply' not in match.group(0)
+
+
+def test_repeated_apply_has_no_parent_width_or_index_assignment():
+    apply = method(HELPER, 'class function TGridLayoutManager.Apply', 'end.\n')
+    guard = apply.index('if Signature = AState.FLastSignature')
+    exit_noop = apply.index('Exit(False)', guard)
+    first_assignment = min(apply.index('Column.Parent :='),
+                           apply.index('Column.Width :='),
+                           apply.index('Column.Index :='))
+    assert guard < exit_noop < first_assignment
+
+
+def test_structural_mutations_are_conditional_and_width_snapshot_is_before_update():
+    apply = method(HELPER, 'class function TGridLayoutManager.Apply', 'end.\n')
+    assert 'if Column.Parent <> AGrid then' in apply
+    assert 'if Abs(Column.Width - SavedWidth) >= CWidthEpsilon then' in apply
+    assert 'if Column.Index <> DesiredIndex then' in apply
+    snapshot = apply.index('AState.FWidths.AddOrSetValue')
+    assert snapshot < apply.index('AGrid.BeginUpdate')
+    assert apply.count('AState.FWidths.AddOrSetValue') == 1
+    assert apply.index('if IsNewColumn then') < apply.index('Column.Width :=')
+
+
+def test_apply_reentrancy_and_diagnostics_are_present():
+    apply = method(HELPER, 'class function TGridLayoutManager.Apply', 'end.\n')
+    assert 'if AState.FApplying then' in apply
+    assert 'AState.FApplying := True' in apply
+    assert 'AState.FApplying := False' in apply
+    for stage in ('before BeginUpdate', 'after Parent', 'after Width',
+                  'after Index', 'after EndUpdate',
+                  'after Model.ContentChanged'):
+        assert stage in apply
+    assert 'AStructureContext' in apply
+    assert 'FApplyCount' in apply
+    assert 'AGrid.Model.InvalidateContentSize' not in apply
