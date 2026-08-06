@@ -958,6 +958,14 @@ object FrameProceed: TFrameProceed
     Left = 826
     Top = 328
   end
+  object PopupMenuChart: TPopupMenu
+    Left = 922
+    Top = 328
+    object MenuItemChartDevices: TMenuItem
+      Locked = True
+      Text = #1055#1088#1080#1073#1086#1088#1099
+    end
+  end
   object ActionListWorkTables: TActionList
     Left = 434
     Top = 200
