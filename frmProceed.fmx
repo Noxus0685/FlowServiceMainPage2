@@ -543,7 +543,7 @@ object FrameProceed: TFrameProceed
         LineType = Right
         Margins.Top = 5.000000000000000000
         Margins.Bottom = 5.000000000000000000
-        Position.X = 505.000000000000000000
+        Position.X = 715.000000000000000000
         Position.Y = 5.000000000000000000
         Size.Width = 12.000000000000000000
         Size.Height = 22.000000000000000000
@@ -554,6 +554,7 @@ object FrameProceed: TFrameProceed
         Align = Left
         Padding.Left = 5.000000000000000000
         Padding.Right = 5.000000000000000000
+        Position.X = 210.000000000000000000
         Size.Width = 271.000000000000000000
         Size.Height = 32.000000000000000000
         Size.PlatformDefault = False
@@ -672,7 +673,7 @@ object FrameProceed: TFrameProceed
       end
       object Layout20: TLayout
         Align = Left
-        Position.X = 281.000000000000000000
+        Position.X = 491.000000000000000000
         Size.Width = 224.000000000000000000
         Size.Height = 32.000000000000000000
         Size.PlatformDefault = False
@@ -701,7 +702,7 @@ object FrameProceed: TFrameProceed
         LineType = Right
         Margins.Top = 5.000000000000000000
         Margins.Bottom = 5.000000000000000000
-        Position.X = 271.000000000000000000
+        Position.X = 481.000000000000000000
         Position.Y = 5.000000000000000000
         Size.Width = 10.000000000000000000
         Size.Height = 22.000000000000000000
