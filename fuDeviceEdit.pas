@@ -42,7 +42,9 @@ uses
   uDataManager,
   uDeviceClass,
   uRepositories,
-  uProtocols;
+  uProtocols,
+  uGridStabilityController,
+  uGridStabilityRegistry;
 
 type
   TFormDeviceEditor = class(TForm)
@@ -360,6 +362,7 @@ type
      FClipboardPoint: TDevicePoint;
      FPointSortColumn: Integer;
      FPointSortAscending: Boolean;
+     FGridPointsStability: TGridStabilityController;
 
      function ResolveDeviceType(out ARepo: TTypeRepository): TDeviceType;
      procedure ApplyMassMode;
@@ -421,6 +424,8 @@ type
 
      procedure  UpdateComboEditDN;
 
+  protected
+    procedure DoShow; override;
   public
     { Public declarations }
      procedure LoadDevice(ADevice: TDevice);
@@ -1590,6 +1595,7 @@ begin
   FComboCoefTable.OnChange := ComboCoefTableChange;
 
   FGridCoefs := TGrid.Create(FTabItemCoefs);
+  RegisterStableGrid(Self, FGridCoefs, Name);
   FGridCoefs.Parent := FTabItemCoefs;
   FGridCoefs.Align := TAlignLayout.Client;
   FGridCoefs.Options := FGridCoefs.Options + [TGridOption.Editing];
@@ -2080,6 +2086,9 @@ var
   FoundType: TDeviceType;
   FoundRepo: TTypeRepository;
 begin
+  if FGridPointsStability = nil then
+    FGridPointsStability := RegisterStableGrid(Self, GridPoints, Name);
+  FGridPointsStability.Snapshot('after-fmx-load');
   InitCoefsTab;
   OnKeyDown := FormKeyDown;
   GridPoints.OnKeyDown := GridPointsKeyDown;
@@ -4306,10 +4315,19 @@ begin
   ceCategory.Hint := TextValue;
 end;
 
+procedure TFormDeviceEditor.DoShow;
+begin
+  inherited;
+  if FGridPointsStability <> nil then
+    FGridPointsStability.Snapshot('after-show');
+end;
+
 procedure TFormDeviceEditor.UpdatePointsGrid;
 var
   i, VisibleCount: Integer;
 begin
+  if FGridPointsStability <> nil then
+    FGridPointsStability.Snapshot('before-UpdatePointsGrid');
   if FDevice = nil then
     Exit;
 
@@ -4334,6 +4352,18 @@ begin
 
   finally
     GridPoints.EndUpdate;
+    if FGridPointsStability <> nil then
+      FGridPointsStability.Snapshot('after-EndUpdate');
+  end;
+  if FGridPointsStability <> nil then
+  begin
+    FGridPointsStability.Snapshot('after-UpdatePointsGrid');
+    TThread.Queue(nil,
+      procedure
+      begin
+        if FGridPointsStability <> nil then
+          FGridPointsStability.Snapshot('after-deferred-layout');
+      end);
   end;
 end;
 

@@ -3,6 +3,7 @@
 interface
 
 uses
+  uGridStabilityRegistry,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Edit,
@@ -155,6 +156,7 @@ begin
   ButtonSelect.OnClick := ButtonSelectClick;
 
   StringGridValuesList := TStringGrid.Create(Self);
+  RegisterStableGrid(Self, StringGridValuesList, Name);
   StringGridValuesList.Parent := Layout22;
   StringGridValuesList.Align := TAlignLayout.Client;
   StringGridValuesList.ReadOnly := True;
