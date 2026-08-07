@@ -2090,8 +2090,8 @@ begin
   end;
 end;
 
-// Перестраивает график: все проливки остаются маркерами, а средние точки
-// соединяются PCHIP в log(Q) либо прямыми отрезками без экстраполяции.
+// Перестраивает график: все проливки остаются маркерами, общая точка получает
+// единый средний X для всех приборов, а линии строятся без экстраполяции.
 procedure TFrameProceed.UpdateSessionErrorChart;
 const
   CChartCurvePointsPerInterval = 24;
@@ -2103,15 +2103,95 @@ var
   Groups: TObjectDictionary<string, TList<TPointF>>;
   GroupPoints: TList<TPointF>;
   Pair: TPair<string, TList<TPointF>>;
+  SharedXGroups, DeviceXGroups: TObjectDictionary<string, TList<Double>>;
+  SharedXByGroup: TDictionary<string, Double>;
+  XValues: TList<Double>;
+  XPair: TPair<string, TList<Double>>;
   PointSeries, AverageSeries, LineSeries: TChartSeries;
   Sorter: IComparer<TPointF>;
   P1: TPointF;
   GroupKey, LegendBase, FlowUnitName: string;
   I, J, DeviceIndex: Integer;
   SumX, SumY: Double;
-  FlowValue, BaseFlowValue: Double;
+  FlowValue, SharedFlowValue: Double;
   ChartMinX, ChartMaxX, ChartPaddingX, LogPaddingX: Double;
   UseVolumeFlow: Boolean;
+
+  // Возвращает фактический расход проливки и стабильный ключ её поверочной точки.
+  function TryGetSpillageChartFlow(APoint: TPointSpillage;
+    out AFlowValue: Double; out AGroupKey: string): Boolean;
+  var
+    BaseFlowValue: Double;
+  begin
+    Result := False;
+    AFlowValue := 0;
+    AGroupKey := '';
+    if (APoint = nil) or (APoint.State = osDeleted) or not APoint.Enabled or
+       not IsResultErrorValid(APoint.Error) then
+      Exit;
+
+    if UseVolumeFlow then
+    begin
+      BaseFlowValue := APoint.EtalonVolumeFlow;
+      if (BaseFlowValue <= 0) and (APoint.SpillTime > 0) then
+        BaseFlowValue := APoint.EtalonVolume / APoint.SpillTime;
+    end
+    else
+    begin
+      BaseFlowValue := APoint.EtalonMassFlow;
+      if (BaseFlowValue <= 0) and (APoint.SpillTime > 0) then
+        BaseFlowValue := APoint.EtalonMass / APoint.SpillTime;
+    end;
+
+    if BaseFlowValue <= 0 then
+      BaseFlowValue := APoint.QavgEtalon;
+    AFlowValue := ConvertBaseFlowToUnit(BaseFlowValue, FlowUnitName);
+    if IsNan(AFlowValue) or IsInfinite(AFlowValue) or (AFlowValue <= 0) then
+      Exit;
+
+    AGroupKey := Trim(APoint.DeviceTypeUUID);
+    if AGroupKey = '' then
+      AGroupKey := Trim(APoint.Name);
+    if AGroupKey = '' then
+      AGroupKey := FormatFloat('0.############', AFlowValue);
+    Result := True;
+  end;
+
+  // Собирает фактические расходы активной сессии по поверочным точкам прибора.
+  procedure CollectDeviceXGroups(ADevice: TDevice; ASession: TSessionSpillage;
+    AGroups: TObjectDictionary<string, TList<Double>>);
+  var
+    Point: TPointSpillage;
+    PointFlow: Double;
+    PointKey: string;
+    Values: TList<Double>;
+    AddedCount: Integer;
+
+    procedure AddPoint(APoint: TPointSpillage);
+    begin
+      if not TryGetSpillageChartFlow(APoint, PointFlow, PointKey) then
+        Exit;
+      if not AGroups.TryGetValue(PointKey, Values) then
+      begin
+        Values := TList<Double>.Create;
+        AGroups.Add(PointKey, Values);
+      end;
+      Values.Add(PointFlow);
+      Inc(AddedCount);
+    end;
+  begin
+    AddedCount := 0;
+    if (ADevice = nil) or (ASession = nil) or (AGroups = nil) then
+      Exit;
+    if ADevice.Spillages <> nil then
+      for Point in ADevice.Spillages do
+        if (Point <> nil) and (Point.SessionID = ASession.ID) then
+          AddPoint(Point);
+    if (AddedCount = 0) and (ASession <> nil) and
+       (ASession.Spillages <> nil) then
+      for Point in ASession.Spillages do
+        AddPoint(Point);
+  end;
 
   // Добавляет формосохраняющую кусочно-кубическую линию в координате log10(Q).
   function AddPchipLogLine(const APoints: TList<TPointF>;
@@ -2206,39 +2286,13 @@ var
 
   procedure AddSpillagePoint(APoint: TPointSpillage);
   begin
-    if (APoint = nil) or (APoint.State = osDeleted) or not APoint.Enabled or
-       not IsResultErrorValid(APoint.Error) then
-      Exit;
-
-    if UseVolumeFlow then
-    begin
-      BaseFlowValue := APoint.EtalonVolumeFlow;
-      if (BaseFlowValue <= 0) and (APoint.SpillTime > 0) then
-        BaseFlowValue := APoint.EtalonVolume / APoint.SpillTime;
-    end
-    else
-    begin
-      BaseFlowValue := APoint.EtalonMassFlow;
-      if (BaseFlowValue <= 0) and (APoint.SpillTime > 0) then
-        BaseFlowValue := APoint.EtalonMass / APoint.SpillTime;
-    end;
-
-    if BaseFlowValue <= 0 then
-      BaseFlowValue := APoint.QavgEtalon;
-    FlowValue := ConvertBaseFlowToUnit(BaseFlowValue, FlowUnitName);
-
-    if IsNan(FlowValue) or IsInfinite(FlowValue) or (FlowValue <= 0) then
+    if not TryGetSpillageChartFlow(APoint, FlowValue, GroupKey) then
       Exit;
 
     P1 := PointF(FlowValue, APoint.Error);
     RawPoints.Add(P1);
     ChartMinX := Min(ChartMinX, FlowValue);
     ChartMaxX := Max(ChartMaxX, FlowValue);
-    GroupKey := Trim(APoint.DeviceTypeUUID);
-    if GroupKey = '' then
-      GroupKey := Trim(APoint.Name);
-    if GroupKey = '' then
-      GroupKey := FormatFloat('0.############', FlowValue);
     if not Groups.TryGetValue(GroupKey, GroupPoints) then
     begin
       GroupPoints := TList<TPointF>.Create;
@@ -2268,6 +2322,8 @@ begin
   Chart1.MarginLeft := 105;
   Chart1.MarginBottom := 70;
   Chart1.BeginUpdate;
+  SharedXGroups := TObjectDictionary<string, TList<Double>>.Create([doOwnsValues]);
+  SharedXByGroup := TDictionary<string, Double>.Create;
   try
     Chart1.ClearAllSeries;
     SelectedDevice := ResolveSelectedDevice;
@@ -2282,6 +2338,54 @@ begin
         else
           Result := 0;
       end);
+
+    // Сначала рассчитывается одна общая координата X для каждой общей
+    // поверочной точки по средним расходам участвующих приборов.
+    if FProcessingDevices <> nil then
+      for Device in FProcessingDevices do
+      begin
+        if (Device = nil) or (Device.State = osDeleted) or
+           IsProcessingDevicePendingRemoved(Device) or
+           not IsChartDeviceVisible(Device) then
+          Continue;
+        if (Device = SelectedDevice) and (FCurrentSession <> nil) then
+          Session := FCurrentSession
+        else
+          Session := GetActiveVisibleSession(Device);
+        if Session = nil then
+          Continue;
+
+        DeviceXGroups := TObjectDictionary<string, TList<Double>>.Create([doOwnsValues]);
+        try
+          CollectDeviceXGroups(Device, Session, DeviceXGroups);
+          for XPair in DeviceXGroups do
+          begin
+            SumX := 0;
+            for J := 0 to XPair.Value.Count - 1 do
+              SumX := SumX + XPair.Value[J];
+            if XPair.Value.Count = 0 then
+              Continue;
+            if not SharedXGroups.TryGetValue(XPair.Key, XValues) then
+            begin
+              XValues := TList<Double>.Create;
+              SharedXGroups.Add(XPair.Key, XValues);
+            end;
+            XValues.Add(SumX / XPair.Value.Count);
+          end;
+        finally
+          DeviceXGroups.Free;
+        end;
+      end;
+
+    for XPair in SharedXGroups do
+    begin
+      SumX := 0;
+      for J := 0 to XPair.Value.Count - 1 do
+        SumX := SumX + XPair.Value[J];
+      if XPair.Value.Count > 0 then
+        SharedXByGroup.AddOrSetValue(XPair.Key,
+          SumX / XPair.Value.Count);
+    end;
 
     if FProcessingDevices <> nil then
       for Device in FProcessingDevices do
@@ -2336,9 +2440,12 @@ begin
               SumY := SumY + Pair.Value[J].Y;
             end;
             if Pair.Value.Count > 0 then
-              AveragePoints.Add(PointF(
-                SumX / Pair.Value.Count,
+            begin
+              if not SharedXByGroup.TryGetValue(Pair.Key, SharedFlowValue) then
+                SharedFlowValue := SumX / Pair.Value.Count;
+              AveragePoints.Add(PointF(SharedFlowValue,
                 SumY / Pair.Value.Count));
+            end;
           end;
           AveragePoints.Sort(Sorter);
 
@@ -2396,6 +2503,8 @@ begin
         end;
       end;
   finally
+    SharedXByGroup.Free;
+    SharedXGroups.Free;
     if (ChartMinX <> MaxDouble) and (ChartMaxX <> -MaxDouble) then
     begin
       Chart1.AutoRangeX := False;
