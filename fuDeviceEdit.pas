@@ -364,6 +364,7 @@ type
      FPointSortColumn: Integer;
      FPointSortAscending: Boolean;
      FGridPointsStability: TGridStabilityController;
+     FGridPointsLayoutState: TGridLayoutState;
 
      function ResolveDeviceType(out ARepo: TTypeRepository): TDeviceType;
      procedure ApplyMassMode;
@@ -405,6 +406,8 @@ type
      procedure UpdateQmaxQmin;
      procedure SortPoints;
      procedure CreateGridPointsHeaderMenu;
+     { Registers DeviceEdit point columns for persistent manual width control. }
+     procedure RegisterGridPointsWidthControl;
 
      procedure InitCoefsTab;
      procedure UpdateCoefTablesCombo;
@@ -1205,6 +1208,7 @@ end;
 procedure TFormDeviceEditor.FormClose(Sender: TObject;
   var Action: TCloseAction);
 begin
+      FreeAndNil(FGridPointsLayoutState);
       FreeAndNil(FDevice);      // уничтожаем клон
       FreeAndNil(FLoadedDeviceSnapshot);
       FreeAndNil(FClipboardPoint);
@@ -2077,6 +2081,15 @@ begin
   FPopupMenuGridPointsHeader.Popup(P.X, P.Y);
 end;
 
+procedure TFormDeviceEditor.RegisterGridPointsWidthControl;
+begin
+  if FGridPointsLayoutState = nil then
+    FGridPointsLayoutState := TGridLayoutState.Create;
+  FGridPointsLayoutState.ConfigureWidthControl(GridPoints,
+    ClassName + '.' + GridPoints.Name);
+  FGridPointsLayoutState.RegisterExistingColumns;
+end;
+
 procedure TFormDeviceEditor.LoadDevice(ADevice: TDevice);
 var
   FoundType: TDeviceType;
@@ -2085,6 +2098,7 @@ begin
   if FGridPointsStability = nil then
     FGridPointsStability := RegisterStableGrid(Self, GridPoints, Name);
   FGridPointsStability.Snapshot('after-fmx-load');
+  RegisterGridPointsWidthControl;
   InitCoefsTab;
   OnKeyDown := FormKeyDown;
   GridPoints.OnKeyDown := GridPointsKeyDown;
