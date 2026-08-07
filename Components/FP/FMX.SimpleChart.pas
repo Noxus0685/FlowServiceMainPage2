@@ -115,7 +115,8 @@ type
     procedure DrawAxesAndGrid;    // рисует оси, сетку, подписи, заголовки
     procedure DrawSeries;         // рисует все видимые серии
     procedure DrawLegend;
-    procedure DrawMarkersForSeries(Series: TChartSeries); // маркеры для одной серии
+    procedure DrawMarkersForSeries(Series: TChartSeries;
+      ADrawnXLabels: TList<Double>); // маркеры для одной серии
     function GetSeries(Index: Integer): TChartSeries;
     function GetSeriesCount: Integer;
     function GetFirstSeriesPoints: TList<TPointF>;
@@ -776,12 +777,26 @@ end;
 // -----------------------------------------------------------------------------
 // Отрисовка маркеров для одной серии
 // -----------------------------------------------------------------------------
-procedure TSimpleChart.DrawMarkersForSeries(Series: TChartSeries);
+procedure TSimpleChart.DrawMarkersForSeries(Series: TChartSeries;
+  ADrawnXLabels: TList<Double>);
 var
   I: Integer;
   PointValue, ScreenPt: TPointF;
   PlotRect, TextRect: TRectF;
   GuideColor: TAlphaColor;
+
+  // Проверяет, была ли подпись общей координаты X уже выведена другой серией.
+  function IsXLabelDrawn(const AX: Double): Boolean;
+  var
+    DrawnX: Double;
+  begin
+    Result := False;
+    if ADrawnXLabels = nil then
+      Exit;
+    for DrawnX in ADrawnXLabels do
+      if SameValue(DrawnX, AX, Max(1E-9, Abs(AX) * 1E-9)) then
+        Exit(True);
+  end;
 begin
   PlotRect := TRectF.Create(
     MarginLeft,
@@ -806,10 +821,15 @@ begin
 
       Canvas.Fill.Color := Series.Color;
       // Подписи координат размещаются с внешней стороны осей.
-      TextRect := RectF(ScreenPt.X - 32, PlotRect.Bottom + 26,
-        ScreenPt.X + 32, PlotRect.Bottom + 42);
-      Canvas.FillText(TextRect, FormatFloat('0.###', PointValue.X), False,
-        1, [], TTextAlign.Center, TTextAlign.Center);
+      if not IsXLabelDrawn(PointValue.X) then
+      begin
+        TextRect := RectF(ScreenPt.X - 32, PlotRect.Bottom + 26,
+          ScreenPt.X + 32, PlotRect.Bottom + 42);
+        Canvas.FillText(TextRect, FormatFloat('0.###', PointValue.X), False,
+          1, [], TTextAlign.Center, TTextAlign.Center);
+        if ADrawnXLabels <> nil then
+          ADrawnXLabels.Add(PointValue.X);
+      end;
 
       TextRect := RectF(PlotRect.Left - 92, ScreenPt.Y - 9,
         PlotRect.Left - 40, ScreenPt.Y + 9);
@@ -837,14 +857,17 @@ var
   series: TChartSeries;
   Delta: TPointF;
   LengthPx, DashPos: Single;
+  DrawnXLabels: TList<Double>;
 begin
-  for i := 0 to FSeries.Count - 1 do
-  begin
-    series := FSeries[i];
-    if not series.Visible then
-      Continue;
-    if series.Points.Count = 0 then
-      Continue;
+  DrawnXLabels := TList<Double>.Create;
+  try
+    for i := 0 to FSeries.Count - 1 do
+    begin
+      series := FSeries[i];
+      if not series.Visible then
+        Continue;
+      if series.Points.Count = 0 then
+        Continue;
 
     SetLength(screenPoints, series.Points.Count);
     for j := 0 to series.Points.Count - 1 do
@@ -872,8 +895,11 @@ begin
         end;
     end;
 
-    if series.ShowMarkers then
-      DrawMarkersForSeries(series);
+      if series.ShowMarkers then
+        DrawMarkersForSeries(series, DrawnXLabels);
+    end;
+  finally
+    DrawnXLabels.Free;
   end;
 end;
 
