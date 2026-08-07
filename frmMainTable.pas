@@ -8117,11 +8117,14 @@ begin
   end;
 end;
 
-procedure AddStringColumn(AGrid: TGrid; const AHeader: string; const AWidth: Single);
+{ Creates one runtime grid column with a stable persistent identity. }
+procedure AddStringColumn(AGrid: TGrid; const AName, AHeader: string;
+  const AWidth: Single);
 var
   Col: TStringColumn;
 begin
   Col := TStringColumn.Create(AGrid);
+  Col.Name := AName;
   Col.Header := AHeader;
   Col.Width := AWidth;
   Col.Parent := AGrid;
@@ -8202,47 +8205,49 @@ begin
   FAutoTestStatusLabel.Text := 'Тест не запускался';
 
   GridAutoTestNumbers := TGrid.Create(Self);
-  RegisterStableGrid(Self, GridAutoTestNumbers, Name);
+  GridAutoTestNumbers.Name := 'GridAutoTestNumbers';
   GridAutoTestNumbers.Parent := Layout;
   GridAutoTestNumbers.Align := TAlignLayout.Top;
   GridAutoTestNumbers.Height := 220;
   GridAutoTestNumbers.OnGetValue := GridAutoTestNumbersGetValue;
-  AddStringColumn(GridAutoTestNumbers, 'Время', 70);
-  AddStringColumn(GridAutoTestNumbers, 'Точка', 120);
-  AddStringColumn(GridAutoTestNumbers, 'Repeat', 70);
-  AddStringColumn(GridAutoTestNumbers, 'Q заданный', 90);
-  AddStringColumn(GridAutoTestNumbers, 'Q фактический', 100);
-  AddStringColumn(GridAutoTestNumbers, 'Q parameter', 100);
-  AddStringColumn(GridAutoTestNumbers, 'Q sample', 100);
-  AddStringColumn(GridAutoTestNumbers, 'Sample time', 100);
-  AddStringColumn(GridAutoTestNumbers, 'Time source', 90);
-  AddStringColumn(GridAutoTestNumbers, 'T заданная', 90);
-  AddStringColumn(GridAutoTestNumbers, 'T фактическая', 100);
-  AddStringColumn(GridAutoTestNumbers, 'P заданное', 90);
-  AddStringColumn(GridAutoTestNumbers, 'P фактическое', 100);
-  AddStringColumn(GridAutoTestNumbers, 'Stable', 90);
-  AddStringColumn(GridAutoTestNumbers, 'Virtual command', 130);
-  AddStringColumn(GridAutoTestNumbers, 'Virtual response', 130);
-  AddStringColumn(GridAutoTestNumbers, 'Progress', 90);
-  AddStringColumn(GridAutoTestNumbers, 'Причина', 300);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnTime', 'Время', 70);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnPoint', 'Точка', 120);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnRepeat', 'Repeat', 70);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnTargetFlow', 'Q заданный', 90);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnActualFlow', 'Q фактический', 100);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnFlowParameter', 'Q parameter', 100);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnFlowSample', 'Q sample', 100);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnSampleTime', 'Sample time', 100);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnTimeSource', 'Time source', 90);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnTargetTemperature', 'T заданная', 90);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnActualTemperature', 'T фактическая', 100);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnTargetPressure', 'P заданное', 90);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnActualPressure', 'P фактическое', 100);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnStable', 'Stable', 90);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnVirtualCommand', 'Virtual command', 130);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnVirtualResponse', 'Virtual response', 130);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnProgress', 'Progress', 90);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnReason', 'Причина', 300);
+  RegisterStableGrid(Self, GridAutoTestNumbers, Name);
 
   GridAutoTestResults := TGrid.Create(Self);
-  RegisterStableGrid(Self, GridAutoTestResults, Name);
+  GridAutoTestResults.Name := 'GridAutoTestResults';
   GridAutoTestResults.Parent := Layout;
   GridAutoTestResults.Align := TAlignLayout.Top;
   GridAutoTestResults.Height := 260;
   GridAutoTestResults.OnGetValue := GridAutoTestResultsGetValue;
-  AddStringColumn(GridAutoTestResults, '№', 40);
-  AddStringColumn(GridAutoTestResults, 'Сценарий', 260);
-  AddStringColumn(GridAutoTestResults, 'Результат', 90);
-  AddStringColumn(GridAutoTestResults, 'Время', 80);
-  AddStringColumn(GridAutoTestResults, 'Вирт. время', 90);
-  AddStringColumn(GridAutoTestResults, 'Точек', 60);
-  AddStringColumn(GridAutoTestResults, 'Повторов', 70);
-  AddStringColumn(GridAutoTestResults, 'Stage', 130);
-  AddStringColumn(GridAutoTestResults, 'WorkTable.State', 130);
-  AddStringColumn(GridAutoTestResults, 'Причина', 240);
-  AddStringColumn(GridAutoTestResults, 'Файл лога', 220);
+  AddStringColumn(GridAutoTestResults, 'StringColumnNumber', '№', 40);
+  AddStringColumn(GridAutoTestResults, 'StringColumnScenario', 'Сценарий', 260);
+  AddStringColumn(GridAutoTestResults, 'StringColumnResult', 'Результат', 90);
+  AddStringColumn(GridAutoTestResults, 'StringColumnTime', 'Время', 80);
+  AddStringColumn(GridAutoTestResults, 'StringColumnVirtualTime', 'Вирт. время', 90);
+  AddStringColumn(GridAutoTestResults, 'StringColumnPoints', 'Точек', 60);
+  AddStringColumn(GridAutoTestResults, 'StringColumnRepeats', 'Повторов', 70);
+  AddStringColumn(GridAutoTestResults, 'StringColumnStage', 'Stage', 130);
+  AddStringColumn(GridAutoTestResults, 'StringColumnWorkTableState', 'WorkTable.State', 130);
+  AddStringColumn(GridAutoTestResults, 'StringColumnReason', 'Причина', 240);
+  AddStringColumn(GridAutoTestResults, 'StringColumnLogFile', 'Файл лога', 220);
+  RegisterStableGrid(Self, GridAutoTestResults, Name);
 
   InitializeAutoTestScenarioList;
   ButtonStopAutoTestScenario.Enabled := False;
