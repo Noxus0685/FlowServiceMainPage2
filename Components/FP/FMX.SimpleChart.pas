@@ -116,7 +116,7 @@ type
     procedure DrawSeries;         // рисует все видимые серии
     procedure DrawLegend;
     procedure DrawMarkersForSeries(Series: TChartSeries;
-      ADrawnXLabels: TList<Double>); // маркеры для одной серии
+      ADrawnXLabels, ADrawnYLabels: TList<Double>); // маркеры для одной серии
     function GetSeries(Index: Integer): TChartSeries;
     function GetSeriesCount: Integer;
     function GetFirstSeriesPoints: TList<TPointF>;
@@ -778,23 +778,25 @@ end;
 // Отрисовка маркеров для одной серии
 // -----------------------------------------------------------------------------
 procedure TSimpleChart.DrawMarkersForSeries(Series: TChartSeries;
-  ADrawnXLabels: TList<Double>);
+  ADrawnXLabels, ADrawnYLabels: TList<Double>);
 var
   I: Integer;
   PointValue, ScreenPt: TPointF;
   PlotRect, TextRect: TRectF;
   GuideColor: TAlphaColor;
 
-  // Проверяет, была ли подпись общей координаты X уже выведена другой серией.
-  function IsXLabelDrawn(const AX: Double): Boolean;
+  // Проверяет, была ли подпись координаты уже выведена другой серией.
+  function IsAxisLabelDrawn(const AValue: Double;
+    ADrawnLabels: TList<Double>): Boolean;
   var
-    DrawnX: Double;
+    DrawnValue: Double;
   begin
     Result := False;
-    if ADrawnXLabels = nil then
+    if ADrawnLabels = nil then
       Exit;
-    for DrawnX in ADrawnXLabels do
-      if SameValue(DrawnX, AX, Max(1E-9, Abs(AX) * 1E-9)) then
+    for DrawnValue in ADrawnLabels do
+      if SameValue(DrawnValue, AValue,
+        Max(1E-9, Abs(AValue) * 1E-9)) then
         Exit(True);
   end;
 begin
@@ -821,7 +823,7 @@ begin
 
       Canvas.Fill.Color := Series.Color;
       // Подписи координат размещаются с внешней стороны осей.
-      if not IsXLabelDrawn(PointValue.X) then
+      if not IsAxisLabelDrawn(PointValue.X, ADrawnXLabels) then
       begin
         TextRect := RectF(ScreenPt.X - 32, PlotRect.Bottom + 26,
           ScreenPt.X + 32, PlotRect.Bottom + 42);
@@ -831,10 +833,15 @@ begin
           ADrawnXLabels.Add(PointValue.X);
       end;
 
-      TextRect := RectF(PlotRect.Left - 92, ScreenPt.Y - 9,
-        PlotRect.Left - 40, ScreenPt.Y + 9);
-      Canvas.FillText(TextRect, FormatFloat('0.###', PointValue.Y), False,
-        1, [], TTextAlign.Trailing, TTextAlign.Center);
+      if not IsAxisLabelDrawn(PointValue.Y, ADrawnYLabels) then
+      begin
+        TextRect := RectF(PlotRect.Left - 92, ScreenPt.Y - 9,
+          PlotRect.Left - 40, ScreenPt.Y + 9);
+        Canvas.FillText(TextRect, FormatFloat('0.###', PointValue.Y), False,
+          1, [], TTextAlign.Trailing, TTextAlign.Center);
+        if ADrawnYLabels <> nil then
+          ADrawnYLabels.Add(PointValue.Y);
+      end;
     end;
 
     Canvas.Fill.Color := Series.Color;
@@ -857,9 +864,10 @@ var
   series: TChartSeries;
   Delta: TPointF;
   LengthPx, DashPos: Single;
-  DrawnXLabels: TList<Double>;
+  DrawnXLabels, DrawnYLabels: TList<Double>;
 begin
   DrawnXLabels := TList<Double>.Create;
+  DrawnYLabels := TList<Double>.Create;
   try
     for i := 0 to FSeries.Count - 1 do
     begin
@@ -896,9 +904,10 @@ begin
     end;
 
       if series.ShowMarkers then
-        DrawMarkersForSeries(series, DrawnXLabels);
+        DrawMarkersForSeries(series, DrawnXLabels, DrawnYLabels);
     end;
   finally
+    DrawnYLabels.Free;
     DrawnXLabels.Free;
   end;
 end;
