@@ -73,6 +73,8 @@ type
     procedure ButtonCreateSessionClick(Sender: TObject);
     procedure ButtonExportExcelClick(Sender: TObject);
     procedure GridMRResultsSelChanged(Sender: TObject);
+    procedure GridMRResultsMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure GridMRResultsMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
   private
@@ -208,11 +210,14 @@ begin
   FDisplayPoints := TObjectList<TDisplayPointGroup>.Create(True);
   FRows := TList<TChannel>.Create;
   FGridLayoutState := TGridLayoutState.Create;
+  FGridLayoutState.ConfigureWidthControl(GridMRResults,
+    ClassName + '.' + GridMRResults.Name);
 
   GridMRResults.OnGetValue := GridMRResultsGetValue;
   GridMRResults.OnDrawColumnCell := GridMRResultsDrawColumnCell;
   GridMRResults.OnSetValue := nil;
   GridMRResults.OnSelChanged := GridMRResultsSelChanged;
+  GridMRResults.OnMouseDown := GridMRResultsMouseDown;
   GridMRResults.OnMouseUp := GridMRResultsMouseUp;
   SetGridReadOnly(GridMRResults);
 end;
@@ -593,12 +598,22 @@ begin
   ButtonCreateSession.Enabled := ButtonClearSession.Enabled;
 end;
 
-{ Saves column widths only after the user finishes a manual resize. }
+{ Starts width tracking only on a left-button header-divider drag. }
+procedure TFrameMRResults.GridMRResultsMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+begin
+  if (Button = TMouseButton.mbLeft) and (not FRefreshing) and
+     (FGridLayoutState <> nil) then
+    FGridLayoutState.BeginManualColumnResize(GridMRResults, X, Y);
+end;
+
+{ Persists width only after the tracked manual resize has completed. }
 procedure TFrameMRResults.GridMRResultsMouseUp(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 begin
-  if not FRefreshing then
-    TGridLayoutManager.CaptureWidths(FGridLayoutState);
+  if (Button = TMouseButton.mbLeft) and (not FRefreshing) and
+     (FGridLayoutState <> nil) then
+    FGridLayoutState.EndManualColumnResize;
 end;
 
 procedure TFrameMRResults.BuildRows;
@@ -643,7 +658,7 @@ begin
       StringColumnName.Visible, StringColumnName));
     for Group in RequiredDisplayPoints do
       Definitions.Add(TGridColumnDefinition.Create(GetDisplayPointKey(Group),
-        Group.Header, TStringColumn, 130, True, True));
+        Group.Header, TStringColumn, C_DYNAMIC_COLUMN_WIDTH, True, True));
     Definitions.Add(TGridColumnDefinition.Create('fixed:result',
       StringColumnResult.Header, TStringColumn, StringColumnResult.Width, True,
       StringColumnResult.Visible, StringColumnResult));
