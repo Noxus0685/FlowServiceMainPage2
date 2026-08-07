@@ -8,7 +8,8 @@ uses
   System.Generics.Collections,
   System.IniFiles,
   System.IOUtils,
-  System.SysUtils;
+  System.SysUtils,
+  System.Types;
 
 const
   C_DYNAMIC_COLUMN_WIDTH = 125.0;
