@@ -2096,7 +2096,7 @@ var
   FoundRepo: TTypeRepository;
 begin
   if FGridPointsStability = nil then
-    FGridPointsStability := RegisterStableGrid(Self, GridPoints, Name);
+    FGridPointsStability := RegisterStableGrid(Self, GridPoints, Name, False);
   FGridPointsStability.Snapshot('after-fmx-load');
   RegisterGridPointsWidthControl;
   InitCoefsTab;
