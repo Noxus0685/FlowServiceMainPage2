@@ -41,6 +41,7 @@ uses
   uClasses,
   uDataManager,
   uDeviceClass,
+  uGridLayoutManager,
   uRepositories,
   uProtocols,
   uGridStabilityController,
@@ -363,6 +364,7 @@ type
      FPointSortColumn: Integer;
      FPointSortAscending: Boolean;
      FGridPointsStability: TGridStabilityController;
+     FGridPointsLayoutState: TGridLayoutState;
 
      function ResolveDeviceType(out ARepo: TTypeRepository): TDeviceType;
      procedure ApplyMassMode;
@@ -404,6 +406,8 @@ type
      procedure UpdateQmaxQmin;
      procedure SortPoints;
      procedure CreateGridPointsHeaderMenu;
+     { Registers DeviceEdit point columns for persistent manual width control. }
+     procedure RegisterGridPointsWidthControl;
 
      procedure InitCoefsTab;
      procedure UpdateCoefTablesCombo;
@@ -1204,6 +1208,7 @@ end;
 procedure TFormDeviceEditor.FormClose(Sender: TObject;
   var Action: TCloseAction);
 begin
+      FreeAndNil(FGridPointsLayoutState);
       FreeAndNil(FDevice);      // уничтожаем клон
       FreeAndNil(FLoadedDeviceSnapshot);
       FreeAndNil(FClipboardPoint);
@@ -1518,9 +1523,12 @@ end;
 
 procedure TFormDeviceEditor.InitCoefsTab;
 
-  function NewCol(const AHeader: string; const AWidth: Single): TStringColumn;
+  { Creates one coefficient column with a stable persistent identity. }
+  function NewCol(const AName, AHeader: string;
+    const AWidth: Single): TStringColumn;
   begin
     Result := TStringColumn.Create(FGridCoefs);
+    Result.Name := AName;
     Result.Header := AHeader;
     Result.Width := AWidth;
     Result.Parent := FGridCoefs;
@@ -1595,7 +1603,7 @@ begin
   FComboCoefTable.OnChange := ComboCoefTableChange;
 
   FGridCoefs := TGrid.Create(FTabItemCoefs);
-  RegisterStableGrid(Self, FGridCoefs, Name);
+  FGridCoefs.Name := 'GridCoefs';
   FGridCoefs.Parent := FTabItemCoefs;
   FGridCoefs.Align := TAlignLayout.Client;
   FGridCoefs.Options := FGridCoefs.Options + [TGridOption.Editing];
@@ -1603,13 +1611,14 @@ begin
   FGridCoefs.OnSetValue := GridCoefsSetValue;
   FGridCoefs.OnKeyDown := GridCoefsKeyDown;
 
-  NewCol('Наименование', 170);
-  NewCol('Value', 90);
-  NewCol('Arg', 90);
-  NewCol('QFrom', 90);
-  NewCol('QTo', 90);
-  NewCol('K', 90);
-  NewCol('b', 90);
+  NewCol('StringColumnCoefName', 'Наименование', 170);
+  NewCol('StringColumnCoefValue', 'Value', 90);
+  NewCol('StringColumnCoefArg', 'Arg', 90);
+  NewCol('StringColumnCoefQFrom', 'QFrom', 90);
+  NewCol('StringColumnCoefQTo', 'QTo', 90);
+  NewCol('StringColumnCoefK', 'K', 90);
+  NewCol('StringColumnCoefB', 'b', 90);
+  RegisterStableGrid(Self, FGridCoefs, Name);
 
   FTabControlMain.ActiveTab := FTabItemDevice;
   FCoefsTabInitialized := True;
@@ -1745,15 +1754,10 @@ begin
 
   Table := GetSelectedCalibrCoefTable;
 
-  FGridCoefs.BeginUpdate;
-  try
-    if Table <> nil then
-      FGridCoefs.RowCount := Table.Items.Count
-    else
-      FGridCoefs.RowCount := 0;
-  finally
-    FGridCoefs.EndUpdate;
-  end;
+  if Table <> nil then
+    TGridLayoutManager.SetRowCount(FGridCoefs, Table.Items.Count)
+  else
+    TGridLayoutManager.SetRowCount(FGridCoefs, 0);
 end;
 
 function TFormDeviceEditor.GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;
@@ -2081,14 +2085,24 @@ begin
   FPopupMenuGridPointsHeader.Popup(P.X, P.Y);
 end;
 
+procedure TFormDeviceEditor.RegisterGridPointsWidthControl;
+begin
+  if FGridPointsLayoutState = nil then
+    FGridPointsLayoutState := TGridLayoutState.Create;
+  FGridPointsLayoutState.ConfigureWidthControl(GridPoints,
+    ClassName + '.' + GridPoints.Name);
+  FGridPointsLayoutState.RegisterExistingColumns;
+end;
+
 procedure TFormDeviceEditor.LoadDevice(ADevice: TDevice);
 var
   FoundType: TDeviceType;
   FoundRepo: TTypeRepository;
 begin
   if FGridPointsStability = nil then
-    FGridPointsStability := RegisterStableGrid(Self, GridPoints, Name);
+    FGridPointsStability := RegisterStableGrid(Self, GridPoints, Name, False);
   FGridPointsStability.Snapshot('after-fmx-load');
+  RegisterGridPointsWidthControl;
   InitCoefsTab;
   OnKeyDown := FormKeyDown;
   GridPoints.OnKeyDown := GridPointsKeyDown;
@@ -4333,28 +4347,23 @@ begin
 
   SortPoints;
 
-  GridPoints.BeginUpdate;
-  try
-    VisibleCount := 0;
+  VisibleCount := 0;
 
-    for i := 0 to FDevice.Points.Count - 1 do
-      if FDevice.Points[i].State <> osDeleted then
-        Inc(VisibleCount);
+  for i := 0 to FDevice.Points.Count - 1 do
+    if FDevice.Points[i].State <> osDeleted then
+      Inc(VisibleCount);
 
-    GridPoints.RowCount := VisibleCount;
+  TGridLayoutManager.SetRowCount(GridPoints, VisibleCount);
 
-    { корректировка текущей строки }
-    if GridPoints.Row >= GridPoints.RowCount then
-      GridPoints.Row := GridPoints.RowCount - 1;
+  { корректировка текущей строки }
+  if GridPoints.Row >= GridPoints.RowCount then
+    GridPoints.Row := GridPoints.RowCount - 1;
 
-    if GridPoints.RowCount = 0 then
-      GridPoints.Row := -1;
+  if GridPoints.RowCount = 0 then
+    GridPoints.Row := -1;
 
-  finally
-    GridPoints.EndUpdate;
-    if FGridPointsStability <> nil then
-      FGridPointsStability.Snapshot('after-EndUpdate');
-  end;
+  if FGridPointsStability <> nil then
+    FGridPointsStability.Snapshot('after-EndUpdate');
   if FGridPointsStability <> nil then
   begin
     FGridPointsStability.Snapshot('after-UpdatePointsGrid');

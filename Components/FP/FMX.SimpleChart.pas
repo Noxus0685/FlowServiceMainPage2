@@ -4,13 +4,20 @@ interface
 
 uses
   System.SysUtils, System.Classes, System.Types, System.Math,
-  System.Generics.Collections,
+  System.Generics.Collections, System.Generics.Defaults,
   System.UITypes,
   System.Math.Vectors,
   FMX.Controls, FMX.Types, FMX.Graphics, FMX.Forms;
 
 type
   TChartLineStyle = (clsSolid, clsDash);
+
+  // Хранит значение и экранную координату подписи средней погрешности.
+  TChartYLabelInfo = record
+    Value: Double;
+    ScreenY: Single;
+    Color: TAlphaColor;
+  end;
   // ---------------------------------------------------------------------------
   // Серия данных (одна линия на графике)
   // ---------------------------------------------------------------------------
@@ -60,6 +67,7 @@ type
     FAutoRangeX: Boolean;
     FAutoRangeY: Boolean;
     FAutoRangeOnClear: Boolean;
+    FLogarithmicX: Boolean;
     FUpdating: Boolean;
     FXMin, FXMax: Double;
     FYMin, FYMax: Double;
@@ -82,6 +90,7 @@ type
     // Вспомогательные методы
     procedure SetAutoRangeX(const Value: Boolean);
     procedure SetAutoRangeY(const Value: Boolean);
+    procedure SetLogarithmicX(const Value: Boolean);
     procedure SetXMin(const Value: Double);
     procedure SetXMax(const Value: Double);
     procedure SetYMin(const Value: Double);
@@ -109,10 +118,14 @@ type
     procedure UpdateRanges;
     function WorldToScreen(const Value: TPointF): TPointF;
     function GetNiceTicks(minVal, maxVal: Double; approxTicks: Integer): TArray<Double>;
+    function GetLogTicks(minVal, maxVal: Double): TArray<Double>;
     procedure DrawAxesAndGrid;    // рисует оси, сетку, подписи, заголовки
     procedure DrawSeries;         // рисует все видимые серии
     procedure DrawLegend;
-    procedure DrawMarkersForSeries(Series: TChartSeries); // маркеры для одной серии
+    procedure DrawMarkersForSeries(Series: TChartSeries;
+      ADrawnXLabels: TList<Double>;
+      AYLabels: TList<TChartYLabelInfo>); // маркеры для одной серии
+    procedure DrawAveragedYLabels(AYLabels: TList<TChartYLabelInfo>);
     function GetSeries(Index: Integer): TChartSeries;
     function GetSeriesCount: Integer;
     function GetFirstSeriesPoints: TList<TPointF>;
@@ -146,6 +159,7 @@ type
     property AutoRangeX: Boolean read FAutoRangeX write SetAutoRangeX default True;
     property AutoRangeY: Boolean read FAutoRangeY write SetAutoRangeY default True;
     property AutoRangeOnClear: Boolean read FAutoRangeOnClear write FAutoRangeOnClear default True;
+    property LogarithmicX: Boolean read FLogarithmicX write SetLogarithmicX default False;
     property XMin: Double read FXMin write SetXMin;
     property XMax: Double read FXMax write SetXMax;
     property YMin: Double read FYMin write SetYMin;
@@ -277,6 +291,7 @@ begin
   FAutoRangeX := True;
   FAutoRangeY := True;
   FAutoRangeOnClear := True;
+  FLogarithmicX := False;
   FUpdating := False;
   FXMin := 0;
   FXMax := 100;
@@ -437,31 +452,40 @@ begin
   anyPoint := False;
   minX := 0; maxX := 0; minY := 0; maxY := 0; // ← инициализация
   for i := 0 to FSeries.Count - 1 do
-  begin
-    if FSeries[i].Points.Count = 0 then Continue;
-    if not anyPoint then
-    begin
-      p := FSeries[i].Points[0];
-      minX := p.X; maxX := p.X;
-      minY := p.Y; maxY := p.Y;
-      anyPoint := True;
-    end;
     for j := 0 to FSeries[i].Points.Count - 1 do
     begin
       p := FSeries[i].Points[j];
-      if p.X < minX then minX := p.X;
-      if p.X > maxX then maxX := p.X;
-      if p.Y < minY then minY := p.Y;
-      if p.Y > maxY then maxY := p.Y;
+      if FLogarithmicX and (p.X <= 0) then
+        Continue;
+      if not anyPoint then
+      begin
+        minX := p.X; maxX := p.X;
+        minY := p.Y; maxY := p.Y;
+        anyPoint := True;
+      end
+      else
+      begin
+        if p.X < minX then minX := p.X;
+        if p.X > maxX then maxX := p.X;
+        if p.Y < minY then minY := p.Y;
+        if p.Y > maxY then maxY := p.Y;
+      end;
     end;
-  end;
 
   if not anyPoint then
   begin
     if FAutoRangeX then
     begin
-      FXMin := 0;
-      FXMax := 100;
+      if FLogarithmicX then
+      begin
+        FXMin := 1;
+        FXMax := 10;
+      end
+      else
+      begin
+        FXMin := 0;
+        FXMax := 100;
+      end;
     end;
     if FAutoRangeY then
     begin
@@ -475,8 +499,16 @@ begin
   begin
     if SameValue(minX, maxX) then
     begin
-      FXMin := minX - 1;
-      FXMax := maxX + 1;
+      if FLogarithmicX then
+      begin
+        FXMin := minX / 1.1;
+        FXMax := maxX * 1.1;
+      end
+      else
+      begin
+        FXMin := minX - 1;
+        FXMax := maxX + 1;
+      end;
     end
     else
     begin
@@ -506,6 +538,7 @@ end;
 function TSimpleChart.WorldToScreen(const Value: TPointF): TPointF;
 var
   plotRect: TRectF;
+  MinX, MaxX, PointX: Double;
 begin
   plotRect := TRectF.Create(
     MarginLeft,
@@ -513,7 +546,22 @@ begin
     Width - MarginRight,
     Height - MarginBottom
   );
-  Result.X := plotRect.Left + (Value.X - FXMin) / (FXMax - FXMin) * plotRect.Width;
+  if FLogarithmicX and (FXMin > 0) and (FXMax > FXMin) and (Value.X > 0) then
+  begin
+    MinX := Log10(FXMin);
+    MaxX := Log10(FXMax);
+    PointX := Log10(Value.X);
+  end
+  else
+  begin
+    MinX := FXMin;
+    MaxX := FXMax;
+    PointX := Value.X;
+  end;
+  if SameValue(MinX, MaxX) then
+    Result.X := plotRect.Left
+  else
+    Result.X := plotRect.Left + (PointX - MinX) / (MaxX - MinX) * plotRect.Width;
   Result.Y := plotRect.Bottom - (Value.Y - FYMin) / (FYMax - FYMin) * plotRect.Height;
 end;
 
@@ -560,6 +608,34 @@ begin
   end;
 end;
 
+// Возвращает физические значения меток 1/2/5 для логарифмической оси X.
+function TSimpleChart.GetLogTicks(minVal, maxVal: Double): TArray<Double>;
+const
+  Mantissas: array[0..2] of Double = (1, 2, 5);
+var
+  ExponentValue, I: Integer;
+  TickValue: Double;
+  List: TList<Double>;
+begin
+  SetLength(Result, 0);
+  if (minVal <= 0) or (maxVal <= minVal) then
+    Exit;
+
+  List := TList<Double>.Create;
+  try
+    for ExponentValue := Floor(Log10(minVal)) to Ceil(Log10(maxVal)) do
+      for I := Low(Mantissas) to High(Mantissas) do
+      begin
+        TickValue := Mantissas[I] * Power(10, ExponentValue);
+        if (TickValue >= minVal) and (TickValue <= maxVal) then
+          List.Add(TickValue);
+      end;
+    Result := List.ToArray;
+  finally
+    List.Free;
+  end;
+end;
+
 // -----------------------------------------------------------------------------
 // Отрисовка осей, сетки, подписей и заголовков
 // -----------------------------------------------------------------------------
@@ -575,7 +651,6 @@ var
   txt: string;
   corners: TCorners;
   SaveState: TCanvasSaveState;
-  CenterY: Single;
 begin
   Canvas := Self.Canvas;
   if Canvas = nil then Exit;
@@ -602,7 +677,10 @@ begin
   if FShowGrid then
   begin
     Canvas.Stroke.Color := FGridColor;
-    xTicks := GetNiceTicks(FXMin, FXMax, 8);
+    if FLogarithmicX then
+      xTicks := GetLogTicks(FXMin, FXMax)
+    else
+      xTicks := GetNiceTicks(FXMin, FXMax, 8);
     for i := 0 to Length(xTicks) - 1 do
     begin
       tickVal := xTicks[i];
@@ -614,7 +692,7 @@ begin
     for i := 0 to Length(yTicks) - 1 do
     begin
       tickVal := yTicks[i];
-      p1 := WorldToScreen(TPointF.Create(0, tickVal));
+      p1 := WorldToScreen(TPointF.Create(FXMin, tickVal));
       p2 := TPointF.Create(plotRect.Right, p1.Y);
       Canvas.DrawLine(p1, p2, 1);
     end;
@@ -650,7 +728,10 @@ begin
   end;
 
   // X-метки
-  xTicks := GetNiceTicks(FXMin, FXMax, 8);
+  if FLogarithmicX then
+    xTicks := GetLogTicks(FXMin, FXMax)
+  else
+    xTicks := GetNiceTicks(FXMin, FXMax, 8);
   for i := 0 to Length(xTicks) - 1 do
   begin
     tickVal := xTicks[i];
@@ -680,11 +761,10 @@ begin
     SaveState := Canvas.SaveState;
     try
       Canvas.MultiplyMatrix(TMatrix.CreateRotation(-Pi/2));
-      CenterY := (plotRect.Top + plotRect.Bottom) / 2;
       textRect := TRectF.Create(
-        -CenterY - 30,
+        -plotRect.Bottom,
         FYTitleOffset - 40,
-        -CenterY + 30,
+        -plotRect.Top,
         FYTitleOffset + 40
       );
       Canvas.FillText(textRect, FYTitle, False, 1, [], TTextAlign.Center, TTextAlign.Center);
@@ -704,12 +784,30 @@ end;
 // -----------------------------------------------------------------------------
 // Отрисовка маркеров для одной серии
 // -----------------------------------------------------------------------------
-procedure TSimpleChart.DrawMarkersForSeries(Series: TChartSeries);
+procedure TSimpleChart.DrawMarkersForSeries(Series: TChartSeries;
+  ADrawnXLabels: TList<Double>; AYLabels: TList<TChartYLabelInfo>);
 var
   I: Integer;
   PointValue, ScreenPt: TPointF;
   PlotRect, TextRect: TRectF;
   GuideColor: TAlphaColor;
+  YLabel: TChartYLabelInfo;
+
+  // Проверяет, была ли подпись координаты уже выведена другой серией.
+  function IsAxisLabelDrawn(const AValue: Double;
+    ADrawnLabels: TList<Double>): Boolean;
+  var
+    DrawnValue: Double;
+  begin
+    Result := False;
+    if ADrawnLabels = nil then
+      Exit;
+    for DrawnValue in ADrawnLabels do
+      if SameValue(DrawnValue, AValue,
+        Max(1E-9, Abs(AValue) * 1E-9)) then
+        Exit(True);
+  end;
+
 begin
   PlotRect := TRectF.Create(
     MarginLeft,
@@ -734,15 +832,23 @@ begin
 
       Canvas.Fill.Color := Series.Color;
       // Подписи координат размещаются с внешней стороны осей.
-      TextRect := RectF(ScreenPt.X - 32, PlotRect.Bottom + 26,
-        ScreenPt.X + 32, PlotRect.Bottom + 42);
-      Canvas.FillText(TextRect, FormatFloat('0.###', PointValue.X), False,
-        1, [], TTextAlign.Center, TTextAlign.Center);
+      if not IsAxisLabelDrawn(PointValue.X, ADrawnXLabels) then
+      begin
+        TextRect := RectF(ScreenPt.X - 32, PlotRect.Bottom + 26,
+          ScreenPt.X + 32, PlotRect.Bottom + 42);
+        Canvas.FillText(TextRect, FormatFloat('0.###', PointValue.X), False,
+          1, [], TTextAlign.Center, TTextAlign.Center);
+        if ADrawnXLabels <> nil then
+          ADrawnXLabels.Add(PointValue.X);
+      end;
 
-      TextRect := RectF(PlotRect.Left - 92, ScreenPt.Y - 9,
-        PlotRect.Left - 40, ScreenPt.Y + 9);
-      Canvas.FillText(TextRect, FormatFloat('0.###', PointValue.Y), False,
-        1, [], TTextAlign.Trailing, TTextAlign.Center);
+      if AYLabels <> nil then
+      begin
+        YLabel.Value := PointValue.Y;
+        YLabel.ScreenY := ScreenPt.Y;
+        YLabel.Color := Series.Color;
+        AYLabels.Add(YLabel);
+      end;
     end;
 
     Canvas.Fill.Color := Series.Color;
@@ -752,6 +858,70 @@ begin
                              ScreenPt.Y - Series.MarkerRadius,
                              ScreenPt.X + Series.MarkerRadius,
                              ScreenPt.Y + Series.MarkerRadius), 1);
+  end;
+end;
+
+// Объединяет пересекающиеся подписи погрешности и выводит их среднее значение.
+procedure TSimpleChart.DrawAveragedYLabels(
+  AYLabels: TList<TChartYLabelInfo>);
+const
+  CLabelHeight = 18.0;
+  CLabelGap = 2.0;
+var
+  SortedLabels: TList<TChartYLabelInfo>;
+  I, GroupStart, GroupEnd, GroupCount: Integer;
+  SumValue, AverageValue: Double;
+  AverageScreenY: Single;
+  TextRect: TRectF;
+  LabelColor: TAlphaColor;
+begin
+  if (AYLabels = nil) or (AYLabels.Count = 0) then
+    Exit;
+
+  SortedLabels := TList<TChartYLabelInfo>.Create;
+  try
+    SortedLabels.AddRange(AYLabels);
+    SortedLabels.Sort(TComparer<TChartYLabelInfo>.Construct(
+      function(const Left, Right: TChartYLabelInfo): Integer
+      begin
+        if Left.ScreenY < Right.ScreenY then
+          Result := -1
+        else if Left.ScreenY > Right.ScreenY then
+          Result := 1
+        else
+          Result := 0;
+      end));
+
+    GroupStart := 0;
+    while GroupStart < SortedLabels.Count do
+    begin
+      GroupEnd := GroupStart;
+      while (GroupEnd + 1 < SortedLabels.Count) and
+            (SortedLabels[GroupEnd + 1].ScreenY -
+             SortedLabels[GroupEnd].ScreenY < CLabelHeight + CLabelGap) do
+        Inc(GroupEnd);
+
+      SumValue := 0;
+      for I := GroupStart to GroupEnd do
+        SumValue := SumValue + SortedLabels[I].Value;
+      GroupCount := GroupEnd - GroupStart + 1;
+      AverageValue := SumValue / GroupCount;
+      AverageScreenY := WorldToScreen(PointF(FXMin, AverageValue)).Y;
+
+      if GroupCount = 1 then
+        LabelColor := SortedLabels[GroupStart].Color
+      else
+        LabelColor := FAxisColor;
+      Canvas.Fill.Color := LabelColor;
+      TextRect := RectF(MarginLeft - 92, AverageScreenY - CLabelHeight / 2,
+        MarginLeft - 40, AverageScreenY + CLabelHeight / 2);
+      Canvas.FillText(TextRect, FormatFloat('0.###', AverageValue), False,
+        1, [], TTextAlign.Trailing, TTextAlign.Center);
+
+      GroupStart := GroupEnd + 1;
+    end;
+  finally
+    SortedLabels.Free;
   end;
 end;
 
@@ -765,14 +935,19 @@ var
   series: TChartSeries;
   Delta: TPointF;
   LengthPx, DashPos: Single;
+  DrawnXLabels: TList<Double>;
+  YLabels: TList<TChartYLabelInfo>;
 begin
-  for i := 0 to FSeries.Count - 1 do
-  begin
-    series := FSeries[i];
-    if not series.Visible then
-      Continue;
-    if series.Points.Count = 0 then
-      Continue;
+  DrawnXLabels := TList<Double>.Create;
+  YLabels := TList<TChartYLabelInfo>.Create;
+  try
+    for i := 0 to FSeries.Count - 1 do
+    begin
+      series := FSeries[i];
+      if not series.Visible then
+        Continue;
+      if series.Points.Count = 0 then
+        Continue;
 
     SetLength(screenPoints, series.Points.Count);
     for j := 0 to series.Points.Count - 1 do
@@ -800,8 +975,13 @@ begin
         end;
     end;
 
-    if series.ShowMarkers then
-      DrawMarkersForSeries(series);
+      if series.ShowMarkers then
+        DrawMarkersForSeries(series, DrawnXLabels, YLabels);
+    end;
+    DrawAveragedYLabels(YLabels);
+  finally
+    YLabels.Free;
+    DrawnXLabels.Free;
   end;
 end;
 
@@ -923,6 +1103,18 @@ begin
   begin
     FAutoRangeY := Value;
     if FAutoRangeY then
+      UpdateRanges;
+    Repaint;
+  end;
+end;
+
+// Переключает преобразование координат и метки оси X без изменения исходных данных серий.
+procedure TSimpleChart.SetLogarithmicX(const Value: Boolean);
+begin
+  if FLogarithmicX <> Value then
+  begin
+    FLogarithmicX := Value;
+    if FAutoRangeX then
       UpdateRanges;
     Repaint;
   end;

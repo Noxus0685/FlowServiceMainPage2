@@ -67,6 +67,7 @@ uses
   uDataManager,
   uDeviceClass,
   uFlowMeter,
+  uGridLayoutManager,
   uMeasurementRun,
   uMeterValue,
   uObservable,
@@ -2489,7 +2490,7 @@ begin
   FFrameChannelProperties := nil;
   FFrameWorkTableProperties := nil;
 
-  GridDevices.RowCount := 2;
+  TGridLayoutManager.SetRowCount(GridDevices, 2);
 
   // Заполняем список через имя колонки
   PopupColumnDeviceSignal1.Items.Clear;
@@ -4121,8 +4122,8 @@ begin
 
     if Assigned(GridEtalonsN) then
     begin
-      GridEtalonsN.RowCount := WorkTable.EtalonChannels.Count;
-      GridEtalonsN.Repaint;
+      TGridLayoutManager.SetRowCount(GridEtalonsN,
+        WorkTable.EtalonChannels.Count);
     end;
 
     GridDevicesN := FindComponent('GridDevices' + IntToStr(I)) as TGrid;
@@ -4131,8 +4132,8 @@ begin
 
     if Assigned(GridDevicesN) then
     begin
-      GridDevicesN.RowCount := WorkTable.DeviceChannels.Count;
-      GridDevicesN.Repaint;
+      TGridLayoutManager.SetRowCount(GridDevicesN,
+        WorkTable.DeviceChannels.Count);
     end;
 
     if WorkTable = FActiveWorkTable then
@@ -8116,11 +8117,14 @@ begin
   end;
 end;
 
-procedure AddStringColumn(AGrid: TGrid; const AHeader: string; const AWidth: Single);
+{ Creates one runtime grid column with a stable persistent identity. }
+procedure AddStringColumn(AGrid: TGrid; const AName, AHeader: string;
+  const AWidth: Single);
 var
   Col: TStringColumn;
 begin
   Col := TStringColumn.Create(AGrid);
+  Col.Name := AName;
   Col.Header := AHeader;
   Col.Width := AWidth;
   Col.Parent := AGrid;
@@ -8201,47 +8205,49 @@ begin
   FAutoTestStatusLabel.Text := 'Тест не запускался';
 
   GridAutoTestNumbers := TGrid.Create(Self);
-  RegisterStableGrid(Self, GridAutoTestNumbers, Name);
+  GridAutoTestNumbers.Name := 'GridAutoTestNumbers';
   GridAutoTestNumbers.Parent := Layout;
   GridAutoTestNumbers.Align := TAlignLayout.Top;
   GridAutoTestNumbers.Height := 220;
   GridAutoTestNumbers.OnGetValue := GridAutoTestNumbersGetValue;
-  AddStringColumn(GridAutoTestNumbers, 'Время', 70);
-  AddStringColumn(GridAutoTestNumbers, 'Точка', 120);
-  AddStringColumn(GridAutoTestNumbers, 'Repeat', 70);
-  AddStringColumn(GridAutoTestNumbers, 'Q заданный', 90);
-  AddStringColumn(GridAutoTestNumbers, 'Q фактический', 100);
-  AddStringColumn(GridAutoTestNumbers, 'Q parameter', 100);
-  AddStringColumn(GridAutoTestNumbers, 'Q sample', 100);
-  AddStringColumn(GridAutoTestNumbers, 'Sample time', 100);
-  AddStringColumn(GridAutoTestNumbers, 'Time source', 90);
-  AddStringColumn(GridAutoTestNumbers, 'T заданная', 90);
-  AddStringColumn(GridAutoTestNumbers, 'T фактическая', 100);
-  AddStringColumn(GridAutoTestNumbers, 'P заданное', 90);
-  AddStringColumn(GridAutoTestNumbers, 'P фактическое', 100);
-  AddStringColumn(GridAutoTestNumbers, 'Stable', 90);
-  AddStringColumn(GridAutoTestNumbers, 'Virtual command', 130);
-  AddStringColumn(GridAutoTestNumbers, 'Virtual response', 130);
-  AddStringColumn(GridAutoTestNumbers, 'Progress', 90);
-  AddStringColumn(GridAutoTestNumbers, 'Причина', 300);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnTime', 'Время', 70);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnPoint', 'Точка', 120);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnRepeat', 'Repeat', 70);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnTargetFlow', 'Q заданный', 90);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnActualFlow', 'Q фактический', 100);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnFlowParameter', 'Q parameter', 100);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnFlowSample', 'Q sample', 100);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnSampleTime', 'Sample time', 100);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnTimeSource', 'Time source', 90);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnTargetTemperature', 'T заданная', 90);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnActualTemperature', 'T фактическая', 100);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnTargetPressure', 'P заданное', 90);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnActualPressure', 'P фактическое', 100);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnStable', 'Stable', 90);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnVirtualCommand', 'Virtual command', 130);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnVirtualResponse', 'Virtual response', 130);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnProgress', 'Progress', 90);
+  AddStringColumn(GridAutoTestNumbers, 'StringColumnReason', 'Причина', 300);
+  RegisterStableGrid(Self, GridAutoTestNumbers, Name);
 
   GridAutoTestResults := TGrid.Create(Self);
-  RegisterStableGrid(Self, GridAutoTestResults, Name);
+  GridAutoTestResults.Name := 'GridAutoTestResults';
   GridAutoTestResults.Parent := Layout;
   GridAutoTestResults.Align := TAlignLayout.Top;
   GridAutoTestResults.Height := 260;
   GridAutoTestResults.OnGetValue := GridAutoTestResultsGetValue;
-  AddStringColumn(GridAutoTestResults, '№', 40);
-  AddStringColumn(GridAutoTestResults, 'Сценарий', 260);
-  AddStringColumn(GridAutoTestResults, 'Результат', 90);
-  AddStringColumn(GridAutoTestResults, 'Время', 80);
-  AddStringColumn(GridAutoTestResults, 'Вирт. время', 90);
-  AddStringColumn(GridAutoTestResults, 'Точек', 60);
-  AddStringColumn(GridAutoTestResults, 'Повторов', 70);
-  AddStringColumn(GridAutoTestResults, 'Stage', 130);
-  AddStringColumn(GridAutoTestResults, 'WorkTable.State', 130);
-  AddStringColumn(GridAutoTestResults, 'Причина', 240);
-  AddStringColumn(GridAutoTestResults, 'Файл лога', 220);
+  AddStringColumn(GridAutoTestResults, 'StringColumnNumber', '№', 40);
+  AddStringColumn(GridAutoTestResults, 'StringColumnScenario', 'Сценарий', 260);
+  AddStringColumn(GridAutoTestResults, 'StringColumnResult', 'Результат', 90);
+  AddStringColumn(GridAutoTestResults, 'StringColumnTime', 'Время', 80);
+  AddStringColumn(GridAutoTestResults, 'StringColumnVirtualTime', 'Вирт. время', 90);
+  AddStringColumn(GridAutoTestResults, 'StringColumnPoints', 'Точек', 60);
+  AddStringColumn(GridAutoTestResults, 'StringColumnRepeats', 'Повторов', 70);
+  AddStringColumn(GridAutoTestResults, 'StringColumnStage', 'Stage', 130);
+  AddStringColumn(GridAutoTestResults, 'StringColumnWorkTableState', 'WorkTable.State', 130);
+  AddStringColumn(GridAutoTestResults, 'StringColumnReason', 'Причина', 240);
+  AddStringColumn(GridAutoTestResults, 'StringColumnLogFile', 'Файл лога', 220);
+  RegisterStableGrid(Self, GridAutoTestResults, Name);
 
   InitializeAutoTestScenarioList;
   ButtonStopAutoTestScenario.Enabled := False;
@@ -8824,8 +8830,10 @@ begin
     SetLength(FAutoTestResultRows, Length(FAutoTestResultRows) + 1);
     FAutoTestResultRows[High(FAutoTestResultRows)] := ResultRow;
 
-    GridAutoTestNumbers.RowCount := Length(FAutoTestStepRows);
-    GridAutoTestResults.RowCount := Length(FAutoTestResultRows);
+    TGridLayoutManager.SetRowCount(GridAutoTestNumbers,
+      Length(FAutoTestStepRows));
+    TGridLayoutManager.SetRowCount(GridAutoTestResults,
+      Length(FAutoTestResultRows));
     if FAutoTestStatusLabel <> nil then
       FAutoTestStatusLabel.Text := FinalReason;
     RefreshAutoMeasurementTestContext;
@@ -9151,9 +9159,6 @@ begin
   end;
 end;
 
-procedure SaveGridColumnWidths(AGrid: TGrid; out AWidths: TArray<Single>); forward;
-procedure RestoreGridColumnWidths(AGrid: TGrid; const AWidths: TArray<Single>); forward;
-
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
 const
   SECOND_CLICK_MS = 1000; // окно "второго клика" (подбери по ощущениям)
@@ -9162,7 +9167,6 @@ var
   IsSecondClick: Boolean;
   Rows: Integer;
   WorkTable: TWorkTable;
-  ColumnWidths: TArray<Single>;
 begin
  if not CanEditActiveWorkTable then
   begin
@@ -9178,7 +9182,6 @@ begin
     Exit;
 
   Rows := GridDevices.RowCount;
-  SaveGridColumnWidths(GridDevices, ColumnWidths);
   Tick := TThread.GetTickCount;
   GridDevices.ReadOnly := True;
 
@@ -9256,13 +9259,7 @@ begin
     end;
   end;
 
-  GridDevices.BeginUpdate;
-  try
-    GridDevices.RowCount := Rows;
-    RestoreGridColumnWidths(GridDevices, ColumnWidths);
-  finally
-    GridDevices.EndUpdate;
-  end;
+  TGridLayoutManager.SetRowCount(GridDevices, Rows);
 
   UpdateFlowMeterPropertiesFrame(Row);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -9350,7 +9347,6 @@ procedure TFrameMainTable.GridDevicesCellDblClick(const Column: TColumn;
 var
   Rows: Integer;
   WorkTable: TWorkTable;
-  ColumnWidths: TArray<Single>;
 begin
   if not CanEditActiveWorkTable then
   begin
@@ -9366,7 +9362,6 @@ begin
     Exit;
 
   Rows := GridDevices.RowCount;
-  SaveGridColumnWidths(GridDevices, ColumnWidths);
   GridDevices.ReadOnly := True;
 
 
@@ -9396,13 +9391,7 @@ begin
     end;
 
 
-  GridDevices.BeginUpdate;
-  try
-    GridDevices.RowCount := Rows;
-    RestoreGridColumnWidths(GridDevices, ColumnWidths);
-  finally
-    GridDevices.EndUpdate;
-  end;
+  TGridLayoutManager.SetRowCount(GridDevices, Rows);
 
   UpdateFlowMeterPropertiesFrame(Row);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -9936,12 +9925,7 @@ begin
     end;
   end;
 
-  GridEtalons.BeginUpdate;
-  try
-    GridEtalons.RowCount := Rows;
-  finally
-    GridEtalons.EndUpdate;
-  end;
+  TGridLayoutManager.SetRowCount(GridEtalons, Rows);
 
   UpdateFlowMeterPropertiesFrame(Row, True);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -9994,12 +9978,7 @@ begin
     end;
 
 
-  GridEtalons.BeginUpdate;
-  try
-    GridEtalons.RowCount := Rows;
-  finally
-    GridEtalons.EndUpdate;
-  end;
+  TGridLayoutManager.SetRowCount(GridEtalons, Rows);
 
   UpdateFlowMeterPropertiesFrame(Row, True);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -10254,79 +10233,28 @@ begin
     Value := FRows[ARow].SignalName;
 end;
 
-procedure SaveGridColumnWidths(AGrid: TGrid; out AWidths: TArray<Single>);
-var
-  I: Integer;
-begin
-  SetLength(AWidths, 0);
-  if AGrid = nil then
-    Exit;
-
-  SetLength(AWidths, AGrid.ColumnCount);
-  for I := 0 to AGrid.ColumnCount - 1 do
-    AWidths[I] := AGrid.Columns[I].Width;
-end;
-
-procedure RestoreGridColumnWidths(AGrid: TGrid; const AWidths: TArray<Single>);
-var
-  I: Integer;
-begin
-  if AGrid = nil then
-    Exit;
-
-  for I := 0 to AGrid.ColumnCount - 1 do
-    if (I <= High(AWidths)) and (AWidths[I] > 0) then
-      AGrid.Columns[I].Width := AWidths[I];
-end;
-
  procedure TFrameMainTable.UpdateGridDevices;
   var
     Rows: Integer;
-    ColumnWidths: TArray<Single>;
  begin
    Rows:= GridDevices.RowCount;
-   SaveGridColumnWidths(GridDevices, ColumnWidths);
-
-    GridDevices.BeginUpdate;
-
-    GridDevices.RowCount := 0;
-
-  try
-    GridDevices.RowCount := Rows;
-    RestoreGridColumnWidths(GridDevices, ColumnWidths);
-  finally
-    GridDevices.EndUpdate;
-  end;
-
-
+   TGridLayoutManager.SetRowCount(GridDevices, Rows, True);
  end;
 
 procedure ReloadGridByGrowingRowCount(AGrid: TGrid; ANewRowCount: Integer);
 var
-  i: Integer;
   Sel: Integer;
 begin
   if AGrid = nil then Exit;
 
   Sel := AGrid.Selected;
 
-  AGrid.BeginUpdate;
-  try
-    AGrid.RowCount := 0;
-
-    // добавляем строки по одной
-    for i := 1 to ANewRowCount do
-      AGrid.RowCount := i;
-
-  finally
-    AGrid.EndUpdate;
-  end;
+  TGridLayoutManager.SetRowCount(AGrid, ANewRowCount, True);
 
   // вернуть выделение (если осталось валидным)
   if (Sel >= 0) and (Sel < AGrid.RowCount) then
     AGrid.Selected := Sel;
 
-  AGrid.Repaint;
 end;
 
 procedure SoftReloadGridByGrowingRowCount(AGrid: TGrid; ANewRowCount: Integer;
@@ -10340,16 +10268,7 @@ begin
 
   Sel := AGrid.Selected;
 
-  AGrid.BeginUpdate;
-  try
-    if AGrid.RowCount < ANewRowCount then
-      for I := AGrid.RowCount + 1 to ANewRowCount do
-        AGrid.RowCount := I
-    else if AGrid.RowCount <> ANewRowCount then
-      AGrid.RowCount := ANewRowCount;
-  finally
-    AGrid.EndUpdate;
-  end;
+  TGridLayoutManager.SetRowCount(AGrid, ANewRowCount);
 
   if (Sel >= 0) and (Sel < AGrid.RowCount) then
     AGrid.Selected := Sel;

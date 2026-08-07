@@ -73,6 +73,8 @@ type
     procedure ButtonCreateSessionClick(Sender: TObject);
     procedure ButtonExportExcelClick(Sender: TObject);
     procedure GridMRResultsSelChanged(Sender: TObject);
+    procedure GridMRResultsMouseUp(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
   private
     FActiveWorkTable: TWorkTable;
     FPointColumns: TObjectList<TStringColumn>;
@@ -201,16 +203,19 @@ end;
 constructor TFrameMRResults.Create(AOwner: TComponent);
 begin
   inherited;
-  RegisterStableGrid(Self, GridMRResults, Name);
+  RegisterStableGrid(Self, GridMRResults, Name, False);
   FPointColumns := TObjectList<TStringColumn>.Create(False);
   FDisplayPoints := TObjectList<TDisplayPointGroup>.Create(True);
   FRows := TList<TChannel>.Create;
   FGridLayoutState := TGridLayoutState.Create;
+  FGridLayoutState.ConfigureWidthControl(GridMRResults,
+    ClassName + '.' + GridMRResults.Name);
 
   GridMRResults.OnGetValue := GridMRResultsGetValue;
   GridMRResults.OnDrawColumnCell := GridMRResultsDrawColumnCell;
   GridMRResults.OnSetValue := nil;
   GridMRResults.OnSelChanged := GridMRResultsSelChanged;
+  GridMRResults.OnMouseUp := GridMRResultsMouseUp;
   SetGridReadOnly(GridMRResults);
 end;
 
@@ -590,6 +595,15 @@ begin
   ButtonCreateSession.Enabled := ButtonClearSession.Enabled;
 end;
 
+{ Persists width only after the tracked manual resize has completed. }
+procedure TFrameMRResults.GridMRResultsMouseUp(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+begin
+  if (Button = TMouseButton.mbLeft) and (not FRefreshing) and
+     (FGridLayoutState <> nil) then
+    FGridLayoutState.FinishPendingManualResize;
+end;
+
 procedure TFrameMRResults.BuildRows;
 var
   Ch: TChannel;
@@ -632,7 +646,7 @@ begin
       StringColumnName.Visible, StringColumnName));
     for Group in RequiredDisplayPoints do
       Definitions.Add(TGridColumnDefinition.Create(GetDisplayPointKey(Group),
-        Group.Header, TStringColumn, 130, True, True));
+        Group.Header, TStringColumn, C_DYNAMIC_COLUMN_WIDTH, True, True));
     Definitions.Add(TGridColumnDefinition.Create('fixed:result',
       StringColumnResult.Header, TStringColumn, StringColumnResult.Width, True,
       StringColumnResult.Visible, StringColumnResult));
@@ -665,14 +679,37 @@ end;
 function TFrameMRResults.GetDisplayPointKey(AGroup: TDisplayPointGroup): string;
 var
   Participant: TDisplayPointParticipant;
+  KeyParts: TStringList;
+  PartKey: string;
 begin
   Result := 'point:';
-  if AGroup = nil then Exit;
-  if AGroup.ScenarioPoint <> nil then
-    Result := Result + 'scenario=' + AGroup.ScenarioPoint.UUID;
-  for Participant in AGroup.Participants do
-    Result := Result + '|participant=' + Participant.DeviceUUID + ':' +
-      Participant.DeviceChannelUUID + ':' + Participant.SourcePointUUID;
+  if AGroup = nil then
+    Exit;
+
+  // UUID сценарной точки пересоздаётся кнопкой формирования точек и поэтому
+  // не может быть идентификатором визуального столбца.
+  KeyParts := TStringList.Create;
+  try
+    KeyParts.Sorted := True;
+    KeyParts.Duplicates := dupAccept;
+    for Participant in AGroup.Participants do
+    begin
+      PartKey := LowerCase(Trim(Participant.DeviceUUID)) + ':' +
+        LowerCase(Trim(Participant.DeviceChannelUUID)) + ':' +
+        LowerCase(Trim(Participant.SourcePointUUID));
+      if PartKey <> '::' then
+        KeyParts.Add(PartKey);
+    end;
+    for PartKey in KeyParts do
+      Result := Result + '|participant=' + IntToStr(Length(PartKey)) + ':' +
+        PartKey;
+  finally
+    KeyParts.Free;
+  end;
+
+  if (Result = 'point:') and (AGroup.ScenarioPoint <> nil) then
+    Result := Result + 'name=' + LowerCase(Trim(AGroup.ScenarioPoint.Name)) +
+      '|num=' + IntToStr(AGroup.ScenarioPoint.Num);
 end;
 
 function TFrameMRResults.HasCurrentMeasurementPoints: Boolean;
@@ -780,10 +817,15 @@ begin
               Break;
             end;
         Suffix := '';
-        if FDisplayPoints[I].ScenarioPoint <> nil then
-          Suffix := Copy(FDisplayPoints[I].ScenarioPoint.UUID, 1, 8)
-        else if FDisplayPoints[I].Participants.Count > 0 then
-          Suffix := FDisplayPoints[I].Participants[0].DeviceUUID;
+        if FDisplayPoints[I].Participants.Count > 0 then
+        begin
+          Suffix := Copy(FDisplayPoints[I].Participants[0].SourcePointUUID, 1, 8);
+          if Suffix = '' then
+            Suffix := Copy(FDisplayPoints[I].Participants[0].DeviceUUID, 1, 8);
+        end
+        else if FDisplayPoints[I].ScenarioPoint <> nil then
+          Suffix := LowerCase(Trim(FDisplayPoints[I].ScenarioPoint.Name)) + '-' +
+            IntToStr(FDisplayPoints[I].ScenarioPoint.Num);
         if Device <> nil then
           if Trim(Device.SerialNumber) <> '' then
             Suffix := Device.SerialNumber
@@ -799,19 +841,8 @@ begin
 end;
 
 procedure TFrameMRResults.RefreshRows;
-var
-  RowCount: Integer;
 begin
-  RowCount := 0;
-  RowCount := FRows.Count;
-
-  GridMRResults.BeginUpdate;
-  try
-    GridMRResults.RowCount := 0;
-    GridMRResults.RowCount := RowCount;
-  finally
-    GridMRResults.EndUpdate;
-  end;
+  TGridLayoutManager.SetRowCount(GridMRResults, FRows.Count);
 end;
 
 function TFrameMRResults.GetRowChannel(const ARow: Integer): TChannel;

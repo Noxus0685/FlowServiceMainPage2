@@ -3,7 +3,7 @@ from pathlib import Path
 PROCEED = Path('frmProceed.pas').read_text(encoding='utf-8-sig')
 VERSION = Path('uAppVersion.pas').read_text(encoding='utf-8-sig')
 
-assert "APP_VERSION = '1.0.75'" in VERSION
+assert "APP_VERSION = '1.0.77'" in VERSION
 assert 'function IsValidSummaryResultSpillage' in PROCEED
 assert 'SummaryResultSelection' in PROCEED
 assert 'InvalidDoubleValue' in PROCEED

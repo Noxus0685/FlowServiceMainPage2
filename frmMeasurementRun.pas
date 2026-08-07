@@ -30,6 +30,7 @@ uses
   uClasses,
   uDeviceClass,
   uDataManager,
+  uGridLayoutManager,
   uMeasurementRun,
   uObservable,
   uProtocols,
@@ -714,13 +715,7 @@ begin
   SelectedRow := GridMeasurmentRun.Row;
   UpdateStopCriteriaColumns;
 
-  GridMeasurmentRun.BeginUpdate;
-  try
-    GridMeasurmentRun.RowCount := 0;
-    GridMeasurmentRun.RowCount := Rows;
-  finally
-    GridMeasurmentRun.EndUpdate;
-  end;
+  TGridLayoutManager.SetRowCount(GridMeasurmentRun, Rows, True);
 
   if Rows = 0 then
     GridMeasurmentRun.Row := -1

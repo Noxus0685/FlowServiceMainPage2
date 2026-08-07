@@ -48,6 +48,7 @@ uses
   uBaseProcedures,
   uClasses,
   uDataManager,
+  uGridLayoutManager,
   uRepositories,
   uProtocols;
 type
@@ -486,7 +487,7 @@ begin
   if ActiveRepo = nil then
   begin
     TreeViewTypes.Clear;
-    GridTypes.RowCount:=0;
+    TGridLayoutManager.SetRowCount(GridTypes, 0);
     Exit;
   end;
 
@@ -1776,15 +1777,10 @@ begin
       if (FDevFilteredTypes = nil) or (FDevFilteredTypes.IndexOf(FCheckedTypes[I]) < 0) then
         FCheckedTypes.Delete(I);
 
-  GridTypes.BeginUpdate;
-  try
-    if FDevFilteredTypes <> nil then
-      GridTypes.RowCount := FDevFilteredTypes.Count
-    else
-      GridTypes.RowCount := 0;
-  finally
-    GridTypes.EndUpdate;
-  end;
+  if FDevFilteredTypes <> nil then
+    TGridLayoutManager.SetRowCount(GridTypes, FDevFilteredTypes.Count)
+  else
+    TGridLayoutManager.SetRowCount(GridTypes, 0);
 
   if (GridTypes.Row >= GridTypes.RowCount) then
     GridTypes.Row := -1;
@@ -2826,4 +2822,3 @@ end;
 
 
 end.
-

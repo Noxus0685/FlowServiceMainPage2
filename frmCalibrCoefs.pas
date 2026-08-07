@@ -29,6 +29,8 @@ uses
   uClasses,
   uDeviceClass,
   uFlowMeter,
+  uGridLayoutManager,
+  uGridStabilityRegistry,
   uMeterValue;
 
 type
@@ -144,6 +146,7 @@ begin
   FFilteredTables := TObjectList<TCalibrCoefTable>.Create(False);
   FCurrentSpillages := TObjectList<TPointSpillage>.Create(False);
   FCurrentType := cctReference;
+  RegisterStableGrid(Self, GridCoefs, Name);
 
   GridCoefs.OnGetValue := GridCoefsGetValue;
   GridCoefs.OnSetValue := GridCoefsSetValue;
@@ -534,12 +537,10 @@ end;
 
 procedure TFrameCalibrCoefs.UpdateGrid;
 begin
-   GridCoefs.RowCount := 0;
-
   if (FCurrentTable <> nil) and (FCurrentTable.Items <> nil) then
-        GridCoefs.RowCount := FCurrentTable.Items.Count;
-
-  GridCoefs.Repaint;
+    TGridLayoutManager.SetRowCount(GridCoefs, FCurrentTable.Items.Count, True)
+  else
+    TGridLayoutManager.SetRowCount(GridCoefs, 0, True);
 end;
 
 function TFrameCalibrCoefs.InitErrorPercent(AItem: TCalibrCoefItem): Double;

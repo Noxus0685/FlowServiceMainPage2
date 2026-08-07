@@ -55,6 +55,11 @@ type
   // Направление сортировки таблицы обработки.
   TGridSortDirection = (gsdNone, gsdAscending, gsdDescending);
 
+  // Способ соединения усреднённых метрологических точек.
+  TChartAverageLineMode = (calmPchipLogQ, calmLinearSegments);
+  // Способ отображения физического расхода по оси X.
+  TChartFlowScale = (cfsLogarithmic, cfsLinear);
+
   // Хранит выбранный цвет и UUID прибора в динамическом пункте ПКМ графика.
   TChartDeviceColorMenuItem = class(TMenuItem)
   public
@@ -216,6 +221,13 @@ type
     PopupMenuGridResults: TPopupMenu;
     PopupMenuChart: TPopupMenu;
     MenuItemChartDevices: TMenuItem;
+    MenuItemChartSettings: TMenuItem;
+    MenuItemChartLineMode: TMenuItem;
+    MenuItemChartLinePchip: TMenuItem;
+    MenuItemChartLineSegments: TMenuItem;
+    MenuItemChartScale: TMenuItem;
+    MenuItemChartScaleLog: TMenuItem;
+    MenuItemChartScaleLinear: TMenuItem;
     MenuItemGridResultsDelete: TMenuItem;
     MenuItemGridResultsClear: TMenuItem;
     MenuItemGridResultsClose: TMenuItem;
@@ -368,6 +380,10 @@ type
     procedure ChartPointColorMenuClick(Sender: TObject);
     // Открывает выбор цвета усреднённой линии выбранного в ПКМ прибора.
     procedure ChartLineColorMenuClick(Sender: TObject);
+    // Переключает алгоритм линии средних значений и перестраивает график.
+    procedure ChartLineModeMenuClick(Sender: TObject);
+    // Переключает линейное/логарифмическое отображение оси расхода.
+    procedure ChartScaleMenuClick(Sender: TObject);
     procedure UpdateCalibrCoefsFrame;
     procedure ResetPointDeleteConfirm;
     procedure InitCalibrCoefsFrame;
@@ -422,6 +438,8 @@ type
     FChartPointColors: TDictionary<string, TAlphaColor>;
     FChartLineColors: TDictionary<string, TAlphaColor>;
     FChartDeviceVisibility: TDictionary<string, Boolean>;
+    FChartAverageLineMode: TChartAverageLineMode;
+    FChartFlowScale: TChartFlowScale;
     // Перестраивает зависимости погрешности от расхода для текущих сессий приборов.
     procedure UpdateSessionErrorChart;
     function GetChartDeviceColor(ADevice: TDevice; const ALineColor: Boolean;
@@ -542,11 +560,13 @@ procedure TFrameProceed.Initialize;
 var
   UnitName: string;
 begin
-  RegisterStableGrid(Self, GridResults, Name);
+  RegisterStableGrid(Self, GridResults, Name, False);
   RegisterStableGrid(Self, GridDataPoints, Name);
   RegisterStableGrid(Self, GridCoefs, Name);
   if FResultsGridLayoutState = nil then
     FResultsGridLayoutState := TGridLayoutState.Create;
+  FResultsGridLayoutState.ConfigureWidthControl(GridResults,
+    ClassName + '.' + GridResults.Name);
   FWorkTableManager := WorkTableManager;
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
 
@@ -579,11 +599,22 @@ begin
     Chart1.XTitle := 'Расход';
     Chart1.YTitle := 'Погрешность, %';
     Chart1.ShowLegend := True;
+    Chart1.LogarithmicX := FChartFlowScale = cfsLogarithmic;
   end;
+
+  if MenuItemChartLinePchip <> nil then
+    MenuItemChartLinePchip.IsChecked := FChartAverageLineMode = calmPchipLogQ;
+  if MenuItemChartLineSegments <> nil then
+    MenuItemChartLineSegments.IsChecked := FChartAverageLineMode = calmLinearSegments;
+  if MenuItemChartScaleLog <> nil then
+    MenuItemChartScaleLog.IsChecked := FChartFlowScale = cfsLogarithmic;
+  if MenuItemChartScaleLinear <> nil then
+    MenuItemChartScaleLinear.IsChecked := FChartFlowScale = cfsLinear;
 
   if GridResults <> nil then
   begin
     GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
+    GridResults.OnMouseDown := GridResultsMouseDown;
     // Подключаем существующий обработчик Hint для ячеек таблицы результатов.
     GridResults.OnMouseMove := GridResultsMouseMove;
     GridResults.OnMouseUp := GridColumnLayoutMouseUp;
@@ -2062,8 +2093,8 @@ begin
   end;
 end;
 
-// Перестраивает график: исходные измерения рисуются маркерами,
-// а линия проходит через средние точки кусочно-гиперболическими участками.
+// Перестраивает график: все проливки остаются маркерами, общая точка получает
+// единый средний X для всех приборов, а линии строятся без экстраполяции.
 procedure TFrameProceed.UpdateSessionErrorChart;
 const
   CChartCurvePointsPerInterval = 24;
@@ -2075,18 +2106,47 @@ var
   Groups: TObjectDictionary<string, TList<TPointF>>;
   GroupPoints: TList<TPointF>;
   Pair: TPair<string, TList<TPointF>>;
+  SharedXGroups, DeviceXGroups: TObjectDictionary<string, TList<Double>>;
+  SharedXByGroup: TDictionary<string, Double>;
+  XValues: TList<Double>;
+  XPair: TPair<string, TList<Double>>;
   PointSeries, AverageSeries, LineSeries: TChartSeries;
   Sorter: IComparer<TPointF>;
   P1: TPointF;
   GroupKey, LegendBase, FlowUnitName: string;
   I, J, DeviceIndex: Integer;
-  SumX, SumY, Z, X, Y: Double;
-  FlowValue, BaseFlowValue: Double;
-  ChartMinX, ChartMaxX, ChartPaddingX: Double;
+  SumX, SumY: Double;
+  FlowValue, SharedFlowValue: Double;
+  ChartMinX, ChartMaxX, ChartPaddingX, LogPaddingX: Double;
   UseVolumeFlow: Boolean;
 
-  procedure AddSpillagePoint(APoint: TPointSpillage);
+  // Возвращает ключ общей merged-точки Summary, рассчитанной для таблицы
+  // обработки; при отсутствии подходящей колонки сохраняет исходный ключ.
+  function ResolveChartMergedGroupKey(APoint: TPointSpillage;
+    const AFallbackKey: string): string;
+  var
+    ColumnIndex: Integer;
   begin
+    Result := AFallbackKey;
+    if APoint = nil then
+      Exit;
+
+    for ColumnIndex := 0 to High(FResultPointColumns) do
+      if FResultPointColumns[ColumnIndex].IsMerged and
+         IsProcessingSpillageInMergedColumn(APoint,
+           FResultPointColumns[ColumnIndex]) then
+        Exit('MERGED:' + IntToStr(ColumnIndex));
+  end;
+
+  // Возвращает фактический расход проливки и ключ её общей точки графика.
+  function TryGetSpillageChartFlow(APoint: TPointSpillage;
+    out AFlowValue: Double; out AGroupKey: string): Boolean;
+  var
+    BaseFlowValue: Double;
+  begin
+    Result := False;
+    AFlowValue := 0;
+    AGroupKey := '';
     if (APoint = nil) or (APoint.State = osDeleted) or not APoint.Enabled or
        not IsResultErrorValid(APoint.Error) then
       Exit;
@@ -2106,20 +2166,155 @@ var
 
     if BaseFlowValue <= 0 then
       BaseFlowValue := APoint.QavgEtalon;
-    FlowValue := ConvertBaseFlowToUnit(BaseFlowValue, FlowUnitName);
+    AFlowValue := ConvertBaseFlowToUnit(BaseFlowValue, FlowUnitName);
+    if IsNan(AFlowValue) or IsInfinite(AFlowValue) or (AFlowValue <= 0) then
+      Exit;
 
-    if IsNan(FlowValue) or IsInfinite(FlowValue) or (FlowValue <= 0) then
+    AGroupKey := Trim(APoint.DeviceTypeUUID);
+    if AGroupKey = '' then
+      AGroupKey := Trim(APoint.Name);
+    if AGroupKey = '' then
+      AGroupKey := FormatFloat('0.############', AFlowValue);
+    AGroupKey := ResolveChartMergedGroupKey(APoint, AGroupKey);
+    Result := True;
+  end;
+
+  // Собирает фактические расходы активной сессии по поверочным точкам прибора.
+  procedure CollectDeviceXGroups(ADevice: TDevice; ASession: TSessionSpillage;
+    AGroups: TObjectDictionary<string, TList<Double>>);
+  var
+    Point: TPointSpillage;
+    PointFlow: Double;
+    PointKey: string;
+    Values: TList<Double>;
+    AddedCount: Integer;
+
+    procedure AddPoint(APoint: TPointSpillage);
+    begin
+      if not TryGetSpillageChartFlow(APoint, PointFlow, PointKey) then
+        Exit;
+      if not AGroups.TryGetValue(PointKey, Values) then
+      begin
+        Values := TList<Double>.Create;
+        AGroups.Add(PointKey, Values);
+      end;
+      Values.Add(PointFlow);
+      Inc(AddedCount);
+    end;
+  begin
+    AddedCount := 0;
+    if (ADevice = nil) or (ASession = nil) or (AGroups = nil) then
+      Exit;
+    if ADevice.Spillages <> nil then
+      for Point in ADevice.Spillages do
+        if (Point <> nil) and (Point.SessionID = ASession.ID) then
+          AddPoint(Point);
+    if (AddedCount = 0) and (ASession <> nil) and
+       (ASession.Spillages <> nil) then
+      for Point in ASession.Spillages do
+        AddPoint(Point);
+  end;
+
+  // Добавляет формосохраняющую кусочно-кубическую линию в координате log10(Q).
+  function AddPchipLogLine(const APoints: TList<TPointF>;
+    ASeries: TChartSeries): Boolean;
+  var
+    LogX, PointY, H, Delta, Derivative: TArray<Double>;
+    PointCount, PointIndex, SegmentIndex, SampleIndex: Integer;
+    T, H00, H10, H01, H11, CurveLogX, CurveY: Double;
+
+    function SameNonZeroSign(const A, B: Double): Boolean;
+    begin
+      Result := not SameValue(A, 0.0) and not SameValue(B, 0.0) and
+        ((A > 0) = (B > 0));
+    end;
+
+    function EndpointDerivative(const H0, H1, Delta0,
+      Delta1: Double): Double;
+    begin
+      Result := ((2 * H0 + H1) * Delta0 - H0 * Delta1) / (H0 + H1);
+      if not SameNonZeroSign(Result, Delta0) then
+        Result := 0
+      else if not SameNonZeroSign(Delta0, Delta1) and
+              (Abs(Result) > 3 * Abs(Delta0)) then
+        Result := 3 * Delta0;
+    end;
+  begin
+    Result := False;
+    if (APoints = nil) or (ASeries = nil) or (APoints.Count < 3) then
+      Exit;
+
+    PointCount := APoints.Count;
+    SetLength(LogX, PointCount);
+    SetLength(PointY, PointCount);
+    SetLength(H, PointCount - 1);
+    SetLength(Delta, PointCount - 1);
+    SetLength(Derivative, PointCount);
+    for PointIndex := 0 to PointCount - 1 do
+    begin
+      if APoints[PointIndex].X <= 0 then
+        Exit;
+      LogX[PointIndex] := Log10(APoints[PointIndex].X);
+      PointY[PointIndex] := APoints[PointIndex].Y;
+      if (PointIndex > 0) and
+         (LogX[PointIndex] <= LogX[PointIndex - 1]) then
+        Exit;
+    end;
+
+    for PointIndex := 0 to PointCount - 2 do
+    begin
+      H[PointIndex] := LogX[PointIndex + 1] - LogX[PointIndex];
+      Delta[PointIndex] :=
+        (PointY[PointIndex + 1] - PointY[PointIndex]) / H[PointIndex];
+    end;
+
+    Derivative[0] := EndpointDerivative(H[0], H[1], Delta[0], Delta[1]);
+    Derivative[PointCount - 1] := EndpointDerivative(
+      H[PointCount - 2], H[PointCount - 3], Delta[PointCount - 2],
+      Delta[PointCount - 3]);
+    for PointIndex := 1 to PointCount - 2 do
+      if SameNonZeroSign(Delta[PointIndex - 1], Delta[PointIndex]) then
+        Derivative[PointIndex] :=
+          (2 * H[PointIndex] + H[PointIndex - 1] + H[PointIndex] +
+           2 * H[PointIndex - 1]) /
+          ((2 * H[PointIndex] + H[PointIndex - 1]) /
+             Delta[PointIndex - 1] +
+           (H[PointIndex] + 2 * H[PointIndex - 1]) /
+             Delta[PointIndex])
+      else
+        Derivative[PointIndex] := 0;
+
+    for SegmentIndex := 0 to PointCount - 2 do
+      for SampleIndex := 0 to CChartCurvePointsPerInterval do
+      begin
+        if (SegmentIndex > 0) and (SampleIndex = 0) then
+          Continue;
+        T := SampleIndex / CChartCurvePointsPerInterval;
+        H00 := 2 * T * T * T - 3 * T * T + 1;
+        H10 := T * T * T - 2 * T * T + T;
+        H01 := -2 * T * T * T + 3 * T * T;
+        H11 := T * T * T - T * T;
+        CurveLogX := LogX[SegmentIndex] + H[SegmentIndex] * T;
+        CurveY := H00 * PointY[SegmentIndex] +
+          H10 * H[SegmentIndex] * Derivative[SegmentIndex] +
+          H01 * PointY[SegmentIndex + 1] +
+          H11 * H[SegmentIndex] * Derivative[SegmentIndex + 1];
+        if IsNan(CurveY) or IsInfinite(CurveY) then
+          Exit;
+        ASeries.AddPoint(Power(10, CurveLogX), CurveY);
+      end;
+    Result := ASeries.Points.Count > 1;
+  end;
+
+  procedure AddSpillagePoint(APoint: TPointSpillage);
+  begin
+    if not TryGetSpillageChartFlow(APoint, FlowValue, GroupKey) then
       Exit;
 
     P1 := PointF(FlowValue, APoint.Error);
     RawPoints.Add(P1);
     ChartMinX := Min(ChartMinX, FlowValue);
     ChartMaxX := Max(ChartMaxX, FlowValue);
-    GroupKey := Trim(APoint.DeviceTypeUUID);
-    if GroupKey = '' then
-      GroupKey := Trim(APoint.Name);
-    if GroupKey = '' then
-      GroupKey := FormatFloat('0.############', FlowValue);
     if not Groups.TryGetValue(GroupKey, GroupPoints) then
     begin
       GroupPoints := TList<TPointF>.Create;
@@ -2144,10 +2339,13 @@ begin
   ChartMinX := MaxDouble;
   ChartMaxX := -MaxDouble;
   Chart1.XTitle := 'Расход, ' + FlowUnitName;
+  Chart1.LogarithmicX := FChartFlowScale = cfsLogarithmic;
   // Внешние подписи координат размещаются в увеличенных полях осей.
   Chart1.MarginLeft := 105;
   Chart1.MarginBottom := 70;
   Chart1.BeginUpdate;
+  SharedXGroups := TObjectDictionary<string, TList<Double>>.Create([doOwnsValues]);
+  SharedXByGroup := TDictionary<string, Double>.Create;
   try
     Chart1.ClearAllSeries;
     SelectedDevice := ResolveSelectedDevice;
@@ -2162,6 +2360,54 @@ begin
         else
           Result := 0;
       end);
+
+    // Сначала рассчитывается одна общая координата X для каждой общей
+    // поверочной точки по средним расходам участвующих приборов.
+    if FProcessingDevices <> nil then
+      for Device in FProcessingDevices do
+      begin
+        if (Device = nil) or (Device.State = osDeleted) or
+           IsProcessingDevicePendingRemoved(Device) or
+           not IsChartDeviceVisible(Device) then
+          Continue;
+        if (Device = SelectedDevice) and (FCurrentSession <> nil) then
+          Session := FCurrentSession
+        else
+          Session := GetActiveVisibleSession(Device);
+        if Session = nil then
+          Continue;
+
+        DeviceXGroups := TObjectDictionary<string, TList<Double>>.Create([doOwnsValues]);
+        try
+          CollectDeviceXGroups(Device, Session, DeviceXGroups);
+          for XPair in DeviceXGroups do
+          begin
+            SumX := 0;
+            for J := 0 to XPair.Value.Count - 1 do
+              SumX := SumX + XPair.Value[J];
+            if XPair.Value.Count = 0 then
+              Continue;
+            if not SharedXGroups.TryGetValue(XPair.Key, XValues) then
+            begin
+              XValues := TList<Double>.Create;
+              SharedXGroups.Add(XPair.Key, XValues);
+            end;
+            XValues.Add(SumX / XPair.Value.Count);
+          end;
+        finally
+          DeviceXGroups.Free;
+        end;
+      end;
+
+    for XPair in SharedXGroups do
+    begin
+      SumX := 0;
+      for J := 0 to XPair.Value.Count - 1 do
+        SumX := SumX + XPair.Value[J];
+      if XPair.Value.Count > 0 then
+        SharedXByGroup.AddOrSetValue(XPair.Key,
+          SumX / XPair.Value.Count);
+    end;
 
     if FProcessingDevices <> nil then
       for Device in FProcessingDevices do
@@ -2216,9 +2462,12 @@ begin
               SumY := SumY + Pair.Value[J].Y;
             end;
             if Pair.Value.Count > 0 then
-              AveragePoints.Add(PointF(
-                SumX / Pair.Value.Count,
+            begin
+              if not SharedXByGroup.TryGetValue(Pair.Key, SharedFlowValue) then
+                SharedFlowValue := SumX / Pair.Value.Count;
+              AveragePoints.Add(PointF(SharedFlowValue,
                 SumY / Pair.Value.Count));
+            end;
           end;
           AveragePoints.Sort(Sorter);
 
@@ -2235,8 +2484,7 @@ begin
           for I := 0 to RawPoints.Count - 1 do
             PointSeries.AddPoint(RawPoints[I].X, RawPoints[I].Y);
 
-          // Проекции и подписи координат отображаются только для средних
-          // точек, которые используются как узлы сглаженной линии.
+          // Проекции и подписи координат отображаются только для средних точек.
           AverageSeries := Chart1.AddSeries('');
           AverageSeries.Color := GetChartDeviceColor(Device, True, DeviceIndex);
           AverageSeries.ShowLine := False;
@@ -2246,31 +2494,29 @@ begin
           for I := 0 to AveragePoints.Count - 1 do
             AverageSeries.AddPoint(AveragePoints[I].X, AveragePoints[I].Y);
 
-          LineSeries := Chart1.AddSeries(LegendBase + ' — средняя линия');
+          LineSeries := Chart1.AddSeries('');
           LineSeries.Color := GetChartDeviceColor(Device, True, DeviceIndex);
           LineSeries.ShowLine := True;
           LineSeries.ShowMarkers := False;
           LineSeries.Thickness := 2;
 
-          // Строит между соседними средними точками участки Y = a + b / X.
-          // Каждый участок точно проходит через обе ограничивающие точки.
-          for J := 0 to AveragePoints.Count - 2 do
-            for I := 0 to CChartCurvePointsPerInterval do
+          if FChartAverageLineMode = calmPchipLogQ then
+          begin
+            LineSeries.LegendName := LegendBase + ' — PCHIP log(Q)';
+            if not AddPchipLogLine(AveragePoints, LineSeries) then
             begin
-              if (J > 0) and (I = 0) then
-                Continue;
-              Z := 1 / AveragePoints[J].X +
-                (1 / AveragePoints[J + 1].X -
-                 1 / AveragePoints[J].X) *
-                I / CChartCurvePointsPerInterval;
-              if SameValue(Z, 0.0) then
-                Continue;
-              X := 1 / Z;
-              Y := AveragePoints[J].Y +
-                (AveragePoints[J + 1].Y - AveragePoints[J].Y) *
-                I / CChartCurvePointsPerInterval;
-              LineSeries.AddPoint(X, Y);
+              LineSeries.ClearPoints;
+              LineSeries.LegendName := LegendBase + ' — отрезки';
+              for I := 0 to AveragePoints.Count - 1 do
+                LineSeries.AddPoint(AveragePoints[I].X, AveragePoints[I].Y);
             end;
+          end
+          else
+          begin
+            LineSeries.LegendName := LegendBase + ' — отрезки';
+            for I := 0 to AveragePoints.Count - 1 do
+              LineSeries.AddPoint(AveragePoints[I].X, AveragePoints[I].Y);
+          end;
           Inc(DeviceIndex);
         finally
           Groups.Free;
@@ -2279,15 +2525,34 @@ begin
         end;
       end;
   finally
+    SharedXByGroup.Free;
+    SharedXGroups.Free;
     if (ChartMinX <> MaxDouble) and (ChartMaxX <> -MaxDouble) then
     begin
       Chart1.AutoRangeX := False;
-      if SameValue(ChartMinX, ChartMaxX) then
-        ChartPaddingX := Max(Abs(ChartMaxX) * 0.1, 1.0)
+      if FChartFlowScale = cfsLogarithmic then
+      begin
+        if SameValue(ChartMinX, ChartMaxX) then
+        begin
+          Chart1.XMin := ChartMinX / 1.1;
+          Chart1.XMax := ChartMaxX * 1.1;
+        end
+        else
+        begin
+          LogPaddingX := (Log10(ChartMaxX) - Log10(ChartMinX)) * 0.05;
+          Chart1.XMin := Power(10, Log10(ChartMinX) - LogPaddingX);
+          Chart1.XMax := Power(10, Log10(ChartMaxX) + LogPaddingX);
+        end;
+      end
       else
-        ChartPaddingX := (ChartMaxX - ChartMinX) * 0.1;
-      Chart1.XMin := ChartMinX;
-      Chart1.XMax := ChartMaxX + ChartPaddingX;
+      begin
+        if SameValue(ChartMinX, ChartMaxX) then
+          ChartPaddingX := Max(Abs(ChartMaxX) * 0.1, 1.0)
+        else
+          ChartPaddingX := (ChartMaxX - ChartMinX) * 0.1;
+        Chart1.XMin := ChartMinX;
+        Chart1.XMax := ChartMaxX + ChartPaddingX;
+      end;
     end
     else
       Chart1.AutoRangeX := True;
@@ -2336,6 +2601,12 @@ begin
   if (Button <> TMouseButton.mbRight) or not (Sender is TControl) or
      (PopupMenuChart = nil) or (MenuItemChartDevices = nil) then
     Exit;
+
+  MenuItemChartLinePchip.IsChecked := FChartAverageLineMode = calmPchipLogQ;
+  MenuItemChartLineSegments.IsChecked :=
+    FChartAverageLineMode = calmLinearSegments;
+  MenuItemChartScaleLog.IsChecked := FChartFlowScale = cfsLogarithmic;
+  MenuItemChartScaleLinear.IsChecked := FChartFlowScale = cfsLinear;
 
   while MenuItemChartDevices.ItemsCount > 0 do
     MenuItemChartDevices.Items[MenuItemChartDevices.ItemsCount - 1].Free;
@@ -2439,6 +2710,37 @@ begin
 
   Item := TChartDeviceColorMenuItem(Sender);
   FChartLineColors.AddOrSetValue(Item.DeviceUUID, Item.NewColor);
+  UpdateSessionErrorChart;
+end;
+
+// Переключает алгоритм соединения средних точек без изменения исходных проливок.
+procedure TFrameProceed.ChartLineModeMenuClick(Sender: TObject);
+begin
+  if Sender = MenuItemChartLinePchip then
+    FChartAverageLineMode := calmPchipLogQ
+  else if Sender = MenuItemChartLineSegments then
+    FChartAverageLineMode := calmLinearSegments
+  else
+    Exit;
+
+  MenuItemChartLinePchip.IsChecked := FChartAverageLineMode = calmPchipLogQ;
+  MenuItemChartLineSegments.IsChecked :=
+    FChartAverageLineMode = calmLinearSegments;
+  UpdateSessionErrorChart;
+end;
+
+// Переключает геометрию оси X; значения расхода в сериях остаются физическими.
+procedure TFrameProceed.ChartScaleMenuClick(Sender: TObject);
+begin
+  if Sender = MenuItemChartScaleLog then
+    FChartFlowScale := cfsLogarithmic
+  else if Sender = MenuItemChartScaleLinear then
+    FChartFlowScale := cfsLinear
+  else
+    Exit;
+
+  MenuItemChartScaleLog.IsChecked := FChartFlowScale = cfsLogarithmic;
+  MenuItemChartScaleLinear.IsChecked := FChartFlowScale = cfsLinear;
   UpdateSessionErrorChart;
 end;
 
@@ -3256,15 +3558,16 @@ var
       Result := ADefault;
   end;
 
+  { Builds a stable physical-point key without using the measured flow of a repeat. }
   function BuildWithoutMergeGroupKey(const ADeviceUUID, ASourcePointUUID,
-    APointName: string; const AQavgEtalon: Double): string;
+    APointName: string): string;
   begin
     if Trim(ASourcePointUUID) <> '' then
       Result := AnsiUpperCase(Trim(ADeviceUUID)) + '|UUID:' +
         AnsiUpperCase(Trim(ASourcePointUUID))
     else
       Result := AnsiUpperCase(Trim(ADeviceUUID)) + '|POINT:' +
-        AnsiUpperCase(Trim(APointName)) + '|Q:' + FormatFloat('0.##########', AQavgEtalon);
+        AnsiUpperCase(Trim(APointName));
   end;
 
   function SelectBestSpillageByAbsoluteError(AItems: TList<TPointSpillage>): TPointSpillage;
@@ -3346,7 +3649,7 @@ begin
           SourcePointUUID := Trim(Spillage.DeviceTypeUUID);
           PointName := SpillageHeader(Spillage, Format('Q%d', [Groups.Count + 1]));
           GroupKey := BuildWithoutMergeGroupKey(DeviceUUID, SourcePointUUID,
-            PointName, Spillage.QavgEtalon);
+            PointName);
           if not Groups.TryGetValue(GroupKey, GroupSpillages) then
           begin
             GroupSpillages := TList<TPointSpillage>.Create;
@@ -3428,13 +3731,17 @@ procedure TFrameProceed.BuildSummaryColumnsWithMerge(const ADevices: TList<TDevi
 var
   Cols: TList<TProceedResultPointColumn>;
   ProcessingSpillages: TList<TPointSpillage>;
+  PhysicalPointGroups: TDictionary<string, TList<TPointSpillage>>;
+  PhysicalPointGroupKeys: TList<string>;
+  PhysicalPointGroup: TList<TPointSpillage>;
   Col: TProceedResultPointColumn;
   WT: TWorkTable;
   Run: TMeasurementRun;
   Device: TDevice;
-  Spillage, GroupSpillage: TPointSpillage;
+  Spillage, GroupSpillage, SelectedSpillage: TPointSpillage;
   ActiveSession: TSessionSpillage;
-  I, J, DevicesCount, SpillagesCount: Integer;
+  I, J, DevicesCount, SpillagesCount, SourceSpillagesCount: Integer;
+  DeviceUUID, PhysicalPointKey: string;
   Headers: string;
   RunPointsEmpty: Boolean;
   GroupNames, GroupFlows, GroupEtalons, GroupSpillageIDs: string;
@@ -3506,6 +3813,76 @@ var
       AKeys := AKeys + Key;
   end;
 
+  { Builds a stable identity for one physical device point across repeated spillages. }
+  function BuildPhysicalPointKey(AOwnerDevice: TDevice;
+    ASpillage: TPointSpillage): string;
+  var
+    OwnerDeviceUUID, PointUUID, PhysicalPointName: string;
+  begin
+    OwnerDeviceUUID := '';
+    if AOwnerDevice <> nil then
+      OwnerDeviceUUID := Trim(AOwnerDevice.UUID);
+    if (OwnerDeviceUUID = '') and (ASpillage <> nil) then
+      OwnerDeviceUUID := Trim(ASpillage.DeviceUUID);
+
+    PointUUID := '';
+    if ASpillage <> nil then
+      PointUUID := Trim(ASpillage.DeviceTypeUUID);
+
+    if PointUUID <> '' then
+      Result := AnsiUpperCase(OwnerDeviceUUID) + '|UUID:' +
+        AnsiUpperCase(PointUUID)
+    else
+    begin
+      PhysicalPointName := '';
+      if ASpillage <> nil then
+        PhysicalPointName := Trim(ASpillage.Name);
+      if PhysicalPointName <> '' then
+        Result := AnsiUpperCase(OwnerDeviceUUID) + '|POINT:' +
+          AnsiUpperCase(PhysicalPointName)
+      else if ASpillage <> nil then
+        Result := AnsiUpperCase(OwnerDeviceUUID) + '|NUM:' +
+          IntToStr(ASpillage.Num)
+      else
+        Result := AnsiUpperCase(OwnerDeviceUUID) + '|NONE';
+    end;
+  end;
+
+  { Selects the valid repeat with the minimum absolute error for column merging. }
+  function SelectBestPhysicalPointSpillage(
+    AItems: TList<TPointSpillage>): TPointSpillage;
+  var
+    Item: TPointSpillage;
+  begin
+    Result := nil;
+    if AItems = nil then
+      Exit;
+
+    for Item in AItems do
+      if (Result = nil) or (Abs(Item.Error) < Abs(Result.Error)) or
+         (SameValue(Abs(Item.Error), Abs(Result.Error), 1E-9) and
+          (Item.ID >= Result.ID)) then
+        Result := Item;
+  end;
+
+  { Returns the IDs of all repeats participating in one physical-point group. }
+  function BuildPhysicalPointSpillageIDs(
+    AItems: TList<TPointSpillage>): string;
+  var
+    Item: TPointSpillage;
+  begin
+    Result := '';
+    if AItems = nil then
+      Exit;
+
+    for Item in AItems do
+    begin
+      if Item = nil then
+        Continue;
+      AppendSpillageID(Result, Item);
+    end;
+  end;
+
   function SpillagePointErrorPercent(AOwnerDevice: TDevice;
     ASpillage: TPointSpillage): Double;
   begin
@@ -3521,6 +3898,8 @@ begin
   SetLength(FResultPointColumns, 0);
   Cols := TList<TProceedResultPointColumn>.Create;
   ProcessingSpillages := TList<TPointSpillage>.Create;
+  PhysicalPointGroups := TDictionary<string, TList<TPointSpillage>>.Create;
+  PhysicalPointGroupKeys := TList<string>.Create;
   try
     WT := ResolveManagerWorkTable(FWorkTableManager);
     Run := nil;
@@ -3528,6 +3907,7 @@ begin
       Run := TMeasurementRun(WT.MeasurementRun);
     RunPointsEmpty := (Run = nil) or (Run.Points = nil) or (Run.Points.Count = 0);
     DevicesCount := 0;
+    SourceSpillagesCount := 0;
 
     if ADevices <> nil then
       for Device in ADevices do
@@ -3539,11 +3919,52 @@ begin
         ActiveSession := GetActiveVisibleSession(Device);
         if (ActiveSession = nil) or (Device.Spillages = nil) then
           Continue;
+
         for Spillage in Device.Spillages do
-          if IsUsableSummarySpillage(Spillage) and
-             (Spillage.SessionID = ActiveSession.ID) then
-            ProcessingSpillages.Add(Spillage);
+        begin
+          if (not IsUsableSummarySpillage(Spillage)) or
+             (Spillage.SessionID <> ActiveSession.ID) then
+            Continue;
+
+          DeviceUUID := Trim(Device.UUID);
+          if (Trim(Spillage.DeviceUUID) <> '') and (DeviceUUID <> '') and
+             (not SameText(Trim(Spillage.DeviceUUID), DeviceUUID)) then
+            Continue;
+
+          Inc(SourceSpillagesCount);
+          PhysicalPointKey := BuildPhysicalPointKey(Device, Spillage);
+          if not PhysicalPointGroups.TryGetValue(PhysicalPointKey,
+            PhysicalPointGroup) then
+          begin
+            PhysicalPointGroup := TList<TPointSpillage>.Create;
+            PhysicalPointGroups.Add(PhysicalPointKey, PhysicalPointGroup);
+            PhysicalPointGroupKeys.Add(PhysicalPointKey);
+          end;
+          PhysicalPointGroup.Add(Spillage);
+        end;
       end;
+
+    for I := 0 to PhysicalPointGroupKeys.Count - 1 do
+    begin
+      PhysicalPointKey := PhysicalPointGroupKeys[I];
+      if not PhysicalPointGroups.TryGetValue(PhysicalPointKey,
+        PhysicalPointGroup) then
+        Continue;
+
+      SelectedSpillage :=
+        SelectBestPhysicalPointSpillage(PhysicalPointGroup);
+      if SelectedSpillage = nil then
+        Continue;
+
+      ProcessingSpillages.Add(SelectedSpillage);
+      ProtocolManager.AddMessage(pcProc, psForm, 'SummaryBestRepeatSelected',
+        'Выбрана лучшая проливка физической точки для построения merged-колонок',
+        Format('GroupKey=%s; RepeatCount=%d; SpillageIDs=%s; SelectedSpillageID=%d; SelectedError=%s',
+          [PhysicalPointKey, PhysicalPointGroup.Count,
+           BuildPhysicalPointSpillageIDs(PhysicalPointGroup),
+           SelectedSpillage.ID,
+           FormatResultErrorValue(SelectedSpillage.Error)]));
+    end;
 
     ProcessingSpillages.Sort(TComparer<TPointSpillage>.Construct(
       function(const Left, Right: TPointSpillage): Integer
@@ -3671,10 +4092,17 @@ begin
 
     ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingSummaryColumnsBuilt',
       'Построены колонки Summary обработки',
-      Format('MergeEnabled=%s; Source=Spillages; DevicesCount=%d; SpillagesCount=%d; MergedGroupsCount=%d; ColumnsCount=%d; ColumnHeaders=%s; FallbackMeasurementRunUsed=False; MeasurementRunPointsEmpty=%s; SummaryColumnsSource=ProcessingSpillages',
-        [BoolToStr(True, True), DevicesCount, SpillagesCount, Cols.Count,
-         Cols.Count, Headers, BoolToStr(RunPointsEmpty, True)]));
+      Format('MergeEnabled=%s; Source=Spillages; DevicesCount=%d; SourceSpillagesCount=%d; SelectedSpillagesCount=%d; MergedGroupsCount=%d; ColumnsCount=%d; ColumnHeaders=%s; FallbackMeasurementRunUsed=False; MeasurementRunPointsEmpty=%s; SummaryColumnsSource=BestPhysicalPointSpillages',
+        [BoolToStr(True, True), DevicesCount, SourceSpillagesCount,
+         SpillagesCount, Cols.Count, Cols.Count, Headers,
+         BoolToStr(RunPointsEmpty, True)]));
   finally
+    for I := 0 to PhysicalPointGroupKeys.Count - 1 do
+      if PhysicalPointGroups.TryGetValue(PhysicalPointGroupKeys[I],
+        PhysicalPointGroup) then
+        PhysicalPointGroup.Free;
+    PhysicalPointGroupKeys.Free;
+    PhysicalPointGroups.Free;
     ProcessingSpillages.Free;
     Cols.Free;
   end;
@@ -3780,12 +4208,16 @@ var
         FloatToStr(FResultPointColumns[DynamicPointIndex].TargetFlow);
       Definitions.Add(TGridColumnDefinition.Create(DynamicKey,
         FormatPointHeader(FResultPointColumns[DynamicPointIndex].Header),
-        TStringColumn, 125, True, True));
+        TStringColumn, C_DYNAMIC_COLUMN_WIDTH, True, True));
     end;
   end;
 begin
   if FResultsGridLayoutState = nil then
+  begin
     FResultsGridLayoutState := TGridLayoutState.Create;
+    FResultsGridLayoutState.ConfigureWidthControl(GridResults,
+      ClassName + '.' + GridResults.Name);
+  end;
   Definitions := TGridColumnDefinitions.Create(True);
   try
     { Describe the complete visual structure, but mark resource columns as
@@ -4232,7 +4664,8 @@ begin
     GridResults.EndUpdate;
   end;
 
-  GridResults.RowCount := Length(FCurrentResultRows);
+  TGridLayoutManager.SetRowCount(GridResults,
+    Length(FCurrentResultRows));
   ButtonExportExcel.Enabled := GridResults.RowCount > 0;
   if Length(FCurrentResultRows) = 0 then
     GridResults.Row := -1
@@ -4258,34 +4691,8 @@ begin
   LogProceedGridContext('Summary', nil, nil, GridResults.RowCount,
     VisibleColumnCount);
 end;
-procedure SaveGridColumnWidths(AGrid: TGrid; out AWidths: TArray<Single>);
-var
-  I: Integer;
-begin
-  SetLength(AWidths, 0);
-  if AGrid = nil then
-    Exit;
-
-  SetLength(AWidths, AGrid.ColumnCount);
-  for I := 0 to AGrid.ColumnCount - 1 do
-    AWidths[I] := AGrid.Columns[I].Width;
-end;
-
-procedure RestoreGridColumnWidths(AGrid: TGrid; const AWidths: TArray<Single>);
-var
-  I: Integer;
-begin
-  if AGrid = nil then
-    Exit;
-
-  for I := 0 to AGrid.ColumnCount - 1 do
-    if (I <= High(AWidths)) and (AWidths[I] > 0) then
-      AGrid.Columns[I].Width := AWidths[I];
-end;
-
 procedure TFrameProceed.UpdateGridDataPoints;
 var
-  ColumnWidths: TArray<Single>;
   I, Count: Integer;
 begin
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
@@ -4300,16 +4707,8 @@ begin
   SetLength(FCurrentSpillages, Count);
   SortProcessingDataByDate;
 
-  SaveGridColumnWidths(GridDataPoints, ColumnWidths);
-  GridDataPoints.BeginUpdate;
-  try
-    GridDataPoints.RowCount := 0;
-    GridDataPoints.RowCount := Length(FCurrentSpillages);
-    RestoreGridColumnWidths(GridDataPoints, ColumnWidths);
-    GridDataPoints.Repaint;
-  finally
-    GridDataPoints.EndUpdate;
-  end;
+  TGridLayoutManager.SetRowCount(GridDataPoints,
+    Length(FCurrentSpillages), True);
   GridResults.Visible := False;
   GridDataPoints.Visible := True;
   ButtonExportExcel.Enabled := GridDataPoints.RowCount > 0;
@@ -4981,11 +5380,11 @@ begin
     LabelSessionActive.Text := '';
 
   if GridResults <> nil then
-    GridResults.RowCount := 0;
+    TGridLayoutManager.SetRowCount(GridResults, 0);
   if GridDataPoints <> nil then
-    GridDataPoints.RowCount := 0;
+    TGridLayoutManager.SetRowCount(GridDataPoints, 0);
   if GridCoefs <> nil then
-    GridCoefs.RowCount := 0;
+    TGridLayoutManager.SetRowCount(GridCoefs, 0);
   if Chart1 <> nil then
     Chart1.ClearAllSeries;
 
@@ -6157,6 +6556,8 @@ procedure TFrameProceed.GridResultsMouseDown(Sender: TObject; Button: TMouseButt
 var
   Col, Row: Integer;
 begin
+  if Button = TMouseButton.mbLeft then
+    Exit;
   if Button <> TMouseButton.mbRight then
     Exit;
 
@@ -6525,9 +6926,19 @@ end;
 procedure TFrameProceed.GridColumnLayoutMouseUp(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 begin
-  // После изменения мышью сохраняем ширину, порядок и видимость по Name столбца.
-  if (not FApplyingGridColumnsLayout) and
-     ((Sender = GridDataPoints) or (Sender = GridResults)) then
+  if FApplyingGridColumnsLayout then
+    Exit;
+
+  { GridResults persists widths only after a confirmed header-divider drag. }
+  if Sender = GridResults then
+  begin
+    if (FResultsGridLayoutState <> nil) and
+       FResultsGridLayoutState.FinishPendingManualResize then
+      SaveLayoutSettingsToWorkTable;
+    Exit;
+  end;
+
+  if Sender = GridDataPoints then
     SaveLayoutSettingsToWorkTable;
 end;
 
