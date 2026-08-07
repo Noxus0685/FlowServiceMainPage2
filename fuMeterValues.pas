@@ -31,6 +31,7 @@ uses
   uDeviceClass,
   uFlowMeter,
   uGridLayoutManager,
+  uGridStabilityRegistry,
   uProtocols;
 
 type
@@ -155,6 +156,7 @@ type
     FCoefHash: string;
     FFilteredValues: TObjectList<TMeterValue>;
     FFrameMeterValueEdit: TFrameMeterValueEdit;
+    FGridWidthControlsRegistered: Boolean;
     procedure EnsureMeterValueEditFrame;
     function SafeFloat(const S: string): Double;
     function SafeInt(const S: string): Integer;
@@ -279,6 +281,14 @@ end;
 
 procedure TFormMeterValues.FormShow(Sender: TObject);
 begin
+  if not FGridWidthControlsRegistered then
+  begin
+    RegisterStableGrid(Self, StringGridCoefsData, Name);
+    RegisterStableGrid(Self, StringGridCoefs, Name);
+    RegisterStableGrid(Self, StringGridDimensions, Name);
+    RegisterStableGrid(Self, StringGridValuesList, Name);
+    FGridWidthControlsRegistered := True;
+  end;
   StringGridCoefsData.OnKeyDown := StringGridCoefsDataKeyDown;
   EnsureMeterValueEditFrame;
   if MeterValue <> nil then
