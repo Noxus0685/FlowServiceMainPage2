@@ -73,8 +73,6 @@ type
     procedure ButtonCreateSessionClick(Sender: TObject);
     procedure ButtonExportExcelClick(Sender: TObject);
     procedure GridMRResultsSelChanged(Sender: TObject);
-    procedure GridMRResultsMouseDown(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Single);
     procedure GridMRResultsMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
   private
@@ -217,7 +215,6 @@ begin
   GridMRResults.OnDrawColumnCell := GridMRResultsDrawColumnCell;
   GridMRResults.OnSetValue := nil;
   GridMRResults.OnSelChanged := GridMRResultsSelChanged;
-  GridMRResults.OnMouseDown := GridMRResultsMouseDown;
   GridMRResults.OnMouseUp := GridMRResultsMouseUp;
   SetGridReadOnly(GridMRResults);
 end;
@@ -598,22 +595,13 @@ begin
   ButtonCreateSession.Enabled := ButtonClearSession.Enabled;
 end;
 
-{ Starts width tracking only on a left-button header-divider drag. }
-procedure TFrameMRResults.GridMRResultsMouseDown(Sender: TObject;
-  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
-begin
-  if (Button = TMouseButton.mbLeft) and (not FRefreshing) and
-     (FGridLayoutState <> nil) then
-    FGridLayoutState.BeginManualColumnResize(GridMRResults, X, Y);
-end;
-
 { Persists width only after the tracked manual resize has completed. }
 procedure TFrameMRResults.GridMRResultsMouseUp(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 begin
   if (Button = TMouseButton.mbLeft) and (not FRefreshing) and
      (FGridLayoutState <> nil) then
-    FGridLayoutState.EndManualColumnResize;
+    FGridLayoutState.FinishPendingManualResize;
 end;
 
 procedure TFrameMRResults.BuildRows;
