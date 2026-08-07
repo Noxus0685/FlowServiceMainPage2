@@ -48,7 +48,10 @@ def test_simple_chart_maps_log_axis_without_changing_series_values():
 
 
 def test_chart_uses_one_shared_x_for_the_same_point_across_devices():
-    assert "function TryGetSpillageChartFlow" in PROCEED
+    assert "function ResolveChartMergedGroupKey" in PROCEED
+    assert "IsProcessingSpillageInMergedColumn(APoint," in PROCEED
+    assert "Exit('MERGED:' + IntToStr(ColumnIndex))" in PROCEED
+    assert "AGroupKey := ResolveChartMergedGroupKey(APoint, AGroupKey)" in PROCEED
     assert "procedure CollectDeviceXGroups" in PROCEED
     assert "SharedXByGroup: TDictionary<string, Double>" in PROCEED
     assert "XValues.Add(SumX / XPair.Value.Count)" in PROCEED
@@ -79,4 +82,4 @@ def test_grid_widths_are_never_changed_after_end_update():
 
 
 def test_version():
-    assert "APP_VERSION = '1.0.78'" in VERSION
+    assert "APP_VERSION = '1.0.81'" in VERSION

@@ -2117,7 +2117,25 @@ var
   ChartMinX, ChartMaxX, ChartPaddingX, LogPaddingX: Double;
   UseVolumeFlow: Boolean;
 
-  // Возвращает фактический расход проливки и стабильный ключ её поверочной точки.
+  // Возвращает ключ общей merged-точки Summary, рассчитанной для таблицы
+  // обработки; при отсутствии подходящей колонки сохраняет исходный ключ.
+  function ResolveChartMergedGroupKey(APoint: TPointSpillage;
+    const AFallbackKey: string): string;
+  var
+    ColumnIndex: Integer;
+  begin
+    Result := AFallbackKey;
+    if APoint = nil then
+      Exit;
+
+    for ColumnIndex := 0 to High(FResultPointColumns) do
+      if FResultPointColumns[ColumnIndex].IsMerged and
+         IsProcessingSpillageInMergedColumn(APoint,
+           FResultPointColumns[ColumnIndex]) then
+        Exit('MERGED:' + IntToStr(ColumnIndex));
+  end;
+
+  // Возвращает фактический расход проливки и ключ её общей точки графика.
   function TryGetSpillageChartFlow(APoint: TPointSpillage;
     out AFlowValue: Double; out AGroupKey: string): Boolean;
   var
@@ -2154,6 +2172,7 @@ var
       AGroupKey := Trim(APoint.Name);
     if AGroupKey = '' then
       AGroupKey := FormatFloat('0.############', AFlowValue);
+    AGroupKey := ResolveChartMergedGroupKey(APoint, AGroupKey);
     Result := True;
   end;
 
