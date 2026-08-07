@@ -288,6 +288,8 @@ begin
   finally
     FRestoringWidth := False;
   end;
+  if FGrid <> nil then
+    FGrid.Repaint;
   DebugLog(Format(
     'GridWidthControl restored Grid="%s" ColumnKey="%s" Rejected=%.4f Approved=%.4f Context="%s"',
     [FGridKey, AColumnKey, RejectedWidth, ApprovedWidth, AContext]));
@@ -298,6 +300,7 @@ function TGridLayoutState.IsUserColumnResize(
 var
   CursorPos: TPoint;
   CursorScreen, DividerScreen: TPointF;
+  GridTopLeft, GridBottomRight: TPointF;
 begin
   Result := False;
   if (AColumn = nil) or (FGrid = nil) or FApplying or FRestoringWidth or
@@ -310,10 +313,12 @@ begin
 
   CursorScreen := PointF(CursorPos.X, CursorPos.Y);
   DividerScreen := AColumn.LocalToScreen(PointF(AColumn.Width, 0));
+  GridTopLeft := FGrid.LocalToScreen(PointF(0, 0));
+  GridBottomRight := FGrid.LocalToScreen(PointF(FGrid.Width, FGrid.Height));
   Result :=
     (Abs(CursorScreen.X - DividerScreen.X) <= CDividerHitTolerance) and
-    (CursorScreen.Y >= DividerScreen.Y) and
-    (CursorScreen.Y <= DividerScreen.Y + FGrid.Height);
+    (CursorScreen.Y >= Min(GridTopLeft.Y, GridBottomRight.Y)) and
+    (CursorScreen.Y <= Max(GridTopLeft.Y, GridBottomRight.Y));
 end;
 
 procedure TGridLayoutState.ColumnResizeHandler(Sender: TObject);
@@ -350,6 +355,8 @@ begin
         FRestoringWidth := False;
       end;
     end;
+    if FGrid <> nil then
+      FGrid.Repaint;
     DebugLog(Format(
       'GridWidthControl manual resize Grid="%s" Column="%s" Width=%.4f',
       [FGridKey, ColumnKey, ApprovedWidth]));
