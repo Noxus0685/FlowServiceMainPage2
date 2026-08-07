@@ -116,7 +116,8 @@ type
     procedure DrawSeries;         // рисует все видимые серии
     procedure DrawLegend;
     procedure DrawMarkersForSeries(Series: TChartSeries;
-      ADrawnXLabels, ADrawnYLabels: TList<Double>); // маркеры для одной серии
+      ADrawnXLabels: TList<Double>;
+      ADrawnYLabelRects: TList<TRectF>); // маркеры для одной серии
     function GetSeries(Index: Integer): TChartSeries;
     function GetSeriesCount: Integer;
     function GetFirstSeriesPoints: TList<TPointF>;
@@ -642,7 +643,6 @@ var
   txt: string;
   corners: TCorners;
   SaveState: TCanvasSaveState;
-  CenterY: Single;
 begin
   Canvas := Self.Canvas;
   if Canvas = nil then Exit;
@@ -753,11 +753,10 @@ begin
     SaveState := Canvas.SaveState;
     try
       Canvas.MultiplyMatrix(TMatrix.CreateRotation(-Pi/2));
-      CenterY := (plotRect.Top + plotRect.Bottom) / 2;
       textRect := TRectF.Create(
-        -CenterY - 30,
+        -plotRect.Bottom,
         FYTitleOffset - 40,
-        -CenterY + 30,
+        -plotRect.Top,
         FYTitleOffset + 40
       );
       Canvas.FillText(textRect, FYTitle, False, 1, [], TTextAlign.Center, TTextAlign.Center);
@@ -778,7 +777,7 @@ end;
 // Отрисовка маркеров для одной серии
 // -----------------------------------------------------------------------------
 procedure TSimpleChart.DrawMarkersForSeries(Series: TChartSeries;
-  ADrawnXLabels, ADrawnYLabels: TList<Double>);
+  ADrawnXLabels: TList<Double>; ADrawnYLabelRects: TList<TRectF>);
 var
   I: Integer;
   PointValue, ScreenPt: TPointF;
@@ -798,6 +797,51 @@ var
       if SameValue(DrawnValue, AValue,
         Max(1E-9, Abs(AValue) * 1E-9)) then
         Exit(True);
+  end;
+
+  // Places a Y value in the nearest free screen row without overlapping labels.
+  function TryPlaceYLabel(var ARect: TRectF): Boolean;
+  const
+    CLabelStep = 20.0;
+    CLabelGap = 2.0;
+  var
+    InitialRect, Candidate, DrawnRect: TRectF;
+    Step, Direction: Integer;
+    Intersects: Boolean;
+  begin
+    InitialRect := ARect;
+    for Step := 0 to Ceil(PlotRect.Height / CLabelStep) do
+      for Direction := -1 to 1 do
+      begin
+        if (Step > 0) and (Direction = 0) then
+          Continue;
+        if (Step = 0) and (Direction <> 0) then
+          Continue;
+
+        Candidate := InitialRect;
+        Candidate.Offset(0, Step * Direction * CLabelStep);
+        if (Candidate.Top < PlotRect.Top) or
+           (Candidate.Bottom > PlotRect.Bottom) then
+          Continue;
+
+        Intersects := False;
+        if ADrawnYLabelRects <> nil then
+          for DrawnRect in ADrawnYLabelRects do
+            if (Candidate.Left < DrawnRect.Right + CLabelGap) and
+               (Candidate.Right > DrawnRect.Left - CLabelGap) and
+               (Candidate.Top < DrawnRect.Bottom + CLabelGap) and
+               (Candidate.Bottom > DrawnRect.Top - CLabelGap) then
+            begin
+              Intersects := True;
+              Break;
+            end;
+        if not Intersects then
+        begin
+          ARect := Candidate;
+          Exit(True);
+        end;
+      end;
+    Result := False;
   end;
 begin
   PlotRect := TRectF.Create(
@@ -833,14 +877,22 @@ begin
           ADrawnXLabels.Add(PointValue.X);
       end;
 
-      if not IsAxisLabelDrawn(PointValue.Y, ADrawnYLabels) then
+      TextRect := RectF(PlotRect.Left - 92, ScreenPt.Y - 9,
+        PlotRect.Left - 40, ScreenPt.Y + 9);
+      if TryPlaceYLabel(TextRect) then
       begin
-        TextRect := RectF(PlotRect.Left - 92, ScreenPt.Y - 9,
-          PlotRect.Left - 40, ScreenPt.Y + 9);
+        if not SameValue((TextRect.Top + TextRect.Bottom) / 2,
+          ScreenPt.Y, 0.5) then
+        begin
+          Canvas.Stroke.Color := GuideColor;
+          Canvas.DrawLine(PointF(TextRect.Right + 2,
+            (TextRect.Top + TextRect.Bottom) / 2),
+            PointF(PlotRect.Left - 2, ScreenPt.Y), 1);
+        end;
         Canvas.FillText(TextRect, FormatFloat('0.###', PointValue.Y), False,
           1, [], TTextAlign.Trailing, TTextAlign.Center);
-        if ADrawnYLabels <> nil then
-          ADrawnYLabels.Add(PointValue.Y);
+        if ADrawnYLabelRects <> nil then
+          ADrawnYLabelRects.Add(TextRect);
       end;
     end;
 
@@ -864,10 +916,11 @@ var
   series: TChartSeries;
   Delta: TPointF;
   LengthPx, DashPos: Single;
-  DrawnXLabels, DrawnYLabels: TList<Double>;
+  DrawnXLabels: TList<Double>;
+  DrawnYLabelRects: TList<TRectF>;
 begin
   DrawnXLabels := TList<Double>.Create;
-  DrawnYLabels := TList<Double>.Create;
+  DrawnYLabelRects := TList<TRectF>.Create;
   try
     for i := 0 to FSeries.Count - 1 do
     begin
@@ -904,10 +957,10 @@ begin
     end;
 
       if series.ShowMarkers then
-        DrawMarkersForSeries(series, DrawnXLabels, DrawnYLabels);
+        DrawMarkersForSeries(series, DrawnXLabels, DrawnYLabelRects);
     end;
   finally
-    DrawnYLabels.Free;
+    DrawnYLabelRects.Free;
     DrawnXLabels.Free;
   end;
 end;
