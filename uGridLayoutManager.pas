@@ -160,15 +160,16 @@ begin
       AGrid.RowCount := 0;
     if AGrid.RowCount <> NewRowCount then
       AGrid.RowCount := NewRowCount;
-    { Widths belong to the same atomic structural update as RowCount.  Never
-      change them after EndUpdate because the header presentation is already built. }
-    for I := 0 to High(Columns) do
-      if (Columns[I] <> nil) and
-         (Abs(Columns[I].Width - Widths[I]) >= CWidthEpsilon) then
-        Columns[I].Width := Widths[I];
   finally
     AGrid.EndUpdate;
   end;
+
+  { EndUpdate performs the FMX layout pass and may scale every column.  Restore
+    the snapshot only after that pass so reopening a tab cannot accumulate width. }
+  for I := 0 to High(Columns) do
+    if (Columns[I] <> nil) and
+       (Abs(Columns[I].Width - Widths[I]) >= CWidthEpsilon) then
+      Columns[I].Width := Widths[I];
   AGrid.Repaint;
 end;
 
@@ -319,21 +320,6 @@ begin
         if Column.Visible <> Definition.Visible then
           Column.Visible := Definition.Visible;
 
-        { During a real rebuild, restore a trusted pre-rebuild width if FMX
-          changed an existing column while applying Parent/Index.  A replacement
-          column uses the same stable-key snapshot, or its declared initial
-          width when that key has never existed. }
-        if AState.FWidths.TryGetValue(Key, SavedWidth) then
-        begin
-          if Abs(Column.Width - SavedWidth) >= CWidthEpsilon then
-            Column.Width := SavedWidth;
-        end;
-        if IsNewColumn and not AState.FWidths.ContainsKey(Key) and
-           (Abs(Column.Width - Definition.InitialWidth) >= CWidthEpsilon) then
-          Column.Width := Definition.InitialWidth;
-        LogColumn('after Width', Key, Column,
-          AState.FWidths.TryGetValue(Key, SavedWidth), SavedWidth);
-
         if Column.Index <> DesiredIndex then
           Column.Index := DesiredIndex;
         LogColumn('after Index', Key, Column,
@@ -344,9 +330,20 @@ begin
     finally
       AGrid.EndUpdate;
     end;
+    { EndUpdate is the FMX layout boundary.  Restore the final widths only now:
+      an existing key gets its trusted snapshot; a newly introduced dynamic
+      column gets the declarative initial width. }
     for Definition in ADefinitions do
     begin
       Column := AState.FColumns[Definition.Key];
+      if AState.FWidths.TryGetValue(Definition.Key, SavedWidth) then
+      begin
+        if Abs(Column.Width - SavedWidth) >= CWidthEpsilon then
+          Column.Width := SavedWidth;
+      end
+      else if (Definition.ExistingColumn = nil) and
+              (Abs(Column.Width - Definition.InitialWidth) >= CWidthEpsilon) then
+        Column.Width := Definition.InitialWidth;
       LogColumn('after EndUpdate', Definition.Key, Column,
         AState.FWidths.TryGetValue(Definition.Key, SavedWidth), SavedWidth);
     end;

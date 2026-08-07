@@ -92,6 +92,18 @@ def test_apply_reentrancy_and_diagnostics_are_present():
     assert 'AGrid.Model.InvalidateContentSize' not in apply
 
 
+def test_apply_restores_final_widths_only_after_end_update():
+    apply = method(HELPER, 'class function TGridLayoutManager.Apply', 'end.\n')
+    end_update = apply.index('AGrid.EndUpdate;')
+    width_assignments = [
+        match.start()
+        for match in re.finditer(r'Column\.Width\s*:=', apply)
+    ]
+    assert width_assignments
+    assert all(position > end_update for position in width_assignments)
+    assert 'Definition.ExistingColumn = nil' in apply
+
+
 def test_end_update_is_the_only_publication_point():
     apply = method(HELPER, 'class function TGridLayoutManager.Apply', 'end.\n')
     after_end_update = apply[apply.index('AGrid.EndUpdate;') + len('AGrid.EndUpdate;'):]

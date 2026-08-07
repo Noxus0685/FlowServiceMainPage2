@@ -45,6 +45,14 @@ def test_column_builder_delegates_atomic_rebuild_to_layout_manager():
     assert "GridMRResults.Model.InvalidateContentSize" not in body
 
 
+def test_refresh_rows_cannot_change_column_widths_directly():
+    body = procedure_body("RefreshRows")
+    assert "TGridLayoutManager.SetRowCount" in body
+    assert ".Width :=" not in body
+    assert "GridMRResults.BeginUpdate" not in body
+    assert "GridMRResults.EndUpdate" not in body
+
+
 def test_other_dynamic_grid_rebuild_sites_are_explicitly_audited():
     """Dynamic column ownership is centralized in the layout manager."""
     sources = Path(__file__).parents[1].glob("*.pas")
