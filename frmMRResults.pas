@@ -73,6 +73,8 @@ type
     procedure ButtonCreateSessionClick(Sender: TObject);
     procedure ButtonExportExcelClick(Sender: TObject);
     procedure GridMRResultsSelChanged(Sender: TObject);
+    procedure GridMRResultsMouseUp(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
   private
     FActiveWorkTable: TWorkTable;
     FPointColumns: TObjectList<TStringColumn>;
@@ -211,6 +213,7 @@ begin
   GridMRResults.OnDrawColumnCell := GridMRResultsDrawColumnCell;
   GridMRResults.OnSetValue := nil;
   GridMRResults.OnSelChanged := GridMRResultsSelChanged;
+  GridMRResults.OnMouseUp := GridMRResultsMouseUp;
   SetGridReadOnly(GridMRResults);
 end;
 
@@ -588,6 +591,14 @@ begin
   ButtonClearSession.Enabled := (FProceed is TFrameProceed) and
     TFrameProceed(FProceed).CanManageResultSessions;
   ButtonCreateSession.Enabled := ButtonClearSession.Enabled;
+end;
+
+{ Saves column widths only after the user finishes a manual resize. }
+procedure TFrameMRResults.GridMRResultsMouseUp(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+begin
+  if not FRefreshing then
+    TGridLayoutManager.CaptureWidths(FGridLayoutState);
 end;
 
 procedure TFrameMRResults.BuildRows;

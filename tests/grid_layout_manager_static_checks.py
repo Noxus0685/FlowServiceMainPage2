@@ -12,12 +12,19 @@ def method(text, signature, next_signature):
     return text[start:text.index(next_signature, start + len(signature))]
 
 
-def test_equal_signature_is_a_strict_no_op_before_fmx_mutation():
+def test_equal_signature_restores_width_without_structural_mutation():
     apply = method(HELPER, 'class function TGridLayoutManager.Apply', 'end.\n')
     guard = apply.index('if Signature = AState.FLastSignature')
-    for mutation in ('AGrid.BeginUpdate', '.Parent :=', '.Index :=', '.Width :='):
-        assert guard < apply.index(mutation)
-    assert 'Exit(False)' in apply[guard:apply.index('AGrid.BeginUpdate')]
+    structural = apply.index('AState.FApplying := True', guard)
+    unchanged = apply[guard:structural]
+    assert 'AState.FColumns.TryGetValue' in unchanged
+    assert 'AState.FWidths.TryGetValue' in unchanged
+    assert 'Column.Width := SavedWidth' in unchanged
+    assert 'GridWidthRestored' in unchanged
+    assert 'AGrid.BeginUpdate' not in unchanged
+    assert '.Parent :=' not in unchanged
+    assert '.Index :=' not in unchanged
+    assert 'Exit(False)' in unchanged
 
 
 def test_state_and_declarative_definition_contain_required_fields():
@@ -55,14 +62,14 @@ def test_no_structural_helper_in_notification_or_timer_handlers():
         assert 'TGridLayoutManager.Apply' not in match.group(0)
 
 
-def test_repeated_apply_has_no_parent_width_or_index_assignment():
+def test_repeated_apply_does_not_rebuild_columns():
     apply = method(HELPER, 'class function TGridLayoutManager.Apply', 'end.\n')
     guard = apply.index('if Signature = AState.FLastSignature')
-    exit_noop = apply.index('Exit(False)', guard)
-    first_assignment = min(apply.index('Column.Parent :='),
-                           apply.index('Column.Width :='),
-                           apply.index('Column.Index :='))
-    assert guard < exit_noop < first_assignment
+    structural = apply.index('AState.FApplying := True', guard)
+    unchanged = apply[guard:structural]
+    assert 'Column.Parent :=' not in unchanged
+    assert 'Column.Index :=' not in unchanged
+    assert 'Column.Width := SavedWidth' in unchanged
 
 
 def test_structural_mutations_are_conditional_and_width_snapshot_is_before_update():
@@ -72,11 +79,11 @@ def test_structural_mutations_are_conditional_and_width_snapshot_is_before_updat
     assert 'if Column.Index <> DesiredIndex then' in apply
     snapshot = apply.index('CaptureWidths(AState)')
     assert snapshot < apply.index('AGrid.BeginUpdate')
-    assert 'AState.FWidths.AddOrSetValue' not in apply
+    assert 'not AState.FWidths.ContainsKey(Definition.Key)' in apply
     capture = method(HELPER, 'class procedure TGridLayoutManager.CaptureWidths',
                      'class function TGridLayoutManager.Apply')
     assert capture.count('AState.FWidths.AddOrSetValue') == 1
-    assert 'if IsNewColumn and not AState.FWidths.ContainsKey(Key)' in apply
+    assert 'AState.FWidths.AddOrSetValue(Definition.Key, Column.Width)' in apply
 
 
 def test_apply_reentrancy_and_diagnostics_are_present():
@@ -84,24 +91,27 @@ def test_apply_reentrancy_and_diagnostics_are_present():
     assert 'if AState.FApplying then' in apply
     assert 'AState.FApplying := True' in apply
     assert 'AState.FApplying := False' in apply
-    for stage in ('before BeginUpdate', 'after Parent', 'after Width',
-                  'after Index', 'after EndUpdate'):
+    for stage in ('before BeginUpdate', 'after Parent', 'after Index',
+                  'after EndUpdate'):
         assert stage in apply
+    assert 'GridWidthRestored' in apply
     assert 'AStructureContext' in apply
     assert 'FApplyCount' in apply
     assert 'AGrid.Model.InvalidateContentSize' not in apply
 
 
-def test_apply_restores_final_widths_only_after_end_update():
+def test_structural_apply_restores_widths_only_after_end_update():
     apply = method(HELPER, 'class function TGridLayoutManager.Apply', 'end.\n')
-    end_update = apply.index('AGrid.EndUpdate;')
+    structural = apply[apply.index('AState.FApplying := True'):]
+    end_update = structural.index('AGrid.EndUpdate;')
     width_assignments = [
         match.start()
-        for match in re.finditer(r'Column\.Width\s*:=', apply)
+        for match in re.finditer(r'Column\.Width\s*:=', structural)
     ]
     assert width_assignments
     assert all(position > end_update for position in width_assignments)
-    assert 'Definition.ExistingColumn = nil' in apply
+    assert 'Definition.ExistingColumn = nil' in structural
+    assert 'AState.FWidths.AddOrSetValue(Definition.Key, Column.Width)' in structural
 
 
 def test_end_update_is_the_only_publication_point():

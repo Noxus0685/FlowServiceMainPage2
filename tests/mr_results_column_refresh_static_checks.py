@@ -69,3 +69,13 @@ def test_other_dynamic_grid_rebuild_sites_are_explicitly_audited():
         encoding="utf-8-sig"
     )
     assert "TGridLayoutManager.Apply(GridResults" in proceed
+
+def test_manual_resize_captures_stable_widths_on_mouse_up():
+    constructor = TEXT[
+        TEXT.index("constructor TFrameMRResults.Create"):
+        TEXT.index("destructor TFrameMRResults.Destroy")
+    ]
+    mouse_up = procedure_body("GridMRResultsMouseUp")
+    assert "GridMRResults.OnMouseUp := GridMRResultsMouseUp" in constructor
+    assert "TGridLayoutManager.CaptureWidths(FGridLayoutState)" in mouse_up
+    assert "if not FRefreshing then" in mouse_up

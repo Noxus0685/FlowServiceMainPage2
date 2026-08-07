@@ -185,6 +185,8 @@ var
   Pair: TPair<string, TColumn>;
   IsNewColumn: Boolean;
   DesiredIndex: Integer;
+  WidthRestored: Boolean;
+  CurrentWidth: Single;
 
   function PrintableSignature(const AValue: string): string;
   begin
@@ -250,10 +252,28 @@ begin
       [AState.FApplyCount]));
     Exit(False);
   end;
-  { This guard is deliberately before every observable FMX mutation. }
+  { An unchanged signature skips every structural mutation.  FMX may still
+    have stretched live columns while reopening the tab, so verify their
+    widths against the last trusted user-visible snapshot. }
   if Signature = AState.FLastSignature then
   begin
-    DebugLog(Format('GridLayout Apply #%d skipped: signature unchanged',
+    WidthRestored := False;
+    for Definition in ADefinitions do
+      if AState.FColumns.TryGetValue(Definition.Key, Column) and
+         (Column <> nil) and
+         AState.FWidths.TryGetValue(Definition.Key, SavedWidth) and
+         (Abs(Column.Width - SavedWidth) >= CWidthEpsilon) then
+      begin
+        CurrentWidth := Column.Width;
+        Column.Width := SavedWidth;
+        WidthRestored := True;
+        DebugLog(Format(
+          'GridWidthRestored ColumnKey="%s" CurrentWidth=%.4f StableWidth=%.4f Context="%s"',
+          [Definition.Key, CurrentWidth, SavedWidth, AStructureContext]));
+      end;
+    if WidthRestored then
+      AGrid.Repaint;
+    DebugLog(Format('GridLayout Apply #%d verified: signature unchanged',
       [AState.FApplyCount]));
     Exit(False);
   end;
@@ -270,6 +290,12 @@ begin
       Column := Definition.ExistingColumn;
       if Column = nil then
         Column := OldColumnForKey(Definition.Key);
+      { Fixed design-time columns are not yet present in FColumns during the
+        first Apply.  Capture their pre-layout widths before EndUpdate can
+        stretch them. }
+      if (Column <> nil) and
+         not AState.FWidths.ContainsKey(Definition.Key) then
+        AState.FWidths.AddOrSetValue(Definition.Key, Column.Width);
       LogColumn('before BeginUpdate', Definition.Key, Column,
         AState.FWidths.TryGetValue(Definition.Key, SavedWidth), SavedWidth);
     end;
@@ -341,9 +367,14 @@ begin
         if Abs(Column.Width - SavedWidth) >= CWidthEpsilon then
           Column.Width := SavedWidth;
       end
-      else if (Definition.ExistingColumn = nil) and
-              (Abs(Column.Width - Definition.InitialWidth) >= CWidthEpsilon) then
-        Column.Width := Definition.InitialWidth;
+      else if Definition.ExistingColumn = nil then
+      begin
+        if Abs(Column.Width - Definition.InitialWidth) >= CWidthEpsilon then
+          Column.Width := Definition.InitialWidth;
+        AState.FWidths.AddOrSetValue(Definition.Key, Column.Width);
+      end
+      else
+        AState.FWidths.AddOrSetValue(Definition.Key, Column.Width);
       LogColumn('after EndUpdate', Definition.Key, Column,
         AState.FWidths.TryGetValue(Definition.Key, SavedWidth), SavedWidth);
     end;
