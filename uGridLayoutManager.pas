@@ -61,122 +61,11 @@ type
 implementation
 
 uses
-  FMX.Types,
   System.Math,
   uDebugLog;
 
 const
   CWidthEpsilon = 0.01;
-  CDeferredRestorePasses = 8;
-  CStableRestorePasses = 2;
-
-type
-  { One-shot guard owned by the grid. It restores the trusted widths during
-    the deferred FMX layout passes that run after TCustomGrid.EndUpdate. }
-  TGridDeferredWidthRestore = class(TTimer)
-  private
-    FGrid: TCustomGrid;
-    FColumns: TArray<TColumn>;
-    FWidths: TArray<Single>;
-    FRemainingPasses: Integer;
-    FStablePasses: Integer;
-    function ColumnStillRegistered(AColumn: TColumn): Boolean;
-    function RestoreWidths: Boolean;
-    procedure TimerTick(Sender: TObject);
-  public
-    constructor Create(AGrid: TCustomGrid); reintroduce;
-    procedure Schedule(const AColumns: TArray<TColumn>;
-      const AWidths: TArray<Single>);
-  end;
-
-constructor TGridDeferredWidthRestore.Create(AGrid: TCustomGrid);
-begin
-  inherited Create(AGrid);
-  FGrid := AGrid;
-  Enabled := False;
-  Interval := 1;
-  OnTimer := TimerTick;
-end;
-
-function TGridDeferredWidthRestore.ColumnStillRegistered(
-  AColumn: TColumn): Boolean;
-var
-  I: Integer;
-begin
-  Result := False;
-  if (FGrid = nil) or (AColumn = nil) then
-    Exit;
-
-  for I := 0 to FGrid.ColumnCount - 1 do
-    if FGrid.Columns[I] = AColumn then
-      Exit(True);
-end;
-
-function TGridDeferredWidthRestore.RestoreWidths: Boolean;
-var
-  I, Count: Integer;
-begin
-  Result := False;
-  Count := Min(Length(FColumns), Length(FWidths));
-  for I := 0 to Count - 1 do
-    if ColumnStillRegistered(FColumns[I]) and
-       (Abs(FColumns[I].Width - FWidths[I]) >= CWidthEpsilon) then
-    begin
-      FColumns[I].Width := FWidths[I];
-      Result := True;
-    end;
-end;
-
-procedure TGridDeferredWidthRestore.Schedule(
-  const AColumns: TArray<TColumn>; const AWidths: TArray<Single>);
-begin
-  FColumns := Copy(AColumns, 0, Length(AColumns));
-  FWidths := Copy(AWidths, 0, Length(AWidths));
-  FRemainingPasses := CDeferredRestorePasses;
-  FStablePasses := 0;
-  Enabled := Length(FColumns) > 0;
-end;
-
-procedure TGridDeferredWidthRestore.TimerTick(Sender: TObject);
-var
-  Changed: Boolean;
-begin
-  if (FGrid = nil) or (csDestroying in FGrid.ComponentState) then
-  begin
-    Enabled := False;
-    Exit;
-  end;
-
-  Changed := RestoreWidths;
-  Dec(FRemainingPasses);
-  if Changed then
-  begin
-    FStablePasses := 0;
-    FGrid.Repaint;
-  end
-  else
-    Inc(FStablePasses);
-
-  if (FRemainingPasses <= 0) or
-     (FStablePasses >= CStableRestorePasses) then
-  begin
-    Enabled := False;
-    FColumns := nil;
-    FWidths := nil;
-  end;
-end;
-
-function EnsureDeferredWidthRestore(
-  AGrid: TCustomGrid): TGridDeferredWidthRestore;
-var
-  I: Integer;
-begin
-  for I := 0 to AGrid.ComponentCount - 1 do
-    if AGrid.Components[I] is TGridDeferredWidthRestore then
-      Exit(TGridDeferredWidthRestore(AGrid.Components[I]));
-
-  Result := TGridDeferredWidthRestore.Create(AGrid);
-end;
 
 constructor TGridColumnDefinition.Create(const AKey, AHeader: string;
   AColumnClass: TClass; const AInitialWidth: Single; const AReadOnly,
@@ -238,7 +127,6 @@ class procedure TGridLayoutManager.SetRowCount(AGrid: TCustomGrid;
 var
   Columns: TArray<TColumn>;
   Widths: TArray<Single>;
-  RestoreTimer: TGridDeferredWidthRestore;
   I, NewRowCount: Integer;
 begin
   if AGrid = nil then
@@ -272,21 +160,15 @@ begin
       AGrid.RowCount := 0;
     if AGrid.RowCount <> NewRowCount then
       AGrid.RowCount := NewRowCount;
+    { Widths belong to the same atomic structural update as RowCount.  Never
+      change them after EndUpdate because the header presentation is already built. }
+    for I := 0 to High(Columns) do
+      if (Columns[I] <> nil) and
+         (Abs(Columns[I].Width - Widths[I]) >= CWidthEpsilon) then
+        Columns[I].Width := Widths[I];
   finally
     AGrid.EndUpdate;
   end;
-
-  { EndUpdate can rebuild the FMX presentation and change widths.  Restore the
-    exact column objects only after that rebuild has completed. }
-  for I := 0 to High(Columns) do
-    if (Columns[I] <> nil) and
-       (Abs(Columns[I].Width - Widths[I]) >= CWidthEpsilon) then
-      Columns[I].Width := Widths[I];
-
-  { EndUpdate also schedules FMX presentation work. Keep the same trusted
-    snapshot alive until those deferred layout passes have completed. }
-  RestoreTimer := EnsureDeferredWidthRestore(AGrid);
-  RestoreTimer.Schedule(Columns, Widths);
   AGrid.Repaint;
 end;
 

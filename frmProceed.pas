@@ -55,6 +55,11 @@ type
   // Направление сортировки таблицы обработки.
   TGridSortDirection = (gsdNone, gsdAscending, gsdDescending);
 
+  // Способ соединения усреднённых метрологических точек.
+  TChartAverageLineMode = (calmPchipLogQ, calmLinearSegments);
+  // Способ отображения физического расхода по оси X.
+  TChartFlowScale = (cfsLogarithmic, cfsLinear);
+
   // Хранит выбранный цвет и UUID прибора в динамическом пункте ПКМ графика.
   TChartDeviceColorMenuItem = class(TMenuItem)
   public
@@ -216,6 +221,13 @@ type
     PopupMenuGridResults: TPopupMenu;
     PopupMenuChart: TPopupMenu;
     MenuItemChartDevices: TMenuItem;
+    MenuItemChartSettings: TMenuItem;
+    MenuItemChartLineMode: TMenuItem;
+    MenuItemChartLinePchip: TMenuItem;
+    MenuItemChartLineSegments: TMenuItem;
+    MenuItemChartScale: TMenuItem;
+    MenuItemChartScaleLog: TMenuItem;
+    MenuItemChartScaleLinear: TMenuItem;
     MenuItemGridResultsDelete: TMenuItem;
     MenuItemGridResultsClear: TMenuItem;
     MenuItemGridResultsClose: TMenuItem;
@@ -368,6 +380,10 @@ type
     procedure ChartPointColorMenuClick(Sender: TObject);
     // Открывает выбор цвета усреднённой линии выбранного в ПКМ прибора.
     procedure ChartLineColorMenuClick(Sender: TObject);
+    // Переключает алгоритм линии средних значений и перестраивает график.
+    procedure ChartLineModeMenuClick(Sender: TObject);
+    // Переключает линейное/логарифмическое отображение оси расхода.
+    procedure ChartScaleMenuClick(Sender: TObject);
     procedure UpdateCalibrCoefsFrame;
     procedure ResetPointDeleteConfirm;
     procedure InitCalibrCoefsFrame;
@@ -422,6 +438,8 @@ type
     FChartPointColors: TDictionary<string, TAlphaColor>;
     FChartLineColors: TDictionary<string, TAlphaColor>;
     FChartDeviceVisibility: TDictionary<string, Boolean>;
+    FChartAverageLineMode: TChartAverageLineMode;
+    FChartFlowScale: TChartFlowScale;
     // Перестраивает зависимости погрешности от расхода для текущих сессий приборов.
     procedure UpdateSessionErrorChart;
     function GetChartDeviceColor(ADevice: TDevice; const ALineColor: Boolean;
@@ -579,7 +597,17 @@ begin
     Chart1.XTitle := 'Расход';
     Chart1.YTitle := 'Погрешность, %';
     Chart1.ShowLegend := True;
+    Chart1.LogarithmicX := FChartFlowScale = cfsLogarithmic;
   end;
+
+  if MenuItemChartLinePchip <> nil then
+    MenuItemChartLinePchip.IsChecked := FChartAverageLineMode = calmPchipLogQ;
+  if MenuItemChartLineSegments <> nil then
+    MenuItemChartLineSegments.IsChecked := FChartAverageLineMode = calmLinearSegments;
+  if MenuItemChartScaleLog <> nil then
+    MenuItemChartScaleLog.IsChecked := FChartFlowScale = cfsLogarithmic;
+  if MenuItemChartScaleLinear <> nil then
+    MenuItemChartScaleLinear.IsChecked := FChartFlowScale = cfsLinear;
 
   if GridResults <> nil then
   begin
@@ -2062,11 +2090,11 @@ begin
   end;
 end;
 
-// Перестраивает график: исходные измерения рисуются маркерами,
-// а тенденция погрешности отображается устойчивой полиномиальной регрессией.
+// Перестраивает график: все проливки остаются маркерами, а средние точки
+// соединяются PCHIP в log(Q) либо прямыми отрезками без экстраполяции.
 procedure TFrameProceed.UpdateSessionErrorChart;
 const
-  CChartPolynomialSamples = 96;
+  CChartCurvePointsPerInterval = 24;
 var
   Device, SelectedDevice: TDevice;
   Session: TSessionSpillage;
@@ -2078,105 +2106,96 @@ var
   PointSeries, AverageSeries, LineSeries: TChartSeries;
   Sorter: IComparer<TPointF>;
   P1: TPointF;
-  PolynomialCoefficients: TArray<Double>;
   GroupKey, LegendBase, FlowUnitName: string;
-  I, J, DeviceIndex, PolynomialDegree: Integer;
-  SumX, SumY, X, Y: Double;
+  I, J, DeviceIndex: Integer;
+  SumX, SumY: Double;
   FlowValue, BaseFlowValue: Double;
-  ChartMinX, ChartMaxX, ChartPaddingX: Double;
-  PolynomialCoefficients: TArray<Double>;
+  ChartMinX, ChartMaxX, ChartPaddingX, LogPaddingX: Double;
   UseVolumeFlow: Boolean;
 
-  function FitPolynomial(const APoints: TList<TPointF>;
-    const ADegree: Integer; out ACoefficients: TArray<Double>): Boolean;
+  // Добавляет формосохраняющую кусочно-кубическую линию в координате log10(Q).
+  function AddPchipLogLine(const APoints: TList<TPointF>;
+    ASeries: TChartSeries): Boolean;
   var
-    Matrix: TArray<TArray<Double>>;
-    Powers: TArray<Double>;
-    Row, Column, Power, PivotRow, PointIndex: Integer;
-    PivotValue, Factor, Scale, NormalizedX: Double;
+    LogX, PointY, H, Delta, Derivative: TArray<Double>;
+    PointCount, SegmentIndex, SampleIndex: Integer;
+    T, H00, H10, H01, H11, CurveLogX, CurveY: Double;
+
+    function SameNonZeroSign(const A, B: Double): Boolean;
+    begin
+      Result := not SameValue(A, 0.0) and not SameValue(B, 0.0) and
+        ((A > 0) = (B > 0));
+    end;
+
+    function EndpointDerivative(const H0, H1, Delta0,
+      Delta1: Double): Double;
+    begin
+      Result := ((2 * H0 + H1) * Delta0 - H0 * Delta1) / (H0 + H1);
+      if not SameNonZeroSign(Result, Delta0) then
+        Result := 0
+      else if not SameNonZeroSign(Delta0, Delta1) and
+              (Abs(Result) > 3 * Abs(Delta0)) then
+        Result := 3 * Delta0;
+    end;
   begin
     Result := False;
-    SetLength(ACoefficients, 0);
-    if (APoints = nil) or (ADegree < 1) or
-       (APoints.Count < ADegree + 2) then
+    if (APoints = nil) or (ASeries = nil) or (APoints.Count < 3) then
       Exit;
 
-    // Нормализация расхода улучшает обусловленность нормальных уравнений,
-    // когда измерительные точки различаются на несколько порядков.
-    Scale := Max(Abs(APoints[0].X), Abs(APoints[APoints.Count - 1].X));
-    if SameValue(Scale, 0.0) then
-      Exit;
-    SetLength(Matrix, ADegree + 1, ADegree + 2);
-    SetLength(Powers, ADegree * 2 + 1);
-    for PointIndex := 0 to APoints.Count - 1 do
+    PointCount := APoints.Count;
+    SetLength(LogX, PointCount);
+    SetLength(PointY, PointCount);
+    SetLength(H, PointCount - 1);
+    SetLength(Delta, PointCount - 1);
+    SetLength(Derivative, PointCount);
+    for I := 0 to PointCount - 1 do
     begin
-      NormalizedX := APoints[PointIndex].X / Scale;
-      Powers[0] := 1;
-      for Power := 1 to High(Powers) do
-        Powers[Power] := Powers[Power - 1] * NormalizedX;
-      for Row := 0 to ADegree do
-      begin
-        for Column := 0 to ADegree do
-          Matrix[Row][Column] := Matrix[Row][Column] + Powers[Row + Column];
-        Matrix[Row][ADegree + 1] := Matrix[Row][ADegree + 1] +
-          APoints[PointIndex].Y * Powers[Row];
-      end;
-    end;
-
-    for Column := 0 to ADegree do
-    begin
-      PivotRow := Column;
-      for Row := Column + 1 to ADegree do
-        if Abs(Matrix[Row][Column]) > Abs(Matrix[PivotRow][Column]) then
-          PivotRow := Row;
-      if SameValue(Matrix[PivotRow][Column], 0.0, 1E-12) then
+      if APoints[I].X <= 0 then
         Exit;
-      if PivotRow <> Column then
-        for Power := Column to ADegree + 1 do
-        begin
-          PivotValue := Matrix[Column][Power];
-          Matrix[Column][Power] := Matrix[PivotRow][Power];
-          Matrix[PivotRow][Power] := PivotValue;
-        end;
-      PivotValue := Matrix[Column][Column];
-      for Power := Column to ADegree + 1 do
-        Matrix[Column][Power] := Matrix[Column][Power] / PivotValue;
-      for Row := 0 to ADegree do
-        if Row <> Column then
-        begin
-          Factor := Matrix[Row][Column];
-          for Power := Column to ADegree + 1 do
-            Matrix[Row][Power] := Matrix[Row][Power] -
-              Factor * Matrix[Column][Power];
-        end;
-    end;
-
-    SetLength(ACoefficients, ADegree + 2);
-    ACoefficients[0] := Scale;
-    for Row := 0 to ADegree do
-    begin
-      ACoefficients[Row + 1] := Matrix[Row][ADegree + 1];
-      if IsNan(ACoefficients[Row + 1]) or
-         IsInfinite(ACoefficients[Row + 1]) then
-      begin
-        SetLength(ACoefficients, 0);
+      LogX[I] := Log10(APoints[I].X);
+      PointY[I] := APoints[I].Y;
+      if (I > 0) and (LogX[I] <= LogX[I - 1]) then
         Exit;
-      end;
     end;
-    Result := True;
-  end;
 
-  function EvaluatePolynomial(const ACoefficients: TArray<Double>;
-    const AX: Double): Double;
-  var
-    CoefficientIndex: Integer;
-  begin
-    Result := 0;
-    if Length(ACoefficients) < 3 then
-      Exit;
-    for CoefficientIndex := High(ACoefficients) downto 1 do
-      Result := Result * (AX / ACoefficients[0]) +
-        ACoefficients[CoefficientIndex];
+    for I := 0 to PointCount - 2 do
+    begin
+      H[I] := LogX[I + 1] - LogX[I];
+      Delta[I] := (PointY[I + 1] - PointY[I]) / H[I];
+    end;
+
+    Derivative[0] := EndpointDerivative(H[0], H[1], Delta[0], Delta[1]);
+    Derivative[PointCount - 1] := EndpointDerivative(
+      H[PointCount - 2], H[PointCount - 3], Delta[PointCount - 2],
+      Delta[PointCount - 3]);
+    for I := 1 to PointCount - 2 do
+      if SameNonZeroSign(Delta[I - 1], Delta[I]) then
+        Derivative[I] := (2 * H[I] + H[I - 1] + H[I] + 2 * H[I - 1]) /
+          ((2 * H[I] + H[I - 1]) / Delta[I - 1] +
+           (H[I] + 2 * H[I - 1]) / Delta[I])
+      else
+        Derivative[I] := 0;
+
+    for SegmentIndex := 0 to PointCount - 2 do
+      for SampleIndex := 0 to CChartCurvePointsPerInterval do
+      begin
+        if (SegmentIndex > 0) and (SampleIndex = 0) then
+          Continue;
+        T := SampleIndex / CChartCurvePointsPerInterval;
+        H00 := 2 * T * T * T - 3 * T * T + 1;
+        H10 := T * T * T - 2 * T * T + T;
+        H01 := -2 * T * T * T + 3 * T * T;
+        H11 := T * T * T - T * T;
+        CurveLogX := LogX[SegmentIndex] + H[SegmentIndex] * T;
+        CurveY := H00 * PointY[SegmentIndex] +
+          H10 * H[SegmentIndex] * Derivative[SegmentIndex] +
+          H01 * PointY[SegmentIndex + 1] +
+          H11 * H[SegmentIndex] * Derivative[SegmentIndex + 1];
+        if IsNan(CurveY) or IsInfinite(CurveY) then
+          Exit;
+        ASeries.AddPoint(Power(10, CurveLogX), CurveY);
+      end;
+    Result := ASeries.Points.Count > 1;
   end;
 
   procedure AddSpillagePoint(APoint: TPointSpillage);
@@ -2238,6 +2257,7 @@ begin
   ChartMinX := MaxDouble;
   ChartMaxX := -MaxDouble;
   Chart1.XTitle := 'Расход, ' + FlowUnitName;
+  Chart1.LogarithmicX := FChartFlowScale = cfsLogarithmic;
   // Внешние подписи координат размещаются в увеличенных полях осей.
   Chart1.MarginLeft := 105;
   Chart1.MarginBottom := 70;
@@ -2329,8 +2349,7 @@ begin
           for I := 0 to RawPoints.Count - 1 do
             PointSeries.AddPoint(RawPoints[I].X, RawPoints[I].Y);
 
-          // Проекции и подписи координат отображаются только для средних
-          // точек, которые служат входными данными полинома.
+          // Проекции и подписи координат отображаются только для средних точек.
           AverageSeries := Chart1.AddSeries('');
           AverageSeries.Color := GetChartDeviceColor(Device, True, DeviceIndex);
           AverageSeries.ShowLine := False;
@@ -2340,31 +2359,29 @@ begin
           for I := 0 to AveragePoints.Count - 1 do
             AverageSeries.AddPoint(AveragePoints[I].X, AveragePoints[I].Y);
 
-          LineSeries := Chart1.AddSeries(LegendBase + ' — полином');
+          LineSeries := Chart1.AddSeries('');
           LineSeries.Color := GetChartDeviceColor(Device, True, DeviceIndex);
           LineSeries.ShowLine := True;
           LineSeries.ShowMarkers := False;
           LineSeries.Thickness := 2;
 
-          // Три точки недостаточны для надёжной параболической регрессии:
-          // точная парабола между далеко разнесёнными расходами создаёт
-          // физически бессмысленный провал. Поэтому квадратичный полином
-          // используется только при четырёх и более средних точках.
-          if AveragePoints.Count >= 4 then
-            PolynomialDegree := 2
-          else
-            PolynomialDegree := 1;
-          if FitPolynomial(AveragePoints, PolynomialDegree,
-             PolynomialCoefficients) then
-            for I := 0 to CChartPolynomialSamples do
+          if FChartAverageLineMode = calmPchipLogQ then
+          begin
+            LineSeries.LegendName := LegendBase + ' — PCHIP log(Q)';
+            if not AddPchipLogLine(AveragePoints, LineSeries) then
             begin
-              X := AveragePoints[0].X +
-                (AveragePoints[AveragePoints.Count - 1].X -
-                 AveragePoints[0].X) * I / CChartPolynomialSamples;
-              Y := EvaluatePolynomial(PolynomialCoefficients, X);
-              if not IsNan(Y) and not IsInfinite(Y) then
-                LineSeries.AddPoint(X, Y);
+              LineSeries.ClearPoints;
+              LineSeries.LegendName := LegendBase + ' — отрезки';
+              for I := 0 to AveragePoints.Count - 1 do
+                LineSeries.AddPoint(AveragePoints[I].X, AveragePoints[I].Y);
             end;
+          end
+          else
+          begin
+            LineSeries.LegendName := LegendBase + ' — отрезки';
+            for I := 0 to AveragePoints.Count - 1 do
+              LineSeries.AddPoint(AveragePoints[I].X, AveragePoints[I].Y);
+          end;
           Inc(DeviceIndex);
         finally
           Groups.Free;
@@ -2376,12 +2393,29 @@ begin
     if (ChartMinX <> MaxDouble) and (ChartMaxX <> -MaxDouble) then
     begin
       Chart1.AutoRangeX := False;
-      if SameValue(ChartMinX, ChartMaxX) then
-        ChartPaddingX := Max(Abs(ChartMaxX) * 0.1, 1.0)
+      if FChartFlowScale = cfsLogarithmic then
+      begin
+        if SameValue(ChartMinX, ChartMaxX) then
+        begin
+          Chart1.XMin := ChartMinX / 1.1;
+          Chart1.XMax := ChartMaxX * 1.1;
+        end
+        else
+        begin
+          LogPaddingX := (Log10(ChartMaxX) - Log10(ChartMinX)) * 0.05;
+          Chart1.XMin := Power(10, Log10(ChartMinX) - LogPaddingX);
+          Chart1.XMax := Power(10, Log10(ChartMaxX) + LogPaddingX);
+        end;
+      end
       else
-        ChartPaddingX := (ChartMaxX - ChartMinX) * 0.1;
-      Chart1.XMin := ChartMinX;
-      Chart1.XMax := ChartMaxX + ChartPaddingX;
+      begin
+        if SameValue(ChartMinX, ChartMaxX) then
+          ChartPaddingX := Max(Abs(ChartMaxX) * 0.1, 1.0)
+        else
+          ChartPaddingX := (ChartMaxX - ChartMinX) * 0.1;
+        Chart1.XMin := ChartMinX;
+        Chart1.XMax := ChartMaxX + ChartPaddingX;
+      end;
     end
     else
       Chart1.AutoRangeX := True;
@@ -2430,6 +2464,12 @@ begin
   if (Button <> TMouseButton.mbRight) or not (Sender is TControl) or
      (PopupMenuChart = nil) or (MenuItemChartDevices = nil) then
     Exit;
+
+  MenuItemChartLinePchip.IsChecked := FChartAverageLineMode = calmPchipLogQ;
+  MenuItemChartLineSegments.IsChecked :=
+    FChartAverageLineMode = calmLinearSegments;
+  MenuItemChartScaleLog.IsChecked := FChartFlowScale = cfsLogarithmic;
+  MenuItemChartScaleLinear.IsChecked := FChartFlowScale = cfsLinear;
 
   while MenuItemChartDevices.ItemsCount > 0 do
     MenuItemChartDevices.Items[MenuItemChartDevices.ItemsCount - 1].Free;
@@ -2533,6 +2573,37 @@ begin
 
   Item := TChartDeviceColorMenuItem(Sender);
   FChartLineColors.AddOrSetValue(Item.DeviceUUID, Item.NewColor);
+  UpdateSessionErrorChart;
+end;
+
+// Переключает алгоритм соединения средних точек без изменения исходных проливок.
+procedure TFrameProceed.ChartLineModeMenuClick(Sender: TObject);
+begin
+  if Sender = MenuItemChartLinePchip then
+    FChartAverageLineMode := calmPchipLogQ
+  else if Sender = MenuItemChartLineSegments then
+    FChartAverageLineMode := calmLinearSegments
+  else
+    Exit;
+
+  MenuItemChartLinePchip.IsChecked := FChartAverageLineMode = calmPchipLogQ;
+  MenuItemChartLineSegments.IsChecked :=
+    FChartAverageLineMode = calmLinearSegments;
+  UpdateSessionErrorChart;
+end;
+
+// Переключает геометрию оси X; значения расхода в сериях остаются физическими.
+procedure TFrameProceed.ChartScaleMenuClick(Sender: TObject);
+begin
+  if Sender = MenuItemChartScaleLog then
+    FChartFlowScale := cfsLogarithmic
+  else if Sender = MenuItemChartScaleLinear then
+    FChartFlowScale := cfsLinear
+  else
+    Exit;
+
+  MenuItemChartScaleLog.IsChecked := FChartFlowScale = cfsLogarithmic;
+  MenuItemChartScaleLinear.IsChecked := FChartFlowScale = cfsLinear;
   UpdateSessionErrorChart;
 end;
 

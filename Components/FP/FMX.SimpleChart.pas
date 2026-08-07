@@ -60,6 +60,7 @@ type
     FAutoRangeX: Boolean;
     FAutoRangeY: Boolean;
     FAutoRangeOnClear: Boolean;
+    FLogarithmicX: Boolean;
     FUpdating: Boolean;
     FXMin, FXMax: Double;
     FYMin, FYMax: Double;
@@ -82,6 +83,7 @@ type
     // Вспомогательные методы
     procedure SetAutoRangeX(const Value: Boolean);
     procedure SetAutoRangeY(const Value: Boolean);
+    procedure SetLogarithmicX(const Value: Boolean);
     procedure SetXMin(const Value: Double);
     procedure SetXMax(const Value: Double);
     procedure SetYMin(const Value: Double);
@@ -109,6 +111,7 @@ type
     procedure UpdateRanges;
     function WorldToScreen(const Value: TPointF): TPointF;
     function GetNiceTicks(minVal, maxVal: Double; approxTicks: Integer): TArray<Double>;
+    function GetLogTicks(minVal, maxVal: Double): TArray<Double>;
     procedure DrawAxesAndGrid;    // рисует оси, сетку, подписи, заголовки
     procedure DrawSeries;         // рисует все видимые серии
     procedure DrawLegend;
@@ -146,6 +149,7 @@ type
     property AutoRangeX: Boolean read FAutoRangeX write SetAutoRangeX default True;
     property AutoRangeY: Boolean read FAutoRangeY write SetAutoRangeY default True;
     property AutoRangeOnClear: Boolean read FAutoRangeOnClear write FAutoRangeOnClear default True;
+    property LogarithmicX: Boolean read FLogarithmicX write SetLogarithmicX default False;
     property XMin: Double read FXMin write SetXMin;
     property XMax: Double read FXMax write SetXMax;
     property YMin: Double read FYMin write SetYMin;
@@ -277,6 +281,7 @@ begin
   FAutoRangeX := True;
   FAutoRangeY := True;
   FAutoRangeOnClear := True;
+  FLogarithmicX := False;
   FUpdating := False;
   FXMin := 0;
   FXMax := 100;
@@ -437,31 +442,40 @@ begin
   anyPoint := False;
   minX := 0; maxX := 0; minY := 0; maxY := 0; // ← инициализация
   for i := 0 to FSeries.Count - 1 do
-  begin
-    if FSeries[i].Points.Count = 0 then Continue;
-    if not anyPoint then
-    begin
-      p := FSeries[i].Points[0];
-      minX := p.X; maxX := p.X;
-      minY := p.Y; maxY := p.Y;
-      anyPoint := True;
-    end;
     for j := 0 to FSeries[i].Points.Count - 1 do
     begin
       p := FSeries[i].Points[j];
-      if p.X < minX then minX := p.X;
-      if p.X > maxX then maxX := p.X;
-      if p.Y < minY then minY := p.Y;
-      if p.Y > maxY then maxY := p.Y;
+      if FLogarithmicX and (p.X <= 0) then
+        Continue;
+      if not anyPoint then
+      begin
+        minX := p.X; maxX := p.X;
+        minY := p.Y; maxY := p.Y;
+        anyPoint := True;
+      end
+      else
+      begin
+        if p.X < minX then minX := p.X;
+        if p.X > maxX then maxX := p.X;
+        if p.Y < minY then minY := p.Y;
+        if p.Y > maxY then maxY := p.Y;
+      end;
     end;
-  end;
 
   if not anyPoint then
   begin
     if FAutoRangeX then
     begin
-      FXMin := 0;
-      FXMax := 100;
+      if FLogarithmicX then
+      begin
+        FXMin := 1;
+        FXMax := 10;
+      end
+      else
+      begin
+        FXMin := 0;
+        FXMax := 100;
+      end;
     end;
     if FAutoRangeY then
     begin
@@ -475,8 +489,16 @@ begin
   begin
     if SameValue(minX, maxX) then
     begin
-      FXMin := minX - 1;
-      FXMax := maxX + 1;
+      if FLogarithmicX then
+      begin
+        FXMin := minX / 1.1;
+        FXMax := maxX * 1.1;
+      end
+      else
+      begin
+        FXMin := minX - 1;
+        FXMax := maxX + 1;
+      end;
     end
     else
     begin
@@ -506,6 +528,7 @@ end;
 function TSimpleChart.WorldToScreen(const Value: TPointF): TPointF;
 var
   plotRect: TRectF;
+  MinX, MaxX, PointX: Double;
 begin
   plotRect := TRectF.Create(
     MarginLeft,
@@ -513,7 +536,22 @@ begin
     Width - MarginRight,
     Height - MarginBottom
   );
-  Result.X := plotRect.Left + (Value.X - FXMin) / (FXMax - FXMin) * plotRect.Width;
+  if FLogarithmicX and (FXMin > 0) and (FXMax > FXMin) and (Value.X > 0) then
+  begin
+    MinX := Log10(FXMin);
+    MaxX := Log10(FXMax);
+    PointX := Log10(Value.X);
+  end
+  else
+  begin
+    MinX := FXMin;
+    MaxX := FXMax;
+    PointX := Value.X;
+  end;
+  if SameValue(MinX, MaxX) then
+    Result.X := plotRect.Left
+  else
+    Result.X := plotRect.Left + (PointX - MinX) / (MaxX - MinX) * plotRect.Width;
   Result.Y := plotRect.Bottom - (Value.Y - FYMin) / (FYMax - FYMin) * plotRect.Height;
 end;
 
@@ -560,6 +598,34 @@ begin
   end;
 end;
 
+// Возвращает физические значения меток 1/2/5 для логарифмической оси X.
+function TSimpleChart.GetLogTicks(minVal, maxVal: Double): TArray<Double>;
+const
+  Mantissas: array[0..2] of Double = (1, 2, 5);
+var
+  ExponentValue, I: Integer;
+  TickValue: Double;
+  List: TList<Double>;
+begin
+  SetLength(Result, 0);
+  if (minVal <= 0) or (maxVal <= minVal) then
+    Exit;
+
+  List := TList<Double>.Create;
+  try
+    for ExponentValue := Floor(Log10(minVal)) to Ceil(Log10(maxVal)) do
+      for I := Low(Mantissas) to High(Mantissas) do
+      begin
+        TickValue := Mantissas[I] * Power(10, ExponentValue);
+        if (TickValue >= minVal) and (TickValue <= maxVal) then
+          List.Add(TickValue);
+      end;
+    Result := List.ToArray;
+  finally
+    List.Free;
+  end;
+end;
+
 // -----------------------------------------------------------------------------
 // Отрисовка осей, сетки, подписей и заголовков
 // -----------------------------------------------------------------------------
@@ -602,7 +668,10 @@ begin
   if FShowGrid then
   begin
     Canvas.Stroke.Color := FGridColor;
-    xTicks := GetNiceTicks(FXMin, FXMax, 8);
+    if FLogarithmicX then
+      xTicks := GetLogTicks(FXMin, FXMax)
+    else
+      xTicks := GetNiceTicks(FXMin, FXMax, 8);
     for i := 0 to Length(xTicks) - 1 do
     begin
       tickVal := xTicks[i];
@@ -614,7 +683,7 @@ begin
     for i := 0 to Length(yTicks) - 1 do
     begin
       tickVal := yTicks[i];
-      p1 := WorldToScreen(TPointF.Create(0, tickVal));
+      p1 := WorldToScreen(TPointF.Create(FXMin, tickVal));
       p2 := TPointF.Create(plotRect.Right, p1.Y);
       Canvas.DrawLine(p1, p2, 1);
     end;
@@ -650,7 +719,10 @@ begin
   end;
 
   // X-метки
-  xTicks := GetNiceTicks(FXMin, FXMax, 8);
+  if FLogarithmicX then
+    xTicks := GetLogTicks(FXMin, FXMax)
+  else
+    xTicks := GetNiceTicks(FXMin, FXMax, 8);
   for i := 0 to Length(xTicks) - 1 do
   begin
     tickVal := xTicks[i];
@@ -923,6 +995,18 @@ begin
   begin
     FAutoRangeY := Value;
     if FAutoRangeY then
+      UpdateRanges;
+    Repaint;
+  end;
+end;
+
+// Переключает преобразование координат и метки оси X без изменения исходных данных серий.
+procedure TSimpleChart.SetLogarithmicX(const Value: Boolean);
+begin
+  if FLogarithmicX <> Value then
+  begin
+    FLogarithmicX := Value;
+    if FAutoRangeX then
       UpdateRanges;
     Repaint;
   end;

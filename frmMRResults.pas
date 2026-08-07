@@ -665,14 +665,37 @@ end;
 function TFrameMRResults.GetDisplayPointKey(AGroup: TDisplayPointGroup): string;
 var
   Participant: TDisplayPointParticipant;
+  KeyParts: TStringList;
+  PartKey: string;
 begin
   Result := 'point:';
-  if AGroup = nil then Exit;
-  if AGroup.ScenarioPoint <> nil then
-    Result := Result + 'scenario=' + AGroup.ScenarioPoint.UUID;
-  for Participant in AGroup.Participants do
-    Result := Result + '|participant=' + Participant.DeviceUUID + ':' +
-      Participant.DeviceChannelUUID + ':' + Participant.SourcePointUUID;
+  if AGroup = nil then
+    Exit;
+
+  // UUID сценарной точки пересоздаётся кнопкой формирования точек и поэтому
+  // не может быть идентификатором визуального столбца.
+  KeyParts := TStringList.Create;
+  try
+    KeyParts.Sorted := True;
+    KeyParts.Duplicates := dupAccept;
+    for Participant in AGroup.Participants do
+    begin
+      PartKey := LowerCase(Trim(Participant.DeviceUUID)) + ':' +
+        LowerCase(Trim(Participant.DeviceChannelUUID)) + ':' +
+        LowerCase(Trim(Participant.SourcePointUUID));
+      if PartKey <> '::' then
+        KeyParts.Add(PartKey);
+    end;
+    for PartKey in KeyParts do
+      Result := Result + '|participant=' + IntToStr(Length(PartKey)) + ':' +
+        PartKey;
+  finally
+    KeyParts.Free;
+  end;
+
+  if (Result = 'point:') and (AGroup.ScenarioPoint <> nil) then
+    Result := Result + 'name=' + LowerCase(Trim(AGroup.ScenarioPoint.Name)) +
+      '|num=' + IntToStr(AGroup.ScenarioPoint.Num);
 end;
 
 function TFrameMRResults.HasCurrentMeasurementPoints: Boolean;
@@ -780,10 +803,15 @@ begin
               Break;
             end;
         Suffix := '';
-        if FDisplayPoints[I].ScenarioPoint <> nil then
-          Suffix := Copy(FDisplayPoints[I].ScenarioPoint.UUID, 1, 8)
-        else if FDisplayPoints[I].Participants.Count > 0 then
-          Suffix := FDisplayPoints[I].Participants[0].DeviceUUID;
+        if FDisplayPoints[I].Participants.Count > 0 then
+        begin
+          Suffix := Copy(FDisplayPoints[I].Participants[0].SourcePointUUID, 1, 8);
+          if Suffix = '' then
+            Suffix := Copy(FDisplayPoints[I].Participants[0].DeviceUUID, 1, 8);
+        end
+        else if FDisplayPoints[I].ScenarioPoint <> nil then
+          Suffix := LowerCase(Trim(FDisplayPoints[I].ScenarioPoint.Name)) + '-' +
+            IntToStr(FDisplayPoints[I].ScenarioPoint.Num);
         if Device <> nil then
           if Trim(Device.SerialNumber) <> '' then
             Suffix := Device.SerialNumber
@@ -800,7 +828,7 @@ end;
 
 procedure TFrameMRResults.RefreshRows;
 begin
-  TGridLayoutManager.SetRowCount(GridMRResults, FRows.Count, True);
+  TGridLayoutManager.SetRowCount(GridMRResults, FRows.Count);
 end;
 
 function TFrameMRResults.GetRowChannel(const ARow: Integer): TChannel;

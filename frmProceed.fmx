@@ -910,6 +910,31 @@ object FrameProceed: TFrameProceed
   object PopupMenuChart: TPopupMenu
     Left = 922
     Top = 328
+    object MenuItemChartSettings: TMenuItem
+      Text = 'Настройки'
+      object MenuItemChartLineMode: TMenuItem
+        Text = 'Линия средних значений'
+        object MenuItemChartLinePchip: TMenuItem
+          Text = 'PCHIP по log(Q)'
+          OnClick = ChartLineModeMenuClick
+        end
+        object MenuItemChartLineSegments: TMenuItem
+          Text = 'Прямые отрезки'
+          OnClick = ChartLineModeMenuClick
+        end
+      end
+      object MenuItemChartScale: TMenuItem
+        Text = 'Шкала расхода'
+        object MenuItemChartScaleLog: TMenuItem
+          Text = 'Логарифмическая'
+          OnClick = ChartScaleMenuClick
+        end
+        object MenuItemChartScaleLinear: TMenuItem
+          Text = 'Обычная'
+          OnClick = ChartScaleMenuClick
+        end
+      end
+    end
     object MenuItemChartDevices: TMenuItem
       Locked = True
       Text = #1055#1088#1080#1073#1086#1088#1099

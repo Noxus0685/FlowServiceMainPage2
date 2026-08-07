@@ -36,4 +36,4 @@ def test_cleanup_confirmation_report_logging_and_refresh():
 
 
 def test_version_bumped_to_1_0_74():
-    assert "APP_VERSION = '1.0.75'" in VERSION
+    assert "APP_VERSION = '1.0.77'" in VERSION
