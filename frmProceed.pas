@@ -565,6 +565,8 @@ begin
   RegisterStableGrid(Self, GridCoefs, Name);
   if FResultsGridLayoutState = nil then
     FResultsGridLayoutState := TGridLayoutState.Create;
+  FResultsGridLayoutState.ConfigureWidthControl(GridResults,
+    ClassName + '.' + GridResults.Name);
   FWorkTableManager := WorkTableManager;
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
 
@@ -612,6 +614,7 @@ begin
   if GridResults <> nil then
   begin
     GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
+    GridResults.OnMouseDown := GridResultsMouseDown;
     // Подключаем существующий обработчик Hint для ячеек таблицы результатов.
     GridResults.OnMouseMove := GridResultsMouseMove;
     GridResults.OnMouseUp := GridColumnLayoutMouseUp;
@@ -4205,12 +4208,16 @@ var
         FloatToStr(FResultPointColumns[DynamicPointIndex].TargetFlow);
       Definitions.Add(TGridColumnDefinition.Create(DynamicKey,
         FormatPointHeader(FResultPointColumns[DynamicPointIndex].Header),
-        TStringColumn, 125, True, True));
+        TStringColumn, C_DYNAMIC_COLUMN_WIDTH, True, True));
     end;
   end;
 begin
   if FResultsGridLayoutState = nil then
+  begin
     FResultsGridLayoutState := TGridLayoutState.Create;
+    FResultsGridLayoutState.ConfigureWidthControl(GridResults,
+      ClassName + '.' + GridResults.Name);
+  end;
   Definitions := TGridColumnDefinitions.Create(True);
   try
     { Describe the complete visual structure, but mark resource columns as
@@ -6549,6 +6556,12 @@ procedure TFrameProceed.GridResultsMouseDown(Sender: TObject; Button: TMouseButt
 var
   Col, Row: Integer;
 begin
+  if Button = TMouseButton.mbLeft then
+  begin
+    if FResultsGridLayoutState <> nil then
+      FResultsGridLayoutState.BeginManualColumnResize(GridResults, X, Y);
+    Exit;
+  end;
   if Button <> TMouseButton.mbRight then
     Exit;
 
@@ -6917,9 +6930,19 @@ end;
 procedure TFrameProceed.GridColumnLayoutMouseUp(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 begin
-  // После изменения мышью сохраняем ширину, порядок и видимость по Name столбца.
-  if (not FApplyingGridColumnsLayout) and
-     ((Sender = GridDataPoints) or (Sender = GridResults)) then
+  if FApplyingGridColumnsLayout then
+    Exit;
+
+  { GridResults persists widths only after a confirmed header-divider drag. }
+  if Sender = GridResults then
+  begin
+    if (FResultsGridLayoutState <> nil) and
+       FResultsGridLayoutState.EndManualColumnResize then
+      SaveLayoutSettingsToWorkTable;
+    Exit;
+  end;
+
+  if Sender = GridDataPoints then
     SaveLayoutSettingsToWorkTable;
 end;
 
