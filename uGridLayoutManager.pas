@@ -58,6 +58,8 @@ type
     procedure SaveApprovedWidth(const AColumnKey: string;
       const AWidth: Single);
     function ValidateColumnWidth(const AWidth: Single): Single;
+    { Returns True only while the user is dragging this column divider. }
+    function IsUserColumnResize(AColumn: TColumn): Boolean;
     procedure ColumnResizeHandler(Sender: TObject);
     procedure RestoreApprovedColumnWidth(AColumn: TColumn;
       const AColumnKey, AContext: string);
@@ -72,6 +74,10 @@ type
     procedure ConfigureWidthControl(AGrid: TGrid; const AGridKey: string);
     { Starts manual resize only when the left mouse button hits a header divider. }
     procedure BeginManualColumnResize(AGrid: TGrid; const X, Y: Single);
+    { Registers all existing named columns of the configured grid. }
+    procedure RegisterExistingColumns;
+    { Persists the final approved width after the active mouse drag has ended. }
+    function FinishPendingManualResize: Boolean;
     { Confirms and persists a width only after the tracked drag ends. }
     function EndManualColumnResize: Boolean;
     property LastSignature: string read FLastSignature;
@@ -95,10 +101,12 @@ implementation
 
 uses
   System.Math,
+  Winapi.Windows,
   uDebugLog;
 
 const
   CWidthEpsilon = 0.01;
+  CDividerHitTolerance = 12.0;
 
 constructor TGridColumnDefinition.Create(const AKey, AHeader: string;
   AColumnClass: TClass; const AInitialWidth: Single; const AReadOnly,
@@ -284,6 +292,29 @@ begin
     [FGridKey, AColumnKey, RejectedWidth, ApprovedWidth, AContext]));
 end;
 
+function TGridLayoutState.IsUserColumnResize(
+  AColumn: TColumn): Boolean;
+var
+  CursorPos: TPoint;
+  CursorScreen, DividerScreen: TPointF;
+begin
+  Result := False;
+  if (AColumn = nil) or (FGrid = nil) or FApplying or FRestoringWidth or
+     FApplyingInitialWidths or not FColumnKeys.ContainsKey(AColumn) then
+    Exit;
+  if GetAsyncKeyState(VK_LBUTTON) >= 0 then
+    Exit;
+  if not GetCursorPos(CursorPos) then
+    Exit;
+
+  CursorScreen := PointF(CursorPos.X, CursorPos.Y);
+  DividerScreen := AColumn.LocalToScreen(PointF(AColumn.Width, 0));
+  Result :=
+    (Abs(CursorScreen.X - DividerScreen.X) <= CDividerHitTolerance) and
+    (CursorScreen.Y >= DividerScreen.Y) and
+    (CursorScreen.Y <= DividerScreen.Y + FGrid.Height);
+end;
+
 procedure TGridLayoutState.ColumnResizeHandler(Sender: TObject);
 var
   Column: TColumn;
@@ -291,7 +322,7 @@ var
   PreviousHandler: TNotifyEvent;
   ApprovedWidth: Single;
 begin
-  if FRestoringWidth or FApplyingInitialWidths then
+  if FRestoringWidth or FApplyingInitialWidths or FApplying then
     Exit;
   if not (Sender is TColumn) then
     Exit;
@@ -302,10 +333,13 @@ begin
   if not FColumnKeys.TryGetValue(Column, ColumnKey) then
     Exit;
 
-  if FManualResizeActive and (Column = FTrackedColumn) then
+  if IsUserColumnResize(Column) then
   begin
+    FManualResizeActive := True;
+    FTrackedColumn := Column;
     ApprovedWidth := ValidateColumnWidth(Column.Width);
     FApprovedWidths.AddOrSetValue(ColumnKey, ApprovedWidth);
+    SaveApprovedWidth(ColumnKey, ApprovedWidth);
     if not SameValue(Column.Width, ApprovedWidth, CWidthEpsilon) then
     begin
       FRestoringWidth := True;
@@ -315,6 +349,9 @@ begin
         FRestoringWidth := False;
       end;
     end;
+    DebugLog(Format(
+      'GridWidthControl manual resize Grid="%s" Column="%s" Width=%.4f',
+      [FGridKey, ColumnKey, ApprovedWidth]));
   end
   else
     RestoreApprovedColumnWidth(Column, ColumnKey, 'OnResize');
@@ -352,7 +389,28 @@ begin
   end;
 end;
 
-function TGridLayoutState.EndManualColumnResize: Boolean;
+procedure TGridLayoutState.RegisterExistingColumns;
+var
+  I: Integer;
+  Column: TColumn;
+  ColumnKey: string;
+begin
+  if FGrid = nil then
+    Exit;
+  for I := 0 to FGrid.ColumnCount - 1 do
+  begin
+    Column := FGrid.Columns[I];
+    if Column = nil then
+      Continue;
+    ColumnKey := Trim(Column.Name);
+    if ColumnKey = '' then
+      Continue;
+    ApplyInitialWidth(ColumnKey, Column, Column.Width);
+    RegisterColumn(ColumnKey, Column);
+  end;
+end;
+
+function TGridLayoutState.FinishPendingManualResize: Boolean;
 var
   ColumnKey: string;
   ApprovedWidth: Single;
@@ -370,6 +428,13 @@ begin
   end;
   FManualResizeActive := False;
   FTrackedColumn := nil;
+  if FGrid <> nil then
+    FGrid.Repaint;
+end;
+
+function TGridLayoutState.EndManualColumnResize: Boolean;
+begin
+  Result := FinishPendingManualResize;
 end;
 
 class function TGridLayoutManager.BuildSignature(
