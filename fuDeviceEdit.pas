@@ -1523,9 +1523,12 @@ end;
 
 procedure TFormDeviceEditor.InitCoefsTab;
 
-  function NewCol(const AHeader: string; const AWidth: Single): TStringColumn;
+  { Creates one coefficient column with a stable persistent identity. }
+  function NewCol(const AName, AHeader: string;
+    const AWidth: Single): TStringColumn;
   begin
     Result := TStringColumn.Create(FGridCoefs);
+    Result.Name := AName;
     Result.Header := AHeader;
     Result.Width := AWidth;
     Result.Parent := FGridCoefs;
@@ -1600,7 +1603,7 @@ begin
   FComboCoefTable.OnChange := ComboCoefTableChange;
 
   FGridCoefs := TGrid.Create(FTabItemCoefs);
-  RegisterStableGrid(Self, FGridCoefs, Name);
+  FGridCoefs.Name := 'GridCoefs';
   FGridCoefs.Parent := FTabItemCoefs;
   FGridCoefs.Align := TAlignLayout.Client;
   FGridCoefs.Options := FGridCoefs.Options + [TGridOption.Editing];
@@ -1608,13 +1611,14 @@ begin
   FGridCoefs.OnSetValue := GridCoefsSetValue;
   FGridCoefs.OnKeyDown := GridCoefsKeyDown;
 
-  NewCol('Наименование', 170);
-  NewCol('Value', 90);
-  NewCol('Arg', 90);
-  NewCol('QFrom', 90);
-  NewCol('QTo', 90);
-  NewCol('K', 90);
-  NewCol('b', 90);
+  NewCol('StringColumnCoefName', 'Наименование', 170);
+  NewCol('StringColumnCoefValue', 'Value', 90);
+  NewCol('StringColumnCoefArg', 'Arg', 90);
+  NewCol('StringColumnCoefQFrom', 'QFrom', 90);
+  NewCol('StringColumnCoefQTo', 'QTo', 90);
+  NewCol('StringColumnCoefK', 'K', 90);
+  NewCol('StringColumnCoefB', 'b', 90);
+  RegisterStableGrid(Self, FGridCoefs, Name);
 
   FTabControlMain.ActiveTab := FTabItemDevice;
   FCoefsTabInitialized := True;
