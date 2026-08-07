@@ -130,8 +130,8 @@ end;
 procedure TGridDeferredWidthRestore.Schedule(
   const AColumns: TArray<TColumn>; const AWidths: TArray<Single>);
 begin
-  FColumns := Copy(AColumns);
-  FWidths := Copy(AWidths);
+  FColumns := Copy(AColumns, 0, Length(AColumns));
+  FWidths := Copy(AWidths, 0, Length(AWidths));
   FRemainingPasses := CDeferredRestorePasses;
   FStablePasses := 0;
   Enabled := Length(FColumns) > 0;
