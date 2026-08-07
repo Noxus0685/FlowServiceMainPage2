@@ -50,6 +50,7 @@ type
     FManualResizeActive: Boolean;
     FRestoringWidth: Boolean;
     FApplyingInitialWidths: Boolean;
+    FSyncingPresentation: Boolean;
     FTrackedColumn: TColumn;
     FGrid: TGrid;
     FGridKey: string;
@@ -62,6 +63,8 @@ type
     { Returns True only while the user is dragging this column divider. }
     function IsUserColumnResize(AColumn: TColumn): Boolean;
     procedure ColumnResizeHandler(Sender: TObject);
+    { Rebuilds FMX grid presentation geometry after an accepted column width. }
+    procedure RefreshGridPresentation;
     procedure RestoreApprovedColumnWidth(AColumn: TColumn;
       const AColumnKey, AContext: string);
     procedure RegisterColumn(const AColumnKey: string; AColumn: TColumn);
@@ -107,7 +110,6 @@ uses
 
 const
   CWidthEpsilon = 0.01;
-  CDividerHitTolerance = 12.0;
 
 constructor TGridColumnDefinition.Create(const AKey, AHeader: string;
   AColumnClass: TClass; const AInitialWidth: Single; const AReadOnly,
@@ -288,8 +290,7 @@ begin
   finally
     FRestoringWidth := False;
   end;
-  if FGrid <> nil then
-    FGrid.Repaint;
+  RefreshGridPresentation;
   DebugLog(Format(
     'GridWidthControl restored Grid="%s" ColumnKey="%s" Rejected=%.4f Approved=%.4f Context="%s"',
     [FGridKey, AColumnKey, RejectedWidth, ApprovedWidth, AContext]));
@@ -297,28 +298,30 @@ end;
 
 function TGridLayoutState.IsUserColumnResize(
   AColumn: TColumn): Boolean;
-var
-  CursorPos: TPoint;
-  CursorScreen, DividerScreen: TPointF;
-  GridTopLeft, GridBottomRight: TPointF;
 begin
-  Result := False;
-  if (AColumn = nil) or (FGrid = nil) or FApplying or FRestoringWidth or
-     FApplyingInitialWidths or not FColumnKeys.ContainsKey(AColumn) then
-    Exit;
-  if GetAsyncKeyState(VK_LBUTTON) >= 0 then
-    Exit;
-  if not GetCursorPos(CursorPos) then
+  Result :=
+    (AColumn <> nil) and
+    (FGrid <> nil) and
+    not FApplying and
+    not FRestoringWidth and
+    not FApplyingInitialWidths and
+    not FSyncingPresentation and
+    FColumnKeys.ContainsKey(AColumn) and
+    (GetAsyncKeyState(VK_LBUTTON) < 0);
+end;
+
+procedure TGridLayoutState.RefreshGridPresentation;
+begin
+  if (FGrid = nil) or FSyncingPresentation then
     Exit;
 
-  CursorScreen := PointF(CursorPos.X, CursorPos.Y);
-  DividerScreen := AColumn.LocalToScreen(PointF(AColumn.Width, 0));
-  GridTopLeft := FGrid.LocalToScreen(PointF(0, 0));
-  GridBottomRight := FGrid.LocalToScreen(PointF(FGrid.Width, FGrid.Height));
-  Result :=
-    (Abs(CursorScreen.X - DividerScreen.X) <= CDividerHitTolerance) and
-    (CursorScreen.Y >= Min(GridTopLeft.Y, GridBottomRight.Y)) and
-    (CursorScreen.Y <= Max(GridTopLeft.Y, GridBottomRight.Y));
+  FSyncingPresentation := True;
+  try
+    FGrid.Model.ContentChanged;
+    FGrid.Repaint;
+  finally
+    FSyncingPresentation := False;
+  end;
 end;
 
 procedure TGridLayoutState.ColumnResizeHandler(Sender: TObject);
@@ -328,7 +331,8 @@ var
   PreviousHandler: TNotifyEvent;
   ApprovedWidth: Single;
 begin
-  if FRestoringWidth or FApplyingInitialWidths or FApplying then
+  if FRestoringWidth or FApplyingInitialWidths or FApplying or
+     FSyncingPresentation then
     Exit;
   if not (Sender is TColumn) then
     Exit;
@@ -355,8 +359,7 @@ begin
         FRestoringWidth := False;
       end;
     end;
-    if FGrid <> nil then
-      FGrid.Repaint;
+    RefreshGridPresentation;
     DebugLog(Format(
       'GridWidthControl manual resize Grid="%s" Column="%s" Width=%.4f',
       [FGridKey, ColumnKey, ApprovedWidth]));
