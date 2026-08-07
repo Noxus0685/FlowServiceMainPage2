@@ -2063,10 +2063,10 @@ begin
 end;
 
 // Перестраивает график: исходные измерения рисуются маркерами,
-// а линия проходит через средние точки кусочно-гиперболическими участками.
+// а тенденция погрешности отображается устойчивой полиномиальной регрессией.
 procedure TFrameProceed.UpdateSessionErrorChart;
 const
-  CChartCurvePointsPerInterval = 24;
+  CChartPolynomialSamples = 96;
 var
   Device, SelectedDevice: TDevice;
   Session: TSessionSpillage;
@@ -2079,11 +2079,104 @@ var
   Sorter: IComparer<TPointF>;
   P1: TPointF;
   GroupKey, LegendBase, FlowUnitName: string;
-  I, J, DeviceIndex: Integer;
-  SumX, SumY, Z, X, Y: Double;
+  I, J, DeviceIndex, PolynomialDegree: Integer;
+  SumX, SumY, X, Y: Double;
   FlowValue, BaseFlowValue: Double;
   ChartMinX, ChartMaxX, ChartPaddingX: Double;
+  PolynomialCoefficients: TArray<Double>;
   UseVolumeFlow: Boolean;
+
+  function FitPolynomial(const APoints: TList<TPointF>;
+    const ADegree: Integer; out ACoefficients: TArray<Double>): Boolean;
+  var
+    Matrix: TArray<TArray<Double>>;
+    Powers: TArray<Double>;
+    Row, Column, Power, PivotRow, PointIndex: Integer;
+    PivotValue, Factor, Scale, NormalizedX: Double;
+  begin
+    Result := False;
+    SetLength(ACoefficients, 0);
+    if (APoints = nil) or (ADegree < 1) or
+       (APoints.Count < ADegree + 2) then
+      Exit;
+
+    // Нормализация расхода улучшает обусловленность нормальных уравнений,
+    // когда измерительные точки различаются на несколько порядков.
+    Scale := Max(Abs(APoints[0].X), Abs(APoints[APoints.Count - 1].X));
+    if SameValue(Scale, 0.0) then
+      Exit;
+    SetLength(Matrix, ADegree + 1, ADegree + 2);
+    SetLength(Powers, ADegree * 2 + 1);
+    for PointIndex := 0 to APoints.Count - 1 do
+    begin
+      NormalizedX := APoints[PointIndex].X / Scale;
+      Powers[0] := 1;
+      for Power := 1 to High(Powers) do
+        Powers[Power] := Powers[Power - 1] * NormalizedX;
+      for Row := 0 to ADegree do
+      begin
+        for Column := 0 to ADegree do
+          Matrix[Row][Column] := Matrix[Row][Column] + Powers[Row + Column];
+        Matrix[Row][ADegree + 1] := Matrix[Row][ADegree + 1] +
+          APoints[PointIndex].Y * Powers[Row];
+      end;
+    end;
+
+    for Column := 0 to ADegree do
+    begin
+      PivotRow := Column;
+      for Row := Column + 1 to ADegree do
+        if Abs(Matrix[Row][Column]) > Abs(Matrix[PivotRow][Column]) then
+          PivotRow := Row;
+      if SameValue(Matrix[PivotRow][Column], 0.0, 1E-12) then
+        Exit;
+      if PivotRow <> Column then
+        for Power := Column to ADegree + 1 do
+        begin
+          PivotValue := Matrix[Column][Power];
+          Matrix[Column][Power] := Matrix[PivotRow][Power];
+          Matrix[PivotRow][Power] := PivotValue;
+        end;
+      PivotValue := Matrix[Column][Column];
+      for Power := Column to ADegree + 1 do
+        Matrix[Column][Power] := Matrix[Column][Power] / PivotValue;
+      for Row := 0 to ADegree do
+        if Row <> Column then
+        begin
+          Factor := Matrix[Row][Column];
+          for Power := Column to ADegree + 1 do
+            Matrix[Row][Power] := Matrix[Row][Power] -
+              Factor * Matrix[Column][Power];
+        end;
+    end;
+
+    SetLength(ACoefficients, ADegree + 2);
+    ACoefficients[0] := Scale;
+    for Row := 0 to ADegree do
+    begin
+      ACoefficients[Row + 1] := Matrix[Row][ADegree + 1];
+      if IsNan(ACoefficients[Row + 1]) or
+         IsInfinite(ACoefficients[Row + 1]) then
+      begin
+        SetLength(ACoefficients, 0);
+        Exit;
+      end;
+    end;
+    Result := True;
+  end;
+
+  function EvaluatePolynomial(const ACoefficients: TArray<Double>;
+    const AX: Double): Double;
+  var
+    CoefficientIndex: Integer;
+  begin
+    Result := 0;
+    if Length(ACoefficients) < 3 then
+      Exit;
+    for CoefficientIndex := High(ACoefficients) downto 1 do
+      Result := Result * (AX / ACoefficients[0]) +
+        ACoefficients[CoefficientIndex];
+  end;
 
   procedure AddSpillagePoint(APoint: TPointSpillage);
   begin
@@ -2246,30 +2339,30 @@ begin
           for I := 0 to AveragePoints.Count - 1 do
             AverageSeries.AddPoint(AveragePoints[I].X, AveragePoints[I].Y);
 
-          LineSeries := Chart1.AddSeries(LegendBase + ' — средняя линия');
+          LineSeries := Chart1.AddSeries(LegendBase + ' — полином');
           LineSeries.Color := GetChartDeviceColor(Device, True, DeviceIndex);
           LineSeries.ShowLine := True;
           LineSeries.ShowMarkers := False;
           LineSeries.Thickness := 2;
 
-          // Строит между соседними средними точками участки Y = a + b / X.
-          // Каждый участок точно проходит через обе ограничивающие точки.
-          for J := 0 to AveragePoints.Count - 2 do
-            for I := 0 to CChartCurvePointsPerInterval do
+          // Три точки недостаточны для надёжной параболической регрессии:
+          // точная парабола между далеко разнесёнными расходами создаёт
+          // физически бессмысленный провал. Поэтому квадратичный полином
+          // используется только при четырёх и более средних точках.
+          if AveragePoints.Count >= 4 then
+            PolynomialDegree := 2
+          else
+            PolynomialDegree := 1;
+          if FitPolynomial(AveragePoints, PolynomialDegree,
+             PolynomialCoefficients) then
+            for I := 0 to CChartPolynomialSamples do
             begin
-              if (J > 0) and (I = 0) then
-                Continue;
-              Z := 1 / AveragePoints[J].X +
-                (1 / AveragePoints[J + 1].X -
-                 1 / AveragePoints[J].X) *
-                I / CChartCurvePointsPerInterval;
-              if SameValue(Z, 0.0) then
-                Continue;
-              X := 1 / Z;
-              Y := AveragePoints[J].Y +
-                (AveragePoints[J + 1].Y - AveragePoints[J].Y) *
-                I / CChartCurvePointsPerInterval;
-              LineSeries.AddPoint(X, Y);
+              X := AveragePoints[0].X +
+                (AveragePoints[AveragePoints.Count - 1].X -
+                 AveragePoints[0].X) * I / CChartPolynomialSamples;
+              Y := EvaluatePolynomial(PolynomialCoefficients, X);
+              if not IsNan(Y) and not IsInfinite(Y) then
+                LineSeries.AddPoint(X, Y);
             end;
           Inc(DeviceIndex);
         finally
