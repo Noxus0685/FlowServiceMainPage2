@@ -3256,15 +3256,16 @@ var
       Result := ADefault;
   end;
 
+  { Builds a stable physical-point key without using the measured flow of a repeat. }
   function BuildWithoutMergeGroupKey(const ADeviceUUID, ASourcePointUUID,
-    APointName: string; const AQavgEtalon: Double): string;
+    APointName: string): string;
   begin
     if Trim(ASourcePointUUID) <> '' then
       Result := AnsiUpperCase(Trim(ADeviceUUID)) + '|UUID:' +
         AnsiUpperCase(Trim(ASourcePointUUID))
     else
       Result := AnsiUpperCase(Trim(ADeviceUUID)) + '|POINT:' +
-        AnsiUpperCase(Trim(APointName)) + '|Q:' + FormatFloat('0.##########', AQavgEtalon);
+        AnsiUpperCase(Trim(APointName));
   end;
 
   function SelectBestSpillageByAbsoluteError(AItems: TList<TPointSpillage>): TPointSpillage;
@@ -3346,7 +3347,7 @@ begin
           SourcePointUUID := Trim(Spillage.DeviceTypeUUID);
           PointName := SpillageHeader(Spillage, Format('Q%d', [Groups.Count + 1]));
           GroupKey := BuildWithoutMergeGroupKey(DeviceUUID, SourcePointUUID,
-            PointName, Spillage.QavgEtalon);
+            PointName);
           if not Groups.TryGetValue(GroupKey, GroupSpillages) then
           begin
             GroupSpillages := TList<TPointSpillage>.Create;
