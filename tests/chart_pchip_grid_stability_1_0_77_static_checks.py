@@ -47,6 +47,20 @@ def test_simple_chart_maps_log_axis_without_changing_series_values():
     assert "function TSimpleChart.GetLogTicks" in CHART
 
 
+def test_chart_uses_one_shared_x_for_the_same_point_across_devices():
+    assert "function TryGetSpillageChartFlow" in PROCEED
+    assert "procedure CollectDeviceXGroups" in PROCEED
+    assert "SharedXByGroup: TDictionary<string, Double>" in PROCEED
+    assert "XValues.Add(SumX / XPair.Value.Count)" in PROCEED
+    assert "SharedXByGroup.TryGetValue(Pair.Key, SharedFlowValue)" in PROCEED
+
+
+def test_chart_draws_a_shared_x_label_only_once():
+    assert "function IsXLabelDrawn" in CHART
+    assert "if not IsXLabelDrawn(PointValue.X) then" in CHART
+    assert "ADrawnXLabels.Add(PointValue.X)" in CHART
+
+
 def test_measurement_result_columns_have_stable_keys_and_rows():
     key_body = method_body(MR_RESULTS, "TFrameMRResults", "GetDisplayPointKey")
     assert "ScenarioPoint.UUID" not in key_body
@@ -65,4 +79,4 @@ def test_grid_widths_are_never_changed_after_end_update():
 
 
 def test_version():
-    assert "APP_VERSION = '1.0.77'" in VERSION
+    assert "APP_VERSION = '1.0.78'" in VERSION
