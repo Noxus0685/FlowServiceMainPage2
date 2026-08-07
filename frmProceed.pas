@@ -3428,13 +3428,17 @@ procedure TFrameProceed.BuildSummaryColumnsWithMerge(const ADevices: TList<TDevi
 var
   Cols: TList<TProceedResultPointColumn>;
   ProcessingSpillages: TList<TPointSpillage>;
+  PhysicalPointGroups: TDictionary<string, TList<TPointSpillage>>;
+  PhysicalPointGroupKeys: TList<string>;
+  PhysicalPointGroup: TList<TPointSpillage>;
   Col: TProceedResultPointColumn;
   WT: TWorkTable;
   Run: TMeasurementRun;
   Device: TDevice;
-  Spillage, GroupSpillage: TPointSpillage;
+  Spillage, GroupSpillage, SelectedSpillage: TPointSpillage;
   ActiveSession: TSessionSpillage;
-  I, J, DevicesCount, SpillagesCount: Integer;
+  I, J, DevicesCount, SpillagesCount, SourceSpillagesCount: Integer;
+  DeviceUUID, PhysicalPointKey: string;
   Headers: string;
   RunPointsEmpty: Boolean;
   GroupNames, GroupFlows, GroupEtalons, GroupSpillageIDs: string;
@@ -3506,6 +3510,76 @@ var
       AKeys := AKeys + Key;
   end;
 
+  { Builds a stable identity for one physical device point across repeated spillages. }
+  function BuildPhysicalPointKey(AOwnerDevice: TDevice;
+    ASpillage: TPointSpillage): string;
+  var
+    OwnerDeviceUUID, PointUUID, PhysicalPointName: string;
+  begin
+    OwnerDeviceUUID := '';
+    if AOwnerDevice <> nil then
+      OwnerDeviceUUID := Trim(AOwnerDevice.UUID);
+    if (OwnerDeviceUUID = '') and (ASpillage <> nil) then
+      OwnerDeviceUUID := Trim(ASpillage.DeviceUUID);
+
+    PointUUID := '';
+    if ASpillage <> nil then
+      PointUUID := Trim(ASpillage.DeviceTypeUUID);
+
+    if PointUUID <> '' then
+      Result := AnsiUpperCase(OwnerDeviceUUID) + '|UUID:' +
+        AnsiUpperCase(PointUUID)
+    else
+    begin
+      PhysicalPointName := '';
+      if ASpillage <> nil then
+        PhysicalPointName := Trim(ASpillage.Name);
+      if PhysicalPointName <> '' then
+        Result := AnsiUpperCase(OwnerDeviceUUID) + '|POINT:' +
+          AnsiUpperCase(PhysicalPointName)
+      else if ASpillage <> nil then
+        Result := AnsiUpperCase(OwnerDeviceUUID) + '|NUM:' +
+          IntToStr(ASpillage.Num)
+      else
+        Result := AnsiUpperCase(OwnerDeviceUUID) + '|NONE';
+    end;
+  end;
+
+  { Selects the valid repeat with the minimum absolute error for column merging. }
+  function SelectBestPhysicalPointSpillage(
+    AItems: TList<TPointSpillage>): TPointSpillage;
+  var
+    Item: TPointSpillage;
+  begin
+    Result := nil;
+    if AItems = nil then
+      Exit;
+
+    for Item in AItems do
+      if (Result = nil) or (Abs(Item.Error) < Abs(Result.Error)) or
+         (SameValue(Abs(Item.Error), Abs(Result.Error), 1E-9) and
+          (Item.ID >= Result.ID)) then
+        Result := Item;
+  end;
+
+  { Returns the IDs of all repeats participating in one physical-point group. }
+  function BuildPhysicalPointSpillageIDs(
+    AItems: TList<TPointSpillage>): string;
+  var
+    Item: TPointSpillage;
+  begin
+    Result := '';
+    if AItems = nil then
+      Exit;
+
+    for Item in AItems do
+    begin
+      if Item = nil then
+        Continue;
+      AppendSpillageID(Result, Item);
+    end;
+  end;
+
   function SpillagePointErrorPercent(AOwnerDevice: TDevice;
     ASpillage: TPointSpillage): Double;
   begin
@@ -3521,6 +3595,8 @@ begin
   SetLength(FResultPointColumns, 0);
   Cols := TList<TProceedResultPointColumn>.Create;
   ProcessingSpillages := TList<TPointSpillage>.Create;
+  PhysicalPointGroups := TDictionary<string, TList<TPointSpillage>>.Create;
+  PhysicalPointGroupKeys := TList<string>.Create;
   try
     WT := ResolveManagerWorkTable(FWorkTableManager);
     Run := nil;
@@ -3528,6 +3604,7 @@ begin
       Run := TMeasurementRun(WT.MeasurementRun);
     RunPointsEmpty := (Run = nil) or (Run.Points = nil) or (Run.Points.Count = 0);
     DevicesCount := 0;
+    SourceSpillagesCount := 0;
 
     if ADevices <> nil then
       for Device in ADevices do
@@ -3539,11 +3616,52 @@ begin
         ActiveSession := GetActiveVisibleSession(Device);
         if (ActiveSession = nil) or (Device.Spillages = nil) then
           Continue;
+
         for Spillage in Device.Spillages do
-          if IsUsableSummarySpillage(Spillage) and
-             (Spillage.SessionID = ActiveSession.ID) then
-            ProcessingSpillages.Add(Spillage);
+        begin
+          if (not IsUsableSummarySpillage(Spillage)) or
+             (Spillage.SessionID <> ActiveSession.ID) then
+            Continue;
+
+          DeviceUUID := Trim(Device.UUID);
+          if (Trim(Spillage.DeviceUUID) <> '') and (DeviceUUID <> '') and
+             (not SameText(Trim(Spillage.DeviceUUID), DeviceUUID)) then
+            Continue;
+
+          Inc(SourceSpillagesCount);
+          PhysicalPointKey := BuildPhysicalPointKey(Device, Spillage);
+          if not PhysicalPointGroups.TryGetValue(PhysicalPointKey,
+            PhysicalPointGroup) then
+          begin
+            PhysicalPointGroup := TList<TPointSpillage>.Create;
+            PhysicalPointGroups.Add(PhysicalPointKey, PhysicalPointGroup);
+            PhysicalPointGroupKeys.Add(PhysicalPointKey);
+          end;
+          PhysicalPointGroup.Add(Spillage);
+        end;
       end;
+
+    for I := 0 to PhysicalPointGroupKeys.Count - 1 do
+    begin
+      PhysicalPointKey := PhysicalPointGroupKeys[I];
+      if not PhysicalPointGroups.TryGetValue(PhysicalPointKey,
+        PhysicalPointGroup) then
+        Continue;
+
+      SelectedSpillage :=
+        SelectBestPhysicalPointSpillage(PhysicalPointGroup);
+      if SelectedSpillage = nil then
+        Continue;
+
+      ProcessingSpillages.Add(SelectedSpillage);
+      ProtocolManager.AddMessage(pcProc, psForm, 'SummaryBestRepeatSelected',
+        'Выбрана лучшая проливка физической точки для построения merged-колонок',
+        Format('GroupKey=%s; RepeatCount=%d; SpillageIDs=%s; SelectedSpillageID=%d; SelectedError=%s',
+          [PhysicalPointKey, PhysicalPointGroup.Count,
+           BuildPhysicalPointSpillageIDs(PhysicalPointGroup),
+           SelectedSpillage.ID,
+           FormatResultErrorValue(SelectedSpillage.Error)]));
+    end;
 
     ProcessingSpillages.Sort(TComparer<TPointSpillage>.Construct(
       function(const Left, Right: TPointSpillage): Integer
@@ -3671,10 +3789,17 @@ begin
 
     ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingSummaryColumnsBuilt',
       'Построены колонки Summary обработки',
-      Format('MergeEnabled=%s; Source=Spillages; DevicesCount=%d; SpillagesCount=%d; MergedGroupsCount=%d; ColumnsCount=%d; ColumnHeaders=%s; FallbackMeasurementRunUsed=False; MeasurementRunPointsEmpty=%s; SummaryColumnsSource=ProcessingSpillages',
-        [BoolToStr(True, True), DevicesCount, SpillagesCount, Cols.Count,
-         Cols.Count, Headers, BoolToStr(RunPointsEmpty, True)]));
+      Format('MergeEnabled=%s; Source=Spillages; DevicesCount=%d; SourceSpillagesCount=%d; SelectedSpillagesCount=%d; MergedGroupsCount=%d; ColumnsCount=%d; ColumnHeaders=%s; FallbackMeasurementRunUsed=False; MeasurementRunPointsEmpty=%s; SummaryColumnsSource=BestPhysicalPointSpillages',
+        [BoolToStr(True, True), DevicesCount, SourceSpillagesCount,
+         SpillagesCount, Cols.Count, Cols.Count, Headers,
+         BoolToStr(RunPointsEmpty, True)]));
   finally
+    for I := 0 to PhysicalPointGroupKeys.Count - 1 do
+      if PhysicalPointGroups.TryGetValue(PhysicalPointGroupKeys[I],
+        PhysicalPointGroup) then
+        PhysicalPointGroup.Free;
+    PhysicalPointGroupKeys.Free;
+    PhysicalPointGroups.Free;
     ProcessingSpillages.Free;
     Cols.Free;
   end;
