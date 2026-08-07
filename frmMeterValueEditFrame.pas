@@ -29,6 +29,7 @@ uses
   System.UITypes,
   uBaseProcedures,
   uGridLayoutManager,
+  uGridStabilityRegistry,
   uMeterValue, FMX.Grid.Style, FMX.ScrollBox, FMX.SimpleChart, uDebugLog;
 
 type
@@ -357,6 +358,7 @@ begin
   FTestStableCandidateSinceMs := 0;
   FTestStabilityConfirmed := False;
   BuildUI;
+  RegisterStableGrid(Self, GridSamples, Name);
   ClearAnalysisDisplay;
 end;
 
