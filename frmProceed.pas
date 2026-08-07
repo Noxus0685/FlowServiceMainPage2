@@ -2062,14 +2062,11 @@ begin
   end;
 end;
 
-// Перестраивает график: исходные измерения и средние точки сохраняются
-// отдельными сериями, а линия показывает полиномиальную аппроксимацию средних точек.
+// Перестраивает график: исходные измерения рисуются маркерами,
+// а тенденция погрешности отображается устойчивой полиномиальной регрессией.
 procedure TFrameProceed.UpdateSessionErrorChart;
 const
-  CChartPolynomialMaxDegree = 3;
-  CChartPolynomialSampleCount = 72;
-type
-  TDoubleMatrix = TArray<TArray<Double>>;
+  CChartPolynomialSamples = 96;
 var
   Device, SelectedDevice: TDevice;
   Session: TSessionSpillage;
@@ -2083,97 +2080,86 @@ var
   P1: TPointF;
   PolynomialCoefficients: TArray<Double>;
   GroupKey, LegendBase, FlowUnitName: string;
-  I, J, PolynomialDegree, DeviceIndex: Integer;
-  SumX, SumY, Z, X, Y: Double;
+  I, J, DeviceIndex, PolynomialDegree: Integer;
+  SumX, SumY, X, Y: Double;
   FlowValue, BaseFlowValue: Double;
   ChartMinX, ChartMaxX, ChartPaddingX: Double;
+  PolynomialCoefficients: TArray<Double>;
   UseVolumeFlow: Boolean;
 
-  function TryCalculatePolynomialCoefficients(const APoints: TList<TPointF>;
-    ADegree: Integer; out ACoefficients: TArray<Double>): Boolean;
-  const
-    CPivotEpsilon = 1E-12;
+  function FitPolynomial(const APoints: TList<TPointF>;
+    const ADegree: Integer; out ACoefficients: TArray<Double>): Boolean;
   var
-    Matrix: TDoubleMatrix;
+    Matrix: TArray<TArray<Double>>;
     Powers: TArray<Double>;
-    Row, Col, K, PivotRow, Size: Integer;
-    Scale, Pivot, Factor, Value, NormalizedX, MinX, MaxX: Double;
+    Row, Column, Power, PivotRow, PointIndex: Integer;
+    PivotValue, Factor, Scale, NormalizedX: Double;
   begin
     Result := False;
-    ACoefficients := nil;
-    if (APoints = nil) or (APoints.Count = 0) or (ADegree < 0) or
-       (APoints.Count < ADegree + 1) then
+    SetLength(ACoefficients, 0);
+    if (APoints = nil) or (ADegree < 1) or
+       (APoints.Count < ADegree + 2) then
       Exit;
 
-    MinX := APoints[0].X;
-    MaxX := APoints[APoints.Count - 1].X;
-    Scale := MaxX - MinX;
-    if (ADegree > 0) and (SameValue(Scale, 0.0) or IsNan(Scale) or
-       IsInfinite(Scale)) then
+    // Нормализация расхода улучшает обусловленность нормальных уравнений,
+    // когда измерительные точки различаются на несколько порядков.
+    Scale := Max(Abs(APoints[0].X), Abs(APoints[APoints.Count - 1].X));
+    if SameValue(Scale, 0.0) then
       Exit;
-
-    Size := ADegree + 1;
-    SetLength(Matrix, Size);
-    for Row := 0 to Size - 1 do
-      SetLength(Matrix[Row], Size + 1);
-    SetLength(Powers, 2 * ADegree + 1);
-
-    for K := 0 to APoints.Count - 1 do
+    SetLength(Matrix, ADegree + 1, ADegree + 2);
+    SetLength(Powers, ADegree * 2 + 1);
+    for PointIndex := 0 to APoints.Count - 1 do
     begin
-      if IsNan(APoints[K].X) or IsInfinite(APoints[K].X) or
-         IsNan(APoints[K].Y) or IsInfinite(APoints[K].Y) then
-        Exit;
-      if ADegree = 0 then
-        NormalizedX := 0
-      else
-        NormalizedX := 2 * (APoints[K].X - MinX) / Scale - 1;
+      NormalizedX := APoints[PointIndex].X / Scale;
       Powers[0] := 1;
-      for Col := 1 to 2 * ADegree do
-        Powers[Col] := Powers[Col - 1] * NormalizedX;
+      for Power := 1 to High(Powers) do
+        Powers[Power] := Powers[Power - 1] * NormalizedX;
       for Row := 0 to ADegree do
       begin
-        for Col := 0 to ADegree do
-          Matrix[Row][Col] := Matrix[Row][Col] + Powers[Row + Col];
-        Matrix[Row][Size] := Matrix[Row][Size] +
-          APoints[K].Y * Powers[Row];
+        for Column := 0 to ADegree do
+          Matrix[Row][Column] := Matrix[Row][Column] + Powers[Row + Column];
+        Matrix[Row][ADegree + 1] := Matrix[Row][ADegree + 1] +
+          APoints[PointIndex].Y * Powers[Row];
       end;
     end;
 
-    // Решение нормальной системы с выбором главного элемента.
-    for Col := 0 to Size - 1 do
+    for Column := 0 to ADegree do
     begin
-      PivotRow := Col;
-      for Row := Col + 1 to Size - 1 do
-        if Abs(Matrix[Row][Col]) > Abs(Matrix[PivotRow][Col]) then
+      PivotRow := Column;
+      for Row := Column + 1 to ADegree do
+        if Abs(Matrix[Row][Column]) > Abs(Matrix[PivotRow][Column]) then
           PivotRow := Row;
-      Pivot := Matrix[PivotRow][Col];
-      if IsNan(Pivot) or IsInfinite(Pivot) or (Abs(Pivot) <= CPivotEpsilon) then
+      if SameValue(Matrix[PivotRow][Column], 0.0, 1E-12) then
         Exit;
-      if PivotRow <> Col then
-        for K := Col to Size do
+      if PivotRow <> Column then
+        for Power := Column to ADegree + 1 do
         begin
-          Value := Matrix[Col][K];
-          Matrix[Col][K] := Matrix[PivotRow][K];
-          Matrix[PivotRow][K] := Value;
+          PivotValue := Matrix[Column][Power];
+          Matrix[Column][Power] := Matrix[PivotRow][Power];
+          Matrix[PivotRow][Power] := PivotValue;
         end;
-      for Row := Col + 1 to Size - 1 do
-      begin
-        Factor := Matrix[Row][Col] / Matrix[Col][Col];
-        for K := Col to Size do
-          Matrix[Row][K] := Matrix[Row][K] - Factor * Matrix[Col][K];
-      end;
+      PivotValue := Matrix[Column][Column];
+      for Power := Column to ADegree + 1 do
+        Matrix[Column][Power] := Matrix[Column][Power] / PivotValue;
+      for Row := 0 to ADegree do
+        if Row <> Column then
+        begin
+          Factor := Matrix[Row][Column];
+          for Power := Column to ADegree + 1 do
+            Matrix[Row][Power] := Matrix[Row][Power] -
+              Factor * Matrix[Column][Power];
+        end;
     end;
 
-    SetLength(ACoefficients, Size);
-    for Row := Size - 1 downto 0 do
+    SetLength(ACoefficients, ADegree + 2);
+    ACoefficients[0] := Scale;
+    for Row := 0 to ADegree do
     begin
-      Value := Matrix[Row][Size];
-      for Col := Row + 1 to Size - 1 do
-        Value := Value - Matrix[Row][Col] * ACoefficients[Col];
-      ACoefficients[Row] := Value / Matrix[Row][Row];
-      if IsNan(ACoefficients[Row]) or IsInfinite(ACoefficients[Row]) then
+      ACoefficients[Row + 1] := Matrix[Row][ADegree + 1];
+      if IsNan(ACoefficients[Row + 1]) or
+         IsInfinite(ACoefficients[Row + 1]) then
       begin
-        ACoefficients := nil;
+        SetLength(ACoefficients, 0);
         Exit;
       end;
     end;
@@ -2181,13 +2167,16 @@ var
   end;
 
   function EvaluatePolynomial(const ACoefficients: TArray<Double>;
-    ANormalizedX: Double): Double;
+    const AX: Double): Double;
   var
     CoefficientIndex: Integer;
   begin
     Result := 0;
-    for CoefficientIndex := High(ACoefficients) downto 0 do
-      Result := Result * ANormalizedX + ACoefficients[CoefficientIndex];
+    if Length(ACoefficients) < 3 then
+      Exit;
+    for CoefficientIndex := High(ACoefficients) downto 1 do
+      Result := Result * (AX / ACoefficients[0]) +
+        ACoefficients[CoefficientIndex];
   end;
 
   procedure AddSpillagePoint(APoint: TPointSpillage);
@@ -2351,44 +2340,31 @@ begin
           for I := 0 to AveragePoints.Count - 1 do
             AverageSeries.AddPoint(AveragePoints[I].X, AveragePoints[I].Y);
 
-          LineSeries := Chart1.AddSeries(LegendBase + ' — полиномиальная аппроксимация');
+          LineSeries := Chart1.AddSeries(LegendBase + ' — полином');
           LineSeries.Color := GetChartDeviceColor(Device, True, DeviceIndex);
           LineSeries.ShowLine := True;
           LineSeries.ShowMarkers := False;
           LineSeries.Thickness := 2;
 
-          // Степень ограничена числом средних точек; при вырожденной
-          // системе последовательно пробуются более устойчивые степени.
-          PolynomialCoefficients := nil;
-          PolynomialDegree := Min(CChartPolynomialMaxDegree,
-            AveragePoints.Count - 1);
-          while (PolynomialDegree >= 0) and
-            not TryCalculatePolynomialCoefficients(AveragePoints,
-              PolynomialDegree, PolynomialCoefficients) do
-            Dec(PolynomialDegree);
-
-          if Length(PolynomialCoefficients) > 0 then
-          begin
-            if (AveragePoints.Count = 1) or
-               SameValue(AveragePoints[0].X,
-                 AveragePoints[AveragePoints.Count - 1].X) then
-              LineSeries.AddPoint(AveragePoints[0].X,
-                EvaluatePolynomial(PolynomialCoefficients, 0))
-            else
-              for I := 0 to CChartPolynomialSampleCount do
-              begin
-                X := AveragePoints[0].X +
-                  (AveragePoints[AveragePoints.Count - 1].X -
-                   AveragePoints[0].X) * I / CChartPolynomialSampleCount;
-                Z := 2 * (X - AveragePoints[0].X) /
-                  (AveragePoints[AveragePoints.Count - 1].X -
-                   AveragePoints[0].X) - 1;
-                Y := EvaluatePolynomial(PolynomialCoefficients, Z);
-                if not IsNan(X) and not IsInfinite(X) and
-                   not IsNan(Y) and not IsInfinite(Y) then
-                  LineSeries.AddPoint(X, Y);
-              end;
-          end;
+          // Три точки недостаточны для надёжной параболической регрессии:
+          // точная парабола между далеко разнесёнными расходами создаёт
+          // физически бессмысленный провал. Поэтому квадратичный полином
+          // используется только при четырёх и более средних точках.
+          if AveragePoints.Count >= 4 then
+            PolynomialDegree := 2
+          else
+            PolynomialDegree := 1;
+          if FitPolynomial(AveragePoints, PolynomialDegree,
+             PolynomialCoefficients) then
+            for I := 0 to CChartPolynomialSamples do
+            begin
+              X := AveragePoints[0].X +
+                (AveragePoints[AveragePoints.Count - 1].X -
+                 AveragePoints[0].X) * I / CChartPolynomialSamples;
+              Y := EvaluatePolynomial(PolynomialCoefficients, X);
+              if not IsNan(Y) and not IsInfinite(Y) then
+                LineSeries.AddPoint(X, Y);
+            end;
           Inc(DeviceIndex);
         finally
           Groups.Free;
