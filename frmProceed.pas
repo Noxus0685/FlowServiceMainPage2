@@ -6557,11 +6557,7 @@ var
   Col, Row: Integer;
 begin
   if Button = TMouseButton.mbLeft then
-  begin
-    if FResultsGridLayoutState <> nil then
-      FResultsGridLayoutState.BeginManualColumnResize(GridResults, X, Y);
     Exit;
-  end;
   if Button <> TMouseButton.mbRight then
     Exit;
 
@@ -6937,7 +6933,7 @@ begin
   if Sender = GridResults then
   begin
     if (FResultsGridLayoutState <> nil) and
-       FResultsGridLayoutState.EndManualColumnResize then
+       FResultsGridLayoutState.FinishPendingManualResize then
       SaveLayoutSettingsToWorkTable;
     Exit;
   end;
