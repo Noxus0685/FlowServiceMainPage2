@@ -5,7 +5,8 @@ interface
 uses
   FMX.Grid,
   System.Classes,
-  System.Generics.Collections;
+  System.Generics.Collections,
+  uGridLayoutManager;
 
 type
   TGridColumnSnapshot = record
@@ -20,6 +21,7 @@ type
   TGridStabilityController = class(TComponent)
   private
     FGrid: TCustomGrid;
+    FWidthState: TGridLayoutState;
     FFormName: string;
     FColumns: TDictionary<string, TGridColumnSnapshot>;
     FGridWidth: Single;
@@ -27,11 +29,19 @@ type
     FHasSnapshot: Boolean;
     FStructuralSignature: string;
     function BuildStructuralSignature: string;
+  protected
+    { Drops width-control references before the observed grid is destroyed. }
+    procedure Notification(AComponent: TComponent;
+      Operation: TOperation); override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    procedure Attach(AGrid: TCustomGrid; const AFormName: string);
+    { Attaches diagnostics and optional manual-only width control to one grid. }
+    procedure Attach(AGrid: TCustomGrid; const AFormName: string;
+      const AEnableWidthControl: Boolean = True);
+    { Records the current geometry and registers newly created named columns. }
     procedure Snapshot(const AContext: string);
+    { Returns True when the grid column identity or order has changed. }
     function StructureChanged: Boolean;
     property StructuralSignature: string read FStructuralSignature;
   end;
@@ -54,18 +64,45 @@ end;
 
 destructor TGridStabilityController.Destroy;
 begin
+  if FGrid <> nil then
+    FGrid.RemoveFreeNotification(Self);
+  FWidthState.Free;
   FColumns.Free;
   inherited;
 end;
 
 procedure TGridStabilityController.Attach(AGrid: TCustomGrid;
-  const AFormName: string);
+  const AFormName: string; const AEnableWidthControl: Boolean);
 begin
+  if FGrid <> nil then
+    FGrid.RemoveFreeNotification(Self);
+  FreeAndNil(FWidthState);
   FGrid := AGrid;
   FFormName := AFormName;
+  if FGrid <> nil then
+    FGrid.FreeNotification(Self);
   FColumns.Clear;
   FHasSnapshot := False;
   FStructuralSignature := BuildStructuralSignature;
+  if AEnableWidthControl and (FGrid <> nil) then
+  begin
+    FWidthState := TGridLayoutState.Create;
+    FWidthState.ConfigureWidthControl(FGrid,
+      AFormName + '.' + FGrid.Name);
+    FWidthState.RegisterExistingColumns;
+  end;
+end;
+
+procedure TGridStabilityController.Notification(AComponent: TComponent;
+  Operation: TOperation);
+begin
+  if (Operation = opRemove) and (AComponent = FGrid) then
+  begin
+    if FWidthState <> nil then
+      FWidthState.Detach(False);
+    FGrid := nil;
+  end;
+  inherited;
 end;
 
 function TGridStabilityController.BuildStructuralSignature: string;
@@ -100,6 +137,8 @@ begin
   if FGrid = nil then
     Exit;
 
+  if FWidthState <> nil then
+    FWidthState.RegisterExistingColumns;
   ThreadNumber := TThread.CurrentThread.ThreadID;
   CurrentGridWidth := FGrid.Width;
   CurrentViewportWidth := FGrid.ViewportSize.Width;
