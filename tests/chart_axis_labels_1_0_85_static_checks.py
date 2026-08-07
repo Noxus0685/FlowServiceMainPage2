@@ -19,11 +19,11 @@ def test_point_guide_tracks_both_axis_labels():
         "procedure TSimpleChart.DrawSeries",
     )
     assert "ADrawnXLabels: TList<Double>" in declaration
-    assert "ADrawnYLabelRects: TList<TRectF>" in declaration
+    assert "AYLabels: TList<TChartYLabelInfo>" in declaration
     assert "IsAxisLabelDrawn(PointValue.X, ADrawnXLabels)" in declaration
     assert "ADrawnXLabels.Add(PointValue.X)" in declaration
-    assert "TryPlaceYLabel(TextRect)" in declaration
-    assert "ADrawnYLabelRects.Add(TextRect)" in declaration
+    assert "YLabel.Value := PointValue.Y" in declaration
+    assert "AYLabels.Add(YLabel)" in declaration
 
 
 def test_x_axis_label_comparison_uses_numeric_tolerance():
@@ -43,7 +43,8 @@ def test_draw_series_owns_separate_axis_label_lists():
         "procedure TSimpleChart.Paint",
     )
     assert "DrawnXLabels: TList<Double>" in draw_series
-    assert "DrawnYLabelRects: TList<TRectF>" in draw_series
-    assert "DrawnYLabelRects := TList<TRectF>.Create" in draw_series
-    assert "DrawMarkersForSeries(series, DrawnXLabels, DrawnYLabelRects)" in draw_series
-    assert "DrawnYLabelRects.Free" in draw_series
+    assert "YLabels: TList<TChartYLabelInfo>" in draw_series
+    assert "YLabels := TList<TChartYLabelInfo>.Create" in draw_series
+    assert "DrawMarkersForSeries(series, DrawnXLabels, YLabels)" in draw_series
+    assert "DrawAveragedYLabels(YLabels)" in draw_series
+    assert "YLabels.Free" in draw_series
