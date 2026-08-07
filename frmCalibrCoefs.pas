@@ -30,6 +30,7 @@ uses
   uDeviceClass,
   uFlowMeter,
   uGridLayoutManager,
+  uGridStabilityRegistry,
   uMeterValue;
 
 type
@@ -145,6 +146,7 @@ begin
   FFilteredTables := TObjectList<TCalibrCoefTable>.Create(False);
   FCurrentSpillages := TObjectList<TPointSpillage>.Create(False);
   FCurrentType := cctReference;
+  RegisterStableGrid(Self, GridCoefs, Name);
 
   GridCoefs.OnGetValue := GridCoefsGetValue;
   GridCoefs.OnSetValue := GridCoefsSetValue;

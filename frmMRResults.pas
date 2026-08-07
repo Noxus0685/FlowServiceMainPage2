@@ -203,7 +203,7 @@ end;
 constructor TFrameMRResults.Create(AOwner: TComponent);
 begin
   inherited;
-  RegisterStableGrid(Self, GridMRResults, Name);
+  RegisterStableGrid(Self, GridMRResults, Name, False);
   FPointColumns := TObjectList<TStringColumn>.Create(False);
   FDisplayPoints := TObjectList<TDisplayPointGroup>.Create(True);
   FRows := TList<TChannel>.Create;

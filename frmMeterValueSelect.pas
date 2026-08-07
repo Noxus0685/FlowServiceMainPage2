@@ -80,11 +80,13 @@ end;
 
 procedure TFormMeterValueSelect.BuildUI;
 
-  procedure AddColumn(const AHeader: string; const AWidth: Single);
+  { Creates one selector column with a stable persistent identity. }
+  procedure AddColumn(const AName, AHeader: string; const AWidth: Single);
   var
     Column: TStringColumn;
   begin
     Column := TStringColumn.Create(Self);
+    Column.Name := AName;
     Column.Parent := StringGridValuesList;
     Column.Header := AHeader;
     Column.Width := AWidth;
@@ -157,7 +159,7 @@ begin
   ButtonSelect.OnClick := ButtonSelectClick;
 
   StringGridValuesList := TStringGrid.Create(Self);
-  RegisterStableGrid(Self, StringGridValuesList, Name);
+  StringGridValuesList.Name := 'StringGridValuesList';
   StringGridValuesList.Parent := Layout22;
   StringGridValuesList.Align := TAlignLayout.Client;
   StringGridValuesList.ReadOnly := True;
@@ -165,12 +167,13 @@ begin
     [TGridOption.RowSelect, TGridOption.AlwaysShowSelection];
   StringGridValuesList.OnSelChanged := StringGridValuesListSelChanged;
 
-  AddColumn('№', 45);
-  AddColumn('Владелец', 150);
-  AddColumn('Описание', 220);
-  AddColumn('Значение', 220);
-  AddColumn('Текущее', 120);
-  AddColumn('Hash', 220);
+  AddColumn('StringColumnNumber', '№', 45);
+  AddColumn('StringColumnOwner', 'Владелец', 150);
+  AddColumn('StringColumnDescription', 'Описание', 220);
+  AddColumn('StringColumnValue', 'Значение', 220);
+  AddColumn('StringColumnCurrent', 'Текущее', 120);
+  AddColumn('StringColumnHash', 'Hash', 220);
+  RegisterStableGrid(Self, StringGridValuesList, Name);
 end;
 
 procedure TFormMeterValueSelect.ApplyFilter;

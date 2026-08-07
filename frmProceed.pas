@@ -560,7 +560,7 @@ procedure TFrameProceed.Initialize;
 var
   UnitName: string;
 begin
-  RegisterStableGrid(Self, GridResults, Name);
+  RegisterStableGrid(Self, GridResults, Name, False);
   RegisterStableGrid(Self, GridDataPoints, Name);
   RegisterStableGrid(Self, GridCoefs, Name);
   if FResultsGridLayoutState = nil then
