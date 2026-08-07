@@ -350,6 +350,7 @@ begin
 
   FSyncingPresentation := True;
   try
+    FGrid.Model.InvalidateContentSize;
     FGrid.Model.ContentChanged;
     FGrid.Repaint;
   finally
@@ -472,8 +473,7 @@ begin
   end;
   FManualResizeActive := False;
   FTrackedColumn := nil;
-  if FGrid <> nil then
-    FGrid.Repaint;
+  RefreshGridPresentation;
 end;
 
 function TGridLayoutState.EndManualColumnResize: Boolean;
