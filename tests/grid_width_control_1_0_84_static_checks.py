@@ -15,7 +15,7 @@ def section(text, start, end):
 
 
 def test_release_version():
-    assert "APP_VERSION = '1.0.85'" in VERSION
+    assert "APP_VERSION = '1.0.86'" in VERSION
 
 
 def test_resize_is_authorized_inside_column_resize_handler():
@@ -62,3 +62,23 @@ def test_existing_context_menu_handler_is_preserved():
     )
     assert "TMouseButton.mbRight" in handler
     assert "FPopupMenuGridPointsHeader.Popup" in handler
+
+
+
+def test_header_drag_uses_full_grid_bounds_and_repaints_body():
+    detector = section(
+        HELPER,
+        "function TGridLayoutState.IsUserColumnResize",
+        "procedure TGridLayoutState.ColumnResizeHandler",
+    )
+    assert "FGrid.LocalToScreen(PointF(0, 0))" in detector
+    assert "FGrid.LocalToScreen(PointF(FGrid.Width, FGrid.Height))" in detector
+    assert "CursorScreen.Y >= Min(GridTopLeft.Y, GridBottomRight.Y)" in detector
+    assert "DividerScreen.Y + FGrid.Height" not in detector
+
+    handler = section(
+        HELPER,
+        "procedure TGridLayoutState.ColumnResizeHandler",
+        "procedure TGridLayoutState.BeginManualColumnResize",
+    )
+    assert "FGrid.Repaint" in handler
