@@ -50,7 +50,7 @@ type
     class procedure CaptureWidths(AState: TGridLayoutState); static;
     { Changes the FMX grid row count without allowing its layout pass to alter
       column widths.  AForceRefresh recreates rows when their count is unchanged. }
-    class procedure SetRowCount(AGrid: TGrid; const ARowCount: Integer;
+    class procedure SetRowCount(AGrid: TCustomGrid; const ARowCount: Integer;
       const AForceRefresh: Boolean = False); static;
     class function Apply(AGrid: TGrid; AState: TGridLayoutState;
       const ADefinitions: TGridColumnDefinitions;
@@ -122,7 +122,7 @@ begin
       AState.FWidths.AddOrSetValue(Pair.Key, Pair.Value.Width);
 end;
 
-class procedure TGridLayoutManager.SetRowCount(AGrid: TGrid;
+class procedure TGridLayoutManager.SetRowCount(AGrid: TCustomGrid;
   const ARowCount: Integer; const AForceRefresh: Boolean);
 var
   Columns: TArray<TColumn>;
