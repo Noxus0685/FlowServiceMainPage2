@@ -28,6 +28,7 @@ type
     ReadOnly: Boolean;
     Visible: Boolean;
     ExistingColumn: TColumn;
+    { Creates one stable, persistent description of a grid column. }
     constructor Create(const AKey, AHeader: string; AColumnClass: TClass;
       const AInitialWidth: Single; const AReadOnly, AVisible: Boolean;
       AExistingColumn: TColumn = nil);
@@ -52,32 +53,45 @@ type
     FApplyingInitialWidths: Boolean;
     FSyncingPresentation: Boolean;
     FTrackedColumn: TColumn;
-    FGrid: TGrid;
+    FGrid: TCustomGrid;
     FGridKey: string;
+    { Builds the persistent INI key for one grid column. }
     function BuildStorageKey(const AColumnKey: string): string;
+    { Loads and validates the last user-approved column width. }
     function LoadApprovedWidth(const AColumnKey: string;
       out AWidth: Single): Boolean;
+    { Persists one user-approved column width. }
     procedure SaveApprovedWidth(const AColumnKey: string;
       const AWidth: Single);
+    { Constrains a column width to the supported FMX range. }
     function ValidateColumnWidth(const AWidth: Single): Single;
     { Returns True only while the user is dragging this column divider. }
     function IsUserColumnResize(AColumn: TColumn): Boolean;
+    { Accepts user resize events and rejects programmatic width changes. }
     procedure ColumnResizeHandler(Sender: TObject);
     { Rebuilds FMX grid presentation geometry after an accepted column width. }
     procedure RefreshGridPresentation;
+    { Restores the last approved width after a programmatic mutation. }
     procedure RestoreApprovedColumnWidth(AColumn: TColumn;
       const AColumnKey, AContext: string);
+    { Connects one stable column key to its resize event. }
     procedure RegisterColumn(const AColumnKey: string; AColumn: TColumn);
+    { Disconnects one column from the current layout state. }
     procedure UnregisterColumn(AColumn: TColumn);
+    { Applies a stored or declared width without treating it as user input. }
     procedure ApplyInitialWidth(const AColumnKey: string; AColumn: TColumn;
       const AInitialWidth: Single);
   public
+    { Creates isolated width state for one grid instance. }
     constructor Create;
+    { Releases dictionaries and restores live column handlers. }
     destructor Destroy; override;
     { Connects manual-only width control to one grid and persistent key. }
-    procedure ConfigureWidthControl(AGrid: TGrid; const AGridKey: string);
+    procedure ConfigureWidthControl(AGrid: TCustomGrid; const AGridKey: string);
+    { Disconnects the grid and optionally restores previous resize handlers. }
+    procedure Detach(const ARestoreHandlers: Boolean = True);
     { Starts manual resize only when the left mouse button hits a header divider. }
-    procedure BeginManualColumnResize(AGrid: TGrid; const X, Y: Single);
+    procedure BeginManualColumnResize(AGrid: TCustomGrid; const X, Y: Single);
     { Registers all existing named columns of the configured grid. }
     procedure RegisterExistingColumns;
     { Persists the final approved width after the active mouse drag has ended. }
@@ -90,11 +104,13 @@ type
 
   TGridLayoutManager = class
   public
+    { Builds a deterministic signature of the requested column structure. }
     class function BuildSignature(const ADefinitions: TGridColumnDefinitions): string; static;
     { Changes the FMX grid row count without allowing its layout pass to alter
       column widths.  AForceRefresh recreates rows when their count is unchanged. }
     class procedure SetRowCount(AGrid: TCustomGrid; const ARowCount: Integer;
       const AForceRefresh: Boolean = False); static;
+    { Applies a changed dynamic column structure exactly once per signature. }
     class function Apply(AGrid: TGrid; AState: TGridLayoutState;
       const ADefinitions: TGridColumnDefinitions;
       const AFactory: TGridColumnFactory;
@@ -135,12 +151,8 @@ begin
 end;
 
 destructor TGridLayoutState.Destroy;
-var
-  Pair: TPair<TColumn, TNotifyEvent>;
 begin
-  for Pair in FPreviousResizeHandlers do
-    if Pair.Key <> nil then
-      Pair.Key.OnResize := Pair.Value;
+  Detach(True);
   FPreviousResizeHandlers.Free;
   FColumnKeys.Free;
   FColumns.Free;
@@ -148,12 +160,33 @@ begin
   inherited;
 end;
 
-procedure TGridLayoutState.ConfigureWidthControl(AGrid: TGrid;
+procedure TGridLayoutState.ConfigureWidthControl(AGrid: TCustomGrid;
   const AGridKey: string);
 begin
+  if FGrid <> AGrid then
+    Detach(True);
   FGrid := AGrid;
   FGridKey := AGridKey;
+  if FGrid <> nil then
+    FGrid.Options := FGrid.Options + [TGridOption.ColumnResize];
   DebugLog(Format('GridWidthControl configured Grid="%s"', [FGridKey]));
+end;
+
+procedure TGridLayoutState.Detach(const ARestoreHandlers: Boolean);
+var
+  Pair: TPair<TColumn, TNotifyEvent>;
+begin
+  if ARestoreHandlers then
+    for Pair in FPreviousResizeHandlers do
+      if Pair.Key <> nil then
+        Pair.Key.OnResize := Pair.Value;
+  FPreviousResizeHandlers.Clear;
+  FColumnKeys.Clear;
+  FColumns.Clear;
+  FTrackedColumn := nil;
+  FManualResizeActive := False;
+  FGrid := nil;
+  FGridKey := '';
 end;
 
 function TGridLayoutState.BuildStorageKey(const AColumnKey: string): string;
@@ -368,7 +401,7 @@ begin
     RestoreApprovedColumnWidth(Column, ColumnKey, 'OnResize');
 end;
 
-procedure TGridLayoutState.BeginManualColumnResize(AGrid: TGrid;
+procedure TGridLayoutState.BeginManualColumnResize(AGrid: TCustomGrid;
   const X, Y: Single);
 var
   I: Integer;
@@ -505,12 +538,14 @@ var
   IsNewColumn: Boolean;
   DesiredIndex: Integer;
 
+  { Converts the multiline signature to one diagnostic log line. }
   function PrintableSignature(const AValue: string): string;
   begin
     Result := StringReplace(AValue, #13, '', [rfReplaceAll]);
     Result := StringReplace(Result, #10, ';', [rfReplaceAll]);
   end;
 
+  { Finds a previously registered dynamic column by its stable key. }
   function OldColumnForKey(const AKey: string): TColumn;
   var
     OldPair: TPair<string, TColumn>;
@@ -521,6 +556,7 @@ var
         Exit(OldPair.Value);
   end;
 
+  { Checks whether the requested structure still contains a stable key. }
   function DefinitionContainsKey(const AKey: string): Boolean;
   var
     Item: TGridColumnDefinition;
