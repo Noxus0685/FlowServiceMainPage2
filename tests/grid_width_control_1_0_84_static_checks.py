@@ -15,7 +15,7 @@ def section(text, start, end):
 
 
 def test_release_version():
-    assert "APP_VERSION = '1.0.84'" in VERSION
+    assert "APP_VERSION = '1.0.85'" in VERSION
 
 
 def test_resize_is_authorized_inside_column_resize_handler():
