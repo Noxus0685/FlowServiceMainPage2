@@ -15,26 +15,28 @@ def section(text, start, end):
     return text[left:right]
 
 
-def test_y_point_labels_use_non_overlapping_screen_rectangles():
+def test_overlapping_y_point_labels_are_replaced_with_one_average():
     markers = section(
         CHART,
         "procedure TSimpleChart.DrawMarkersForSeries",
         "procedure TSimpleChart.DrawSeries",
     )
-    assert "ADrawnYLabelRects: TList<TRectF>" in markers
-    assert "function TryPlaceYLabel" in markers
-    assert "ADrawnYLabelRects.Add(TextRect)" in markers
-    assert "DrawnYLabels" not in markers
+    assert "AYLabels: TList<TChartYLabelInfo>" in markers
+    assert "YLabel.Value := PointValue.Y" in markers
+    assert "AYLabels.Add(YLabel)" in markers
+    assert "TryPlaceYLabel" not in markers
 
 
-def test_shifted_y_labels_keep_a_visual_link_to_their_value():
-    markers = section(
+def test_y_labels_use_arithmetic_mean_without_displacement_lines():
+    labels = section(
         CHART,
-        "procedure TSimpleChart.DrawMarkersForSeries",
+        "procedure TSimpleChart.DrawAveragedYLabels",
         "procedure TSimpleChart.DrawSeries",
     )
-    assert "Canvas.DrawLine(PointF(TextRect.Right + 2" in markers
-    assert "PointF(PlotRect.Left - 2, ScreenPt.Y)" in markers
+    assert "AverageValue := SumValue / GroupCount" in labels
+    assert "AverageScreenY := WorldToScreen(PointF(FXMin, AverageValue)).Y" in labels
+    assert "FormatFloat('0.###', AverageValue)" in labels
+    assert "Canvas.DrawLine" not in labels
 
 
 def test_vertical_axis_title_uses_the_full_plot_height():
@@ -71,4 +73,4 @@ def test_manual_resize_finish_uses_the_same_full_presentation_refresh():
 
 
 def test_release_version():
-    assert "APP_VERSION = '1.0.89'" in VERSION
+    assert "APP_VERSION = '1.0.90'" in VERSION
