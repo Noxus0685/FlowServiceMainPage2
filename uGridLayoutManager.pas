@@ -6,7 +6,14 @@ uses
   FMX.Grid,
   System.Classes,
   System.Generics.Collections,
+  System.IniFiles,
+  System.IOUtils,
   System.SysUtils;
+
+const
+  C_DYNAMIC_COLUMN_WIDTH = 125.0;
+  C_MIN_COLUMN_WIDTH = 24.0;
+  C_MAX_COLUMN_WIDTH = 1200.0;
 
 type
   { A declarative column description.  Key is the persistent identity; it must
@@ -33,13 +40,40 @@ type
   TGridLayoutState = class
   private
     FLastSignature: string;
-    FWidths: TDictionary<string, Single>;
+    FApprovedWidths: TDictionary<string, Single>;
     FColumns: TDictionary<string, TColumn>;
+    FColumnKeys: TDictionary<TColumn, string>;
+    FPreviousResizeHandlers: TDictionary<TColumn, TNotifyEvent>;
     FApplying: Boolean;
     FApplyCount: Integer;
+    FManualResizeActive: Boolean;
+    FRestoringWidth: Boolean;
+    FApplyingInitialWidths: Boolean;
+    FTrackedColumn: TColumn;
+    FGrid: TGrid;
+    FGridKey: string;
+    function BuildStorageKey(const AColumnKey: string): string;
+    function LoadApprovedWidth(const AColumnKey: string;
+      out AWidth: Single): Boolean;
+    procedure SaveApprovedWidth(const AColumnKey: string;
+      const AWidth: Single);
+    function ValidateColumnWidth(const AWidth: Single): Single;
+    procedure ColumnResizeHandler(Sender: TObject);
+    procedure RestoreApprovedColumnWidth(AColumn: TColumn;
+      const AColumnKey, AContext: string);
+    procedure RegisterColumn(const AColumnKey: string; AColumn: TColumn);
+    procedure UnregisterColumn(AColumn: TColumn);
+    procedure ApplyInitialWidth(const AColumnKey: string; AColumn: TColumn;
+      const AInitialWidth: Single);
   public
     constructor Create;
     destructor Destroy; override;
+    { Connects manual-only width control to one grid and persistent key. }
+    procedure ConfigureWidthControl(AGrid: TGrid; const AGridKey: string);
+    { Starts manual resize only when the left mouse button hits a header divider. }
+    procedure BeginManualColumnResize(AGrid: TGrid; const X, Y: Single);
+    { Confirms and persists a width only after the tracked drag ends. }
+    function EndManualColumnResize: Boolean;
     property LastSignature: string read FLastSignature;
     property ApplyCount: Integer read FApplyCount;
   end;
@@ -47,7 +81,6 @@ type
   TGridLayoutManager = class
   public
     class function BuildSignature(const ADefinitions: TGridColumnDefinitions): string; static;
-    class procedure CaptureWidths(AState: TGridLayoutState); static;
     { Changes the FMX grid row count without allowing its layout pass to alter
       column widths.  AForceRefresh recreates rows when their count is unchanged. }
     class procedure SetRowCount(AGrid: TCustomGrid; const ARowCount: Integer;
@@ -84,15 +117,259 @@ end;
 constructor TGridLayoutState.Create;
 begin
   inherited Create;
-  FWidths := TDictionary<string, Single>.Create;
+  FApprovedWidths := TDictionary<string, Single>.Create;
   FColumns := TDictionary<string, TColumn>.Create;
+  FColumnKeys := TDictionary<TColumn, string>.Create;
+  FPreviousResizeHandlers := TDictionary<TColumn, TNotifyEvent>.Create;
 end;
 
 destructor TGridLayoutState.Destroy;
+var
+  Pair: TPair<TColumn, TNotifyEvent>;
 begin
+  for Pair in FPreviousResizeHandlers do
+    if Pair.Key <> nil then
+      Pair.Key.OnResize := Pair.Value;
+  FPreviousResizeHandlers.Free;
+  FColumnKeys.Free;
   FColumns.Free;
-  FWidths.Free;
+  FApprovedWidths.Free;
   inherited;
+end;
+
+procedure TGridLayoutState.ConfigureWidthControl(AGrid: TGrid;
+  const AGridKey: string);
+begin
+  FGrid := AGrid;
+  FGridKey := AGridKey;
+  DebugLog(Format('GridWidthControl configured Grid="%s"', [FGridKey]));
+end;
+
+function TGridLayoutState.BuildStorageKey(const AColumnKey: string): string;
+begin
+  Result := FGridKey + '.' + AColumnKey;
+end;
+
+function TGridLayoutState.ValidateColumnWidth(const AWidth: Single): Single;
+begin
+  Result := EnsureRange(AWidth, C_MIN_COLUMN_WIDTH, C_MAX_COLUMN_WIDTH);
+end;
+
+function TGridLayoutState.LoadApprovedWidth(const AColumnKey: string;
+  out AWidth: Single): Boolean;
+var
+  Ini: TIniFile;
+  StoredValue: Double;
+begin
+  Result := False;
+  AWidth := 0;
+  if (FGridKey = '') or (AColumnKey = '') then
+    Exit;
+  Ini := TIniFile.Create(TPath.Combine(TPath.GetDocumentsPath,
+    'FlowServiceGridWidths.ini'));
+  try
+    if not Ini.ValueExists('GridWidths', BuildStorageKey(AColumnKey)) then
+      Exit;
+    StoredValue := Ini.ReadFloat('GridWidths', BuildStorageKey(AColumnKey), 0);
+    Result := (StoredValue >= C_MIN_COLUMN_WIDTH) and
+      (StoredValue <= C_MAX_COLUMN_WIDTH);
+    if Result then
+      AWidth := StoredValue
+    else
+      DebugLog(Format(
+        'GridWidthControl rejected stored width Grid="%s" ColumnKey="%s" Width=%.4f',
+        [FGridKey, AColumnKey, StoredValue]));
+  finally
+    Ini.Free;
+  end;
+end;
+
+procedure TGridLayoutState.SaveApprovedWidth(const AColumnKey: string;
+  const AWidth: Single);
+var
+  Ini: TIniFile;
+begin
+  if (FGridKey = '') or (AColumnKey = '') then
+    Exit;
+  Ini := TIniFile.Create(TPath.Combine(TPath.GetDocumentsPath,
+    'FlowServiceGridWidths.ini'));
+  try
+    Ini.WriteFloat('GridWidths', BuildStorageKey(AColumnKey), AWidth);
+  finally
+    Ini.Free;
+  end;
+end;
+
+procedure TGridLayoutState.ApplyInitialWidth(const AColumnKey: string;
+  AColumn: TColumn; const AInitialWidth: Single);
+var
+  ApprovedWidth: Single;
+begin
+  if (AColumn = nil) or (AColumnKey = '') then
+    Exit;
+  if not FApprovedWidths.TryGetValue(AColumnKey, ApprovedWidth) then
+  begin
+    if not LoadApprovedWidth(AColumnKey, ApprovedWidth) then
+      ApprovedWidth := ValidateColumnWidth(AInitialWidth);
+    FApprovedWidths.AddOrSetValue(AColumnKey, ApprovedWidth);
+  end;
+
+  FApplyingInitialWidths := True;
+  try
+    if not SameValue(AColumn.Width, ApprovedWidth, CWidthEpsilon) then
+      AColumn.Width := ApprovedWidth;
+  finally
+    FApplyingInitialWidths := False;
+  end;
+end;
+
+procedure TGridLayoutState.RegisterColumn(const AColumnKey: string;
+  AColumn: TColumn);
+begin
+  if (AColumn = nil) or (AColumnKey = '') then
+    Exit;
+  FColumns.AddOrSetValue(AColumnKey, AColumn);
+  FColumnKeys.AddOrSetValue(AColumn, AColumnKey);
+  if not FPreviousResizeHandlers.ContainsKey(AColumn) then
+  begin
+    FPreviousResizeHandlers.Add(AColumn, AColumn.OnResize);
+    AColumn.OnResize := ColumnResizeHandler;
+  end;
+end;
+
+procedure TGridLayoutState.UnregisterColumn(AColumn: TColumn);
+var
+  PreviousHandler: TNotifyEvent;
+  ColumnKey: string;
+begin
+  if AColumn = nil then
+    Exit;
+  if FPreviousResizeHandlers.TryGetValue(AColumn, PreviousHandler) then
+  begin
+    AColumn.OnResize := PreviousHandler;
+    FPreviousResizeHandlers.Remove(AColumn);
+  end;
+  if FColumnKeys.TryGetValue(AColumn, ColumnKey) then
+  begin
+    FColumnKeys.Remove(AColumn);
+    FColumns.Remove(ColumnKey);
+  end;
+  if FTrackedColumn = AColumn then
+  begin
+    FTrackedColumn := nil;
+    FManualResizeActive := False;
+  end;
+end;
+
+procedure TGridLayoutState.RestoreApprovedColumnWidth(AColumn: TColumn;
+  const AColumnKey, AContext: string);
+var
+  ApprovedWidth, RejectedWidth: Single;
+begin
+  if (AColumn = nil) or
+     not FApprovedWidths.TryGetValue(AColumnKey, ApprovedWidth) then
+    Exit;
+  if SameValue(AColumn.Width, ApprovedWidth, CWidthEpsilon) then
+    Exit;
+
+  RejectedWidth := AColumn.Width;
+  FRestoringWidth := True;
+  try
+    AColumn.Width := ApprovedWidth;
+  finally
+    FRestoringWidth := False;
+  end;
+  DebugLog(Format(
+    'GridWidthControl restored Grid="%s" ColumnKey="%s" Rejected=%.4f Approved=%.4f Context="%s"',
+    [FGridKey, AColumnKey, RejectedWidth, ApprovedWidth, AContext]));
+end;
+
+procedure TGridLayoutState.ColumnResizeHandler(Sender: TObject);
+var
+  Column: TColumn;
+  ColumnKey: string;
+  PreviousHandler: TNotifyEvent;
+  ApprovedWidth: Single;
+begin
+  if FRestoringWidth or FApplyingInitialWidths then
+    Exit;
+  if not (Sender is TColumn) then
+    Exit;
+  Column := TColumn(Sender);
+  if FPreviousResizeHandlers.TryGetValue(Column, PreviousHandler) and
+     Assigned(PreviousHandler) then
+    PreviousHandler(Sender);
+  if not FColumnKeys.TryGetValue(Column, ColumnKey) then
+    Exit;
+
+  if FManualResizeActive and (Column = FTrackedColumn) then
+  begin
+    ApprovedWidth := ValidateColumnWidth(Column.Width);
+    FApprovedWidths.AddOrSetValue(ColumnKey, ApprovedWidth);
+    if not SameValue(Column.Width, ApprovedWidth, CWidthEpsilon) then
+    begin
+      FRestoringWidth := True;
+      try
+        Column.Width := ApprovedWidth;
+      finally
+        FRestoringWidth := False;
+      end;
+    end;
+  end
+  else
+    RestoreApprovedColumnWidth(Column, ColumnKey, 'OnResize');
+end;
+
+procedure TGridLayoutState.BeginManualColumnResize(AGrid: TGrid;
+  const X, Y: Single);
+var
+  I: Integer;
+  Column: TColumn;
+  DividerX: Single;
+begin
+  FManualResizeActive := False;
+  FTrackedColumn := nil;
+  if (AGrid = nil) or (AGrid <> FGrid) or (Y < 0) or
+     (Y > AGrid.RowHeight) then
+    Exit;
+
+  for I := 0 to AGrid.ColumnCount - 1 do
+  begin
+    Column := AGrid.Columns[I];
+    if (Column = nil) or not Column.Visible or
+       not FColumnKeys.ContainsKey(Column) then
+      Continue;
+    DividerX := Column.Position.X + Column.Width;
+    if Abs(X - DividerX) <= 5.0 then
+    begin
+      FTrackedColumn := Column;
+      FManualResizeActive := True;
+      DebugLog(Format(
+        'GridWidthControl manual begin Grid="%s" Column="%s" Width=%.4f',
+        [FGridKey, FColumnKeys[Column], Column.Width]));
+      Exit;
+    end;
+  end;
+end;
+
+function TGridLayoutState.EndManualColumnResize: Boolean;
+var
+  ColumnKey: string;
+  ApprovedWidth: Single;
+begin
+  Result := FManualResizeActive and (FTrackedColumn <> nil) and
+    FColumnKeys.TryGetValue(FTrackedColumn, ColumnKey);
+  if Result then
+  begin
+    ApprovedWidth := ValidateColumnWidth(FTrackedColumn.Width);
+    FApprovedWidths.AddOrSetValue(ColumnKey, ApprovedWidth);
+    SaveApprovedWidth(ColumnKey, ApprovedWidth);
+    DebugLog(Format(
+      'GridWidthControl manual end Grid="%s" Column="%s" Width=%.4f',
+      [FGridKey, ColumnKey, ApprovedWidth]));
+  end;
+  FManualResizeActive := False;
+  FTrackedColumn := nil;
 end;
 
 class function TGridLayoutManager.BuildSignature(
@@ -108,33 +385,15 @@ begin
       '|' + BoolToStr(Definition.Visible, True) + #10;
 end;
 
-class procedure TGridLayoutManager.CaptureWidths(AState: TGridLayoutState);
-var
-  Pair: TPair<string, TColumn>;
-begin
-  if AState = nil then
-    Exit;
-
-  { Capture only at an explicit, trusted boundary.  In particular, never feed
-    widths produced by the FMX layout pass after EndUpdate back into state. }
-  for Pair in AState.FColumns do
-    if Pair.Value <> nil then
-      AState.FWidths.AddOrSetValue(Pair.Key, Pair.Value.Width);
-end;
-
 class procedure TGridLayoutManager.SetRowCount(AGrid: TCustomGrid;
   const ARowCount: Integer; const AForceRefresh: Boolean);
 var
-  Columns: TArray<TColumn>;
-  Widths: TArray<Single>;
-  I, NewRowCount: Integer;
+  NewRowCount: Integer;
 begin
   if AGrid = nil then
     Exit;
 
   NewRowCount := Max(0, ARowCount);
-  { An empty grid has no rows to recreate.  Avoid even an empty
-    BeginUpdate/EndUpdate cycle during the first tab activation. }
   if (AGrid.RowCount = 0) and (NewRowCount = 0) then
   begin
     AGrid.Repaint;
@@ -146,14 +405,6 @@ begin
     Exit;
   end;
 
-  SetLength(Columns, AGrid.ColumnCount);
-  SetLength(Widths, AGrid.ColumnCount);
-  for I := 0 to AGrid.ColumnCount - 1 do
-  begin
-    Columns[I] := AGrid.Columns[I];
-    Widths[I] := Columns[I].Width;
-  end;
-
   AGrid.BeginUpdate;
   try
     if AForceRefresh and (AGrid.RowCount <> 0) then
@@ -163,13 +414,6 @@ begin
   finally
     AGrid.EndUpdate;
   end;
-
-  { EndUpdate performs the FMX layout pass and may scale every column.  Restore
-    the snapshot only after that pass so reopening a tab cannot accumulate width. }
-  for I := 0 to High(Columns) do
-    if (Columns[I] <> nil) and
-       (Abs(Columns[I].Width - Widths[I]) >= CWidthEpsilon) then
-      Columns[I].Width := Widths[I];
   AGrid.Repaint;
 end;
 
@@ -180,13 +424,10 @@ var
   Signature, Key: string;
   Definition: TGridColumnDefinition;
   Column: TColumn;
-  SavedWidth: Single;
   OldColumns: TArray<TPair<string, TColumn>>;
   Pair: TPair<string, TColumn>;
   IsNewColumn: Boolean;
   DesiredIndex: Integer;
-  WidthRestored: Boolean;
-  CurrentWidth: Single;
 
   function PrintableSignature(const AValue: string): string;
   begin
@@ -213,36 +454,13 @@ var
       if SameText(Item.Key, AKey) then
         Exit(True);
   end;
-
-  procedure LogColumn(const AStage, AKey: string; AColumn: TColumn;
-    const AHasSavedWidth: Boolean; const ASavedWidth: Single);
-  var
-    WidthText, SavedText, IndexText: string;
-  begin
-    if AColumn = nil then
-    begin
-      WidthText := '<not-created>';
-      IndexText := '<not-created>';
-    end
-    else
-    begin
-      WidthText := Format('%.4f', [AColumn.Width]);
-      IndexText := IntToStr(AColumn.Index);
-    end;
-    if AHasSavedWidth then
-      SavedText := Format('%.4f', [ASavedWidth])
-    else
-      SavedText := '<none>';
-    DebugLog(Format('GridLayout Apply #%d %s key="%s" Width=%s saved=%s Index=%s',
-      [AState.FApplyCount, AStage, AKey, WidthText, SavedText, IndexText]));
-  end;
 begin
   if (AGrid = nil) or (AState = nil) or (ADefinitions = nil) then
     Exit(False);
 
   Inc(AState.FApplyCount);
-  Signature := IntToStr(Length(AStructureContext)) + ':' + AStructureContext + #10 +
-    BuildSignature(ADefinitions);
+  Signature := IntToStr(Length(AStructureContext)) + ':' +
+    AStructureContext + #10 + BuildSignature(ADefinitions);
   DebugLog(Format('GridLayout Apply #%d context="%s" old="%s" new="%s"',
     [AState.FApplyCount, AStructureContext,
      PrintableSignature(AState.FLastSignature), PrintableSignature(Signature)]));
@@ -252,61 +470,22 @@ begin
       [AState.FApplyCount]));
     Exit(False);
   end;
-  { An unchanged signature skips every structural mutation.  FMX may still
-    have stretched live columns while reopening the tab, so verify their
-    widths against the last trusted user-visible snapshot. }
+  { An unchanged signature must not mutate Parent, Index, Visible or Width. }
   if Signature = AState.FLastSignature then
-  begin
-    WidthRestored := False;
-    for Definition in ADefinitions do
-      if AState.FColumns.TryGetValue(Definition.Key, Column) and
-         (Column <> nil) and
-         AState.FWidths.TryGetValue(Definition.Key, SavedWidth) and
-         (Abs(Column.Width - SavedWidth) >= CWidthEpsilon) then
-      begin
-        CurrentWidth := Column.Width;
-        Column.Width := SavedWidth;
-        WidthRestored := True;
-        DebugLog(Format(
-          'GridWidthRestored ColumnKey="%s" CurrentWidth=%.4f StableWidth=%.4f Context="%s"',
-          [Definition.Key, CurrentWidth, SavedWidth, AStructureContext]));
-      end;
-    if WidthRestored then
-      AGrid.Repaint;
-    DebugLog(Format('GridLayout Apply #%d verified: signature unchanged',
-      [AState.FApplyCount]));
     Exit(False);
-  end;
 
   AState.FApplying := True;
   try
-    { A changed signature confirms that a structural rebuild is about to run,
-      so the current user-visible widths form a trustworthy snapshot. }
-    CaptureWidths(AState);
     OldColumns := AState.FColumns.ToArray;
-
-    for Definition in ADefinitions do
-    begin
-      Column := Definition.ExistingColumn;
-      if Column = nil then
-        Column := OldColumnForKey(Definition.Key);
-      { Fixed design-time columns are not yet present in FColumns during the
-        first Apply.  Capture their pre-layout widths before EndUpdate can
-        stretch them. }
-      if (Column <> nil) and
-         not AState.FWidths.ContainsKey(Definition.Key) then
-        AState.FWidths.AddOrSetValue(Definition.Key, Column.Width);
-      LogColumn('before BeginUpdate', Definition.Key, Column,
-        AState.FWidths.TryGetValue(Definition.Key, SavedWidth), SavedWidth);
-    end;
-
     AGrid.BeginUpdate;
     try
-      { Only obsolete factory-created columns are owned and freed here. }
       for Pair in OldColumns do
         if (Pair.Value <> nil) and (Pair.Value.Owner = AGrid) and
            not DefinitionContainsKey(Pair.Key) then
+        begin
+          AState.UnregisterColumn(Pair.Value);
           Pair.Value.Free;
+        end;
       AState.FColumns.Clear;
 
       DesiredIndex := 0;
@@ -320,24 +499,28 @@ begin
         if (not IsNewColumn) and (Definition.ExistingColumn = nil) and
            (Column.ClassType <> Definition.ColumnClass) then
         begin
+          AState.UnregisterColumn(Column);
           if Column.Owner = AGrid then
             Column.Free;
           Column := nil;
           IsNewColumn := True;
         end;
+
         if IsNewColumn then
         begin
           if not Assigned(AFactory) then
             raise EArgumentNilException.Create('AFactory');
           Column := AFactory(AGrid, Definition);
           if Column = nil then
-            raise EInvalidOperation.CreateFmt('Factory did not create column "%s"', [Key]);
+            raise EInvalidOperation.CreateFmt(
+              'Factory did not create column "%s"', [Key]);
+          AState.ApplyInitialWidth(Key, Column, Definition.InitialWidth);
           if Column.Parent <> AGrid then
             Column.Parent := AGrid;
           Column.Stored := False;
-        end;
-        LogColumn('after Parent', Key, Column,
-          AState.FWidths.TryGetValue(Key, SavedWidth), SavedWidth);
+        end
+        else if not AState.FColumnKeys.ContainsKey(Column) then
+          AState.ApplyInitialWidth(Key, Column, Definition.InitialWidth);
 
         if Column.Header <> Definition.Header then
           Column.Header := Definition.Header;
@@ -345,38 +528,14 @@ begin
           Column.ReadOnly := Definition.ReadOnly;
         if Column.Visible <> Definition.Visible then
           Column.Visible := Definition.Visible;
-
         if Column.Index <> DesiredIndex then
           Column.Index := DesiredIndex;
-        LogColumn('after Index', Key, Column,
-          AState.FWidths.TryGetValue(Key, SavedWidth), SavedWidth);
-        AState.FColumns.AddOrSetValue(Key, Column);
+
+        AState.RegisterColumn(Key, Column);
         Inc(DesiredIndex);
       end;
     finally
       AGrid.EndUpdate;
-    end;
-    { EndUpdate is the FMX layout boundary.  Restore the final widths only now:
-      an existing key gets its trusted snapshot; a newly introduced dynamic
-      column gets the declarative initial width. }
-    for Definition in ADefinitions do
-    begin
-      Column := AState.FColumns[Definition.Key];
-      if AState.FWidths.TryGetValue(Definition.Key, SavedWidth) then
-      begin
-        if Abs(Column.Width - SavedWidth) >= CWidthEpsilon then
-          Column.Width := SavedWidth;
-      end
-      else if Definition.ExistingColumn = nil then
-      begin
-        if Abs(Column.Width - Definition.InitialWidth) >= CWidthEpsilon then
-          Column.Width := Definition.InitialWidth;
-        AState.FWidths.AddOrSetValue(Definition.Key, Column.Width);
-      end
-      else
-        AState.FWidths.AddOrSetValue(Definition.Key, Column.Width);
-      LogColumn('after EndUpdate', Definition.Key, Column,
-        AState.FWidths.TryGetValue(Definition.Key, SavedWidth), SavedWidth);
     end;
 
     AState.FLastSignature := Signature;
