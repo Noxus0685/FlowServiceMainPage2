@@ -911,26 +911,26 @@ object FrameProceed: TFrameProceed
     Left = 922
     Top = 328
     object MenuItemChartSettings: TMenuItem
-      Text = 'Настройки'
+      Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080
       object MenuItemChartLineMode: TMenuItem
-        Text = 'Линия средних значений'
+        Text = #1051#1080#1085#1080#1103' '#1089#1088#1077#1076#1085#1080#1093' '#1079#1085#1072#1095#1077#1085#1080#1081
         object MenuItemChartLinePchip: TMenuItem
-          Text = 'PCHIP по log(Q)'
+          Text = 'PCHIP '#1087#1086' log(Q)'
           OnClick = ChartLineModeMenuClick
         end
         object MenuItemChartLineSegments: TMenuItem
-          Text = 'Прямые отрезки'
+          Text = #1055#1088#1103#1084#1099#1077' '#1086#1090#1088#1077#1079#1082#1080
           OnClick = ChartLineModeMenuClick
         end
       end
       object MenuItemChartScale: TMenuItem
-        Text = 'Шкала расхода'
+        Text = #1064#1082#1072#1083#1072' '#1088#1072#1089#1093#1086#1076#1072
         object MenuItemChartScaleLog: TMenuItem
-          Text = 'Логарифмическая'
+          Text = #1051#1086#1075#1072#1088#1080#1092#1084#1080#1095#1077#1089#1082#1072#1103
           OnClick = ChartScaleMenuClick
         end
         object MenuItemChartScaleLinear: TMenuItem
-          Text = 'Обычная'
+          Text = #1054#1073#1099#1095#1085#1072#1103
           OnClick = ChartScaleMenuClick
         end
       end

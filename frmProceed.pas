@@ -2118,7 +2118,7 @@ var
     ASeries: TChartSeries): Boolean;
   var
     LogX, PointY, H, Delta, Derivative: TArray<Double>;
-    PointCount, SegmentIndex, SampleIndex: Integer;
+    PointCount, PointIndex, SegmentIndex, SampleIndex: Integer;
     T, H00, H10, H01, H11, CurveLogX, CurveY: Double;
 
     function SameNonZeroSign(const A, B: Double): Boolean;
@@ -2148,33 +2148,39 @@ var
     SetLength(H, PointCount - 1);
     SetLength(Delta, PointCount - 1);
     SetLength(Derivative, PointCount);
-    for I := 0 to PointCount - 1 do
+    for PointIndex := 0 to PointCount - 1 do
     begin
-      if APoints[I].X <= 0 then
+      if APoints[PointIndex].X <= 0 then
         Exit;
-      LogX[I] := Log10(APoints[I].X);
-      PointY[I] := APoints[I].Y;
-      if (I > 0) and (LogX[I] <= LogX[I - 1]) then
+      LogX[PointIndex] := Log10(APoints[PointIndex].X);
+      PointY[PointIndex] := APoints[PointIndex].Y;
+      if (PointIndex > 0) and
+         (LogX[PointIndex] <= LogX[PointIndex - 1]) then
         Exit;
     end;
 
-    for I := 0 to PointCount - 2 do
+    for PointIndex := 0 to PointCount - 2 do
     begin
-      H[I] := LogX[I + 1] - LogX[I];
-      Delta[I] := (PointY[I + 1] - PointY[I]) / H[I];
+      H[PointIndex] := LogX[PointIndex + 1] - LogX[PointIndex];
+      Delta[PointIndex] :=
+        (PointY[PointIndex + 1] - PointY[PointIndex]) / H[PointIndex];
     end;
 
     Derivative[0] := EndpointDerivative(H[0], H[1], Delta[0], Delta[1]);
     Derivative[PointCount - 1] := EndpointDerivative(
       H[PointCount - 2], H[PointCount - 3], Delta[PointCount - 2],
       Delta[PointCount - 3]);
-    for I := 1 to PointCount - 2 do
-      if SameNonZeroSign(Delta[I - 1], Delta[I]) then
-        Derivative[I] := (2 * H[I] + H[I - 1] + H[I] + 2 * H[I - 1]) /
-          ((2 * H[I] + H[I - 1]) / Delta[I - 1] +
-           (H[I] + 2 * H[I - 1]) / Delta[I])
+    for PointIndex := 1 to PointCount - 2 do
+      if SameNonZeroSign(Delta[PointIndex - 1], Delta[PointIndex]) then
+        Derivative[PointIndex] :=
+          (2 * H[PointIndex] + H[PointIndex - 1] + H[PointIndex] +
+           2 * H[PointIndex - 1]) /
+          ((2 * H[PointIndex] + H[PointIndex - 1]) /
+             Delta[PointIndex - 1] +
+           (H[PointIndex] + 2 * H[PointIndex - 1]) /
+             Delta[PointIndex])
       else
-        Derivative[I] := 0;
+        Derivative[PointIndex] := 0;
 
     for SegmentIndex := 0 to PointCount - 2 do
       for SampleIndex := 0 to CChartCurvePointsPerInterval do
