@@ -2078,6 +2078,7 @@ var
   PointSeries, AverageSeries, LineSeries: TChartSeries;
   Sorter: IComparer<TPointF>;
   P1: TPointF;
+  PolynomialCoefficients: TArray<Double>;
   GroupKey, LegendBase, FlowUnitName: string;
   I, J, DeviceIndex, PolynomialDegree: Integer;
   SumX, SumY, X, Y: Double;
@@ -2329,7 +2330,7 @@ begin
             PointSeries.AddPoint(RawPoints[I].X, RawPoints[I].Y);
 
           // Проекции и подписи координат отображаются только для средних
-          // точек, которые используются как узлы сглаженной линии.
+          // точек, которые служат входными данными полинома.
           AverageSeries := Chart1.AddSeries('');
           AverageSeries.Color := GetChartDeviceColor(Device, True, DeviceIndex);
           AverageSeries.ShowLine := False;
