@@ -4,13 +4,20 @@ interface
 
 uses
   System.SysUtils, System.Classes, System.Types, System.Math,
-  System.Generics.Collections,
+  System.Generics.Collections, System.Generics.Defaults,
   System.UITypes,
   System.Math.Vectors,
   FMX.Controls, FMX.Types, FMX.Graphics, FMX.Forms;
 
 type
   TChartLineStyle = (clsSolid, clsDash);
+
+  // Хранит значение и экранную координату подписи средней погрешности.
+  TChartYLabelInfo = record
+    Value: Double;
+    ScreenY: Single;
+    Color: TAlphaColor;
+  end;
   // ---------------------------------------------------------------------------
   // Серия данных (одна линия на графике)
   // ---------------------------------------------------------------------------
@@ -117,7 +124,8 @@ type
     procedure DrawLegend;
     procedure DrawMarkersForSeries(Series: TChartSeries;
       ADrawnXLabels: TList<Double>;
-      ADrawnYLabelRects: TList<TRectF>); // маркеры для одной серии
+      AYLabels: TList<TChartYLabelInfo>); // маркеры для одной серии
+    procedure DrawAveragedYLabels(AYLabels: TList<TChartYLabelInfo>);
     function GetSeries(Index: Integer): TChartSeries;
     function GetSeriesCount: Integer;
     function GetFirstSeriesPoints: TList<TPointF>;
@@ -777,12 +785,13 @@ end;
 // Отрисовка маркеров для одной серии
 // -----------------------------------------------------------------------------
 procedure TSimpleChart.DrawMarkersForSeries(Series: TChartSeries;
-  ADrawnXLabels: TList<Double>; ADrawnYLabelRects: TList<TRectF>);
+  ADrawnXLabels: TList<Double>; AYLabels: TList<TChartYLabelInfo>);
 var
   I: Integer;
   PointValue, ScreenPt: TPointF;
   PlotRect, TextRect: TRectF;
   GuideColor: TAlphaColor;
+  YLabel: TChartYLabelInfo;
 
   // Проверяет, была ли подпись координаты уже выведена другой серией.
   function IsAxisLabelDrawn(const AValue: Double;
@@ -799,50 +808,6 @@ var
         Exit(True);
   end;
 
-  // Places a Y value in the nearest free screen row without overlapping labels.
-  function TryPlaceYLabel(var ARect: TRectF): Boolean;
-  const
-    CLabelStep = 20.0;
-    CLabelGap = 2.0;
-  var
-    InitialRect, Candidate, DrawnRect: TRectF;
-    Step, Direction: Integer;
-    Intersects: Boolean;
-  begin
-    InitialRect := ARect;
-    for Step := 0 to Ceil(PlotRect.Height / CLabelStep) do
-      for Direction := -1 to 1 do
-      begin
-        if (Step > 0) and (Direction = 0) then
-          Continue;
-        if (Step = 0) and (Direction <> 0) then
-          Continue;
-
-        Candidate := InitialRect;
-        Candidate.Offset(0, Step * Direction * CLabelStep);
-        if (Candidate.Top < PlotRect.Top) or
-           (Candidate.Bottom > PlotRect.Bottom) then
-          Continue;
-
-        Intersects := False;
-        if ADrawnYLabelRects <> nil then
-          for DrawnRect in ADrawnYLabelRects do
-            if (Candidate.Left < DrawnRect.Right + CLabelGap) and
-               (Candidate.Right > DrawnRect.Left - CLabelGap) and
-               (Candidate.Top < DrawnRect.Bottom + CLabelGap) and
-               (Candidate.Bottom > DrawnRect.Top - CLabelGap) then
-            begin
-              Intersects := True;
-              Break;
-            end;
-        if not Intersects then
-        begin
-          ARect := Candidate;
-          Exit(True);
-        end;
-      end;
-    Result := False;
-  end;
 begin
   PlotRect := TRectF.Create(
     MarginLeft,
@@ -877,22 +842,12 @@ begin
           ADrawnXLabels.Add(PointValue.X);
       end;
 
-      TextRect := RectF(PlotRect.Left - 92, ScreenPt.Y - 9,
-        PlotRect.Left - 40, ScreenPt.Y + 9);
-      if TryPlaceYLabel(TextRect) then
+      if AYLabels <> nil then
       begin
-        if not SameValue((TextRect.Top + TextRect.Bottom) / 2,
-          ScreenPt.Y, 0.5) then
-        begin
-          Canvas.Stroke.Color := GuideColor;
-          Canvas.DrawLine(PointF(TextRect.Right + 2,
-            (TextRect.Top + TextRect.Bottom) / 2),
-            PointF(PlotRect.Left - 2, ScreenPt.Y), 1);
-        end;
-        Canvas.FillText(TextRect, FormatFloat('0.###', PointValue.Y), False,
-          1, [], TTextAlign.Trailing, TTextAlign.Center);
-        if ADrawnYLabelRects <> nil then
-          ADrawnYLabelRects.Add(TextRect);
+        YLabel.Value := PointValue.Y;
+        YLabel.ScreenY := ScreenPt.Y;
+        YLabel.Color := Series.Color;
+        AYLabels.Add(YLabel);
       end;
     end;
 
@@ -903,6 +858,70 @@ begin
                              ScreenPt.Y - Series.MarkerRadius,
                              ScreenPt.X + Series.MarkerRadius,
                              ScreenPt.Y + Series.MarkerRadius), 1);
+  end;
+end;
+
+// Объединяет пересекающиеся подписи погрешности и выводит их среднее значение.
+procedure TSimpleChart.DrawAveragedYLabels(
+  AYLabels: TList<TChartYLabelInfo>);
+const
+  CLabelHeight = 18.0;
+  CLabelGap = 2.0;
+var
+  SortedLabels: TList<TChartYLabelInfo>;
+  I, GroupStart, GroupEnd, GroupCount: Integer;
+  SumValue, AverageValue: Double;
+  AverageScreenY: Single;
+  TextRect: TRectF;
+  LabelColor: TAlphaColor;
+begin
+  if (AYLabels = nil) or (AYLabels.Count = 0) then
+    Exit;
+
+  SortedLabels := TList<TChartYLabelInfo>.Create;
+  try
+    SortedLabels.AddRange(AYLabels);
+    SortedLabels.Sort(TComparer<TChartYLabelInfo>.Construct(
+      function(const Left, Right: TChartYLabelInfo): Integer
+      begin
+        if Left.ScreenY < Right.ScreenY then
+          Result := -1
+        else if Left.ScreenY > Right.ScreenY then
+          Result := 1
+        else
+          Result := 0;
+      end));
+
+    GroupStart := 0;
+    while GroupStart < SortedLabels.Count do
+    begin
+      GroupEnd := GroupStart;
+      while (GroupEnd + 1 < SortedLabels.Count) and
+            (SortedLabels[GroupEnd + 1].ScreenY -
+             SortedLabels[GroupEnd].ScreenY < CLabelHeight + CLabelGap) do
+        Inc(GroupEnd);
+
+      SumValue := 0;
+      for I := GroupStart to GroupEnd do
+        SumValue := SumValue + SortedLabels[I].Value;
+      GroupCount := GroupEnd - GroupStart + 1;
+      AverageValue := SumValue / GroupCount;
+      AverageScreenY := WorldToScreen(PointF(FXMin, AverageValue)).Y;
+
+      if GroupCount = 1 then
+        LabelColor := SortedLabels[GroupStart].Color
+      else
+        LabelColor := FAxisColor;
+      Canvas.Fill.Color := LabelColor;
+      TextRect := RectF(MarginLeft - 92, AverageScreenY - CLabelHeight / 2,
+        MarginLeft - 40, AverageScreenY + CLabelHeight / 2);
+      Canvas.FillText(TextRect, FormatFloat('0.###', AverageValue), False,
+        1, [], TTextAlign.Trailing, TTextAlign.Center);
+
+      GroupStart := GroupEnd + 1;
+    end;
+  finally
+    SortedLabels.Free;
   end;
 end;
 
@@ -917,10 +936,10 @@ var
   Delta: TPointF;
   LengthPx, DashPos: Single;
   DrawnXLabels: TList<Double>;
-  DrawnYLabelRects: TList<TRectF>;
+  YLabels: TList<TChartYLabelInfo>;
 begin
   DrawnXLabels := TList<Double>.Create;
-  DrawnYLabelRects := TList<TRectF>.Create;
+  YLabels := TList<TChartYLabelInfo>.Create;
   try
     for i := 0 to FSeries.Count - 1 do
     begin
@@ -957,10 +976,11 @@ begin
     end;
 
       if series.ShowMarkers then
-        DrawMarkersForSeries(series, DrawnXLabels, DrawnYLabelRects);
+        DrawMarkersForSeries(series, DrawnXLabels, YLabels);
     end;
+    DrawAveragedYLabels(YLabels);
   finally
-    DrawnYLabelRects.Free;
+    YLabels.Free;
     DrawnXLabels.Free;
   end;
 end;
