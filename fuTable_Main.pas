@@ -1198,6 +1198,9 @@ var
   Notification: TActionNotification;
   Action: EActionWorkTable;
   Error: TErrorInfo;
+  Snapshot: TWorkTableHydraulicSnapshot;
+  Configuration: TWorkTableHydraulicConfiguration;
+  I, N: Integer;
 begin
   WorkTable := Sender;
   if not Assigned(WorkTable) then
@@ -1257,6 +1260,62 @@ begin
 
       end;
 
+
+    awtSelectEtalons:
+    begin
+      Snapshot := WorkTable.GetHydraulicLineSnapshot;
+      Error := TErrorInfo.Empty(Ord(hlsSelecting));
+      Configuration := TWorkTableHydraulicConfiguration.Empty;
+      Configuration.ChartIndex := 0;
+      Configuration.ChartName := 'Default';
+      Configuration.RangeIndex := 0;
+      Configuration.Range.Name := 'Selected etalon range';
+      Configuration.Range.FlowMin := 0;
+      Configuration.Range.FlowMax := Snapshot.TargetFlow;
+      if WorkTable.SelectEtalons(Snapshot.TargetFlow, Error) then
+      begin
+        N := 0;
+        for I := 0 to WorkTable.EtalonChannels.Count - 1 do
+          if WorkTable.EtalonChannels[I].Enabled then
+          begin
+            SetLength(Configuration.EtalonNames, N + 1);
+            Configuration.EtalonNames[N] := WorkTable.EtalonChannels[I].Name;
+            Inc(N);
+          end;
+        WorkTable.CompleteHydraulicSelection(Snapshot.OperationID, Configuration, Error);
+      end
+      else
+        WorkTable.CompleteHydraulicSelection(Snapshot.OperationID, Configuration, Error);
+    end;
+
+    awtSetupHydraulicLine:
+    begin
+      Snapshot := WorkTable.GetHydraulicLineSnapshot;
+      Error := TErrorInfo.Empty(Ord(hlsSettingUp));
+      try
+        WorkTable.InstalledMeasurementPointUUID := Snapshot.PointUUID;
+        WorkTable.InstalledMeasurementPointIndex := Snapshot.PointIndex;
+        WorkTable.InstalledMeasurementTargetFlowLS := Snapshot.TargetFlow;
+        if WorkTable.FlowRate <> nil then
+        begin
+          WorkTable.FlowRate.DoFlowRateSet(Snapshot.TargetFlow);
+          WorkTable.FlowRate.DoFlowRateStart;
+        end;
+        if (WorkTable.CurrentPoint <> nil) and (WorkTable.CurrentPoint.Temp >= 0) and
+           (WorkTable.FluidTemp <> nil) then
+          WorkTable.FluidTemp.DoFluidTempStart(WorkTable.CurrentPoint.Temp);
+        if (WorkTable.CurrentPoint <> nil) and (WorkTable.CurrentPoint.Pressure >= 0) and
+           (WorkTable.FluidPress <> nil) then
+          WorkTable.FluidPress.DoFluidPressStart(WorkTable.CurrentPoint.Pressure);
+        WorkTable.CompleteHydraulicLineSetup(Snapshot.OperationID, True, Error);
+      except
+        on E: Exception do
+        begin
+          Error.Code := 2120; Error.Msg := E.Message; Error.Time := Now;
+          WorkTable.CompleteHydraulicLineSetup(Snapshot.OperationID, False, Error);
+        end;
+      end;
+    end;
 
     awtAddPump:
     begin

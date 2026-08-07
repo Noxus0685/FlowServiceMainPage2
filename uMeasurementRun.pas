@@ -432,11 +432,9 @@ type
     function BuildError(ACode: Integer; const AMsg: string): TErrorInfo;
     function ValidatePoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
     function SetPoint(Index: Integer; out AError: TErrorInfo): Boolean;
-    function SelectEtalons(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
     function BuildPointSelectionLog(APoint: TDevicePoint): string;
     function BuildEtalonSelectionLog(APoint: TDevicePoint): string;
     function CalcMeasureTimeout(APoint: TDevicePoint): Cardinal;
-    function SetupPoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
     function SetupMeasurement(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
     function GetCurrentStopTimeValue: Double;
     function GetCurrentStopImpulseValue: Int64;
@@ -1459,13 +1457,10 @@ begin
     //
     // Если текущий режим и параметры точки требуют автоматического выбора
     // эталонных расходомеров, сначала переходим в msSelectEtalon.
-    if ShouldSelectEtalon then
-      SetStage(msSelectEtalon)
+    if FMode = mrmManual then
+      SetStage(msSetupPoint)
     else
-      // Если эталон уже выбран, выбор эталона запрещён текущим режимом
-      // либо не требуется для данной точки, сразу переходим к настройке
-      // параметров точки.
-      SetStage(msSetupPoint);
+      SetStage(msSelectEtalon);
   end
   else
   begin
@@ -1494,19 +1489,29 @@ end;
 procedure TMeasurementRun.EnterSelectEtalon;
 var
   Error: TErrorInfo;
+  OperationID: Int64;
+  Snapshot: TWorkTableHydraulicSnapshot;
+  Point: TDevicePoint;
 begin
   SetCurrentPointStatus(mptsSelectEtalon);
-  if IsStopRequested then
+  if IsStopRequested then Exit;
+  Point := GetCurrentPoint;
+  if (Point = nil) or (FWorkTable = nil) then
+  begin
+    ContinueAfterPointError(mptsSetupError, meEtalonAbsent,
+      BuildError(1100, 'Нет точки или рабочего стола для выбора гидравлической конфигурации'));
     Exit;
-  if SelectEtalons(GetCurrentPoint, Error) then
-  begin
-    FireEvent(meEtalonSelected);
-    SetStage(msSetupPoint);
-  end
-  else
-  begin
-    ContinueAfterPointError(mptsSetupError, meEtalonAbsent, Error);
   end;
+  Snapshot := FWorkTable.GetHydraulicLineSnapshot;
+  if FWorkTable.IsHydraulicLineActual(Point, FCurrentPointIndex) and
+     (Snapshot.State in [hlsSelected, hlsSettingUp, hlsConfigured]) then
+    Exit;
+  FWorkTable.ResetHydraulicLine;
+  if not FWorkTable.BeginHydraulicSelection(Point, FCurrentPointIndex,
+    OperationID, Error) then
+    ContinueAfterPointError(mptsSetupError, meEtalonAbsent, Error)
+  else
+    FWaitStartedTick := TMeterValue.GetMonotonicTimeMs;
 end;
 
 procedure TMeasurementRun.EnterSetupPoint;
@@ -1515,70 +1520,21 @@ var
   Error: TErrorInfo;
 begin
   Point := GetCurrentPoint;
-
-  if FMode = mrmManual then
-  begin
-    if Point = nil then
-    begin
-      FireEvent(mePointNotSet, BuildError(1200, 'В ручном режиме не задана текущая точка измерения'));
-      SetStage(msDone);
-      Exit;
-    end;
-
-    SetCurrentPointStatus(mptsSetupPoint);
-
-    if not SetupMeasurement(Point, Error) then
-    begin
-      ContinueAfterPointError(mptsSetupError, mePointNotSet, Error);
-      Exit;
-    end;
-
-    if IsStopRequested then
-      Exit;
-
-    FireEvent(mePointSet);
-    SetStage(msWaitMeasureStart);
-    Exit;
-  end;
-
+  FPointSetupCommandSent := False;
+  FSetupStartedMs := 0;
   if Point = nil then
   begin
-    FireEvent(mePointNotSet, BuildError(1200, 'Текущая точка измерения не назначена'));
-    SetStage(msDone);
+    ContinueAfterPointError(mptsSetupError, mePointNotSet,
+      BuildError(1200, 'Текущая точка измерения не назначена'));
     Exit;
   end;
-
   SetCurrentPointStatus(mptsSetupPoint);
-  if IsStopRequested then
-    Exit;
-
-  if ShouldSetupConditions then
+  if FMode = mrmManual then
   begin
-    if not SetupPoint(Point, Error) then
-    begin
-      ContinueAfterPointError(mptsSetupError, mePointNotSet, Error);
-      Exit;
-    end;
-    if IsStopRequested then
-      Exit;
-  end
-  else
-    SetCurrentPointStatus(mptsSetupPoint);
-
-  if not SetupMeasurement(Point, Error) then
-  begin
-    ContinueAfterPointError(mptsSetupError, mePointNotSet, Error);
-    Exit;
+    if not SetupMeasurement(Point, Error) then
+      ContinueAfterPointError(mptsSetupError, mePointNotSet, Error)
+    else begin FireEvent(mePointSet); SetStage(msWaitMeasureStart); end;
   end;
-
-  if IsStopRequested then
-    Exit;
-
-  FireEvent(mePointSet);
-  if ShouldWaitStable then
-    SetStage(msWaitPointSetup)
-  else
-    SetStage(msWaitMeasureStart);
 end;
 
 procedure TMeasurementRun.EnterWaitPointSetup;
@@ -1598,25 +1554,8 @@ begin
 
   Point := GetCurrentPoint;
   CurrentMs := TMeterValue.GetMonotonicTimeMs;
-  FStabilityDataStartMs := FSetupStartedMs;
-  if (FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.Value <> nil) then
-  begin
-    ConfigureStabilityByPoint(FWorkTable.FlowRate.Value, Point);
-    ConfigureTargetRangeByPoint(FWorkTable.FlowRate.Value, Point, True, True);
-    FWorkTable.FlowRate.Value.ResetStabilityRuntimeState;
-    LogPointSetupValueConfigured('TableFlow', FWorkTable.FlowRate.Value);
-  end;
-  // Новое окно поверяемого сигнала начинается при входе в ожидание установки,
-  // а не при последующем входе в msWaitStable. Поэтому данные, накопленные пока
-  // стабилизировалась установка, сохраняются и доступны приборному анализу.
-  if FWorkTable.DeviceChannels <> nil then
-    for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
-    begin
-      Channel := FWorkTable.DeviceChannels[I];
-      if (Channel <> nil) and (Channel.FlowMeter <> nil) and
-         (Channel.FlowMeter.ValueFlow <> nil) then
-        Channel.FlowMeter.ValueFlow.ResetStabilityRuntimeState;
-    end;
+  { Stability history starts only after hlsConfigured is observed. }
+  FStabilityDataStartMs := 0;
 
   if Point <> nil then
   begin
@@ -4550,6 +4489,8 @@ var
   ReasonSnapshot: TMeasurementStopReason;
   Duplicate: Boolean;
 begin
+  if FWorkTable <> nil then
+    FWorkTable.ResetHydraulicLine;
   if FCurrentStage in [msNone, msDone] then
   begin
     ProtocolManager.AddMessage(pcInfo, psMeasurement,
@@ -5006,35 +4947,6 @@ begin
   end;
 end;
 
-function TMeasurementRun.SelectEtalons(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
-begin
-  AError := TErrorInfo.Empty(Integer(msSelectEtalon));
-  Result := False;
-
-  if (APoint = nil) or (FWorkTable = nil) then
-  begin
-    AError := BuildError(1100, 'Нет точки или рабочего стола для выбора эталона');
-    Exit;
-  end;
-
-  Result := FWorkTable.SelectEtalons(APoint.Q, AError);
-  if not Result then
-  begin
-    if GetSelectedEtalonUUID <> '' then
-    begin
-      AddDiagnosticEvent('SelectEtalons warning suppressed: existing selected etalon is valid; SelectedEtalonUUID=' + GetSelectedEtalonUUID + '; Error=' + AError.Msg);
-      AError := TErrorInfo.Empty(Integer(msSelectEtalon));
-      Result := True;
-    end
-    else
-      Exit;
-  end;
-
-  if Assigned(ProtocolManager) then
-    ProtocolManager.AddMessage(pcAction, psMeasurement, 'EtalonSelected',
-      'Выбраны эталоны для точки', BuildEtalonSelectionLog(APoint));
-end;
-
 function TMeasurementRun.CalcMeasureTimeout(APoint: TDevicePoint): Cardinal;
 const
   DEFAULT_MEASURE_TIMEOUT_SEC = 3600;
@@ -5078,77 +4990,6 @@ begin
 
   if HasRestrictions and (TimeByLimit > 0) then
     Result := Ceil(TimeByLimit)+5; // Аварийная добавка к измерению?!
-end;
-
-function TMeasurementRun.SetupPoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
-begin
-  Result := False;
-  AError := TErrorInfo.Empty(Integer(FCurrentStage));
-
-  if (FWorkTable = nil) or (APoint = nil) then
-  begin
-    AError := BuildError(1201, 'Невозможно задать параметры точки');
-    Exit;
-  end;
-
-  if FPointSetupCommandSent then
-  begin
-    AddDiagnosticEvent(Format('SetupPoint skipped: command already sent; PointIndex=%d; PointUUID=%s; TargetFlowLS=%.6f',
-      [FSetupPointIndex, FSetupPointUUID, FSetupTargetFlowLS]));
-    Exit(True);
-  end;
-
-  if FAttempt <= 0 then
-    FAttempt := 1;
-
-  FSetupPointUUID := APoint.UUID;
-  FSetupPointIndex := FCurrentPointIndex;
-  FSetupTargetFlowLS := APoint.Q;
-  FSetupStartedMs := TMeterValue.GetMonotonicTimeMs;
-  FPointSetupCommandSent := True;
-  FWorkTable.InstalledMeasurementPointUUID := FSetupPointUUID;
-  FWorkTable.InstalledMeasurementPointIndex := FSetupPointIndex;
-  FWorkTable.InstalledMeasurementTargetFlowLS := FSetupTargetFlowLS;
-
-  AddDiagnosticEvent(Format(
-    'SetupPoint command: PointIndex=%d; MeasurementPointUUID=%s; PointName=%s; TargetFlowLS=%.6f; SelectedEtalonUUID=%s; WorkTableState=%s; Attempt=%d; CommandSent=%s; %s',
-    [FSetupPointIndex, FSetupPointUUID, APoint.Name, FSetupTargetFlowLS, GetSelectedEtalonUUID,
-     TWorkTable.WorkTableStateToString(FWorkTable.State), FAttempt, BoolToStr(FPointSetupCommandSent, True), BuildPointSetupIdentityLog]));
-
-    ProtocolManager.AddMessage(
-    pcProc,
-    psMeasurement,
-    'SetupPoint',
-    'Отдана команда установки точки измерения',
-    Format(
-      'PointIndex=%d; MeasurementPointUUID=%s; PointName=%s; ' +
-      'TargetFlowLS=%.6f; SelectedEtalonUUID=%s; WorkTableState=%s; ' +
-      'Attempt=%d; CommandSent=%s; %s',
-      [FSetupPointIndex,
-       FSetupPointUUID,
-       APoint.Name,
-       FSetupTargetFlowLS,
-       GetSelectedEtalonUUID,
-       TWorkTable.WorkTableStateToString(FWorkTable.State),
-       FAttempt,
-       BoolToStr(FPointSetupCommandSent, True),
-       BuildPointSetupIdentityLog])
-  );
-
-
-  if (APoint.Q >= 0) and (FWorkTable.FlowRate <> nil) then
-  begin
-    FWorkTable.FlowRate.DoFlowRateSet(APoint.Q);
-    FWorkTable.FlowRate.DoFlowRateStart;
-  end;
-
-  if (APoint.Temp >= 0) and (FWorkTable.FluidTemp <> nil) then
-    FWorkTable.FluidTemp.DoFluidTempStart(APoint.Temp);
-
-  if (APoint.Pressure >= 0) and (FWorkTable.FluidPress <> nil) then
-    FWorkTable.FluidPress.DoFluidPressStart(APoint.Pressure);
-
-  Result := True;
 end;
 
 function TMeasurementRun.SetupMeasurement(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
@@ -5433,13 +5274,70 @@ begin
 end;
 
 procedure TMeasurementRun.ProcessSelectEtalon;
+const
+  SELECTION_TIMEOUT_S = 30;
+var
+  Snapshot: TWorkTableHydraulicSnapshot;
+  Error: TErrorInfo;
 begin
-  // Etalon selection is performed once in EnterSelectEtalon.
+  if (FWorkTable = nil) then Exit;
+  Snapshot := FWorkTable.GetHydraulicLineSnapshot;
+  case Snapshot.State of
+    hlsSelecting:
+      begin
+        if TMeterValue.GetMonotonicTimeMs - FWaitStartedTick > SELECTION_TIMEOUT_S * 1000 then
+        begin
+          Error := BuildError(1101, 'Тайм-аут поиска гидравлической конфигурации');
+          FWorkTable.FailHydraulicOperation(Snapshot.OperationID, Error);
+          ContinueAfterPointError(mptsSetupError, meEtalonAbsent, Error);
+        end;
+        Exit;
+      end;
+    hlsSelected:
+      begin FireEvent(meEtalonSelected); SetStage(msSetupPoint); end;
+    hlsFailed:
+      ContinueAfterPointError(mptsSetupError, meEtalonAbsent, Snapshot.Error);
+    hlsSettingUp, hlsConfigured:
+      SetStage(msSetupPoint);
+  else
+    ContinueAfterPointError(mptsSetupError, meEtalonAbsent,
+      BuildError(1102, 'Несогласованное состояние выбора гидравлической линии'));
+  end;
 end;
 
 procedure TMeasurementRun.ProcessSetupPoint;
+var
+  Snapshot: TWorkTableHydraulicSnapshot;
+  OperationID: Int64;
+  Error: TErrorInfo;
+  Point: TDevicePoint;
 begin
-  // Point and measurement setup are performed once in EnterSetupPoint.
+  if FMode = mrmManual then Exit;
+  Point := GetCurrentPoint;
+  Snapshot := FWorkTable.GetHydraulicLineSnapshot;
+  case Snapshot.State of
+    hlsSelected:
+      begin
+        if FPointSetupCommandSent then Exit;
+        if not SetupMeasurement(Point, Error) then
+        begin ContinueAfterPointError(mptsSetupError, mePointNotSet, Error); Exit; end;
+        if not FWorkTable.BeginHydraulicLineSetup(OperationID, Error) then
+        begin ContinueAfterPointError(mptsSetupError, mePointNotSet, Error); Exit; end;
+        FPointSetupCommandSent := True;
+        FSetupStartedMs := TMeterValue.GetMonotonicTimeMs;
+        FireEvent(mePointSet);
+        SetStage(msWaitPointSetup);
+      end;
+    hlsSettingUp:
+      begin FPointSetupCommandSent := True; FSetupStartedMs := TMeterValue.GetMonotonicTimeMs; SetStage(msWaitPointSetup); end;
+    hlsConfigured:
+      begin FPointSetupCommandSent := True; SetStage(msWaitPointSetup); end;
+    hlsFailed:
+      ContinueAfterPointError(mptsSetupError, mePointNotSet, Snapshot.Error);
+  else
+    ContinueAfterPointError(mptsSetupError, mePointNotSet,
+      BuildError(1202, 'Нарушена последовательность установки гидравлической линии'));
+  end;
 end;
 
 
@@ -5460,6 +5358,10 @@ var
   CurrentMs: Int64;
   FreshLog: string;
   Point: TDevicePoint;
+  Error: TErrorInfo;
+  Snapshot: TWorkTableHydraulicSnapshot;
+  I: Integer;
+  Channel: TChannel;
 begin
   CurrentMs := TMeterValue.GetMonotonicTimeMs;
   Point := GetCurrentPoint;
@@ -5492,6 +5394,47 @@ begin
   end;
 
 
+
+  Snapshot := FWorkTable.GetHydraulicLineSnapshot;
+  case Snapshot.State of
+    hlsSettingUp:
+      begin
+        if (FSetupStartedMs > 0) and (CurrentMs - FSetupStartedMs > SETUP_TIMEOUT_S * 1000) then
+        begin
+          Error := BuildError(1214, 'Тайм-аут физической установки гидравлической линии');
+          FWorkTable.FailHydraulicOperation(Snapshot.OperationID, Error);
+          ContinueAfterPointError(mptsSetupError, mePointNotSet, Error);
+        end;
+        Exit;
+      end;
+    hlsFailed:
+      begin ContinueAfterPointError(mptsSetupError, mePointNotSet, Snapshot.Error); Exit; end;
+    hlsConfigured:
+      if FStabilityDataStartMs = 0 then
+      begin
+        FSetupStartedMs := CurrentMs;
+        FStabilityDataStartMs := CurrentMs;
+        if (FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.Value <> nil) then
+        begin
+          ConfigureStabilityByPoint(FWorkTable.FlowRate.Value, Point);
+          ConfigureTargetRangeByPoint(FWorkTable.FlowRate.Value, Point, True, True);
+          FWorkTable.FlowRate.Value.ResetStabilityRuntimeState;
+          LogPointSetupValueConfigured('TableFlow', FWorkTable.FlowRate.Value);
+        end;
+        if FWorkTable.DeviceChannels <> nil then
+          for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+          begin
+            Channel := FWorkTable.DeviceChannels[I];
+            if (Channel <> nil) and (Channel.FlowMeter <> nil) and
+               (Channel.FlowMeter.ValueFlow <> nil) then
+              Channel.FlowMeter.ValueFlow.ResetStabilityRuntimeState;
+          end;
+      end;
+  else
+    ContinueAfterPointError(mptsSetupError, mePointNotSet,
+      BuildError(1215, 'Гидравлическая линия не готова к ожиданию стабилизации'));
+    Exit;
+  end;
 
   if FWorkTable.State <> swtMONITOR then
   begin

@@ -8,6 +8,7 @@ uses
   System.IniFiles,
   System.Math,
   System.StrUtils,
+  System.SyncObjs,
   System.SysUtils,
   System.TypInfo,
   System.UITypes,
@@ -161,8 +162,10 @@ type
     awtRemoveChannel,
     awtWriteRegister,
     awtReadRegister,
-    // Автоматический выбор эталонных каналов для текущего расхода.
-    awtSelectEtalons
+    // Асинхронный выбор гидравлической конфигурации текущей точки.
+    awtSelectEtalons,
+    // Асинхронная физическая установка ранее выбранной конфигурации.
+    awtSetupHydraulicLine
 
   );
 
@@ -190,6 +193,49 @@ type
     wtecStopTestFailed = 2004,
     wtecSaveResultsFailed = 2005
   );
+
+  EHydraulicLineState = (
+    hlsNone,
+    hlsSelecting,
+    hlsSelected,
+    hlsSettingUp,
+    hlsConfigured,
+    hlsFailed
+  );
+
+  { Immutable value snapshot of a selected hydraulic-chart row.  The current
+    project has no persistent chart model yet, therefore the snapshot keeps
+    the row identity and limits without owning UI/equipment objects. }
+  THydraulicChartRange = record
+    Name: string;
+    FlowMin: Double;
+    FlowMax: Double;
+  end;
+
+  TWorkTableHydraulicConfiguration = record
+    ChartIndex: Integer;
+    ChartName: string;
+    RangeIndex: Integer;
+    Range: THydraulicChartRange;
+    EtalonNames: TArray<string>;
+    ScaleNames: TArray<string>;
+    PumpNames: TArray<string>;
+    RegulatingPumpNames: TArray<string>;
+    UnregulatedPumpNames: TArray<string>;
+    RegulatingValveNames: TArray<string>;
+    class function Empty: TWorkTableHydraulicConfiguration; static;
+    function Clone: TWorkTableHydraulicConfiguration;
+  end;
+
+  TWorkTableHydraulicSnapshot = record
+    State: EHydraulicLineState;
+    Error: TErrorInfo;
+    OperationID: Int64;
+    PointUUID: string;
+    PointIndex: Integer;
+    TargetFlow: Double;
+    Configuration: TWorkTableHydraulicConfiguration;
+  end;
 
   EMeasurementRunMode = (mrmManual =0, mrmHalfAutomatic, mrmAutomatic);
 
@@ -641,6 +687,18 @@ type
   FInstalledMeasurementPointUUID: string;
   FInstalledMeasurementPointIndex: Integer;
   FInstalledMeasurementTargetFlowLS: Double;
+  FHydraulicLineState: EHydraulicLineState;
+  FHydraulicLineError: TErrorInfo;
+  FHydraulicOperationID: Int64;
+  FHydraulicPointUUID: string;
+  FHydraulicPointIndex: Integer;
+  FHydraulicTargetFlow: Double;
+  FHydraulicConfiguration: TWorkTableHydraulicConfiguration;
+  FHydraulicStateLock: TObject;
+  FHydraulicPointEtalonType: Integer;
+  FHydraulicPointFlowSourceType: Integer;
+  FHydraulicPointSpillageType: Integer;
+  FHydraulicPointPressure: Double;
   FParameterObserver: IEventObserver;
 
   procedure SetState(const ANewState: EStateWorkTable);
@@ -846,6 +904,20 @@ type
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
     procedure UpdateAggregateMeterValues;
+    procedure ResetHydraulicLine;
+    function BeginHydraulicSelection(APoint: TDevicePoint; APointIndex: Integer;
+      out AOperationID: Int64; out AError: TErrorInfo): Boolean;
+    function CompleteHydraulicSelection(AOperationID: Int64;
+      const AConfiguration: TWorkTableHydraulicConfiguration;
+      const AError: TErrorInfo): Boolean;
+    function BeginHydraulicLineSetup(out AOperationID: Int64;
+      out AError: TErrorInfo): Boolean;
+    function CompleteHydraulicLineSetup(AOperationID: Int64; ASuccess: Boolean;
+      const AError: TErrorInfo): Boolean;
+    function GetHydraulicLineSnapshot: TWorkTableHydraulicSnapshot;
+    function IsHydraulicLineActual(APoint: TDevicePoint;
+      APointIndex: Integer): Boolean;
+    procedure FailHydraulicOperation(AOperationID: Int64; const AError: TErrorInfo);
     function SelectEtalons(const AFlowRate: Double; out AError: TErrorInfo): Boolean;
     function SetEtalonsByNames(const AEtalonNames: TArray<string>;
       out AError: TErrorInfo): Boolean;
@@ -2092,6 +2164,10 @@ begin
   FParameterObserver := TParameterObserverBridge.Create(Self);
   FUUID := TGUID.NewGuid.ToString;
   FSyncSetup := TSyncSetup.Create;
+  FHydraulicStateLock := TObject.Create;
+  FHydraulicLineState := hlsNone;
+  FHydraulicLineError := TErrorInfo.Empty(0);
+  FHydraulicPointIndex := -1;
 
   FDeviceChannels := TObjectList<TChannel>.Create(True);
   FEtalonChannels := TObjectList<TChannel>.Create(True);
@@ -2974,6 +3050,190 @@ end;
       Channel.Enabled                — канал разрешен конфигурацией;
       Channel.SelectedForMeasurement — канал выбран для текущей точки.
 }
+class function TWorkTableHydraulicConfiguration.Empty: TWorkTableHydraulicConfiguration;
+begin
+  Result.ChartIndex := -1;
+  Result.ChartName := '';
+  Result.RangeIndex := -1;
+  Result.Range.Name := '';
+  Result.Range.FlowMin := 0;
+  Result.Range.FlowMax := 0;
+  SetLength(Result.EtalonNames, 0);
+  SetLength(Result.ScaleNames, 0);
+  SetLength(Result.PumpNames, 0);
+  SetLength(Result.RegulatingPumpNames, 0);
+  SetLength(Result.UnregulatedPumpNames, 0);
+  SetLength(Result.RegulatingValveNames, 0);
+end;
+
+function TWorkTableHydraulicConfiguration.Clone: TWorkTableHydraulicConfiguration;
+begin
+  Result := Self;
+  Result.EtalonNames := Copy(EtalonNames, 0, Length(EtalonNames));
+  Result.ScaleNames := Copy(ScaleNames, 0, Length(ScaleNames));
+  Result.PumpNames := Copy(PumpNames, 0, Length(PumpNames));
+  Result.RegulatingPumpNames := Copy(RegulatingPumpNames, 0, Length(RegulatingPumpNames));
+  Result.UnregulatedPumpNames := Copy(UnregulatedPumpNames, 0, Length(UnregulatedPumpNames));
+  Result.RegulatingValveNames := Copy(RegulatingValveNames, 0, Length(RegulatingValveNames));
+end;
+
+procedure TWorkTable.ResetHydraulicLine;
+var
+  Before: EHydraulicLineState;
+begin
+  TMonitor.Enter(FHydraulicStateLock);
+  try
+    Before := FHydraulicLineState;
+    Inc(FHydraulicOperationID);
+    FHydraulicLineState := hlsNone;
+    FHydraulicLineError := TErrorInfo.Empty(0);
+    FHydraulicPointUUID := '';
+    FHydraulicPointIndex := -1;
+    FHydraulicTargetFlow := 0;
+    FHydraulicConfiguration := TWorkTableHydraulicConfiguration.Empty;
+  finally
+    TMonitor.Exit(FHydraulicStateLock);
+  end;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcState, psWorkTable, 'HydraulicLine.Reset',
+      'Состояние гидравлической линии сброшено',
+      Format('OperationID=%d; StateBefore=%d; StateAfter=%d',
+        [FHydraulicOperationID, Ord(Before), Ord(hlsNone)]));
+end;
+
+function TWorkTable.IsHydraulicLineActual(APoint: TDevicePoint;
+  APointIndex: Integer): Boolean;
+begin
+  Result := False;
+  if APoint = nil then Exit;
+  TMonitor.Enter(FHydraulicStateLock);
+  try
+    Result := (FHydraulicPointUUID = APoint.UUID) and
+      (FHydraulicPointIndex = APointIndex) and SameValue(FHydraulicTargetFlow, APoint.Q) and
+      (FHydraulicPointEtalonType = APoint.EtalonType) and
+      (FHydraulicPointFlowSourceType = APoint.FlowSorceType) and
+      (FHydraulicPointSpillageType = APoint.SpillageType) and
+      SameValue(FHydraulicPointPressure, APoint.Pressure);
+  finally
+    TMonitor.Exit(FHydraulicStateLock);
+  end;
+end;
+
+function TWorkTable.BeginHydraulicSelection(APoint: TDevicePoint;
+  APointIndex: Integer; out AOperationID: Int64; out AError: TErrorInfo): Boolean;
+begin
+  Result := False;
+  AOperationID := 0;
+  AError := TErrorInfo.Empty(Ord(hlsSelecting));
+  if APoint = nil then begin AError.Code := 2101; AError.Msg := 'Точка гидравлической линии не задана'; Exit; end;
+  if APoint.Q < 0 then begin AError.Code := 2102; AError.Msg := 'Расход точки не может быть отрицательным'; Exit; end;
+  TMonitor.Enter(FHydraulicStateLock);
+  try
+    Inc(FHydraulicOperationID);
+    AOperationID := FHydraulicOperationID;
+    FHydraulicPointUUID := APoint.UUID;
+    FHydraulicPointIndex := APointIndex;
+    FHydraulicTargetFlow := APoint.Q;
+    FHydraulicPointEtalonType := APoint.EtalonType;
+    FHydraulicPointFlowSourceType := APoint.FlowSorceType;
+    FHydraulicPointSpillageType := APoint.SpillageType;
+    FHydraulicPointPressure := APoint.Pressure;
+    FHydraulicConfiguration := TWorkTableHydraulicConfiguration.Empty;
+    FHydraulicLineError := TErrorInfo.Empty(Ord(hlsSelecting));
+    FHydraulicLineState := hlsSelecting;
+  finally
+    TMonitor.Exit(FHydraulicStateLock);
+  end;
+  FireAction(awtSelectEtalons, 'BeginHydraulicSelection',
+    Format('OperationID=%d; PointIndex=%d; PointUUID=%s; TargetFlow=%.6f',
+      [AOperationID, APointIndex, APoint.UUID, APoint.Q]));
+  Result := True;
+end;
+
+function TWorkTable.CompleteHydraulicSelection(AOperationID: Int64;
+  const AConfiguration: TWorkTableHydraulicConfiguration;
+  const AError: TErrorInfo): Boolean;
+begin
+  Result := False;
+  TMonitor.Enter(FHydraulicStateLock);
+  try
+    if (AOperationID <> FHydraulicOperationID) or (FHydraulicLineState <> hlsSelecting) or
+       (CurrentPoint = nil) or (CurrentPoint.UUID <> FHydraulicPointUUID) or
+       not SameValue(CurrentPoint.Q, FHydraulicTargetFlow) then Exit;
+    if AError.Code = 0 then begin
+      FHydraulicConfiguration := AConfiguration.Clone;
+      FHydraulicLineError := TErrorInfo.Empty(Ord(hlsSelected));
+      FHydraulicLineState := hlsSelected;
+    end else begin
+      FHydraulicConfiguration := TWorkTableHydraulicConfiguration.Empty;
+      FHydraulicLineError := AError;
+      FHydraulicLineState := hlsFailed;
+    end;
+    Result := True;
+  finally
+    TMonitor.Exit(FHydraulicStateLock);
+  end;
+end;
+
+function TWorkTable.BeginHydraulicLineSetup(out AOperationID: Int64;
+  out AError: TErrorInfo): Boolean;
+begin
+  Result := False; AOperationID := 0; AError := TErrorInfo.Empty(Ord(hlsSettingUp));
+  TMonitor.Enter(FHydraulicStateLock);
+  try
+    if FHydraulicLineState <> hlsSelected then begin AError.Code := 2110; AError.Msg := 'Гидравлическая конфигурация не выбрана'; Exit; end;
+    if (CurrentPoint = nil) or (CurrentPoint.UUID <> FHydraulicPointUUID) or
+       not SameValue(CurrentPoint.Q, FHydraulicTargetFlow) then begin AError.Code := 2111; AError.Msg := 'Выбранная конфигурация не соответствует текущей точке'; Exit; end;
+    if FHydraulicConfiguration.RangeIndex < 0 then begin AError.Code := 2112; AError.Msg := 'Строка гидравлической схемы отсутствует'; Exit; end;
+    Inc(FHydraulicOperationID); AOperationID := FHydraulicOperationID;
+    FHydraulicLineError := TErrorInfo.Empty(Ord(hlsSettingUp));
+    FHydraulicLineState := hlsSettingUp;
+  finally
+    TMonitor.Exit(FHydraulicStateLock);
+  end;
+  FireAction(awtSetupHydraulicLine, 'BeginHydraulicLineSetup',
+    Format('OperationID=%d; PointIndex=%d; PointUUID=%s; TargetFlow=%.6f',
+      [AOperationID, FHydraulicPointIndex, FHydraulicPointUUID, FHydraulicTargetFlow]));
+  Result := True;
+end;
+
+function TWorkTable.CompleteHydraulicLineSetup(AOperationID: Int64;
+  ASuccess: Boolean; const AError: TErrorInfo): Boolean;
+begin
+  Result := False;
+  TMonitor.Enter(FHydraulicStateLock);
+  try
+    if (AOperationID <> FHydraulicOperationID) or (FHydraulicLineState <> hlsSettingUp) or
+       (CurrentPoint = nil) or (CurrentPoint.UUID <> FHydraulicPointUUID) or
+       not SameValue(CurrentPoint.Q, FHydraulicTargetFlow) then Exit;
+    if ASuccess then begin FHydraulicLineState := hlsConfigured; FHydraulicLineError := TErrorInfo.Empty(Ord(hlsConfigured)); end
+    else begin FHydraulicLineState := hlsFailed; FHydraulicLineError := AError; end;
+    Result := True;
+  finally TMonitor.Exit(FHydraulicStateLock); end;
+end;
+
+procedure TWorkTable.FailHydraulicOperation(AOperationID: Int64; const AError: TErrorInfo);
+begin
+  TMonitor.Enter(FHydraulicStateLock);
+  try
+    if AOperationID <> FHydraulicOperationID then Exit;
+    Inc(FHydraulicOperationID);
+    FHydraulicLineError := AError;
+    FHydraulicLineState := hlsFailed;
+  finally TMonitor.Exit(FHydraulicStateLock); end;
+end;
+
+function TWorkTable.GetHydraulicLineSnapshot: TWorkTableHydraulicSnapshot;
+begin
+  TMonitor.Enter(FHydraulicStateLock);
+  try
+    Result.State := FHydraulicLineState; Result.Error := FHydraulicLineError;
+    Result.OperationID := FHydraulicOperationID; Result.PointUUID := FHydraulicPointUUID;
+    Result.PointIndex := FHydraulicPointIndex; Result.TargetFlow := FHydraulicTargetFlow;
+    Result.Configuration := FHydraulicConfiguration.Clone;
+  finally TMonitor.Exit(FHydraulicStateLock); end;
+end;
+
 function TWorkTable.SelectEtalons(
   const AFlowRate: Double;
   out AError: TErrorInfo
@@ -3529,12 +3789,6 @@ begin
     // FireAction для awtSelectEtalons после обработки формирует
     // ewtEtalonsChanged.
 
-    FireAction(
-      awtSelectEtalons,
-      'SelectEtalons',
-      SelectionDescription
-    );
-
     Result := True;
   finally
     Groups.Free;
@@ -3930,6 +4184,7 @@ begin
   FreeAndNil(FlowRate);
   FreeAndNil(FTableFlow);
   FreeAndNil(FSyncSetup);
+  FreeAndNil(FHydraulicStateLock);
   FDeviceChannels.Free;
   FEtalonChannels.Free;
   FreeAndNil(FPumps);
