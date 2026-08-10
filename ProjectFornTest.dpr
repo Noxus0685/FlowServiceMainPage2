@@ -35,6 +35,7 @@ uses
   uAppServices in 'uAppServices.pas',
   uAppVersion in 'uAppVersion.pas',
   uOpenXmlXlsx in 'uOpenXmlXlsx.pas',
+  uReportTemplates in 'uReportTemplates.pas',
   uResultsXlsxExporter in 'uResultsXlsxExporter.pas',
   uGridXlsxExporter in 'uGridXlsxExporter.pas',
   uGridLayoutManager in 'uGridLayoutManager.pas',

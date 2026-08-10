@@ -180,6 +180,10 @@ type
     StringColumn2: TStringColumn;
     TabItemCalibrCoefs: TTabItem;
     TabItemReport: TTabItem;
+    LayoutReportToolbar: TLayout;
+    ButtonLoadReportTemplate: TButton;
+    ButtonExportReportTemplate: TButton;
+    ListBoxReportTemplates: TListBox;
     LayoutTop: TLayout;
     ToolBarDataPoints: TToolBar;
     Line4: TLine;
@@ -319,6 +323,10 @@ type
     procedure GridColumnMenuClick(Sender: TObject);
     procedure GridColumnsResetClick(Sender: TObject);
     procedure ButtonExportExcelClick(Sender: TObject);
+    // Загружает XLSX в общий каталог шаблонов и добавляет единую таблицу _Data.
+    procedure ButtonLoadReportTemplateClick(Sender: TObject);
+    // Заполняет выбранный шаблон данными выбранного прибора и сохраняет копию отчёта.
+    procedure ButtonExportReportTemplateClick(Sender: TObject);
     procedure MenuTreeViewDevicesClearClick(Sender: TObject);
     procedure SyncProcessingDevicesFromTable(AWorkTable: TWorkTable; const AClearBeforeSync: Boolean);
     procedure SyncProcessingDevicesWithNewPoints;
@@ -446,6 +454,8 @@ type
       const ADefaultIndex: Integer): TAlphaColor;
     // Возвращает сохранённую видимость прибора на графике.
     function IsChartDeviceVisible(ADevice: TDevice): Boolean;
+    // Обновляет список XLSX-шаблонов, доступных на вкладке «Отчёты».
+    procedure RefreshReportTemplates;
   public
     { Public declarations }
     procedure Initialize;
@@ -476,7 +486,8 @@ implementation
     uAppServices,
     uMeterValue,
     fuDeviceEdit,
-    uGridXlsxExporter;
+    uGridXlsxExporter,
+    uReportTemplates;
 {$R *.fmx}
 
 const
@@ -673,6 +684,7 @@ begin
   RefreshResultsTab;
   UpdateSessionErrorChart;
   UpdateActionHints;
+  RefreshReportTemplates;
 end;
 
 procedure TFrameProceed.SetGridReadOnly(AGrid: TGrid);
@@ -5130,6 +5142,123 @@ begin
     Dialog.Free;
   end;
 end;
+
+procedure TFrameProceed.RefreshReportTemplates;
+var
+  FileName: string;
+begin
+  if ListBoxReportTemplates = nil then
+    Exit;
+
+  ListBoxReportTemplates.Items.BeginUpdate;
+  try
+    ListBoxReportTemplates.Items.Clear;
+    for FileName in TDirectory.GetFiles(TReportTemplateService.TemplatesPath,
+      '*.xlsx', TSearchOption.soTopDirectoryOnly) do
+      ListBoxReportTemplates.Items.Add(TPath.GetFileName(FileName));
+    if ListBoxReportTemplates.Items.Count > 0 then
+      ListBoxReportTemplates.ItemIndex := 0;
+  finally
+    ListBoxReportTemplates.Items.EndUpdate;
+  end;
+end;
+
+procedure TFrameProceed.ButtonLoadReportTemplateClick(Sender: TObject);
+var
+  Dialog: TOpenDialog;
+  ImportedFileName: string;
+begin
+  Dialog := TOpenDialog.Create(Self);
+  try
+    try
+      Dialog.Filter := 'Excel Workbook (*.xlsx)|*.xlsx';
+      Dialog.DefaultExt := 'xlsx';
+      if not Dialog.Execute then
+        Exit;
+
+      ImportedFileName := TReportTemplateService.ImportTemplate(Dialog.FileName);
+      RefreshReportTemplates;
+      ListBoxReportTemplates.ItemIndex := ListBoxReportTemplates.Items.IndexOf(
+        TPath.GetFileName(ImportedFileName));
+      ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateImport',
+        'Загружен шаблон отчёта', TPath.GetFileName(ImportedFileName));
+    except
+      on E: Exception do
+      begin
+        ProtocolManager.AddMessage(pcError, psForm, 'ReportTemplateImport',
+          'Не удалось загрузить шаблон отчёта', E.Message);
+        MessageDlg(E.Message, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
+      end;
+    end;
+  finally
+    Dialog.Free;
+  end;
+end;
+
+procedure TFrameProceed.ButtonExportReportTemplateClick(Sender: TObject);
+var
+  Device: TDevice;
+  DeviceType: TDeviceType;
+  TypeRepo: TTypeRepository;
+  Dialog: TSaveDialog;
+  TemplateFileName, SuggestedName: string;
+begin
+  if (ListBoxReportTemplates = nil) or
+     (ListBoxReportTemplates.ItemIndex < 0) then
+  begin
+    MessageDlg('Выберите шаблон отчёта', TMsgDlgType.mtInformation,
+      [TMsgDlgBtn.mbOK], 0);
+    Exit;
+  end;
+
+  Device := ResolveSelectedDevice;
+  if Device = nil then
+  begin
+    MessageDlg('Выберите прибор или его сессию в дереве обработки',
+      TMsgDlgType.mtInformation, [TMsgDlgBtn.mbOK], 0);
+    Exit;
+  end;
+
+  DeviceType := nil;
+  TypeRepo := nil;
+  if (AppServices <> nil) and (AppServices.DataManager <> nil) then
+    DeviceType := AppServices.DataManager.FindType(Device.DeviceTypeUUID,
+      Device.DeviceTypeName, TypeRepo);
+
+  TemplateFileName := TPath.Combine(TReportTemplateService.TemplatesPath,
+    ListBoxReportTemplates.Items[ListBoxReportTemplates.ItemIndex]);
+  SuggestedName := TPath.GetFileNameWithoutExtension(TemplateFileName);
+  if Trim(Device.SerialNumber) <> '' then
+    SuggestedName := SuggestedName + '_' + Device.SerialNumber;
+
+  Dialog := TSaveDialog.Create(Self);
+  try
+    try
+      Dialog.Filter := 'Excel Workbook (*.xlsx)|*.xlsx';
+      Dialog.DefaultExt := 'xlsx';
+      Dialog.FileName := SuggestedName + '.xlsx';
+      if not Dialog.Execute then
+        Exit;
+
+      TReportTemplateService.ExportTemplate(TemplateFileName, Dialog.FileName,
+        Device, DeviceType);
+      ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateExport',
+        'Сформирован отчёт по шаблону',
+        Format('Template=%s; Device=%s; Output=%s',
+          [TPath.GetFileName(TemplateFileName), Device.UUID, Dialog.FileName]));
+    except
+      on E: Exception do
+      begin
+        ProtocolManager.AddMessage(pcError, psForm, 'ReportTemplateExport',
+          'Не удалось сформировать отчёт', E.Message);
+        MessageDlg(E.Message, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
+      end;
+    end;
+  finally
+    Dialog.Free;
+  end;
+end;
+
 procedure TFrameProceed.MenuTreeViewDevicesClearClick(Sender: TObject);
 var
   Item: TTreeViewItem;

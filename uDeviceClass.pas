@@ -1,5 +1,7 @@
 ﻿unit uDeviceClass;
 
+{$RTTI EXPLICIT FIELDS([vcPublic]) PROPERTIES([vcPublic, vcPublished])}
+
 interface
 
 uses
