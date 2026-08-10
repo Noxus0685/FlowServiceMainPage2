@@ -74,17 +74,37 @@ begin
   TFile.WriteAllText(AFileName, AText, TEncoding.UTF8);
 end;
 
+// Записывает этап формирования отчёта в отдельный технический журнал.
+procedure LogReportStage(const AStage: string);
+var
+  LogFileName: string;
+begin
+  LogFileName := TPath.Combine(TPath.GetTempPath, 'FlowServiceReport.log');
+  TFile.AppendAllText(LogFileName,
+    FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now) + ' ' + AStage + sLineBreak,
+    TEncoding.UTF8);
+end;
+
 function InsertBeforeClosingTag(const AXml, AClosingTag,
   AFragment: string): string;
 var
   P: Integer;
+  Builder: TStringBuilder;
 begin
-  // Вставляет XML-фрагмент непосредственно перед указанным закрывающим тегом.
+  // Создаёт новую XML-строку через TStringBuilder без изменения входной строки.
   P := AXml.LastIndexOf(AClosingTag);
-  if P < 0 then
+  if (P < 0) or (P > AXml.Length) then
     raise EInvalidOpException.CreateFmt('В XLSX не найден XML-узел %s',
       [AClosingTag]);
-  Result := AXml.Insert(P, AFragment);
+  Builder := TStringBuilder.Create(AXml.Length + AFragment.Length);
+  try
+    Builder.Append(AXml, 0, P);
+    Builder.Append(AFragment);
+    Builder.Append(AXml, P, AXml.Length - P);
+    Result := Builder.ToString;
+  finally
+    Builder.Free;
+  end;
 end;
 
 function XmlAttribute(const ATag, AName: string): string;
@@ -424,25 +444,41 @@ begin
     for Field in RttiType.GetFields do
       if Field.Visibility in [mvPublic, mvPublished] then
       begin
-        JsonValue := RttiValueToJson(Field.FieldType.Name,
-          Field.GetValue(AObject));
-        if (JsonValue <> nil) and (ARow.GetValue(Field.Name) = nil) then
-          ARow.AddPair(Field.Name, JsonValue)
-        else
+        JsonValue := nil;
+        try
+          JsonValue := RttiValueToJson(Field.FieldType.Name,
+            Field.GetValue(AObject));
+          if (JsonValue <> nil) and (ARow.GetValue(Field.Name) = nil) then
+          begin
+            ARow.AddPair(Field.Name, JsonValue);
+            JsonValue := nil;
+          end;
+        finally
           JsonValue.Free;
+        end;
       end;
 
     for Prop in RttiType.GetProperties do
       if (Prop.Visibility in [mvPublic, mvPublished]) and Prop.IsReadable and
          (ARow.GetValue(Prop.Name) = nil) then
+      begin
+        JsonValue := nil;
         try
-          JsonValue := RttiValueToJson(Prop.PropertyType.Name,
-            Prop.GetValue(AObject));
-          if JsonValue <> nil then
-            ARow.AddPair(Prop.Name, JsonValue);
+          try
+            JsonValue := RttiValueToJson(Prop.PropertyType.Name,
+              Prop.GetValue(AObject));
+            if JsonValue <> nil then
+            begin
+              ARow.AddPair(Prop.Name, JsonValue);
+              JsonValue := nil;
+            end;
+          finally
+            JsonValue.Free;
+          end;
         except
           { Вычисляемое свойство не должно прерывать формирование отчёта. }
         end;
+      end;
   finally
     Context.Free;
   end;
@@ -572,33 +608,37 @@ var
   I, RowIndex, OutputRow, Width: Integer;
   Row: TJSONObject;
   Value: TJSONValue;
+  Builder: TStringBuilder;
 begin
   Columns := BuildSeparatedColumns(ARows, AObjectTypes);
+  Builder := nil;
   try
+    Builder := TStringBuilder.Create;
     OutputRow := 2;
     for I := 0 to ARows.Count - 1 do
       if RowHasObjectType(ARows.Items[I] as TJSONObject, AObjectTypes) then
         Inc(OutputRow);
-    Result := '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-      Format('<dimension ref="A1:%s%d"/>',
-        [ExcelColumnName(Columns.Count), OutputRow]) +
-      '<sheetViews><sheetView workbookViewId="0"/></sheetViews><cols>';
+    Builder.Append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
+    Builder.Append('<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">');
+    Builder.Append(Format('<dimension ref="A1:%s%d"/>',
+      [ExcelColumnName(Columns.Count), OutputRow]));
+    Builder.Append('<sheetViews><sheetView workbookViewId="0"/></sheetViews><cols>');
     for I := 0 to Columns.Count - 1 do
     begin
       Width := ReportColumnWidth(Columns[I], ARows, AObjectTypes);
-      Result := Result + Format(
+      Builder.Append(Format(
         '<col min="%d" max="%d" width="%d" customWidth="1"/>',
-        [I + 1, I + 1, Width]);
+        [I + 1, I + 1, Width]));
     end;
-    Result := Result + '<sheetData><row r="1">' +
-      Format('<c r="A1" t="inlineStr"><is><t>%s</t></is></c>',
-        [XmlEscape(ATitle)]) + '</row><row r="2">';
+    Builder.Append('<sheetData><row r="1">');
+    Builder.Append(Format('<c r="A1" t="inlineStr"><is><t>%s</t></is></c>',
+      [XmlEscape(ATitle)]));
+    Builder.Append('</row><row r="2">');
     for I := 0 to Columns.Count - 1 do
-      Result := Result + Format(
+      Builder.Append(Format(
         '<c r="%s2" t="inlineStr"><is><t>%s</t></is></c>',
-        [ExcelColumnName(I + 1), XmlEscape(Columns[I])]);
-    Result := Result + '</row>';
+        [ExcelColumnName(I + 1), XmlEscape(Columns[I])]));
+    Builder.Append('</row>');
 
     OutputRow := 3;
     for RowIndex := 0 to ARows.Count - 1 do
@@ -606,35 +646,37 @@ begin
       Row := ARows.Items[RowIndex] as TJSONObject;
       if not RowHasObjectType(Row, AObjectTypes) then
         Continue;
-      Result := Result + Format('<row r="%d">', [OutputRow]);
+      Builder.Append(Format('<row r="%d">', [OutputRow]));
       for I := 0 to Columns.Count - 1 do
       begin
         Value := Row.GetValue(Columns[I]);
         if (Value = nil) or (Value is TJSONNull) then
           Continue;
         if Value is TJSONNumber then
-          Result := Result + Format('<c r="%s"><v>%s</v></c>',
-            [ExcelColumnName(I + 1) + OutputRow.ToString, Value.Value])
+          Builder.Append(Format('<c r="%s"><v>%s</v></c>',
+            [ExcelColumnName(I + 1) + OutputRow.ToString, Value.Value]))
         else if Value is TJSONBool then
         begin
           if TJSONBool(Value).AsBoolean then
-            Result := Result + Format('<c r="%s" t="b"><v>1</v></c>',
-              [ExcelColumnName(I + 1) + OutputRow.ToString])
+            Builder.Append(Format('<c r="%s" t="b"><v>1</v></c>',
+              [ExcelColumnName(I + 1) + OutputRow.ToString]))
           else
-            Result := Result + Format('<c r="%s" t="b"><v>0</v></c>',
-              [ExcelColumnName(I + 1) + OutputRow.ToString]);
+            Builder.Append(Format('<c r="%s" t="b"><v>0</v></c>',
+              [ExcelColumnName(I + 1) + OutputRow.ToString]));
         end
         else
-          Result := Result + Format(
+          Builder.Append(Format(
             '<c r="%s" t="inlineStr"><is><t>%s</t></is></c>',
             [ExcelColumnName(I + 1) + OutputRow.ToString,
-             XmlEscape(JsonValueToText(Value))]);
+             XmlEscape(JsonValueToText(Value))]));
       end;
-      Result := Result + '</row>';
+      Builder.Append('</row>');
       Inc(OutputRow);
     end;
-    Result := Result + '</sheetData></worksheet>';
+    Builder.Append('</sheetData></worksheet>');
+    Result := Builder.ToString;
   finally
+    Builder.Free;
     Columns.Free;
   end;
 end;
@@ -644,27 +686,34 @@ function BuildMetaWorksheetXml(ARoot: TJSONObject): string;
 var
   Pair: TJSONPair;
   RowIndex: Integer;
+  Builder: TStringBuilder;
 begin
-  Result := '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-    '<dimension ref="A1:B20"/><sheetViews><sheetView workbookViewId="0"/></sheetViews>' +
-    '<cols><col min="1" max="1" width="30" customWidth="1"/>' +
-    '<col min="2" max="2" width="40" customWidth="1"/></cols><sheetData>' +
-    '<row r="1"><c r="A1" t="inlineStr"><is><t>Метаданные отчёта</t></is></c></row>' +
-    '<row r="2"><c r="A2" t="inlineStr"><is><t>Параметр</t></is></c>' +
-    '<c r="B2" t="inlineStr"><is><t>Значение</t></is></c></row>';
-  RowIndex := 3;
-  for Pair in ARoot do
-    if not SameText(Pair.JsonString.Value, 'Rows') then
-    begin
-      Result := Result + Format(
-        '<row r="%d"><c r="A%d" t="inlineStr"><is><t>%s</t></is></c>' +
-        '<c r="B%d" t="inlineStr"><is><t>%s</t></is></c></row>',
-        [RowIndex, RowIndex, XmlEscape(Pair.JsonString.Value), RowIndex,
-         XmlEscape(JsonValueToText(Pair.JsonValue))]);
-      Inc(RowIndex);
-    end;
-  Result := Result + '</sheetData></worksheet>';
+  Builder := TStringBuilder.Create;
+  try
+    Builder.Append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
+    Builder.Append('<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">');
+    Builder.Append('<dimension ref="A1:B20"/><sheetViews><sheetView workbookViewId="0"/></sheetViews>');
+    Builder.Append('<cols><col min="1" max="1" width="30" customWidth="1"/>');
+    Builder.Append('<col min="2" max="2" width="40" customWidth="1"/></cols><sheetData>');
+    Builder.Append('<row r="1"><c r="A1" t="inlineStr"><is><t>Метаданные отчёта</t></is></c></row>');
+    Builder.Append('<row r="2"><c r="A2" t="inlineStr"><is><t>Параметр</t></is></c>');
+    Builder.Append('<c r="B2" t="inlineStr"><is><t>Значение</t></is></c></row>');
+    RowIndex := 3;
+    for Pair in ARoot do
+      if not SameText(Pair.JsonString.Value, 'Rows') then
+      begin
+        Builder.Append(Format(
+          '<row r="%d"><c r="A%d" t="inlineStr"><is><t>%s</t></is></c>' +
+          '<c r="B%d" t="inlineStr"><is><t>%s</t></is></c></row>',
+          [RowIndex, RowIndex, XmlEscape(Pair.JsonString.Value), RowIndex,
+           XmlEscape(JsonValueToText(Pair.JsonValue))]));
+        Inc(RowIndex);
+      end;
+    Builder.Append('</sheetData></worksheet>');
+    Result := Builder.ToString;
+  finally
+    Builder.Free;
+  end;
 end;
 
 // Проверяет XML сформированного отдельного служебного листа.
@@ -784,7 +833,10 @@ var
   SheetTargets, SheetFiles, SheetXml: array[0..4] of string;
   SheetId, I: Integer;
   Rows: TJSONArray;
+  Stage: string;
 begin
+  Stage := 'начало выгрузки';
+  LogReportStage(Stage);
   if not FileExists(ASourceFileName) then
     raise EFileNotFoundException.CreateFmt('Шаблон не найден: %s', [ASourceFileName]);
   if ARoot = nil then
@@ -796,6 +848,9 @@ begin
   ForceDirectories(TempDir);
   TempOutput := AOutputFileName + '.tmp';
   try
+    try
+    Stage := 'распаковка XLSX';
+    LogReportStage(Stage);
     Zip := TZipFile.Create;
     try
       Zip.Open(ASourceFileName, zmRead);
@@ -812,6 +867,8 @@ begin
        not FileExists(ContentTypesFile) then
       raise EInvalidOpException.Create('Файл не является корректной книгой XLSX');
 
+    Stage := 'чтение workbook.xml';
+    LogReportStage(Stage);
     WorkbookXml := ReadUtf8File(WorkbookFile);
     ValidateWorkbookXmlText(WorkbookXml, 'чтение исходного шаблона', False);
     ValidateWorkbookXml(WorkbookXml, 'чтение исходного шаблона');
@@ -830,6 +887,8 @@ begin
 
     for I := Low(CSheetNames) to High(CSheetNames) do
     begin
+      Stage := 'обработка служебного листа ' + CSheetNames[I];
+      LogReportStage(Stage);
       RelationId := FindSheetRelationId(WorkbookXml, CSheetNames[I]);
       if RelationId = '' then
       begin
@@ -881,32 +940,59 @@ begin
     if Rows = nil then
       raise EInvalidOpException.Create(
         'В данных отчёта отсутствует массив Rows');
+    Stage := 'формирование листа _Data';
+    LogReportStage(Stage);
     SheetXml[0] := BuildSeparatedWorksheetXml(CSheetTitles[0], Rows,
       ['DeviceType', 'Device']);
+    Stage := 'формирование листа _DevicePoints';
+    LogReportStage(Stage);
     SheetXml[1] := BuildSeparatedWorksheetXml(CSheetTitles[1], Rows,
       ['DevicePoint']);
+    Stage := 'формирование листа _Spillages';
+    LogReportStage(Stage);
     SheetXml[2] := BuildSeparatedWorksheetXml(CSheetTitles[2], Rows,
       ['Spillage']);
+    Stage := 'формирование листа _CoefTables';
+    LogReportStage(Stage);
     SheetXml[3] := BuildSeparatedWorksheetXml(CSheetTitles[3], Rows,
       ['CalibrCoefTable', 'CalibrCoefItem']);
+    Stage := 'формирование листа _Meta';
+    LogReportStage(Stage);
     SheetXml[4] := BuildMetaWorksheetXml(ARoot);
 
     for I := Low(CSheetNames) to High(CSheetNames) do
       ValidateSeparatedWorksheetXml(SheetXml[I], CSheetNames[I]);
     for I := Low(CSheetNames) to High(CSheetNames) do
+    begin
+      Stage := 'запись XML листа ' + CSheetNames[I];
+      LogReportStage(Stage);
       WriteUtf8File(SheetFiles[I], SheetXml[I]);
+    end;
     WriteUtf8File(WorkbookFile, WorkbookXml);
     WorkbookRelsDocument.SaveToFile(WorkbookRelsFile);
     WriteUtf8File(ContentTypesFile, ContentTypesXml);
 
     if FileExists(TempOutput) then
       DeleteFile(TempOutput);
+    Stage := 'упаковка XLSX';
+    LogReportStage(Stage);
     ZipDirectory(TempDir, TempOutput);
     ForceDirectories(ExtractFileDir(AOutputFileName));
+    Stage := 'замена итогового файла';
+    LogReportStage(Stage);
     if FileExists(AOutputFileName) and not DeleteFile(AOutputFileName) then
       raise EInOutError.CreateFmt('Не удалось заменить файл %s', [AOutputFileName]);
     if not RenameFile(TempOutput, AOutputFileName) then
       raise EInOutError.CreateFmt('Не удалось сохранить файл %s', [AOutputFileName]);
+    Stage := 'завершение выгрузки';
+    LogReportStage(Stage);
+    except
+      on E: Exception do
+      begin
+        LogReportStage(Format('ошибка на этапе "%s": %s', [Stage, E.Message]));
+        raise;
+      end;
+    end;
   finally
     if FileExists(TempOutput) then
       DeleteFile(TempOutput);
