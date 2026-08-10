@@ -37,6 +37,7 @@ uses
   System.IOUtils,
   System.Math,
   System.Rtti,
+  System.StrUtils,
   System.RegularExpressions,
   System.TypInfo,
   System.Zip,
@@ -361,6 +362,54 @@ begin
   Result := AValue.Value;
 end;
 
+// Формирует безопасное имя именованного диапазона.
+function BuildReportDefinedName(const AName: string): string;
+var
+  I: Integer;
+begin
+  Result := '';
+  for I := 1 to Length(AName) do
+    if CharInSet(AName[I], ['A'..'Z', 'a'..'z', '0'..'9', '_', '.']) then
+      Result := Result + AName[I]
+    else
+      Result := Result + '_';
+  if (Result = '') or CharInSet(Result[1], ['0'..'9', '.']) then
+    Result := '_' + Result;
+end;
+
+// Возвращает понятное русское название поля служебного отчёта.
+function GetReportFieldCaption(const AObjectType, AFieldName: string): string;
+const
+  CNames: array[0..39, 0..1] of string = (
+    ('Name', 'Название'), ('UUID', 'Уникальный идентификатор'),
+    ('SerialNumber', 'Серийный номер'), ('Manufacturer', 'Производитель'),
+    ('Owner', 'Владелец'), ('Modification', 'Модификация'),
+    ('ReestrNumber', 'Номер в ГРСИ'), ('Category', 'Категория СИ'),
+    ('CategoryName', 'Название категории'), ('AccuracyClass', 'Класс точности'),
+    ('RegDate', 'Дата регистрации'), ('ValidityDate', 'Действителен до'),
+    ('DateOfManufacture', 'Дата изготовления'), ('Documentation', 'Документация'),
+    ('IVI', 'Межповерочный интервал'), ('DN', 'Условный диаметр'),
+    ('Qmax', 'Максимальный расход'), ('Qmin', 'Минимальный расход'),
+    ('Qnom', 'Номинальный расход'), ('Error', 'Погрешность'),
+    ('Temp', 'Температура'), ('Coef', 'Коэффициент преобразования'),
+    ('DeviceTypeName', 'Название типа прибора'), ('DeviceTypeUUID', 'UUID типа прибора'),
+    ('VerificationMethod', 'Методика поверки'), ('ProcedureName', 'Тип процедуры'),
+    ('MeasuredDimension', 'Измеряемая величина'), ('Units', 'Единицы измерения'),
+    ('OutputType', 'Тип выходного сигнала'), ('Freq', 'Максимальная частота'),
+    ('ProtocolName', 'Протокол связи'), ('BaudRate', 'Скорость обмена'),
+    ('DeviceAddress', 'Адрес прибора'), ('Repeats', 'Количество измерений'),
+    ('RepeatsProtocol', 'Измерений в протоколе'), ('Comment', 'Примечание'),
+    ('Enabled', 'Используется'), ('ReportingForm', 'Форма отчётности'),
+    ('RangeDynamic', 'Динамический диапазон'), ('Kp', 'Коэффициент Kp'));
+var
+  I: Integer;
+begin
+  Result := AFieldName;
+  for I := Low(CNames) to High(CNames) do
+    if SameText(CNames[I, 0], AFieldName) then
+      Exit(CNames[I, 1]);
+end;
+
 // Преобразует RTTI-значение набора критериев остановки в текст без вызова
 // TValue.AsOrdinal.
 function SpillageStopCriteriaRttiToString(const AValue: TValue): string;
@@ -601,8 +650,49 @@ begin
 end;
 
 // Формирует читаемый XML отдельного служебного листа по выбранным типам JSON.
-function BuildSeparatedWorksheetXml(const ATitle: string; ARows: TJSONArray;
-  const AObjectTypes: array of string): string;
+function SeparatedRowDefinedName(ARow: TJSONObject;
+  const AFieldName: string): string;
+var
+  ObjectType, TableTypeName: string;
+  PointIndex, SpillageIndex, CoefType, ItemIndex: Integer;
+begin
+  ObjectType := ARow.GetValue<string>('ObjectType');
+  PointIndex := ARow.GetValue<Integer>('PointIndex');
+  SpillageIndex := ARow.GetValue<Integer>('SpillageIndex');
+  CoefType := ARow.GetValue<Integer>('CoefTableType');
+  ItemIndex := ARow.GetValue<Integer>('CoefItemIndex');
+  if SameText(ObjectType, 'DevicePoint') then
+    Result := Format('DevicePoints_%.2d_%s', [PointIndex, AFieldName])
+  else if SameText(ObjectType, 'Spillage') then
+    Result := Format('DevicePoints_%.2d_Spillages_%.2d_%s',
+      [PointIndex, SpillageIndex, AFieldName])
+  else if SameText(ObjectType, 'CalibrCoefTable') or
+          SameText(ObjectType, 'CalibrCoefItem') then
+  begin
+    case CoefType of
+      10: TableTypeName := 'cctReference';
+      11: TableTypeName := 'cctLinear';
+      12: TableTypeName := 'cctPiecewiseLinear';
+      13: TableTypeName := 'cctPolynomial';
+      14: TableTypeName := 'cctFlowCorrection';
+    else
+      TableTypeName := 'Type' + CoefType.ToString;
+    end;
+    if SameText(ObjectType, 'CalibrCoefItem') then
+      Result := Format('CalibrCoefTables_%s_Items_%.2d_%s',
+        [TableTypeName, ItemIndex, AFieldName])
+    else
+      Result := Format('CalibrCoefTables_%s_%s', [TableTypeName, AFieldName]);
+  end
+  else
+    Result := ObjectType + '_' + AFieldName;
+  Result := BuildReportDefinedName(Result);
+end;
+
+// Формирует читаемый XML повторяющихся служебных данных.
+function BuildSeparatedWorksheetXml(const ATitle, ASheetName: string;
+  ARows: TJSONArray; const AObjectTypes: array of string;
+  ADefinedNames: TDictionary<string, string>): string;
 var
   Columns: TList<string>;
   I, RowIndex, OutputRow, Width: Integer;
@@ -650,6 +740,16 @@ begin
       for I := 0 to Columns.Count - 1 do
       begin
         Value := Row.GetValue(Columns[I]);
+        if not SameText(Columns[I], 'ObjectType') and
+           not SameText(Columns[I], 'ObjectIndex') and
+           not SameText(Columns[I], 'PointIndex') and
+           not SameText(Columns[I], 'SpillageIndex') and
+           not SameText(Columns[I], 'CoefTableType') and
+           not SameText(Columns[I], 'CoefItemIndex') then
+          ADefinedNames.AddOrSetValue(
+            SeparatedRowDefinedName(Row, Columns[I]),
+            Format('''%s''!$%s$%d', [ASheetName,
+              ExcelColumnName(I + 1), OutputRow]));
         if (Value = nil) or (Value is TJSONNull) then
           Continue;
         if Value is TJSONNumber then
@@ -681,8 +781,87 @@ begin
   end;
 end;
 
+// Формирует вертикальный XML листа общих данных прибора.
+function BuildDataWorksheetXml(const ATitle: string; ARows: TJSONArray;
+  ADefinedNames: TDictionary<string, string>): string;
+var
+  RowIndex, OutputRow: Integer;
+  Row: TJSONObject;
+  Pair: TJSONPair;
+  ObjectType, FieldName, TechnicalName, ValueCell: string;
+  Builder: TStringBuilder;
+begin
+  Builder := TStringBuilder.Create;
+  try
+    OutputRow := 2;
+    for RowIndex := 0 to ARows.Count - 1 do
+      if RowHasObjectType(ARows.Items[RowIndex] as TJSONObject,
+        ['DeviceType', 'Device']) then
+        for Pair in (ARows.Items[RowIndex] as TJSONObject) do
+          if not MatchText(Pair.JsonString.Value, ['ObjectType', 'ObjectIndex',
+            'PointIndex', 'SpillageIndex', 'CoefTableType', 'CoefItemIndex']) then
+            Inc(OutputRow);
+    Builder.Append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
+    Builder.Append('<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">');
+    Builder.Append(Format('<dimension ref="A1:D%d"/>', [OutputRow]));
+    Builder.Append('<sheetViews><sheetView workbookViewId="0"/></sheetViews>');
+    Builder.Append('<cols><col min="1" max="1" width="36" customWidth="1"/>');
+    Builder.Append('<col min="2" max="2" width="38" customWidth="1"/>');
+    Builder.Append('<col min="3" max="3" width="30" customWidth="1"/>');
+    Builder.Append('<col min="4" max="4" width="16" customWidth="1"/></cols>');
+    Builder.Append('<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>');
+    Builder.Append(XmlEscape(ATitle));
+    Builder.Append('</t></is></c></row><row r="2">');
+    Builder.Append('<c r="A2" t="inlineStr"><is><t>Техническое имя</t></is></c>');
+    Builder.Append('<c r="B2" t="inlineStr"><is><t>Название</t></is></c>');
+    Builder.Append('<c r="C2" t="inlineStr"><is><t>Значение</t></is></c>');
+    Builder.Append('<c r="D2" t="inlineStr"><is><t>Тип объекта</t></is></c></row>');
+    OutputRow := 3;
+    for RowIndex := 0 to ARows.Count - 1 do
+    begin
+      Row := ARows.Items[RowIndex] as TJSONObject;
+      if not RowHasObjectType(Row, ['DeviceType', 'Device']) then
+        Continue;
+      ObjectType := Row.GetValue<string>('ObjectType');
+      for Pair in Row do
+      begin
+        FieldName := Pair.JsonString.Value;
+        if MatchText(FieldName, ['ObjectType', 'ObjectIndex', 'PointIndex',
+          'SpillageIndex', 'CoefTableType', 'CoefItemIndex']) then
+          Continue;
+        TechnicalName := BuildReportDefinedName(ObjectType + '_' + FieldName);
+        ValueCell := 'C' + OutputRow.ToString;
+        Builder.Append(Format('<row r="%d">', [OutputRow]));
+        Builder.Append(Format('<c r="A%d" t="inlineStr"><is><t>%s</t></is></c>',
+          [OutputRow, XmlEscape(TechnicalName)]));
+        Builder.Append(Format('<c r="B%d" t="inlineStr"><is><t>%s</t></is></c>',
+          [OutputRow, XmlEscape(GetReportFieldCaption(ObjectType, FieldName))]));
+        if Pair.JsonValue is TJSONNumber then
+          Builder.Append(Format('<c r="%s"><v>%s</v></c>',
+            [ValueCell, Pair.JsonValue.Value]))
+        else if Pair.JsonValue is TJSONBool then
+          Builder.Append(Format('<c r="%s" t="b"><v>%d</v></c>',
+            [ValueCell, Ord(TJSONBool(Pair.JsonValue).AsBoolean)]))
+        else if not (Pair.JsonValue is TJSONNull) then
+          Builder.Append(Format('<c r="%s" t="inlineStr"><is><t>%s</t></is></c>',
+            [ValueCell, XmlEscape(JsonValueToText(Pair.JsonValue))]));
+        Builder.Append(Format('<c r="D%d" t="inlineStr"><is><t>%s</t></is></c></row>',
+          [OutputRow, XmlEscape(ObjectType)]));
+        ADefinedNames.AddOrSetValue(TechnicalName,
+          Format('''_Data''!$C$%d', [OutputRow]));
+        Inc(OutputRow);
+      end;
+    end;
+    Builder.Append('</sheetData></worksheet>');
+    Result := Builder.ToString;
+  finally
+    Builder.Free;
+  end;
+end;
+
 // Формирует служебный лист метаданных отчёта.
-function BuildMetaWorksheetXml(ARoot: TJSONObject): string;
+function BuildMetaWorksheetXml(ARoot: TJSONObject;
+  ADefinedNames: TDictionary<string, string>): string;
 var
   Pair: TJSONPair;
   RowIndex: Integer;
@@ -707,12 +886,89 @@ begin
           '<c r="B%d" t="inlineStr"><is><t>%s</t></is></c></row>',
           [RowIndex, RowIndex, XmlEscape(Pair.JsonString.Value), RowIndex,
            XmlEscape(JsonValueToText(Pair.JsonValue))]));
+        ADefinedNames.AddOrSetValue(
+          BuildReportDefinedName('ReportMeta_' + Pair.JsonString.Value),
+          Format('''_Meta''!$B$%d', [RowIndex]));
         Inc(RowIndex);
       end;
     Builder.Append('</sheetData></worksheet>');
     Result := Builder.ToString;
   finally
     Builder.Free;
+  end;
+end;
+
+function IsReportDefinedName(const AName: string): Boolean;
+const
+  CPrefixes: array[0..5] of string = ('DeviceType_', 'Device_',
+    'DevicePoints_', 'Spillages_', 'CalibrCoefTables_', 'ReportMeta_');
+var
+  Prefix: string;
+begin
+  Result := False;
+  for Prefix in CPrefixes do
+    if AName.StartsWith(Prefix, True) then
+      Exit(True);
+end;
+
+// Удаляет только устаревшие именованные диапазоны, созданные отчётной подсистемой.
+procedure RemoveObsoleteReportDefinedNames(var AWorkbookXml: string;
+  ADefinedNames: TDictionary<string, string>);
+var
+  Match: TMatch;
+  Name: string;
+  Matches: TMatchCollection;
+  I: Integer;
+begin
+  Matches := TRegEx.Matches(AWorkbookXml,
+    '<definedName\b[^>]*\bname="([^"]+)"[^>]*>.*?</definedName>',
+    [roIgnoreCase, roSingleLine]);
+  for I := Matches.Count - 1 downto 0 do
+  begin
+    Match := Matches[I];
+    Name := Match.Groups[1].Value;
+    if IsReportDefinedName(Name) and not ADefinedNames.ContainsKey(Name) then
+      Delete(AWorkbookXml, Match.Index + 1, Match.Length);
+  end;
+end;
+
+// Добавляет или обновляет именованные диапазоны служебных данных.
+procedure UpdateReportDefinedNames(var AWorkbookXml: string;
+  ADefinedNames: TDictionary<string, string>);
+var
+  Pair: TPair<string, string>;
+  Match: TMatch;
+  Pattern, Node, Fragment: string;
+begin
+  RemoveObsoleteReportDefinedNames(AWorkbookXml, ADefinedNames);
+  for Pair in ADefinedNames do
+  begin
+    Pattern := '<definedName\b([^>]*\bname="' +
+      TRegEx.Escape(Pair.Key) + '"[^>]*)>.*?</definedName>';
+    Match := TRegEx.Match(AWorkbookXml, Pattern,
+      [roIgnoreCase, roSingleLine]);
+    Node := Format('<definedName name="%s">%s</definedName>',
+      [XmlEscape(Pair.Key), XmlEscape(Pair.Value)]);
+    if Match.Success then
+    begin
+      if not SameText(Match.Value, Node) then
+      begin
+        Delete(AWorkbookXml, Match.Index + 1, Match.Length);
+        Insert(Node, AWorkbookXml, Match.Index + 1);
+      end;
+    end
+    else if AWorkbookXml.Contains('</definedNames>') then
+      AWorkbookXml := InsertBeforeClosingTag(AWorkbookXml,
+        '</definedNames>', Node)
+    else
+    begin
+      Fragment := '<definedNames>' + Node + '</definedNames>';
+      if AWorkbookXml.Contains('<calcPr') then
+        AWorkbookXml := AWorkbookXml.Replace('<calcPr', Fragment + '<calcPr', [])
+      else
+        AWorkbookXml := InsertBeforeClosingTag(AWorkbookXml,
+          '</workbook>', Fragment);
+    end;
   end;
 end;
 
@@ -833,6 +1089,7 @@ var
   SheetTargets, SheetFiles, SheetXml: array[0..4] of string;
   SheetId, I: Integer;
   Rows: TJSONArray;
+  DefinedNames: TDictionary<string, string>;
   Stage: string;
 begin
   Stage := 'начало выгрузки';
@@ -847,6 +1104,7 @@ begin
     'FlowServiceReport_' + TPath.GetRandomFileName.Replace('.', ''));
   ForceDirectories(TempDir);
   TempOutput := AOutputFileName + '.tmp';
+  DefinedNames := TDictionary<string, string>.Create;
   try
     try
     Stage := 'распаковка XLSX';
@@ -942,23 +1200,26 @@ begin
         'В данных отчёта отсутствует массив Rows');
     Stage := 'формирование листа _Data';
     LogReportStage(Stage);
-    SheetXml[0] := BuildSeparatedWorksheetXml(CSheetTitles[0], Rows,
-      ['DeviceType', 'Device']);
+    SheetXml[0] := BuildDataWorksheetXml(CSheetTitles[0], Rows, DefinedNames);
     Stage := 'формирование листа _DevicePoints';
     LogReportStage(Stage);
-    SheetXml[1] := BuildSeparatedWorksheetXml(CSheetTitles[1], Rows,
-      ['DevicePoint']);
+    SheetXml[1] := BuildSeparatedWorksheetXml(CSheetTitles[1], CSheetNames[1],
+      Rows, ['DevicePoint'], DefinedNames);
     Stage := 'формирование листа _Spillages';
     LogReportStage(Stage);
-    SheetXml[2] := BuildSeparatedWorksheetXml(CSheetTitles[2], Rows,
-      ['Spillage']);
+    SheetXml[2] := BuildSeparatedWorksheetXml(CSheetTitles[2], CSheetNames[2],
+      Rows, ['Spillage'], DefinedNames);
     Stage := 'формирование листа _CoefTables';
     LogReportStage(Stage);
-    SheetXml[3] := BuildSeparatedWorksheetXml(CSheetTitles[3], Rows,
-      ['CalibrCoefTable', 'CalibrCoefItem']);
+    SheetXml[3] := BuildSeparatedWorksheetXml(CSheetTitles[3], CSheetNames[3],
+      Rows, ['CalibrCoefTable', 'CalibrCoefItem'], DefinedNames);
     Stage := 'формирование листа _Meta';
     LogReportStage(Stage);
-    SheetXml[4] := BuildMetaWorksheetXml(ARoot);
+    SheetXml[4] := BuildMetaWorksheetXml(ARoot, DefinedNames);
+
+    UpdateReportDefinedNames(WorkbookXml, DefinedNames);
+    ValidateWorkbookXmlText(WorkbookXml, 'именованные диапазоны', True);
+    ValidateWorkbookXml(WorkbookXml, 'именованные диапазоны');
 
     for I := Low(CSheetNames) to High(CSheetNames) do
       ValidateSeparatedWorksheetXml(SheetXml[I], CSheetNames[I]);
@@ -994,6 +1255,7 @@ begin
       end;
     end;
   finally
+    DefinedNames.Free;
     if FileExists(TempOutput) then
       DeleteFile(TempOutput);
     if DirectoryExists(TempDir) then
@@ -1080,6 +1342,8 @@ var
   BaseName, Extension: string;
   Suffix: Integer;
   EmptyJson: TJSONObject;
+  EmptyDevice: TDevice;
+  EmptyDeviceType: TDeviceType;
 begin
   if not SameText(ExtractFileExt(ASourceFileName), '.xlsx') then
     raise EArgumentException.Create('Поддерживаются только шаблоны XLSX');
@@ -1095,11 +1359,20 @@ begin
     Inc(Suffix);
   end;
 
-  EmptyJson := BuildReportJson(nil, nil);
+  { Экземпляры без данных дают RTTI полную схему _Data уже
+    при импорте; значения будут заменены при экспорте. }
+  EmptyDevice := TDevice.Create;
+  EmptyDeviceType := TDeviceType.Create;
   try
-    InjectDataSheet(ASourceFileName, Result, EmptyJson);
+    EmptyJson := BuildReportJson(EmptyDevice, EmptyDeviceType);
+    try
+      InjectDataSheet(ASourceFileName, Result, EmptyJson);
+    finally
+      EmptyJson.Free;
+    end;
   finally
-    EmptyJson.Free;
+    EmptyDeviceType.Free;
+    EmptyDevice.Free;
   end;
 end;
 
