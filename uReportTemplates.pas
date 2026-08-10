@@ -41,6 +41,9 @@ uses
   System.RegularExpressions,
   System.TypInfo,
   System.Zip,
+  System.Variants,
+  Xml.XMLDoc,
+  Xml.XMLIntf,
   uOpenXmlXlsx;
 
 const
@@ -111,18 +114,27 @@ begin
   end;
 end;
 
-function FindRelationshipTarget(const ARelsXml, ARelationId: string): string;
+// Находит Target связи книги по её идентификатору rId.
+function FindRelationshipTarget(const ARelsRoot: IXMLNode;
+  const ARelationId: string): string;
 var
-  Match: TMatch;
-  Tag: string;
+  I: Integer;
+  Node: IXMLNode;
+  IdValue: string;
 begin
   Result := '';
-  for Match in TRegEx.Matches(ARelsXml, '<Relationship\b[^>]*/?>',
-    [roIgnoreCase]) do
+  if ARelsRoot = nil then
+    raise EArgumentNilException.Create(
+      'Не задан корневой узел связей workbook.xml.rels');
+
+  for I := 0 to ARelsRoot.ChildNodes.Count - 1 do
   begin
-    Tag := Match.Value;
-    if SameText(XmlAttribute(Tag, 'Id'), ARelationId) then
-      Exit(XmlAttribute(Tag, 'Target'));
+    Node := ARelsRoot.ChildNodes[I];
+    if not SameText(Node.LocalName, 'Relationship') then
+      Continue;
+    IdValue := VarToStr(Node.Attributes['Id']);
+    if SameText(IdValue, ARelationId) then
+      Exit(VarToStr(Node.Attributes['Target']));
   end;
 end;
 
@@ -137,16 +149,59 @@ begin
   Inc(Result);
 end;
 
-function NextRelationId(const ARelsXml: string): string;
+// Возвращает следующий свободный rId по узлам Relationship файла workbook.xml.rels.
+function NextRelationId(const ARelsRoot: IXMLNode): string;
 var
-  Match: TMatch;
-  MaxId: Integer;
+  I, MaxId, IdNumber: Integer;
+  Node: IXMLNode;
+  IdValue: string;
 begin
+  if ARelsRoot = nil then
+    raise EArgumentNilException.Create(
+      'Не задан корневой узел связей workbook.xml.rels');
+
   MaxId := 0;
-  for Match in TRegEx.Matches(ARelsXml, 'Id="rId(\d+)"',
-    [roIgnoreCase]) do
-    MaxId := Max(MaxId, StrToIntDef(Match.Groups[1].Value, 0));
+  for I := 0 to ARelsRoot.ChildNodes.Count - 1 do
+  begin
+    Node := ARelsRoot.ChildNodes[I];
+    if not SameText(Node.LocalName, 'Relationship') then
+      Continue;
+    IdValue := VarToStr(Node.Attributes['Id']);
+    if SameText(Copy(IdValue, 1, 3), 'rId') and
+       TryStrToInt(Copy(IdValue, 4, MaxInt), IdNumber) then
+      MaxId := Max(MaxId, IdNumber);
+  end;
   Result := 'rId' + (MaxId + 1).ToString;
+end;
+
+// Добавляет связь скрытого листа _Data в XML-дерево связей книги.
+procedure AddWorksheetRelationship(const ARelsRoot: IXMLNode;
+  const ARelationId, ATarget: string);
+var
+  I: Integer;
+  Node: IXMLNode;
+begin
+  if ARelsRoot = nil then
+    raise EArgumentNilException.Create(
+      'Не задан корневой узел связей workbook.xml.rels');
+  if ARelationId = '' then
+    raise EArgumentException.Create('Не задан идентификатор связи листа');
+  if ATarget = '' then
+    raise EArgumentException.Create('Не задан путь целевого листа');
+
+  for I := 0 to ARelsRoot.ChildNodes.Count - 1 do
+  begin
+    Node := ARelsRoot.ChildNodes[I];
+    if SameText(Node.LocalName, 'Relationship') and
+       SameText(VarToStr(Node.Attributes['Id']), ARelationId) then
+      raise EInvalidOpException.CreateFmt(
+        'Связь workbook.xml.rels с Id %s уже существует', [ARelationId]);
+  end;
+
+  Node := ARelsRoot.AddChild('Relationship', ARelsRoot.NamespaceURI);
+  Node.Attributes['Id'] := ARelationId;
+  Node.Attributes['Type'] := CWorksheetRelation;
+  Node.Attributes['Target'] := ATarget;
 end;
 
 function EnsureAutomaticCalculation(const AWorkbookXml: string): string;
@@ -485,6 +540,9 @@ procedure ValidateZipEntries(AZip: TZipFile);
 var
   Name: string;
 begin
+  if AZip = nil then
+    raise EArgumentNilException.Create('Не задан ZIP-архив для проверки');
+
   for Name in AZip.FileNames do
     if Name.Contains('..') or Name.StartsWith('/') or Name.StartsWith('\') then
       raise EInvalidOpException.CreateFmt('Недопустимый путь внутри XLSX: %s', [Name]);
@@ -514,9 +572,13 @@ procedure InjectDataSheet(const ASourceFileName, AOutputFileName: string;
   ARoot: TJSONObject);
 var
   Zip: TZipFile;
+  WorkbookRelsDocument: IXMLDocument;
+  WorkbookRelsRoot: IXMLNode;
   TempDir, TempOutput, WorkbookFile, WorkbookRelsFile, ContentTypesFile,
-    WorkbookXml, WorkbookRelsXml, ContentTypesXml, RelationId, Target,
-    SheetArchivePath, SheetFile, SheetRelsFile, TableFile: string;
+    WorkbookXml, ContentTypesXml, RelationId, Target,
+    SheetArchivePath, SheetFile, SheetRelsFile, TableFile,
+    SheetFragment, SheetContentTypeFragment, TableContentTypeFragment,
+    UpdatedWorkbookXml, UpdatedContentTypesXml: string;
   SheetId: Integer;
   Rows: TJSONArray;
   Columns: TList<string>;
@@ -546,31 +608,56 @@ begin
       raise EInvalidOpException.Create('Файл не является корректной книгой XLSX');
 
     WorkbookXml := ReadUtf8File(WorkbookFile);
-    WorkbookRelsXml := ReadUtf8File(WorkbookRelsFile);
     ContentTypesXml := ReadUtf8File(ContentTypesFile);
+    // Загружает связи книги через XML DOM, не используя повторные присваивания
+    // больших UnicodeString.
+    WorkbookRelsDocument := LoadXMLDocument(WorkbookRelsFile);
+    WorkbookRelsDocument.Active := True;
+    WorkbookRelsRoot := WorkbookRelsDocument.DocumentElement;
+    if WorkbookRelsRoot = nil then
+      raise EInvalidOpException.Create(
+        'В workbook.xml.rels отсутствует корневой XML-узел');
+    if not SameText(WorkbookRelsRoot.LocalName, 'Relationships') then
+      raise EInvalidOpException.CreateFmt(
+        'Некорректный корневой узел workbook.xml.rels: %s',
+        [WorkbookRelsRoot.NodeName]);
+
     RelationId := FindDataSheetRelationId(WorkbookXml);
     if RelationId = '' then
     begin
       SheetId := NextSheetId(WorkbookXml);
-      RelationId := NextRelationId(WorkbookRelsXml);
+      RelationId := NextRelationId(WorkbookRelsRoot);
       Target := 'worksheets/flowServiceReportData.xml';
-      WorkbookXml := InsertBeforeClosingTag(WorkbookXml, '</sheets>',
-        Format('<sheet name="%s" sheetId="%d" state="hidden" r:id="%s"/>',
-          [DATA_SHEET_NAME, SheetId, RelationId]));
-      WorkbookRelsXml := InsertBeforeClosingTag(WorkbookRelsXml,
-        '</Relationships>', Format('<Relationship Id="%s" Type="%s" Target="%s"/>',
-          [RelationId, CWorksheetRelation, Target]));
-      ContentTypesXml := InsertBeforeClosingTag(ContentTypesXml, '</Types>',
-        Format('<Override PartName="/xl/%s" ContentType="%s"/>',
-          [Target, CWorksheetContentType]));
+
+      if RelationId = '' then
+        raise EInvalidOpException.Create('Не задан идентификатор связи листа');
+      if Target = '' then
+        raise EInvalidOpException.Create('Не задан путь целевого листа');
+
+      SheetFragment := Format(
+        '<sheet name="%s" sheetId="%d" state="hidden" r:id="%s"/>',
+        [TReportTemplateService.DATA_SHEET_NAME, SheetId, RelationId]);
+      UpdatedWorkbookXml := InsertBeforeClosingTag(
+        WorkbookXml, '</sheets>', SheetFragment);
+      WorkbookXml := UpdatedWorkbookXml;
+
+      AddWorksheetRelationship(WorkbookRelsRoot, RelationId, Target);
+
+      SheetContentTypeFragment := Format(
+        '<Override PartName="/xl/%s" ContentType="%s"/>',
+        [Target, CWorksheetContentType]);
+      UpdatedContentTypesXml := InsertBeforeClosingTag(
+        ContentTypesXml, '</Types>', SheetContentTypeFragment);
+      ContentTypesXml := UpdatedContentTypesXml;
     end
     else
     begin
-      Target := FindRelationshipTarget(WorkbookRelsXml, RelationId);
+      Target := FindRelationshipTarget(WorkbookRelsRoot, RelationId);
       if Target = '' then
         raise EInvalidOpException.Create('Не найдена связь листа _Data в XLSX');
     end;
-    WorkbookXml := EnsureAutomaticCalculation(WorkbookXml);
+    UpdatedWorkbookXml := EnsureAutomaticCalculation(WorkbookXml);
+    WorkbookXml := UpdatedWorkbookXml;
 
     SheetArchivePath := WorkbookTargetToArchivePath(Target);
     SheetFile := TPath.Combine(TempDir,
@@ -581,11 +668,24 @@ begin
 
     if not ContentTypesXml.Contains(
       'PartName="/xl/tables/flowServiceReportData.xml"') then
-      ContentTypesXml := InsertBeforeClosingTag(ContentTypesXml, '</Types>',
-        Format('<Override PartName="/xl/tables/flowServiceReportData.xml" ContentType="%s"/>',
-          [CTableContentType]));
+    begin
+      TableContentTypeFragment := Format(
+        '<Override PartName="/xl/tables/flowServiceReportData.xml" ContentType="%s"/>',
+        [CTableContentType]);
+      UpdatedContentTypesXml := InsertBeforeClosingTag(
+        ContentTypesXml, '</Types>', TableContentTypeFragment);
+      ContentTypesXml := UpdatedContentTypesXml;
+    end;
+
+    // Проверяет структуру JSON до формирования служебного листа _Data.
+    if ARoot = nil then
+      raise EArgumentNilException.Create(
+        'Не заданы данные для формирования листа _Data');
 
     Rows := ARoot.GetValue<TJSONArray>('Rows');
+    if Rows = nil then
+      raise EInvalidOpException.Create(
+        'В данных отчёта отсутствует массив Rows');
     Columns := BuildColumns;
     try
       WriteUtf8File(SheetFile, BuildWorksheetXml(Rows, Columns));
@@ -596,7 +696,7 @@ begin
           [CTableRelation]) + '</Relationships>');
       WriteUtf8File(TableFile, BuildTableXml(Rows.Count, Columns));
       WriteUtf8File(WorkbookFile, WorkbookXml);
-      WriteUtf8File(WorkbookRelsFile, WorkbookRelsXml);
+      WorkbookRelsDocument.SaveToFile(WorkbookRelsFile);
       WriteUtf8File(ContentTypesFile, ContentTypesXml);
     finally
       Columns.Free;
