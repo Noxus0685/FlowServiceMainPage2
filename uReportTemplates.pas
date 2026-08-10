@@ -16,7 +16,6 @@ type
     MAX_POINT_SPILLAGES = 10;
     MAX_COEF_ITEMS = 20;
     DATA_SHEET_NAME = '_Data';
-    DATA_TABLE_NAME = 'tblReportData';
   public
     // Возвращает общий каталог XLSX-шаблонов приложения и создаёт его при отсутствии.
     class function TemplatesPath: string; static;
@@ -54,16 +53,8 @@ const
   CCoefTableTypes: array[0..4] of Integer = (10, 11, 12, 13, 14);
   CWorksheetRelation: string =
     'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet';
-  CTableRelation: string =
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/table';
-  CWorksheetContentType: string =
+  CWorksheetContentType =
     'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml';
-  CTableContentType: string =
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml';
-  CSpreadsheetNamespace =
-    'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
-  CPackageRelationshipsNamespace =
-    'http://schemas.openxmlformats.org/package/2006/relationships';
 
 function NormalizeArchivePath(const APath: string): string;
 begin
@@ -108,7 +99,7 @@ begin
     Result := '';
 end;
 
-function FindDataSheetRelationId(const AWorkbookXml: string): string;
+function FindSheetRelationId(const AWorkbookXml, ASheetName: string): string;
 var
   Match: TMatch;
   Tag: string;
@@ -118,7 +109,7 @@ begin
     [roIgnoreCase]) do
   begin
     Tag := Match.Value;
-    if SameText(XmlAttribute(Tag, 'name'), TReportTemplateService.DATA_SHEET_NAME) then
+    if SameText(XmlAttribute(Tag, 'name'), ASheetName) then
       Exit(XmlAttribute(Tag, 'r:id'));
   end;
 end;
@@ -497,94 +488,65 @@ begin
      SameText(MatchedPoint.UUID, APoint.UUID));
 end;
 
-procedure CollectTypeColumns(AClass: TClass; AColumns: TList<string>);
+// Добавляет имя столбца без дубликатов без учёта регистра.
+procedure AddUniqueColumn(AColumns: TList<string>; const AName: string);
 var
-  Context: TRttiContext;
-  RttiType: TRttiType;
-  Field: TRttiField;
-  Prop: TRttiProperty;
-  Kind: TTypeKind;
-
-  procedure AddName(const AName: string);
-  var
-    Existing: string;
-  begin
-    for Existing in AColumns do
-      if SameText(Existing, AName) then
-        Exit;
-    AColumns.Add(AName);
-  end;
-
-  function IsScalar(AType: TRttiType): Boolean;
-  begin
-    Kind := AType.TypeKind;
-    Result := Kind in [tkInteger, tkInt64, tkFloat, tkEnumeration, tkChar,
-      tkWChar, tkString, tkLString, tkWString, tkUString, tkSet];
-  end;
-
+  Existing: string;
 begin
-  Context := TRttiContext.Create;
-  try
-    RttiType := Context.GetType(AClass.ClassInfo);
-    if RttiType = nil then
+  for Existing in AColumns do
+    if SameText(Existing, AName) then
       Exit;
-    for Field in RttiType.GetFields do
-      if (Field.Visibility in [mvPublic, mvPublished]) and IsScalar(Field.FieldType) then
-        AddName(Field.Name);
-    for Prop in RttiType.GetProperties do
-      if (Prop.Visibility in [mvPublic, mvPublished]) and Prop.IsReadable and
-         IsScalar(Prop.PropertyType) then
-        AddName(Prop.Name);
-  finally
-    Context.Free;
-  end;
+  AColumns.Add(AName);
 end;
 
-function IsServiceColumn(const AName: string): Boolean;
+// Проверяет принадлежность строки JSON одному из типов служебного листа.
+function RowHasObjectType(ARow: TJSONObject;
+  const AObjectTypes: array of string): Boolean;
 var
-  Normalized: string;
+  I: Integer;
+  ObjectType: string;
+  ObjectTypeValue: TJSONValue;
 begin
-  Normalized := LowerCase(AName);
-  Result := (Pos('uuid', Normalized) > 0) or
-    (Copy(Normalized, Max(1, Length(Normalized) - 1), 2) = 'id') or
-    (Pos('status', Normalized) > 0) or
-    (Pos('validation', Normalized) > 0) or
-    SameText(AName, 'State') or SameText(AName, 'ArchivedData') or
-    SameText(AName, 'Description') or SameText(AName, 'RepoName');
+  Result := False;
+  if ARow = nil then
+    Exit;
+  ObjectTypeValue := ARow.GetValue('ObjectType');
+  if ObjectTypeValue = nil then
+    Exit;
+  ObjectType := ObjectTypeValue.Value;
+  for I := Low(AObjectTypes) to High(AObjectTypes) do
+    if SameText(ObjectType, AObjectTypes[I]) then
+      Exit(True);
 end;
 
-function ColumnRank(const AName: string): Integer;
+// Возвращает набор столбцов по фактическим полям выбранных строк JSON.
+function BuildSeparatedColumns(ARows: TJSONArray;
+  const AObjectTypes: array of string): TList<string>;
 var
-  Normalized: string;
-begin
-  if SameText(AName, 'ObjectType') then Exit(0);
-  if SameText(AName, 'ObjectIndex') then Exit(1);
-  if SameText(AName, 'PointIndex') then Exit(2);
-  if SameText(AName, 'SpillageIndex') then Exit(3);
-  if SameText(AName, 'CoefTableType') then Exit(4);
-  if SameText(AName, 'CoefItemIndex') then Exit(5);
-  if SameText(AName, 'Name') then Exit(10);
-  Normalized := LowerCase(AName);
-  if (Pos('date', Normalized) > 0) or SameText(AName, 'AppliedAt') then Exit(11);
-  if IsServiceColumn(AName) then Exit(1000);
-  Result := 100;
-end;
-
-function BuildColumns: TList<string>;
+  I: Integer;
+  Pair: TJSONPair;
+  Row: TJSONObject;
 begin
   Result := TList<string>.Create;
-  Result.Add('ObjectType');
-  Result.Add('ObjectIndex');
-  Result.Add('PointIndex');
-  Result.Add('SpillageIndex');
-  Result.Add('CoefTableType');
-  Result.Add('CoefItemIndex');
+  AddUniqueColumn(Result, 'ObjectType');
+  AddUniqueColumn(Result, 'ObjectIndex');
+  AddUniqueColumn(Result, 'PointIndex');
+  AddUniqueColumn(Result, 'SpillageIndex');
+  AddUniqueColumn(Result, 'CoefTableType');
+  AddUniqueColumn(Result, 'CoefItemIndex');
   CollectTypeColumns(TDeviceType, Result);
   CollectTypeColumns(TDevice, Result);
   CollectTypeColumns(TDevicePoint, Result);
   CollectTypeColumns(TPointSpillage, Result);
   CollectTypeColumns(TCalibrCoefTable, Result);
   CollectTypeColumns(TCalibrCoefItem, Result);
+  for I := 0 to ARows.Count - 1 do
+  begin
+    Row := ARows.Items[I] as TJSONObject;
+    if RowHasObjectType(Row, AObjectTypes) then
+      for Pair in Row do
+        AddUniqueColumn(Result, Pair.JsonString.Value);
+  end;
   Result.Sort(TComparer<string>.Construct(
     function(const Left, Right: string): Integer
     begin
@@ -592,156 +554,190 @@ begin
       if Result = 0 then
         Result := CompareText(Left, Right);
     end));
-end;
-
-// Возвращает диапазон служебной таблицы по количеству строк и столбцов.
-function BuildReportTableRange(ARowCount, AColumnCount: Integer): string;
-begin
-  if ARowCount < 0 then
-    raise EArgumentOutOfRangeException.Create('Количество строк не может быть отрицательным');
-  if (AColumnCount <= 0) or (AColumnCount > 16384) then
-    raise EArgumentOutOfRangeException.CreateFmt(
-      'Количество столбцов служебной таблицы вне диапазона Excel: %d',
-      [AColumnCount]);
-  if ARowCount + 1 > 1048576 then
-    raise EArgumentOutOfRangeException.CreateFmt(
-      'Количество строк служебной таблицы превышает ограничение Excel: %d',
-      [ARowCount + 1]);
-  Result := Format('A1:%s%d',
-    [ExcelColumnName(AColumnCount), ARowCount + 1]);
-end;
-
-// Проверяет имена столбцов служебной Excel-таблицы.
-procedure ValidateReportTableColumns(AColumns: TList<string>);
-var
-  I, J: Integer;
-  ColumnName: string;
-  SeenNames: TDictionary<string, Integer>;
-begin
-  if AColumns = nil then
-    raise EArgumentNilException.Create('Не задан список столбцов служебной таблицы');
-  if AColumns.Count = 0 then
-    raise EInvalidOpException.Create('Список столбцов служебной таблицы пуст');
-  if AColumns.Count > 16384 then
-    raise EInvalidOpException.CreateFmt(
-      'Количество столбцов служебной таблицы превышает 16384: %d',
-      [AColumns.Count]);
-
-  SeenNames := TDictionary<string, Integer>.Create(
-    System.Generics.Defaults.TIStringComparer.Ordinal);
-  try
-    for I := 0 to AColumns.Count - 1 do
-    begin
-      ColumnName := AColumns[I];
-      if ColumnName = '' then
-        raise EInvalidOpException.CreateFmt('Имя столбца %d пусто', [I + 1]);
-      if Length(ColumnName) > 255 then
-        raise EInvalidOpException.CreateFmt(
-          'Имя столбца %d превышает 255 символов: %s', [I + 1, ColumnName]);
-      for J := 1 to Length(ColumnName) do
-        if (Ord(ColumnName[J]) < 32) and
-           not (ColumnName[J] in [#9, #10, #13]) then
-          raise EInvalidOpException.CreateFmt(
-            'Имя столбца %d содержит управляющий символ: %s',
-            [I + 1, ColumnName]);
-      if XmlEscape(ColumnName) = '' then
-        raise EInvalidOpException.CreateFmt(
-          'Имя столбца %d стало пустым после XML-кодирования: %s',
-          [I + 1, ColumnName]);
-      if SeenNames.ContainsKey(ColumnName) then
-        raise EInvalidOpException.CreateFmt(
-          'Имя столбца %d дублируется без учёта регистра: %s',
-          [I + 1, ColumnName]);
-      SeenNames.Add(ColumnName, I);
-    end;
-  finally
-    SeenNames.Free;
   end;
 end;
 
-function BuildWorksheetXml(ARows: TJSONArray; AColumns: TList<string>): string;
+// Возвращает ширину столбца по содержимому с ограничением для читаемости.
+function ReportColumnWidth(const AName: string; ARows: TJSONArray;
+  const AObjectTypes: array of string): Integer;
 var
-  RowIndex, ColumnIndex: Integer;
+  I: Integer;
+  Row: TJSONObject;
+  Value: TJSONValue;
+begin
+  Result := Max(10, Length(AName) + 2);
+  for I := 0 to ARows.Count - 1 do
+  begin
+    Row := ARows.Items[I] as TJSONObject;
+    if not RowHasObjectType(Row, AObjectTypes) then
+      Continue;
+    Value := Row.GetValue(AName);
+    if Value <> nil then
+      Result := Max(Result, Length(JsonValueToText(Value)) + 2);
+  end;
+  Result := Min(Result, 40);
+end;
+
+// Формирует читаемый XML отдельного служебного листа по выбранным типам JSON.
+function BuildSeparatedWorksheetXml(const ATitle: string; ARows: TJSONArray;
+  const AObjectTypes: array of string): string;
+var
+  Columns: TList<string>;
+  I, RowIndex, OutputRow, Width: Integer;
   Row: TJSONObject;
   Value: TJSONValue;
   CellRef, TableRange, TextValue: string;
 begin
-  TableRange := BuildReportTableRange(ARows.Count, AColumns.Count);
-  Result := '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
-    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-    Format('<dimension ref="%s"/>', [TableRange]) +
-    '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" ' +
-    'activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetData>' +
-    '<row r="1">';
-
-  for ColumnIndex := 0 to AColumns.Count - 1 do
-  begin
-    CellRef := ExcelColumnName(ColumnIndex + 1) + '1';
-    Result := Result + Format('<c r="%s" t="inlineStr"><is><t>%s</t></is></c>',
-      [CellRef, XmlEscape(AColumns[ColumnIndex])]);
-  end;
-  Result := Result + '</row>';
-
-  for RowIndex := 0 to ARows.Count - 1 do
-  begin
-    Row := ARows.Items[RowIndex] as TJSONObject;
-    Result := Result + Format('<row r="%d">', [RowIndex + 2]);
-    for ColumnIndex := 0 to AColumns.Count - 1 do
+  Columns := BuildSeparatedColumns(ARows, AObjectTypes);
+  try
+    OutputRow := 2;
+    for I := 0 to ARows.Count - 1 do
+      if RowHasObjectType(ARows.Items[I] as TJSONObject, AObjectTypes) then
+        Inc(OutputRow);
+    Result := '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      Format('<dimension ref="A1:%s%d"/>',
+        [ExcelColumnName(Columns.Count), OutputRow]) +
+      '<sheetViews><sheetView workbookViewId="0"/></sheetViews><cols>';
+    for I := 0 to Columns.Count - 1 do
     begin
-      CellRef := ExcelColumnName(ColumnIndex + 1) + (RowIndex + 2).ToString;
-      Value := Row.GetValue(AColumns[ColumnIndex]);
-      if (Value = nil) or (Value is TJSONNull) then
-        Continue;
-      if Value is TJSONNumber then
-        Result := Result + Format('<c r="%s"><v>%s</v></c>',
-          [CellRef, Value.Value])
-      else if Value is TJSONBool then
-      begin
-        if TJSONBool(Value).AsBoolean then TextValue := '1' else TextValue := '0';
-        Result := Result + Format('<c r="%s" t="b"><v>%s</v></c>',
-          [CellRef, TextValue]);
-      end
-      else
-      begin
-        { inlineStr сохраняет пользовательский текст и не интерпретирует его как формулу. }
-        TextValue := JsonValueToText(Value);
-        Result := Result + Format('<c r="%s" t="inlineStr"><is><t>%s</t></is></c>',
-          [CellRef, XmlEscape(TextValue)]);
-      end;
+      Width := ReportColumnWidth(Columns[I], ARows, AObjectTypes);
+      Result := Result + Format(
+        '<col min="%d" max="%d" width="%d" customWidth="1"/>',
+        [I + 1, I + 1, Width]);
     end;
+    Result := Result + '<sheetData><row r="1">' +
+      Format('<c r="A1" t="inlineStr"><is><t>%s</t></is></c>',
+        [XmlEscape(ATitle)]) + '</row><row r="2">';
+    for I := 0 to Columns.Count - 1 do
+      Result := Result + Format(
+        '<c r="%s2" t="inlineStr"><is><t>%s</t></is></c>',
+        [ExcelColumnName(I + 1), XmlEscape(Columns[I])]);
     Result := Result + '</row>';
-  end;
 
-  Result := Result + '</sheetData>' +
-    '<tableParts count="1"><tablePart r:id="rId1"/></tableParts></worksheet>';
+    OutputRow := 3;
+    for RowIndex := 0 to ARows.Count - 1 do
+    begin
+      Row := ARows.Items[RowIndex] as TJSONObject;
+      if not RowHasObjectType(Row, AObjectTypes) then
+        Continue;
+      Result := Result + Format('<row r="%d">', [OutputRow]);
+      for I := 0 to Columns.Count - 1 do
+      begin
+        Value := Row.GetValue(Columns[I]);
+        if (Value = nil) or (Value is TJSONNull) then
+          Continue;
+        CellRef := ExcelColumnName(I + 1) + OutputRow.ToString;
+        if Value is TJSONNumber then
+          Result := Result + Format('<c r="%s"><v>%s</v></c>',
+            [CellRef, Value.Value])
+        else if Value is TJSONBool then
+        begin
+          if TJSONBool(Value).AsBoolean then TextValue := '1' else TextValue := '0';
+          Result := Result + Format('<c r="%s" t="b"><v>%s</v></c>',
+            [CellRef, TextValue]);
+        end
+        else
+          Result := Result + Format(
+            '<c r="%s" t="inlineStr"><is><t>%s</t></is></c>',
+            [CellRef, XmlEscape(JsonValueToText(Value))]);
+      end;
+      Result := Result + '</row>';
+      Inc(OutputRow);
+    end;
+    Result := Result + '</sheetData></worksheet>';
+  finally
+    Columns.Free;
+  end;
 end;
 
-// Формирует определение Excel-таблицы с уникальным идентификатором и
-// согласованным диапазоном.
-function BuildTableXml(ARowCount: Integer; AColumns: TList<string>;
-  ATableId: Cardinal): string;
+// Формирует служебный лист метаданных отчёта.
+function BuildMetaWorksheetXml(ARoot: TJSONObject): string;
 var
-  I: Integer;
-  TableRange: string;
+  Pair: TJSONPair;
+  RowIndex: Integer;
 begin
   if ATableId = 0 then
     raise EArgumentOutOfRangeException.Create('Идентификатор таблицы должен быть положительным');
   TableRange := BuildReportTableRange(ARowCount, AColumns.Count);
   Result := '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    Format('<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
-      'id="%d" name="%s" displayName="%s" ref="%s" totalsRowShown="0">',
-      [ATableId, TReportTemplateService.DATA_TABLE_NAME,
-       TReportTemplateService.DATA_TABLE_NAME,
-       TableRange]) +
-    Format('<autoFilter ref="%s"/><tableColumns count="%d">',
-      [TableRange, AColumns.Count]);
-  for I := 0 to AColumns.Count - 1 do
-    Result := Result + Format('<tableColumn id="%d" name="%s"/>',
-      [I + 1, XmlEscape(AColumns[I])]);
-  Result := Result + '</tableColumns><tableStyleInfo name="TableStyleMedium2" ' +
-    'showFirstColumn="0" showLastColumn="0" showRowStripes="1" ' +
-    'showColumnStripes="0"/></table>';
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<dimension ref="A1:B20"/><sheetViews><sheetView workbookViewId="0"/></sheetViews>' +
+    '<cols><col min="1" max="1" width="30" customWidth="1"/>' +
+    '<col min="2" max="2" width="40" customWidth="1"/></cols><sheetData>' +
+    '<row r="1"><c r="A1" t="inlineStr"><is><t>Метаданные отчёта</t></is></c></row>' +
+    '<row r="2"><c r="A2" t="inlineStr"><is><t>Параметр</t></is></c>' +
+    '<c r="B2" t="inlineStr"><is><t>Значение</t></is></c></row>';
+  RowIndex := 3;
+  for Pair in ARoot do
+    if not SameText(Pair.JsonString.Value, 'Rows') then
+    begin
+      Result := Result + Format(
+        '<row r="%d"><c r="A%d" t="inlineStr"><is><t>%s</t></is></c>' +
+        '<c r="B%d" t="inlineStr"><is><t>%s</t></is></c></row>',
+        [RowIndex, RowIndex, XmlEscape(Pair.JsonString.Value), RowIndex,
+         XmlEscape(JsonValueToText(Pair.JsonValue))]);
+      Inc(RowIndex);
+    end;
+  Result := Result + '</sheetData></worksheet>';
+end;
+
+// Проверяет XML сформированного отдельного служебного листа.
+procedure ValidateSeparatedWorksheetXml(const AXml, ASheetName: string);
+var
+  Document: IXMLDocument;
+  Root: IXMLNode;
+begin
+  try
+    Document := LoadXMLData(AXml);
+    Document.Active := True;
+  except
+    on E: EDOMParseError do
+      raise EInvalidOpException.CreateFmt(
+        'Некорректный XML служебного листа %s: %s', [ASheetName, E.Message]);
+  end;
+  Root := Document.DocumentElement;
+  if (Root = nil) or not SameText(Root.LocalName, 'worksheet') then
+    raise EInvalidOpException.CreateFmt(
+      'Некорректный корневой узел служебного листа %s', [ASheetName]);
+end;
+
+// Удаляет артефакты прежней однотабличной схемы, не затрагивая таблицы шаблона.
+procedure RemoveLegacyReportTableArtifacts(const ATempDir: string;
+  var AContentTypesXml: string);
+var
+  Document: IXMLDocument;
+  Root: IXMLNode;
+  FileName, LegacyName, PartName, TablesDirectory: string;
+begin
+  LegacyName := 'tblReport' + 'Data';
+  TablesDirectory := TPath.Combine(ATempDir, 'xl\tables');
+  if not DirectoryExists(TablesDirectory) then
+    Exit;
+  for FileName in TDirectory.GetFiles(TablesDirectory, '*.xml') do
+  begin
+    try
+      Document := LoadXMLData(ReadUtf8File(FileName));
+      Document.Active := True;
+    except
+      on E: EDOMParseError do
+        raise EInvalidOpException.CreateFmt(
+          'Некорректный XML существующей Excel-таблицы %s: %s',
+          [FileName, E.Message]);
+    end;
+    Root := Document.DocumentElement;
+    if (Root <> nil) and
+       (SameText(VarToStr(Root.Attributes['name']), LegacyName) or
+        SameText(VarToStr(Root.Attributes['displayName']), LegacyName)) then
+    begin
+      PartName := NormalizeArchivePath(FileName.Substring(
+        IncludeTrailingPathDelimiter(ATempDir).Length));
+      AContentTypesXml := TRegEx.Replace(AContentTypesXml,
+        '<Override\b[^>]*PartName="/' + TRegEx.Escape(PartName) +
+        '"[^>]*/>', '', [roIgnoreCase]);
+      DeleteFile(FileName);
+    end;
+  end;
 end;
 
 // Возвращает существующий идентификатор tblReportData либо следующий свободный
@@ -1069,25 +1065,38 @@ begin
   end;
 end;
 
+// Добавляет или обновляет пять раздельных служебных листов отчёта.
 procedure InjectDataSheet(const ASourceFileName, AOutputFileName: string;
   ARoot: TJSONObject);
+const
+  CSheetNames: array[0..4] of string =
+    ('_Data', '_DevicePoints', '_Spillages', '_CoefTables', '_Meta');
+  CSheetTitles: array[0..4] of string =
+    ('Общие данные прибора', 'Точки прибора', 'Проливки по точкам',
+     'Калибровочные таблицы и коэффициенты', 'Метаданные отчёта');
+  CSheetTargets: array[0..4] of string =
+    ('worksheets/flowServiceData.xml',
+     'worksheets/flowServiceDevicePoints.xml',
+     'worksheets/flowServiceSpillages.xml',
+     'worksheets/flowServiceCoefTables.xml',
+     'worksheets/flowServiceMeta.xml');
 var
   Zip: TZipFile;
   WorkbookRelsDocument: IXMLDocument;
   WorkbookRelsRoot: IXMLNode;
   TempDir, TempOutput, WorkbookFile, WorkbookRelsFile, ContentTypesFile,
-    WorkbookXml, ContentTypesXml, RelationId, Target,
-    SheetArchivePath, SheetFile, SheetRelsFile, TableFile,
-    SheetFragment, SheetContentTypeFragment, TableContentTypeFragment,
-    UpdatedWorkbookXml, UpdatedContentTypesXml, WorksheetXml,
-    WorksheetRelsXml, TableXml, ExpectedTableRange: string;
-  ReportTableId: Cardinal;
-  SheetId: Integer;
+    WorkbookXml, ContentTypesXml, RelationId, SheetFragment,
+    ContentTypeFragment, UpdatedWorkbookXml, UpdatedContentTypesXml,
+    SheetArchivePath, SheetFile: string;
+  SheetTargets, SheetFiles, SheetXml: array[0..4] of string;
+  SheetId, I: Integer;
   Rows: TJSONArray;
-  Columns: TList<string>;
 begin
   if not FileExists(ASourceFileName) then
     raise EFileNotFoundException.CreateFmt('Шаблон не найден: %s', [ASourceFileName]);
+  if ARoot = nil then
+    raise EArgumentNilException.Create(
+      'Не заданы данные для формирования служебных листов отчёта');
 
   TempDir := TPath.Combine(TPath.GetTempPath,
     'FlowServiceReport_' + TPath.GetRandomFileName.Replace('.', ''));
@@ -1114,8 +1123,7 @@ begin
     ValidateWorkbookXmlText(WorkbookXml, 'чтение исходного шаблона', False);
     ValidateWorkbookXml(WorkbookXml, 'чтение исходного шаблона');
     ContentTypesXml := ReadUtf8File(ContentTypesFile);
-    // Загружает связи книги через XML DOM, не используя повторные присваивания
-    // больших UnicodeString.
+    RemoveLegacyReportTableArtifacts(TempDir, ContentTypesXml);
     WorkbookRelsDocument := LoadXMLDocument(WorkbookRelsFile);
     WorkbookRelsDocument.Active := True;
     WorkbookRelsRoot := WorkbookRelsDocument.DocumentElement;
@@ -1127,103 +1135,76 @@ begin
         'Некорректный корневой узел workbook.xml.rels: %s',
         [WorkbookRelsRoot.NodeName]);
 
-    RelationId := FindDataSheetRelationId(WorkbookXml);
-    if RelationId = '' then
+    for I := Low(CSheetNames) to High(CSheetNames) do
     begin
-      SheetId := NextSheetId(WorkbookXml);
-      RelationId := NextRelationId(WorkbookRelsRoot);
-      Target := 'worksheets/flowServiceReportData.xml';
-
+      RelationId := FindSheetRelationId(WorkbookXml, CSheetNames[I]);
       if RelationId = '' then
-        raise EInvalidOpException.Create('Не задан идентификатор связи листа');
-      if Target = '' then
-        raise EInvalidOpException.Create('Не задан путь целевого листа');
+      begin
+        SheetId := NextSheetId(WorkbookXml);
+        RelationId := NextRelationId(WorkbookRelsRoot);
+        SheetTargets[I] := CSheetTargets[I];
+        SheetFragment := Format(
+          '<sheet name="%s" sheetId="%d" r:id="%s"/>',
+          [CSheetNames[I], SheetId, RelationId]);
+        UpdatedWorkbookXml := InsertBeforeClosingTag(
+          WorkbookXml, '</sheets>', SheetFragment);
+        ValidateWorkbookXmlText(UpdatedWorkbookXml,
+          'добавление листа ' + CSheetNames[I], False);
+        ValidateWorkbookXml(UpdatedWorkbookXml,
+          'добавление листа ' + CSheetNames[I]);
+        WorkbookXml := UpdatedWorkbookXml;
+        AddWorksheetRelationship(WorkbookRelsRoot, RelationId, SheetTargets[I]);
+        ContentTypeFragment := Format(
+          '<Override PartName="/xl/%s" ContentType="%s"/>',
+          [SheetTargets[I], CWorksheetContentType]);
+        UpdatedContentTypesXml := InsertBeforeClosingTag(
+          ContentTypesXml, '</Types>', ContentTypeFragment);
+        ContentTypesXml := UpdatedContentTypesXml;
+      end
+      else
+      begin
+        SheetTargets[I] := FindRelationshipTarget(WorkbookRelsRoot, RelationId);
+        if SheetTargets[I] = '' then
+          raise EInvalidOpException.CreateFmt(
+            'Не найдена связь служебного листа %s', [CSheetNames[I]]);
+      end;
 
-      SheetFragment := Format(
-        '<sheet name="%s" sheetId="%d" state="hidden" r:id="%s"/>',
-        [TReportTemplateService.DATA_SHEET_NAME, SheetId, RelationId]);
-      UpdatedWorkbookXml := InsertBeforeClosingTag(
-        WorkbookXml, '</sheets>', SheetFragment);
-      ValidateWorkbookXmlText(UpdatedWorkbookXml,
-        'добавление листа _Data', False);
-      ValidateWorkbookXml(UpdatedWorkbookXml, 'добавление листа _Data');
-      WorkbookXml := UpdatedWorkbookXml;
-
-      AddWorksheetRelationship(WorkbookRelsRoot, RelationId, Target);
-
-      SheetContentTypeFragment := Format(
-        '<Override PartName="/xl/%s" ContentType="%s"/>',
-        [Target, CWorksheetContentType]);
-      UpdatedContentTypesXml := InsertBeforeClosingTag(
-        ContentTypesXml, '</Types>', SheetContentTypeFragment);
-      ContentTypesXml := UpdatedContentTypesXml;
-    end
-    else
-    begin
-      Target := FindRelationshipTarget(WorkbookRelsRoot, RelationId);
-      if Target = '' then
-        raise EInvalidOpException.Create('Не найдена связь листа _Data в XLSX');
+      SheetArchivePath := WorkbookTargetToArchivePath(SheetTargets[I]);
+      SheetFiles[I] := TPath.Combine(TempDir,
+        StringReplace(SheetArchivePath, '/', PathDelim, [rfReplaceAll]));
+      SheetFile := TPath.Combine(ExtractFileDir(SheetFiles[I]), '_rels\' +
+        ExtractFileName(SheetFiles[I]) + '.rels');
+      if FileExists(SheetFile) then
+        DeleteFile(SheetFile);
     end;
+
     UpdatedWorkbookXml := EnsureAutomaticCalculation(WorkbookXml);
     ValidateWorkbookXmlText(UpdatedWorkbookXml,
       'EnsureAutomaticCalculation', True);
     ValidateWorkbookXml(UpdatedWorkbookXml, 'EnsureAutomaticCalculation');
     WorkbookXml := UpdatedWorkbookXml;
 
-    SheetArchivePath := WorkbookTargetToArchivePath(Target);
-    SheetFile := TPath.Combine(TempDir,
-      StringReplace(SheetArchivePath, '/', PathDelim, [rfReplaceAll]));
-    SheetRelsFile := TPath.Combine(ExtractFileDir(SheetFile), '_rels\' +
-      ExtractFileName(SheetFile) + '.rels');
-    TableFile := TPath.Combine(TempDir, 'xl\tables\flowServiceReportData.xml');
-    ReportTableId := ResolveReportTableId(
-      TPath.Combine(TempDir, 'xl\tables'), TableFile);
-
-    if not ContentTypesXml.Contains(
-      'PartName="/xl/tables/flowServiceReportData.xml"') then
-    begin
-      TableContentTypeFragment := Format(
-        '<Override PartName="/xl/tables/flowServiceReportData.xml" ContentType="%s"/>',
-        [CTableContentType]);
-      UpdatedContentTypesXml := InsertBeforeClosingTag(
-        ContentTypesXml, '</Types>', TableContentTypeFragment);
-      ContentTypesXml := UpdatedContentTypesXml;
-    end;
-
-    // Проверяет структуру JSON до формирования служебного листа _Data.
-    if ARoot = nil then
-      raise EArgumentNilException.Create(
-        'Не заданы данные для формирования листа _Data');
-
     Rows := ARoot.GetValue<TJSONArray>('Rows');
     if Rows = nil then
       raise EInvalidOpException.Create(
         'В данных отчёта отсутствует массив Rows');
-    Columns := BuildColumns;
-    try
-      ValidateReportTableColumns(Columns);
-      ExpectedTableRange := BuildReportTableRange(Rows.Count, Columns.Count);
-      WorksheetXml := BuildWorksheetXml(Rows, Columns);
-      TableXml := BuildTableXml(Rows.Count, Columns, ReportTableId);
-      WorksheetRelsXml :=
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-        Format('<Relationship Id="rId1" Type="%s" Target="../tables/flowServiceReportData.xml"/>',
-          [CTableRelation]) + '</Relationships>';
-      ValidateReportWorksheetXml(WorksheetXml, ExpectedTableRange);
-      ValidateReportTableXml(TableXml, ExpectedTableRange,
-        ReportTableId, Columns);
-      ValidateReportWorksheetRelsXml(WorksheetRelsXml);
+    SheetXml[0] := BuildSeparatedWorksheetXml(CSheetTitles[0], Rows,
+      ['DeviceType', 'Device']);
+    SheetXml[1] := BuildSeparatedWorksheetXml(CSheetTitles[1], Rows,
+      ['DevicePoint']);
+    SheetXml[2] := BuildSeparatedWorksheetXml(CSheetTitles[2], Rows,
+      ['Spillage']);
+    SheetXml[3] := BuildSeparatedWorksheetXml(CSheetTitles[3], Rows,
+      ['CalibrCoefTable', 'CalibrCoefItem']);
+    SheetXml[4] := BuildMetaWorksheetXml(ARoot);
 
-      WriteUtf8File(SheetFile, WorksheetXml);
-      WriteUtf8File(SheetRelsFile, WorksheetRelsXml);
-      WriteUtf8File(TableFile, TableXml);
-      WriteUtf8File(WorkbookFile, WorkbookXml);
-      WorkbookRelsDocument.SaveToFile(WorkbookRelsFile);
-      WriteUtf8File(ContentTypesFile, ContentTypesXml);
-    finally
-      Columns.Free;
-    end;
+    for I := Low(CSheetNames) to High(CSheetNames) do
+      ValidateSeparatedWorksheetXml(SheetXml[I], CSheetNames[I]);
+    for I := Low(CSheetNames) to High(CSheetNames) do
+      WriteUtf8File(SheetFiles[I], SheetXml[I]);
+    WriteUtf8File(WorkbookFile, WorkbookXml);
+    WorkbookRelsDocument.SaveToFile(WorkbookRelsFile);
+    WriteUtf8File(ContentTypesFile, ContentTypesXml);
 
     if FileExists(TempOutput) then
       DeleteFile(TempOutput);
