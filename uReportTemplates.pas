@@ -261,7 +261,7 @@ begin
 
   Criteria := [];
   AValue.ExtractRawData(@Criteria);
-  Result := SetToString(TypeInfo(TSpillageStopCriteria),
+  Result := SetToString(PTypeInfo(TypeInfo(TSpillageStopCriteria)),
     CriteriaToInt(Criteria), True);
 end;
 

@@ -112,7 +112,7 @@ def test_spillage_stop_criteria_set_uses_raw_rtti_data():
     assert "AValue.ExtractRawData(@Criteria);" in helper
     assert "GetReferenceToRawData" not in helper
     assert "CriteriaToInt(Criteria)" in helper
-    assert "SetToString(TypeInfo(TSpillageStopCriteria)," in helper
+    assert "SetToString(PTypeInfo(TypeInfo(TSpillageStopCriteria))," in helper
     assert "CriteriaToInt(Criteria), True)" in helper
     assert "Неподдерживаемый тип набора при формировании отчёта" in helper
 
