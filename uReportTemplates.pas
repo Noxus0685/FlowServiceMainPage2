@@ -46,6 +46,9 @@ uses
   Xml.XMLIntf,
   uOpenXmlXlsx;
 
+type
+  PSpillageStopCriteria = ^TSpillageStopCriteria;
+
 const
   CCoefTableTypes: array[0..4] of Integer = (10, 11, 12, 13, 14);
   CWorksheetRelation: string =
@@ -238,6 +241,30 @@ begin
   Result := AValue.Value;
 end;
 
+// Преобразует RTTI-значение набора критериев остановки в текст без вызова
+// TValue.AsOrdinal.
+function SpillageStopCriteriaRttiToString(const AValue: TValue): string;
+var
+  Criteria: TSpillageStopCriteria;
+begin
+  if AValue.IsEmpty then
+    Exit('');
+
+  if AValue.Kind <> tkSet then
+    raise EInvalidCast.CreateFmt('Ожидался RTTI-тип tkSet, получен %s',
+      [AValue.TypeInfo.Name]);
+
+  if AValue.TypeInfo <> TypeInfo(TSpillageStopCriteria) then
+    raise EInvalidCast.CreateFmt(
+      'Неподдерживаемый тип набора при формировании отчёта: %s',
+      [AValue.TypeInfo.Name]);
+
+  Criteria := [];
+  AValue.ExtractRawData(@Criteria);
+  Result := SetToString(TypeInfo(TSpillageStopCriteria),
+    CriteriaToInt(Criteria), True);
+end;
+
 function RttiValueToJson(const ATypeName: string;
   const AValue: TValue): TJSONValue;
 var
@@ -273,8 +300,8 @@ begin
     tkChar, tkWChar, tkString, tkLString, tkWString, tkUString:
       Result := TJSONString.Create(AValue.ToString);
     tkSet:
-      Result := TJSONString.Create(SetToString(AValue.TypeInfo,
-        AValue.AsOrdinal, True));
+      Result := TJSONString.Create(
+        SpillageStopCriteriaRttiToString(AValue));
   end;
 end;
 
