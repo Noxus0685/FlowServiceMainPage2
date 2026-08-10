@@ -23,6 +23,18 @@ def test_single_table_implementation_is_removed():
         assert forbidden not in SERVICE
 
 
+def test_removed_single_table_helpers_have_no_stale_references():
+    """Guard the Delphi unit against E2003 errors from partially removed code."""
+    for removed_identifier in (
+        "CollectTypeColumns",
+        "ColumnRank",
+        "BuildReportTableRange",
+        "ATableId",
+        "TableRange",
+    ):
+        assert removed_identifier not in SERVICE
+
+
 def test_five_visible_service_sheets_are_defined():
     for name in ("_Data", "_DevicePoints", "_Spillages", "_CoefTables", "_Meta"):
         assert name in SERVICE
