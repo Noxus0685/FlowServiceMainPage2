@@ -630,7 +630,7 @@ begin
         '<col min="%d" max="%d" width="%d" customWidth="1"/>',
         [I + 1, I + 1, Width]));
     end;
-    Builder.Append('<sheetData><row r="1">');
+    Builder.Append('</cols><sheetData><row r="1">');
     Builder.Append(Format('<c r="A1" t="inlineStr"><is><t>%s</t></is></c>',
       [XmlEscape(ATitle)]));
     Builder.Append('</row><row r="2">');
