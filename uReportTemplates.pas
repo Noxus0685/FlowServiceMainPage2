@@ -485,6 +485,7 @@ end;
 
 procedure ValidateZipEntries(AZip: TZipFile);
 var
+  Names: TArray<string>;
   Name: string;
 begin
   if AZip = nil then
@@ -620,6 +621,11 @@ begin
         ContentTypesXml, '</Types>', TableContentTypeFragment);
       ContentTypesXml := UpdatedContentTypesXml;
     end;
+
+    // Проверяет структуру JSON до формирования служебного листа _Data.
+    if ARoot = nil then
+      raise EArgumentNilException.Create(
+        'Не заданы данные для формирования листа _Data');
 
     // Проверяет структуру JSON до формирования служебного листа _Data.
     if ARoot = nil then
