@@ -44,6 +44,7 @@ uses
   System.Variants,
   Xml.XMLDoc,
   Xml.XMLIntf,
+  Xml.xmldom,
   uOpenXmlXlsx;
 
 type
@@ -228,24 +229,102 @@ begin
       CCalcPrXml);
 end;
 
-// Проверяет, что сформированное содержимое workbook.xml является корректным XML.
-procedure ValidateWorkbookXml(const AWorkbookXml: string);
+function WorkbookTemplateReloadHint(const AStage: string): string;
+begin
+  if SameText(AStage, 'чтение исходного шаблона') then
+    Result := ' Исходный XLSX-шаблон уже содержит повреждённый ' +
+      'xl/workbook.xml. Удалите его из ReportTemplates и повторно загрузите ' +
+      'исходный корректный XLSX.'
+  else
+    Result := '';
+end;
+
+// Проверяет известные признаки повреждения workbook.xml до запуска XML-парсера.
+procedure ValidateWorkbookXmlText(const AWorkbookXml, AStage: string;
+  ARequireSingleCalcPr: Boolean);
+var
+  DeclarationEnd: Integer;
+  CalcPrCount: Integer;
+  XmlBody: string;
+begin
+  if AWorkbookXml = '' then
+    raise EInvalidOpException.CreateFmt(
+      'Некорректный xl/workbook.xml на этапе "%s": содержимое пусто.%s',
+      [AStage, WorkbookTemplateReloadHint(AStage)]);
+
+  if AWorkbookXml.Contains('<<<calcPr') or
+     AWorkbookXml.Contains('<<calcPr') then
+    raise EInvalidOpException.CreateFmt(
+      'Повреждён xl/workbook.xml на этапе "%s": перед calcPr обнаружен ' +
+      'лишний символ "<".%s', [AStage, WorkbookTemplateReloadHint(AStage)]);
+  if AWorkbookXml.Contains('/>extLst>') then
+    raise EInvalidOpException.CreateFmt(
+      'Повреждён xl/workbook.xml на этапе "%s": нарушен открывающий тег ' +
+      'extLst.%s', [AStage, WorkbookTemplateReloadHint(AStage)]);
+  if AWorkbookXml.Contains('/>xtLst>') then
+    raise EInvalidOpException.CreateFmt(
+      'Повреждён xl/workbook.xml на этапе "%s": отсутствует начало тега ' +
+      'extLst.%s', [AStage, WorkbookTemplateReloadHint(AStage)]);
+
+  if ARequireSingleCalcPr then
+  begin
+    CalcPrCount := TRegEx.Matches(AWorkbookXml, '<calcPr\b[^>]*>',
+      [roIgnoreCase]).Count;
+    if CalcPrCount <> 1 then
+      raise EInvalidOpException.CreateFmt(
+        'Некорректный xl/workbook.xml на этапе "%s": ожидался ровно один ' +
+        'узел calcPr, найдено %d.%s',
+        [AStage, CalcPrCount, WorkbookTemplateReloadHint(AStage)]);
+  end;
+
+  XmlBody := AWorkbookXml.TrimLeft;
+  if XmlBody.StartsWith('<?xml') then
+  begin
+    DeclarationEnd := XmlBody.IndexOf('?>');
+    if DeclarationEnd >= 0 then
+      Delete(XmlBody, 1, DeclarationEnd + 2);
+    XmlBody := XmlBody.TrimLeft;
+  end;
+  if XmlBody = '' then
+    raise EInvalidOpException.CreateFmt(
+      'Некорректный xl/workbook.xml на этапе "%s": отсутствует корневой ' +
+      'узел workbook.%s', [AStage, WorkbookTemplateReloadHint(AStage)]);
+  if not XmlBody.StartsWith('<workbook') then
+    raise EInvalidOpException.CreateFmt(
+      'Некорректный xl/workbook.xml на этапе "%s": перед корневым узлом ' +
+      'workbook обнаружен символ U+%4.4X.%s',
+      [AStage, Ord(XmlBody[1]), WorkbookTemplateReloadHint(AStage)]);
+end;
+
+// Проверяет XML-структуру workbook.xml и указывает этап обнаружения ошибки.
+procedure ValidateWorkbookXml(const AWorkbookXml, AStage: string);
 var
   Document: IXMLDocument;
   Root: IXMLNode;
 begin
   if AWorkbookXml = '' then
-    raise EInvalidOpException.Create('Сформирован пустой xl/workbook.xml');
+    raise EInvalidOpException.CreateFmt(
+      'Некорректный xl/workbook.xml на этапе "%s": содержимое пусто.%s',
+      [AStage, WorkbookTemplateReloadHint(AStage)]);
 
-  Document := LoadXMLData(AWorkbookXml);
-  Document.Active := True;
+  try
+    Document := LoadXMLData(AWorkbookXml);
+    Document.Active := True;
+  except
+    on E: EDOMParseError do
+      raise EInvalidOpException.CreateFmt(
+        'Некорректный xl/workbook.xml на этапе "%s": %s.%s',
+        [AStage, E.Message, WorkbookTemplateReloadHint(AStage)]);
+  end;
   Root := Document.DocumentElement;
   if Root = nil then
-    raise EInvalidOpException.Create(
-      'В xl/workbook.xml отсутствует корневой XML-узел');
+    raise EInvalidOpException.CreateFmt(
+      'В xl/workbook.xml на этапе "%s" отсутствует корневой XML-узел.%s',
+      [AStage, WorkbookTemplateReloadHint(AStage)]);
   if not SameText(Root.LocalName, 'workbook') then
     raise EInvalidOpException.CreateFmt(
-      'Некорректный корневой узел xl/workbook.xml: %s', [Root.NodeName]);
+      'Некорректный корневой узел xl/workbook.xml на этапе "%s": %s.%s',
+      [AStage, Root.NodeName, WorkbookTemplateReloadHint(AStage)]);
 end;
 
 function WorkbookTargetToArchivePath(const ATarget: string): string;
@@ -664,6 +743,8 @@ begin
       raise EInvalidOpException.Create('Файл не является корректной книгой XLSX');
 
     WorkbookXml := ReadUtf8File(WorkbookFile);
+    ValidateWorkbookXmlText(WorkbookXml, 'чтение исходного шаблона', False);
+    ValidateWorkbookXml(WorkbookXml, 'чтение исходного шаблона');
     ContentTypesXml := ReadUtf8File(ContentTypesFile);
     // Загружает связи книги через XML DOM, не используя повторные присваивания
     // больших UnicodeString.
@@ -695,6 +776,9 @@ begin
         [TReportTemplateService.DATA_SHEET_NAME, SheetId, RelationId]);
       UpdatedWorkbookXml := InsertBeforeClosingTag(
         WorkbookXml, '</sheets>', SheetFragment);
+      ValidateWorkbookXmlText(UpdatedWorkbookXml,
+        'добавление листа _Data', False);
+      ValidateWorkbookXml(UpdatedWorkbookXml, 'добавление листа _Data');
       WorkbookXml := UpdatedWorkbookXml;
 
       AddWorksheetRelationship(WorkbookRelsRoot, RelationId, Target);
@@ -713,18 +797,10 @@ begin
         raise EInvalidOpException.Create('Не найдена связь листа _Data в XLSX');
     end;
     UpdatedWorkbookXml := EnsureAutomaticCalculation(WorkbookXml);
-    ValidateWorkbookXml(UpdatedWorkbookXml);
+    ValidateWorkbookXmlText(UpdatedWorkbookXml,
+      'EnsureAutomaticCalculation', True);
+    ValidateWorkbookXml(UpdatedWorkbookXml, 'EnsureAutomaticCalculation');
     WorkbookXml := UpdatedWorkbookXml;
-
-    if WorkbookXml.Contains('<<calcPr') or
-       WorkbookXml.Contains('/>extLst>') or
-       WorkbookXml.Contains('/>xtLst>') then
-      raise EInvalidOpException.Create(
-        'После изменения xl/workbook.xml обнаружены повреждённые XML-теги');
-    if TRegEx.Matches(WorkbookXml, '<calcPr\b[^>]*>',
-      [roIgnoreCase]).Count <> 1 then
-      raise EInvalidOpException.Create(
-        'В xl/workbook.xml должно присутствовать ровно одно описание calcPr');
 
     SheetArchivePath := WorkbookTargetToArchivePath(Target);
     SheetFile := TPath.Combine(TempDir,
