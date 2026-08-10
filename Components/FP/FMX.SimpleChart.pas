@@ -1,5 +1,5 @@
 ﻿unit FMX.SimpleChart;
-
+//10/08/2026
 interface
 
 uses
