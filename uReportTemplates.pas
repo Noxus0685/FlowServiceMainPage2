@@ -60,6 +60,10 @@ const
     'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml';
   CTableContentType: string =
     'application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml';
+  CSpreadsheetNamespace =
+    'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+  CPackageRelationshipsNamespace =
+    'http://schemas.openxmlformats.org/package/2006/relationships';
 
 function NormalizeArchivePath(const APath: string): string;
 begin
@@ -590,18 +594,83 @@ begin
     end));
 end;
 
+// Возвращает диапазон служебной таблицы по количеству строк и столбцов.
+function BuildReportTableRange(ARowCount, AColumnCount: Integer): string;
+begin
+  if ARowCount < 0 then
+    raise EArgumentOutOfRangeException.Create('Количество строк не может быть отрицательным');
+  if (AColumnCount <= 0) or (AColumnCount > 16384) then
+    raise EArgumentOutOfRangeException.CreateFmt(
+      'Количество столбцов служебной таблицы вне диапазона Excel: %d',
+      [AColumnCount]);
+  if ARowCount + 1 > 1048576 then
+    raise EArgumentOutOfRangeException.CreateFmt(
+      'Количество строк служебной таблицы превышает ограничение Excel: %d',
+      [ARowCount + 1]);
+  Result := Format('A1:%s%d',
+    [ExcelColumnName(AColumnCount), ARowCount + 1]);
+end;
+
+// Проверяет имена столбцов служебной Excel-таблицы.
+procedure ValidateReportTableColumns(AColumns: TList<string>);
+var
+  I, J: Integer;
+  ColumnName: string;
+  SeenNames: TDictionary<string, Integer>;
+begin
+  if AColumns = nil then
+    raise EArgumentNilException.Create('Не задан список столбцов служебной таблицы');
+  if AColumns.Count = 0 then
+    raise EInvalidOpException.Create('Список столбцов служебной таблицы пуст');
+  if AColumns.Count > 16384 then
+    raise EInvalidOpException.CreateFmt(
+      'Количество столбцов служебной таблицы превышает 16384: %d',
+      [AColumns.Count]);
+
+  SeenNames := TDictionary<string, Integer>.Create(
+    TStringComparer.OrdinalIgnoreCase);
+  try
+    for I := 0 to AColumns.Count - 1 do
+    begin
+      ColumnName := AColumns[I];
+      if ColumnName = '' then
+        raise EInvalidOpException.CreateFmt('Имя столбца %d пусто', [I + 1]);
+      if Length(ColumnName) > 255 then
+        raise EInvalidOpException.CreateFmt(
+          'Имя столбца %d превышает 255 символов: %s', [I + 1, ColumnName]);
+      for J := 1 to Length(ColumnName) do
+        if (Ord(ColumnName[J]) < 32) and
+           not (ColumnName[J] in [#9, #10, #13]) then
+          raise EInvalidOpException.CreateFmt(
+            'Имя столбца %d содержит управляющий символ: %s',
+            [I + 1, ColumnName]);
+      if XmlEscape(ColumnName) = '' then
+        raise EInvalidOpException.CreateFmt(
+          'Имя столбца %d стало пустым после XML-кодирования: %s',
+          [I + 1, ColumnName]);
+      if SeenNames.ContainsKey(ColumnName) then
+        raise EInvalidOpException.CreateFmt(
+          'Имя столбца %d дублируется без учёта регистра: %s',
+          [I + 1, ColumnName]);
+      SeenNames.Add(ColumnName, I);
+    end;
+  finally
+    SeenNames.Free;
+  end;
+end;
+
 function BuildWorksheetXml(ARows: TJSONArray; AColumns: TList<string>): string;
 var
   RowIndex, ColumnIndex: Integer;
   Row: TJSONObject;
   Value: TJSONValue;
-  CellRef, TextValue: string;
+  CellRef, TableRange, TextValue: string;
 begin
+  TableRange := BuildReportTableRange(ARows.Count, AColumns.Count);
   Result := '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
     'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-    Format('<dimension ref="A1:%s%d"/>',
-      [ExcelColumnName(AColumns.Count), ARows.Count + 1]) +
+    Format('<dimension ref="%s"/>', [TableRange]) +
     '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" ' +
     'activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetData>' +
     '<row r="1">';
@@ -645,29 +714,326 @@ begin
   end;
 
   Result := Result + '</sheetData>' +
-    Format('<autoFilter ref="A1:%s%d"/>',
-      [ExcelColumnName(AColumns.Count), ARows.Count + 1]) +
     '<tableParts count="1"><tablePart r:id="rId1"/></tableParts></worksheet>';
 end;
 
-function BuildTableXml(ARowCount: Integer; AColumns: TList<string>): string;
+// Формирует определение Excel-таблицы с уникальным идентификатором и
+// согласованным диапазоном.
+function BuildTableXml(ARowCount: Integer; AColumns: TList<string>;
+  ATableId: Cardinal): string;
 var
   I: Integer;
+  TableRange: string;
 begin
+  if ATableId = 0 then
+    raise EArgumentOutOfRangeException.Create('Идентификатор таблицы должен быть положительным');
+  TableRange := BuildReportTableRange(ARowCount, AColumns.Count);
   Result := '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     Format('<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
-      'id="50000" name="%s" displayName="%s" ref="A1:%s%d" totalsRowShown="0">',
-      [TReportTemplateService.DATA_TABLE_NAME,
+      'id="%d" name="%s" displayName="%s" ref="%s" totalsRowShown="0">',
+      [ATableId, TReportTemplateService.DATA_TABLE_NAME,
        TReportTemplateService.DATA_TABLE_NAME,
-       ExcelColumnName(AColumns.Count), ARowCount + 1]) +
-    Format('<autoFilter ref="A1:%s%d"/><tableColumns count="%d">',
-      [ExcelColumnName(AColumns.Count), ARowCount + 1, AColumns.Count]);
+       TableRange]) +
+    Format('<autoFilter ref="%s"/><tableColumns count="%d">',
+      [TableRange, AColumns.Count]);
   for I := 0 to AColumns.Count - 1 do
     Result := Result + Format('<tableColumn id="%d" name="%s"/>',
       [I + 1, XmlEscape(AColumns[I])]);
   Result := Result + '</tableColumns><tableStyleInfo name="TableStyleMedium2" ' +
     'showFirstColumn="0" showLastColumn="0" showRowStripes="1" ' +
     'showColumnStripes="0"/></table>';
+end;
+
+// Возвращает существующий идентификатор tblReportData либо следующий свободный
+// идентификатор таблицы книги.
+function ResolveReportTableId(const ATablesDirectory,
+  AReportTableFile: string): Cardinal;
+var
+  Document: IXMLDocument;
+  Root: IXMLNode;
+  FileName, NameValue, DisplayNameValue, IdText: string;
+  Files: TArray<string>;
+  IdValue, MaxTableId, ReportTableId: Cardinal;
+  ParsedId: UInt64;
+  IdFiles: TDictionary<Cardinal, string>;
+  NameFiles: TDictionary<string, string>;
+  IsReportFile, IsReportName: Boolean;
+
+  procedure RegisterName(const AName, AFileName: string);
+  var
+    ExistingFile: string;
+  begin
+    if AName = '' then
+      raise EInvalidOpException.CreateFmt(
+        'В определении таблицы %s отсутствует name или displayName', [AFileName]);
+    if NameFiles.TryGetValue(AName, ExistingFile) and
+       not SameText(ExistingFile, AFileName) then
+      raise EInvalidOpException.CreateFmt(
+        'Имя Excel-таблицы %s повторяется в файлах %s и %s',
+        [AName, ExistingFile, AFileName]);
+    if not NameFiles.ContainsKey(AName) then
+      NameFiles.Add(AName, AFileName);
+  end;
+
+begin
+  MaxTableId := 0;
+  ReportTableId := 0;
+  IdFiles := TDictionary<Cardinal, string>.Create;
+  NameFiles := TDictionary<string, string>.Create(TStringComparer.OrdinalIgnoreCase);
+  try
+    if DirectoryExists(ATablesDirectory) then
+      Files := TDirectory.GetFiles(ATablesDirectory, '*.xml')
+    else
+      SetLength(Files, 0);
+
+    for FileName in Files do
+    begin
+      try
+        Document := LoadXMLData(ReadUtf8File(FileName));
+        Document.Active := True;
+      except
+        on E: EDOMParseError do
+          raise EInvalidOpException.CreateFmt(
+            'Некорректный XML определения таблицы %s: %s', [FileName, E.Message]);
+      end;
+      Root := Document.DocumentElement;
+      if (Root = nil) or not SameText(Root.LocalName, 'table') then
+        raise EInvalidOpException.CreateFmt(
+          'Некорректный корневой узел определения таблицы: %s', [FileName]);
+
+      IdText := VarToStr(Root.Attributes['id']);
+      if not TryStrToUInt64(IdText, ParsedId) or (ParsedId = 0) or
+         (ParsedId > High(Cardinal)) then
+        raise EInvalidOpException.CreateFmt(
+          'Некорректный идентификатор таблицы в %s: %s', [FileName, IdText]);
+      IdValue := Cardinal(ParsedId);
+      if IdFiles.ContainsKey(IdValue) then
+        raise EInvalidOpException.CreateFmt(
+          'Идентификатор таблицы %d повторяется в файлах %s и %s',
+          [IdValue, IdFiles[IdValue], FileName]);
+      IdFiles.Add(IdValue, FileName);
+      if IdValue > MaxTableId then
+        MaxTableId := IdValue;
+
+      NameValue := VarToStr(Root.Attributes['name']);
+      DisplayNameValue := VarToStr(Root.Attributes['displayName']);
+      RegisterName(NameValue, FileName);
+      RegisterName(DisplayNameValue, FileName);
+
+      IsReportFile := SameText(ExpandFileName(FileName),
+        ExpandFileName(AReportTableFile));
+      IsReportName := SameText(NameValue,
+        TReportTemplateService.DATA_TABLE_NAME) or
+        SameText(DisplayNameValue, TReportTemplateService.DATA_TABLE_NAME);
+      if IsReportName and not IsReportFile then
+        raise EInvalidOpException.CreateFmt(
+          'Имя %s уже используется другой таблицей: %s',
+          [TReportTemplateService.DATA_TABLE_NAME, FileName]);
+      if IsReportFile then
+      begin
+        if not SameText(NameValue, TReportTemplateService.DATA_TABLE_NAME) or
+           not SameText(DisplayNameValue,
+             TReportTemplateService.DATA_TABLE_NAME) then
+          raise EInvalidOpException.CreateFmt(
+            'Файл служебной таблицы содержит другое имя: %s', [FileName]);
+        ReportTableId := IdValue;
+      end;
+    end;
+
+    if ReportTableId <> 0 then
+      Exit(ReportTableId);
+    if MaxTableId = High(Cardinal) then
+      raise EInvalidOpException.Create(
+        'Невозможно назначить идентификатор служебной таблицы: переполнение Cardinal');
+    Result := MaxTableId + 1;
+  finally
+    NameFiles.Free;
+    IdFiles.Free;
+  end;
+end;
+
+// Проверяет XML и обязательную структуру служебной Excel-таблицы.
+procedure ValidateReportTableXml(const ATableXml, AExpectedRange: string;
+  AExpectedTableId: Cardinal; AColumns: TList<string>);
+var
+  Document: IXMLDocument;
+  Root, Node, AutoFilterNode, TableColumnsNode: IXMLNode;
+  I, AutoFilterCount, TableColumnsCount, StyleCount: Integer;
+  ParsedValue: UInt64;
+  SeenNames: TDictionary<string, Boolean>;
+begin
+  try
+    Document := LoadXMLData(ATableXml);
+    Document.Active := True;
+  except
+    on E: EDOMParseError do
+      raise EInvalidOpException.CreateFmt(
+        'Некорректный XML служебной таблицы: %s', [E.Message]);
+  end;
+  Root := Document.DocumentElement;
+  if (Root = nil) or not SameText(Root.LocalName, 'table') or
+     not SameText(Root.NamespaceURI, CSpreadsheetNamespace) then
+    raise EInvalidOpException.Create(
+      'Некорректный корневой узел XML служебной таблицы');
+  if not TryStrToUInt64(VarToStr(Root.Attributes['id']), ParsedValue) or
+     (ParsedValue <> AExpectedTableId) then
+    raise EInvalidOpException.Create('Некорректный id служебной таблицы');
+  if not SameText(VarToStr(Root.Attributes['name']),
+     TReportTemplateService.DATA_TABLE_NAME) or
+     not SameText(VarToStr(Root.Attributes['displayName']),
+       TReportTemplateService.DATA_TABLE_NAME) then
+    raise EInvalidOpException.Create('Некорректное имя служебной таблицы');
+  if (VarToStr(Root.Attributes['ref']) <> AExpectedRange) or
+     (VarToStr(Root.Attributes['totalsRowShown']) <> '0') then
+    raise EInvalidOpException.Create('Некорректный диапазон или totalsRowShown таблицы');
+
+  AutoFilterCount := 0;
+  TableColumnsCount := 0;
+  StyleCount := 0;
+  for I := 0 to Root.ChildNodes.Count - 1 do
+  begin
+    Node := Root.ChildNodes[I];
+    if SameText(Node.LocalName, 'autoFilter') then
+    begin
+      Inc(AutoFilterCount);
+      AutoFilterNode := Node;
+    end
+    else if SameText(Node.LocalName, 'tableColumns') then
+    begin
+      Inc(TableColumnsCount);
+      TableColumnsNode := Node;
+    end
+    else if SameText(Node.LocalName, 'tableStyleInfo') then
+      Inc(StyleCount);
+  end;
+  if AutoFilterCount <> 1 then
+    raise EInvalidOpException.Create('Некорректное количество autoFilter таблицы');
+  if VarToStr(AutoFilterNode.Attributes['ref']) <> AExpectedRange then
+    raise EInvalidOpException.Create('Некорректный autoFilter служебной таблицы');
+  if (TableColumnsCount <> 1) or (TableColumnsNode = nil) then
+    raise EInvalidOpException.Create('Отсутствует единственный tableColumns');
+  if (VarToStr(TableColumnsNode.Attributes['count']) <> AColumns.Count.ToString) or
+     (TableColumnsNode.ChildNodes.Count <> AColumns.Count) then
+    raise EInvalidOpException.Create('Некорректное количество столбцов таблицы');
+  if StyleCount <> 1 then
+    raise EInvalidOpException.Create('В служебной таблице отсутствует tableStyleInfo');
+
+  SeenNames := TDictionary<string, Boolean>.Create(TStringComparer.OrdinalIgnoreCase);
+  try
+    for I := 0 to AColumns.Count - 1 do
+    begin
+      Node := TableColumnsNode.ChildNodes[I];
+      if not SameText(Node.LocalName, 'tableColumn') or
+         (VarToStr(Node.Attributes['id']) <> (I + 1).ToString) or
+         (VarToStr(Node.Attributes['name']) <> AColumns[I]) then
+        raise EInvalidOpException.CreateFmt(
+          'Некорректное определение столбца таблицы %d', [I + 1]);
+      if SeenNames.ContainsKey(VarToStr(Node.Attributes['name'])) then
+        raise EInvalidOpException.CreateFmt(
+          'Повторяющееся имя столбца таблицы: %s',
+          [VarToStr(Node.Attributes['name'])]);
+      SeenNames.Add(VarToStr(Node.Attributes['name']), True);
+    end;
+  finally
+    SeenNames.Free;
+  end;
+end;
+
+// Проверяет связь служебного листа с таблицей и отсутствие листового автофильтра.
+procedure ValidateReportWorksheetXml(const AWorksheetXml,
+  AExpectedRange: string);
+var
+  Document: IXMLDocument;
+  Root, Node, TablePartsNode, TablePartNode: IXMLNode;
+  I, DimensionCount, SheetDataCount, AutoFilterCount, TablePartsCount: Integer;
+begin
+  try
+    Document := LoadXMLData(AWorksheetXml);
+    Document.Active := True;
+  except
+    on E: EDOMParseError do
+      raise EInvalidOpException.CreateFmt(
+        'Некорректный XML служебного листа: %s', [E.Message]);
+  end;
+  Root := Document.DocumentElement;
+  if (Root = nil) or not SameText(Root.LocalName, 'worksheet') then
+    raise EInvalidOpException.Create('Некорректный корневой узел служебного листа');
+  DimensionCount := 0;
+  SheetDataCount := 0;
+  AutoFilterCount := 0;
+  TablePartsCount := 0;
+  for I := 0 to Root.ChildNodes.Count - 1 do
+  begin
+    Node := Root.ChildNodes[I];
+    if SameText(Node.LocalName, 'dimension') then
+    begin
+      Inc(DimensionCount);
+      if VarToStr(Node.Attributes['ref']) <> AExpectedRange then
+        raise EInvalidOpException.Create('Диапазон dimension не совпадает с таблицей');
+    end
+    else if SameText(Node.LocalName, 'sheetData') then
+      Inc(SheetDataCount)
+    else if SameText(Node.LocalName, 'autoFilter') then
+      Inc(AutoFilterCount)
+    else if SameText(Node.LocalName, 'tableParts') then
+    begin
+      Inc(TablePartsCount);
+      TablePartsNode := Node;
+    end;
+  end;
+  if (DimensionCount <> 1) or (SheetDataCount <> 1) or
+     (AutoFilterCount <> 0) or (TablePartsCount <> 1) then
+    raise EInvalidOpException.Create('Некорректная структура служебного листа');
+  if TablePartsNode = nil then
+    raise EInvalidOpException.Create('Отсутствует tableParts служебного листа');
+  if (VarToStr(TablePartsNode.Attributes['count']) <> '1') or
+     (TablePartsNode.ChildNodes.Count <> 1) then
+    raise EInvalidOpException.Create('Некорректный tableParts служебного листа');
+  TablePartNode := TablePartsNode.ChildNodes[0];
+  if not SameText(TablePartNode.LocalName, 'tablePart') or
+     (VarToStr(TablePartNode.Attributes['r:id']) <> 'rId1') then
+    raise EInvalidOpException.Create('Некорректная связь tablePart служебного листа');
+end;
+
+// Проверяет единственную связь служебного листа с tblReportData.
+procedure ValidateReportWorksheetRelsXml(const ARelsXml: string);
+var
+  Document: IXMLDocument;
+  Root, Node, RelationshipNode: IXMLNode;
+  I, RelationshipCount: Integer;
+begin
+  try
+    Document := LoadXMLData(ARelsXml);
+    Document.Active := True;
+  except
+    on E: EDOMParseError do
+      raise EInvalidOpException.CreateFmt(
+        'Некорректный XML связей служебного листа: %s', [E.Message]);
+  end;
+  Root := Document.DocumentElement;
+  if (Root = nil) or not SameText(Root.LocalName, 'Relationships') or
+     not SameText(Root.NamespaceURI, CPackageRelationshipsNamespace) then
+    raise EInvalidOpException.Create(
+      'Некорректный корневой узел связей служебного листа');
+  RelationshipCount := 0;
+  for I := 0 to Root.ChildNodes.Count - 1 do
+  begin
+    Node := Root.ChildNodes[I];
+    if SameText(Node.LocalName, 'Relationship') then
+    begin
+      Inc(RelationshipCount);
+      RelationshipNode := Node;
+    end;
+  end;
+  if RelationshipCount <> 1 then
+    raise EInvalidOpException.Create(
+      'Некорректное количество связей служебного листа');
+  if (VarToStr(RelationshipNode.Attributes['Id']) <> 'rId1') or
+     (VarToStr(RelationshipNode.Attributes['Type']) <> CTableRelation) or
+     (VarToStr(RelationshipNode.Attributes['Target']) <>
+       '../tables/flowServiceReportData.xml') then
+    raise EInvalidOpException.Create(
+      'Некорректная связь служебного листа с tblReportData');
 end;
 
 procedure ValidateZipEntries(AZip: TZipFile);
@@ -713,7 +1079,9 @@ var
     WorkbookXml, ContentTypesXml, RelationId, Target,
     SheetArchivePath, SheetFile, SheetRelsFile, TableFile,
     SheetFragment, SheetContentTypeFragment, TableContentTypeFragment,
-    UpdatedWorkbookXml, UpdatedContentTypesXml: string;
+    UpdatedWorkbookXml, UpdatedContentTypesXml, WorksheetXml,
+    WorksheetRelsXml, TableXml, ExpectedTableRange: string;
+  ReportTableId: Cardinal;
   SheetId: Integer;
   Rows: TJSONArray;
   Columns: TList<string>;
@@ -808,6 +1176,8 @@ begin
     SheetRelsFile := TPath.Combine(ExtractFileDir(SheetFile), '_rels\' +
       ExtractFileName(SheetFile) + '.rels');
     TableFile := TPath.Combine(TempDir, 'xl\tables\flowServiceReportData.xml');
+    ReportTableId := ResolveReportTableId(
+      TPath.Combine(TempDir, 'xl\tables'), TableFile);
 
     if not ContentTypesXml.Contains(
       'PartName="/xl/tables/flowServiceReportData.xml"') then
@@ -831,13 +1201,23 @@ begin
         'В данных отчёта отсутствует массив Rows');
     Columns := BuildColumns;
     try
-      WriteUtf8File(SheetFile, BuildWorksheetXml(Rows, Columns));
-      WriteUtf8File(SheetRelsFile,
+      ValidateReportTableColumns(Columns);
+      ExpectedTableRange := BuildReportTableRange(Rows.Count, Columns.Count);
+      WorksheetXml := BuildWorksheetXml(Rows, Columns);
+      TableXml := BuildTableXml(Rows.Count, Columns, ReportTableId);
+      WorksheetRelsXml :=
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
         Format('<Relationship Id="rId1" Type="%s" Target="../tables/flowServiceReportData.xml"/>',
-          [CTableRelation]) + '</Relationships>');
-      WriteUtf8File(TableFile, BuildTableXml(Rows.Count, Columns));
+          [CTableRelation]) + '</Relationships>';
+      ValidateReportWorksheetXml(WorksheetXml, ExpectedTableRange);
+      ValidateReportTableXml(TableXml, ExpectedTableRange,
+        ReportTableId, Columns);
+      ValidateReportWorksheetRelsXml(WorksheetRelsXml);
+
+      WriteUtf8File(SheetFile, WorksheetXml);
+      WriteUtf8File(SheetRelsFile, WorksheetRelsXml);
+      WriteUtf8File(TableFile, TableXml);
       WriteUtf8File(WorkbookFile, WorkbookXml);
       WorkbookRelsDocument.SaveToFile(WorkbookRelsFile);
       WriteUtf8File(ContentTypesFile, ContentTypesXml);
