@@ -2,6 +2,8 @@
 
 
 
+{$RTTI EXPLICIT FIELDS([vcPublic]) PROPERTIES([vcPublic, vcPublished])}
+
 interface
 uses
   System.DateUtils,
