@@ -612,20 +612,23 @@ begin
         Value := Row.GetValue(Columns[I]);
         if (Value = nil) or (Value is TJSONNull) then
           Continue;
-        CellRef := ExcelColumnName(I + 1) + OutputRow.ToString;
         if Value is TJSONNumber then
           Result := Result + Format('<c r="%s"><v>%s</v></c>',
-            [CellRef, Value.Value])
+            [ExcelColumnName(I + 1) + OutputRow.ToString, Value.Value])
         else if Value is TJSONBool then
         begin
-          if TJSONBool(Value).AsBoolean then TextValue := '1' else TextValue := '0';
-          Result := Result + Format('<c r="%s" t="b"><v>%s</v></c>',
-            [CellRef, TextValue]);
+          if TJSONBool(Value).AsBoolean then
+            Result := Result + Format('<c r="%s" t="b"><v>1</v></c>',
+              [ExcelColumnName(I + 1) + OutputRow.ToString])
+          else
+            Result := Result + Format('<c r="%s" t="b"><v>0</v></c>',
+              [ExcelColumnName(I + 1) + OutputRow.ToString]);
         end
         else
           Result := Result + Format(
             '<c r="%s" t="inlineStr"><is><t>%s</t></is></c>',
-            [CellRef, XmlEscape(JsonValueToText(Value))]);
+            [ExcelColumnName(I + 1) + OutputRow.ToString,
+             XmlEscape(JsonValueToText(Value))]);
       end;
       Result := Result + '</row>';
       Inc(OutputRow);

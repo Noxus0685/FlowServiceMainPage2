@@ -35,6 +35,17 @@ def test_removed_single_table_helpers_have_no_stale_references():
         assert removed_identifier not in SERVICE
 
 
+def test_separated_sheet_cells_do_not_depend_on_stale_locals():
+    builder = SERVICE.split("function BuildSeparatedWorksheetXml", 1)[1].split(
+        "function BuildMetaWorksheetXml", 1
+    )[0]
+    assert "CellRef" not in builder
+    assert "TextValue" not in builder
+    assert "ExcelColumnName(I + 1) + OutputRow.ToString" in builder
+    assert '<v>1</v>' in builder
+    assert '<v>0</v>' in builder
+
+
 def test_five_visible_service_sheets_are_defined():
     for name in ("_Data", "_DevicePoints", "_Spillages", "_CoefTables", "_Meta"):
         assert name in SERVICE
