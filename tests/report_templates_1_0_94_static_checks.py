@@ -9,7 +9,7 @@ VERSION = (ROOT / "uAppVersion.pas").read_text(encoding="utf-8-sig")
 
 
 def test_version_and_project_unit():
-    assert "APP_VERSION = '1.0.92'" in VERSION
+    assert "APP_VERSION = '1.0.94'" in VERSION
     assert "uReportTemplates in 'uReportTemplates.pas'" in (
         ROOT / "ProjectFornTest.dpr"
     ).read_text(encoding="utf-8-sig")
@@ -44,6 +44,52 @@ def test_json_is_source_for_data_sheet_and_template_is_preserved():
     assert "<tableParts count=\"1\">" in SERVICE
 
 
+def test_zip_entry_validation_keeps_nil_guard_and_direct_iteration():
+    assert "if AZip = nil then" in SERVICE
+    assert "for Name in AZip.FileNames do" in SERVICE
+    assert "Names := AZip.FileNames;" not in SERVICE
+    assert "локальную копию списка имён" not in SERVICE
+
+
+def test_openxml_updates_avoid_nested_managed_string_expressions():
+    assert "CWorksheetRelation: string =" in SERVICE
+    assert "CTableRelation: string =" in SERVICE
+    assert "CWorksheetContentType: string =" in SERVICE
+    assert "CTableContentType: string =" in SERVICE
+    assert "RelationshipFragment := Format(" in SERVICE
+    assert "UpdatedWorkbookRelsXml := InsertBeforeClosingTag(" in SERVICE
+    assert "WorkbookRelsXml := UpdatedWorkbookRelsXml;" in SERVICE
+    assert "UpdatedWorkbookXml := EnsureAutomaticCalculation(WorkbookXml);" in SERVICE
+    assert not any(
+        line.strip() == "WorkbookXml := EnsureAutomaticCalculation(WorkbookXml);"
+        for line in SERVICE.splitlines()
+    )
+    assert "WorkbookRelsXml := InsertBeforeClosingTag(WorkbookRelsXml" not in SERVICE
+    assert (
+        "InsertBeforeClosingTag(WorkbookRelsXml," +
+        "\n        '</Relationships>', Format("
+    ) not in SERVICE
+    assert "UpdatedContentTypesXml := InsertBeforeClosingTag(" in SERVICE
+
+
+def test_workbook_relationship_inputs_are_validated():
+    assert "if WorkbookRelsXml = '' then" in SERVICE
+    assert "if RelationId = '' then" in SERVICE
+    assert "if Target = '' then" in SERVICE
+    assert "if not WorkbookRelsXml.Contains('</Relationships>') then" in SERVICE
+
+
+def test_data_sheet_input_is_validated_without_taking_json_ownership():
+    assert "if ARoot = nil then" in SERVICE
+    assert "Не заданы данные для формирования листа _Data" in SERVICE
+    assert "if Rows = nil then" in SERVICE
+    assert "В данных отчёта отсутствует массив Rows" in SERVICE
+    assert "ARoot.Free" not in SERVICE
+    assert "[TReportTemplateService.DATA_SHEET_NAME, SheetId, RelationId]" in SERVICE
+    for forbidden in ("FillChar(", "ZeroMemory(", "Move(", "ARoot.Free"):
+        assert forbidden not in SERVICE
+
+
 def test_ui_uses_selected_device_and_save_dialog():
     assert "Device := ResolveSelectedDevice" in FORM
     assert "TReportTemplateService.ImportTemplate(Dialog.FileName)" in FORM
@@ -56,5 +102,9 @@ if __name__ == "__main__":
     test_report_tab_has_template_list_and_two_buttons()
     test_fixed_single_table_schema()
     test_json_is_source_for_data_sheet_and_template_is_preserved()
+    test_zip_entry_validation_keeps_nil_guard_and_direct_iteration()
+    test_openxml_updates_avoid_nested_managed_string_expressions()
+    test_workbook_relationship_inputs_are_validated()
+    test_data_sheet_input_is_validated_without_taking_json_ownership()
     test_ui_uses_selected_device_and_save_dialog()
     print("report template static checks: OK")

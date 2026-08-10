@@ -45,13 +45,13 @@ uses
 
 const
   CCoefTableTypes: array[0..4] of Integer = (10, 11, 12, 13, 14);
-  CWorksheetRelation =
+  CWorksheetRelation: string =
     'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet';
-  CTableRelation =
+  CTableRelation: string =
     'http://schemas.openxmlformats.org/officeDocument/2006/relationships/table';
-  CWorksheetContentType =
+  CWorksheetContentType: string =
     'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml';
-  CTableContentType =
+  CTableContentType: string =
     'application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml';
 
 function NormalizeArchivePath(const APath: string): string;
@@ -77,6 +77,8 @@ function InsertBeforeClosingTag(const AXml, AClosingTag,
 var
   P: Integer;
 begin
+  // Возвращает новую XML-строку со вставленным фрагментом; вызывающий код не
+  // должен совмещать исходную и результирующую строки в одном сложном выражении.
   P := AXml.LastIndexOf(AClosingTag);
   if P < 0 then
     raise EInvalidOpException.CreateFmt('В XLSX не найден XML-узел %s',
@@ -485,6 +487,9 @@ procedure ValidateZipEntries(AZip: TZipFile);
 var
   Name: string;
 begin
+  if AZip = nil then
+    raise EArgumentNilException.Create('Не задан ZIP-архив для проверки');
+
   for Name in AZip.FileNames do
     if Name.Contains('..') or Name.StartsWith('/') or Name.StartsWith('\') then
       raise EInvalidOpException.CreateFmt('Недопустимый путь внутри XLSX: %s', [Name]);
@@ -516,7 +521,10 @@ var
   Zip: TZipFile;
   TempDir, TempOutput, WorkbookFile, WorkbookRelsFile, ContentTypesFile,
     WorkbookXml, WorkbookRelsXml, ContentTypesXml, RelationId, Target,
-    SheetArchivePath, SheetFile, SheetRelsFile, TableFile: string;
+    SheetArchivePath, SheetFile, SheetRelsFile, TableFile,
+    SheetFragment, RelationshipFragment, SheetContentTypeFragment,
+    TableContentTypeFragment, UpdatedWorkbookXml, UpdatedWorkbookRelsXml,
+    UpdatedContentTypesXml: string;
   SheetId: Integer;
   Rows: TJSONArray;
   Columns: TList<string>;
@@ -554,15 +562,37 @@ begin
       SheetId := NextSheetId(WorkbookXml);
       RelationId := NextRelationId(WorkbookRelsXml);
       Target := 'worksheets/flowServiceReportData.xml';
-      WorkbookXml := InsertBeforeClosingTag(WorkbookXml, '</sheets>',
-        Format('<sheet name="%s" sheetId="%d" state="hidden" r:id="%s"/>',
-          [DATA_SHEET_NAME, SheetId, RelationId]));
-      WorkbookRelsXml := InsertBeforeClosingTag(WorkbookRelsXml,
-        '</Relationships>', Format('<Relationship Id="%s" Type="%s" Target="%s"/>',
-          [RelationId, CWorksheetRelation, Target]));
-      ContentTypesXml := InsertBeforeClosingTag(ContentTypesXml, '</Types>',
-        Format('<Override PartName="/xl/%s" ContentType="%s"/>',
-          [Target, CWorksheetContentType]));
+
+      if WorkbookRelsXml = '' then
+        raise EInvalidOpException.Create('Файл workbook.xml.rels пуст');
+      if RelationId = '' then
+        raise EInvalidOpException.Create('Не задан идентификатор связи листа');
+      if Target = '' then
+        raise EInvalidOpException.Create('Не задан путь целевого листа');
+      if not WorkbookRelsXml.Contains('</Relationships>') then
+        raise EInvalidOpException.Create(
+          'В workbook.xml.rels отсутствует закрывающий тег Relationships');
+
+      SheetFragment := Format(
+        '<sheet name="%s" sheetId="%d" state="hidden" r:id="%s"/>',
+        [TReportTemplateService.DATA_SHEET_NAME, SheetId, RelationId]);
+      UpdatedWorkbookXml := InsertBeforeClosingTag(
+        WorkbookXml, '</sheets>', SheetFragment);
+      WorkbookXml := UpdatedWorkbookXml;
+
+      RelationshipFragment := Format(
+        '<Relationship Id="%s" Type="%s" Target="%s"/>',
+        [RelationId, string(CWorksheetRelation), Target]);
+      UpdatedWorkbookRelsXml := InsertBeforeClosingTag(
+        WorkbookRelsXml, '</Relationships>', RelationshipFragment);
+      WorkbookRelsXml := UpdatedWorkbookRelsXml;
+
+      SheetContentTypeFragment := Format(
+        '<Override PartName="/xl/%s" ContentType="%s"/>',
+        [Target, CWorksheetContentType]);
+      UpdatedContentTypesXml := InsertBeforeClosingTag(
+        ContentTypesXml, '</Types>', SheetContentTypeFragment);
+      ContentTypesXml := UpdatedContentTypesXml;
     end
     else
     begin
@@ -570,7 +600,8 @@ begin
       if Target = '' then
         raise EInvalidOpException.Create('Не найдена связь листа _Data в XLSX');
     end;
-    WorkbookXml := EnsureAutomaticCalculation(WorkbookXml);
+    UpdatedWorkbookXml := EnsureAutomaticCalculation(WorkbookXml);
+    WorkbookXml := UpdatedWorkbookXml;
 
     SheetArchivePath := WorkbookTargetToArchivePath(Target);
     SheetFile := TPath.Combine(TempDir,
@@ -581,11 +612,24 @@ begin
 
     if not ContentTypesXml.Contains(
       'PartName="/xl/tables/flowServiceReportData.xml"') then
-      ContentTypesXml := InsertBeforeClosingTag(ContentTypesXml, '</Types>',
-        Format('<Override PartName="/xl/tables/flowServiceReportData.xml" ContentType="%s"/>',
-          [CTableContentType]));
+    begin
+      TableContentTypeFragment := Format(
+        '<Override PartName="/xl/tables/flowServiceReportData.xml" ContentType="%s"/>',
+        [CTableContentType]);
+      UpdatedContentTypesXml := InsertBeforeClosingTag(
+        ContentTypesXml, '</Types>', TableContentTypeFragment);
+      ContentTypesXml := UpdatedContentTypesXml;
+    end;
+
+    // Проверяет структуру JSON до формирования служебного листа _Data.
+    if ARoot = nil then
+      raise EArgumentNilException.Create(
+        'Не заданы данные для формирования листа _Data');
 
     Rows := ARoot.GetValue<TJSONArray>('Rows');
+    if Rows = nil then
+      raise EInvalidOpException.Create(
+        'В данных отчёта отсутствует массив Rows');
     Columns := BuildColumns;
     try
       WriteUtf8File(SheetFile, BuildWorksheetXml(Rows, Columns));
