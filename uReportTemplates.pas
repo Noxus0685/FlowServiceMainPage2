@@ -1,4 +1,4 @@
-unit uReportTemplates;
+﻿unit uReportTemplates;
 
 interface
 
@@ -628,7 +628,7 @@ begin
       [AColumns.Count]);
 
   SeenNames := TDictionary<string, Integer>.Create(
-    TStringComparer.OrdinalIgnoreCase);
+    System.Generics.Defaults.TIStringComparer.Ordinal);
   try
     for I := 0 to AColumns.Count - 1 do
     begin
@@ -779,7 +779,7 @@ begin
   MaxTableId := 0;
   ReportTableId := 0;
   IdFiles := TDictionary<Cardinal, string>.Create;
-  NameFiles := TDictionary<string, string>.Create(TStringComparer.OrdinalIgnoreCase);
+  NameFiles := TDictionary<string, string>.Create(System.Generics.Defaults.TIStringComparer.Ordinal);
   try
     if DirectoryExists(ATablesDirectory) then
       Files := TDirectory.GetFiles(ATablesDirectory, '*.xml')
@@ -918,7 +918,7 @@ begin
   if StyleCount <> 1 then
     raise EInvalidOpException.Create('В служебной таблице отсутствует tableStyleInfo');
 
-  SeenNames := TDictionary<string, Boolean>.Create(TStringComparer.OrdinalIgnoreCase);
+  SeenNames := TDictionary<string, Boolean>.Create(System.Generics.Defaults.TIStringComparer.Ordinal);
   try
     for I := 0 to AColumns.Count - 1 do
     begin
