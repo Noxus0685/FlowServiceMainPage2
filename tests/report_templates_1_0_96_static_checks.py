@@ -76,7 +76,7 @@ def test_workbook_relationships_are_not_held_as_a_string():
     assert "WorkbookRelsXml" not in inject
     assert "ReadUtf8File(WorkbookRelsFile)" not in inject
     assert "InsertBeforeClosingTag(WorkbookRels" not in inject
-    assert "TRegEx" not in inject
+    assert "TRegEx.Matches(WorkbookRels" not in inject
     assert "AddWorksheetRelationship(WorkbookRelsRoot, RelationId, Target);" in inject
     assert "FindRelationshipTarget(WorkbookRelsRoot, RelationId)" in inject
 
@@ -133,6 +133,40 @@ def test_tkset_does_not_use_ordinal_cast_and_enumeration_is_unchanged():
     )[0]
 
 
+def test_workbook_calculation_update_avoids_match_indexes_and_validates_xml():
+    ensure = SERVICE.split("function EnsureAutomaticCalculation", 1)[1].split(
+        "procedure ValidateWorkbookXml", 1
+    )[0]
+    assert "TRegEx.Create(CCalcPrPattern, [roIgnoreCase])" in ensure
+    assert "CalcPrRegex.Replace(AWorkbookXml, CCalcPrXml, 1)" in ensure
+    assert "Match.Index" not in ensure
+    assert "Match.Length" not in ensure
+    assert ".Remove(" not in ensure
+    assert ".Insert(" not in ensure
+    assert "if AWorkbookXml = '' then" in ensure
+
+    validator = SERVICE.split("procedure ValidateWorkbookXml", 1)[1].split(
+        "function WorkbookTargetToArchivePath", 1
+    )[0]
+    assert "LoadXMLData(AWorkbookXml)" in validator
+    assert "Root := Document.DocumentElement;" in validator
+    assert "SameText(Root.LocalName, 'workbook')" in validator
+
+    inject = SERVICE.split("procedure InjectDataSheet", 1)[1].split(
+        "class function TReportTemplateService.TemplatesPath", 1
+    )[0]
+    expected = (
+        "UpdatedWorkbookXml := EnsureAutomaticCalculation(WorkbookXml);\n"
+        "    ValidateWorkbookXml(UpdatedWorkbookXml);\n"
+        "    WorkbookXml := UpdatedWorkbookXml;"
+    )
+    assert expected in inject
+    assert "WorkbookXml.Contains('<<calcPr')" in inject
+    assert "WorkbookXml.Contains('/>extLst>')" in inject
+    assert "WorkbookXml.Contains('/>xtLst>')" in inject
+    assert "Count <> 1" in inject
+
+
 def test_ui_uses_selected_device_and_save_dialog():
     assert "Device := ResolveSelectedDevice" in FORM
     assert "TReportTemplateService.ImportTemplate(Dialog.FileName)" in FORM
@@ -152,5 +186,6 @@ if __name__ == "__main__":
     test_data_sheet_input_is_validated_without_taking_json_ownership()
     test_spillage_stop_criteria_set_uses_raw_rtti_data()
     test_tkset_does_not_use_ordinal_cast_and_enumeration_is_unchanged()
+    test_workbook_calculation_update_avoids_match_indexes_and_validates_xml()
     test_ui_uses_selected_device_and_save_dialog()
     print("report template static checks: OK")

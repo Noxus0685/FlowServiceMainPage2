@@ -83,8 +83,7 @@ function InsertBeforeClosingTag(const AXml, AClosingTag,
 var
   P: Integer;
 begin
-  // Возвращает новую XML-строку со вставленным фрагментом; вызывающий код не
-  // должен совмещать исходную и результирующую строки в одном сложном выражении.
+  // Вставляет XML-фрагмент непосредственно перед указанным закрывающим тегом.
   P := AXml.LastIndexOf(AClosingTag);
   if P < 0 then
     raise EInvalidOpException.CreateFmt('В XLSX не найден XML-узел %s',
@@ -209,17 +208,44 @@ begin
   Node.Attributes['Target'] := ATarget;
 end;
 
+// Включает автоматический пересчёт книги без ручной работы с индексами совпадения.
 function EnsureAutomaticCalculation(const AWorkbookXml: string): string;
+const
+  CCalcPrPattern = '<calcPr\b[^>]*/>';
+  CCalcPrXml =
+    '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>';
 var
-  Match: TMatch;
+  CalcPrRegex: TRegEx;
 begin
-  Match := TRegEx.Match(AWorkbookXml, '<calcPr\b[^>]*/?>', [roIgnoreCase]);
-  if Match.Success then
-    Result := AWorkbookXml.Remove(Match.Index, Match.Length).Insert(Match.Index,
-      '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>')
+  if AWorkbookXml = '' then
+    raise EArgumentException.Create('Не задано содержимое xl/workbook.xml');
+
+  CalcPrRegex := TRegEx.Create(CCalcPrPattern, [roIgnoreCase]);
+  if CalcPrRegex.IsMatch(AWorkbookXml) then
+    Result := CalcPrRegex.Replace(AWorkbookXml, CCalcPrXml, 1)
   else
     Result := InsertBeforeClosingTag(AWorkbookXml, '</workbook>',
-      '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>');
+      CCalcPrXml);
+end;
+
+// Проверяет, что сформированное содержимое workbook.xml является корректным XML.
+procedure ValidateWorkbookXml(const AWorkbookXml: string);
+var
+  Document: IXMLDocument;
+  Root: IXMLNode;
+begin
+  if AWorkbookXml = '' then
+    raise EInvalidOpException.Create('Сформирован пустой xl/workbook.xml');
+
+  Document := LoadXMLData(AWorkbookXml);
+  Document.Active := True;
+  Root := Document.DocumentElement;
+  if Root = nil then
+    raise EInvalidOpException.Create(
+      'В xl/workbook.xml отсутствует корневой XML-узел');
+  if not SameText(Root.LocalName, 'workbook') then
+    raise EInvalidOpException.CreateFmt(
+      'Некорректный корневой узел xl/workbook.xml: %s', [Root.NodeName]);
 end;
 
 function WorkbookTargetToArchivePath(const ATarget: string): string;
@@ -687,7 +713,18 @@ begin
         raise EInvalidOpException.Create('Не найдена связь листа _Data в XLSX');
     end;
     UpdatedWorkbookXml := EnsureAutomaticCalculation(WorkbookXml);
+    ValidateWorkbookXml(UpdatedWorkbookXml);
     WorkbookXml := UpdatedWorkbookXml;
+
+    if WorkbookXml.Contains('<<calcPr') or
+       WorkbookXml.Contains('/>extLst>') or
+       WorkbookXml.Contains('/>xtLst>') then
+      raise EInvalidOpException.Create(
+        'После изменения xl/workbook.xml обнаружены повреждённые XML-теги');
+    if TRegEx.Matches(WorkbookXml, '<calcPr\b[^>]*>',
+      [roIgnoreCase]).Count <> 1 then
+      raise EInvalidOpException.Create(
+        'В xl/workbook.xml должно присутствовать ровно одно описание calcPr');
 
     SheetArchivePath := WorkbookTargetToArchivePath(Target);
     SheetFile := TPath.Combine(TempDir,
