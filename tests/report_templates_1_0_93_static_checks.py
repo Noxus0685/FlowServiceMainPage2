@@ -9,7 +9,7 @@ VERSION = (ROOT / "uAppVersion.pas").read_text(encoding="utf-8-sig")
 
 
 def test_version_and_project_unit():
-    assert "APP_VERSION = '1.0.92'" in VERSION
+    assert "APP_VERSION = '1.0.93'" in VERSION
     assert "uReportTemplates in 'uReportTemplates.pas'" in (
         ROOT / "ProjectFornTest.dpr"
     ).read_text(encoding="utf-8-sig")
@@ -44,6 +44,23 @@ def test_json_is_source_for_data_sheet_and_template_is_preserved():
     assert "<tableParts count=\"1\">" in SERVICE
 
 
+def test_zip_entry_validation_uses_stable_local_array():
+    assert "Names: TArray<string>;" in SERVICE
+    assert "Names := AZip.FileNames;" in SERVICE
+    assert "for Name in Names do" in SERVICE
+    assert "for Name in AZip.FileNames do" not in SERVICE
+    assert "if AZip = nil then" in SERVICE
+
+
+def test_data_sheet_input_is_validated_without_taking_json_ownership():
+    assert "if ARoot = nil then" in SERVICE
+    assert "Не заданы данные для формирования листа _Data" in SERVICE
+    assert "if Rows = nil then" in SERVICE
+    assert "В данных отчёта отсутствует массив Rows" in SERVICE
+    assert "ARoot.Free" not in SERVICE
+    assert "[TReportTemplateService.DATA_SHEET_NAME, SheetId, RelationId]" in SERVICE
+
+
 def test_ui_uses_selected_device_and_save_dialog():
     assert "Device := ResolveSelectedDevice" in FORM
     assert "TReportTemplateService.ImportTemplate(Dialog.FileName)" in FORM
@@ -56,5 +73,7 @@ if __name__ == "__main__":
     test_report_tab_has_template_list_and_two_buttons()
     test_fixed_single_table_schema()
     test_json_is_source_for_data_sheet_and_template_is_preserved()
+    test_zip_entry_validation_uses_stable_local_array()
+    test_data_sheet_input_is_validated_without_taking_json_ownership()
     test_ui_uses_selected_device_and_save_dialog()
     print("report template static checks: OK")

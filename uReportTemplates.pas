@@ -483,9 +483,16 @@ end;
 
 procedure ValidateZipEntries(AZip: TZipFile);
 var
+  Names: TArray<string>;
   Name: string;
 begin
-  for Name in AZip.FileNames do
+  // Проверяет пути элементов XLSX и использует локальную копию списка имён,
+  // чтобы исключить повреждение временного массива строк при for..in.
+  if AZip = nil then
+    raise EArgumentNilException.Create('Не задан ZIP-архив для проверки');
+
+  Names := AZip.FileNames;
+  for Name in Names do
     if Name.Contains('..') or Name.StartsWith('/') or Name.StartsWith('\') then
       raise EInvalidOpException.CreateFmt('Недопустимый путь внутри XLSX: %s', [Name]);
 end;
@@ -556,7 +563,7 @@ begin
       Target := 'worksheets/flowServiceReportData.xml';
       WorkbookXml := InsertBeforeClosingTag(WorkbookXml, '</sheets>',
         Format('<sheet name="%s" sheetId="%d" state="hidden" r:id="%s"/>',
-          [DATA_SHEET_NAME, SheetId, RelationId]));
+          [TReportTemplateService.DATA_SHEET_NAME, SheetId, RelationId]));
       WorkbookRelsXml := InsertBeforeClosingTag(WorkbookRelsXml,
         '</Relationships>', Format('<Relationship Id="%s" Type="%s" Target="%s"/>',
           [RelationId, CWorksheetRelation, Target]));
@@ -585,7 +592,15 @@ begin
         Format('<Override PartName="/xl/tables/flowServiceReportData.xml" ContentType="%s"/>',
           [CTableContentType]));
 
+    // Проверяет структуру JSON до формирования служебного листа _Data.
+    if ARoot = nil then
+      raise EArgumentNilException.Create(
+        'Не заданы данные для формирования листа _Data');
+
     Rows := ARoot.GetValue<TJSONArray>('Rows');
+    if Rows = nil then
+      raise EInvalidOpException.Create(
+        'В данных отчёта отсутствует массив Rows');
     Columns := BuildColumns;
     try
       WriteUtf8File(SheetFile, BuildWorksheetXml(Rows, Columns));
