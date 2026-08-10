@@ -1,4 +1,4 @@
-unit uReportTemplates;
+﻿unit uReportTemplates;
 
 interface
 
@@ -51,7 +51,7 @@ type
 
 const
   CCoefTableTypes: array[0..4] of Integer = (10, 11, 12, 13, 14);
-  CWorksheetRelation =
+  CWorksheetRelation: string =
     'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet';
   CWorksheetContentType =
     'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml';
@@ -776,6 +776,7 @@ end;
 
 procedure ValidateZipEntries(AZip: TZipFile);
 var
+  Names: TArray<string>;
   Name: string;
 begin
   if AZip = nil then
