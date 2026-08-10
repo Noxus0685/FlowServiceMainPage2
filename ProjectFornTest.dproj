@@ -227,11 +227,6 @@
             <FormType>fmx</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
-        <DCCReference Include="frmGraphsWorkspace.pas">
-            <Form>FrameGraphsWorkspace</Form>
-            <FormType>fmx</FormType>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
         <DCCReference Include="frmMainTable.pas">
             <Form>FrameMainTable</Form>
             <FormType>fmx</FormType>
@@ -301,6 +296,7 @@
         <DCCReference Include="uOpenXmlXlsx.pas"/>
         <DCCReference Include="uResultsXlsxExporter.pas"/>
         <DCCReference Include="uGridXlsxExporter.pas"/>
+        <DCCReference Include="uGridLayoutManager.pas"/>
         <DCCReference Include="uTable_Data.pas">
             <Form>TableDM</Form>
             <FormType>dfm</FormType>
@@ -329,12 +325,12 @@
         <DCCReference Include="uControlRegister.pas"/>
         <DCCReference Include="uSyncSetup.pas"/>
         <DCCReference Include="FmxHelper.pas"/>
-        <DCCReference Include="..\FMXFP\Components\FP\FMX.SimpleChart.pas"/>
         <DCCReference Include="frmGraphsWorkspace.pas">
             <Form>Frame1</Form>
             <FormType>fmx</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
+        <DCCReference Include="Components\FP\FMX.SimpleChart.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
