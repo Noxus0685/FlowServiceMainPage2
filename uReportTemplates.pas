@@ -50,15 +50,7 @@ type
     ColumnIndex: Integer;
   end;
 
-// Возвращает полный неизменяемый набор столбцов технических листов отчёта.
-function GetReportStaticColumns: TArray<TReportStaticColumn>;
 
-// Полностью удаляет из XLSX все технические листы FlowService и связанные с ними служебные элементы.
-procedure RemoveReportTechnicalSheets(const ASourceFileName,
-  AOutputFileName: string);
-// Создаёт полный статичный комплект технических листов и служебных definedName.
-procedure AddReportTechnicalSheets(const ASourceFileName,
-  AOutputFileName: string; ARoot: TJSONObject);
 
   TReportWorksheetLocation = record
     SheetName: string;
@@ -66,6 +58,8 @@ procedure AddReportTechnicalSheets(const ASourceFileName,
     RelationshipTarget: string;
     ArchivePath: string;
   end;
+// Возвращает полный неизменяемый набор столбцов технических листов отчёта.
+function GetReportStaticColumns: TArray<TReportStaticColumn>;
 
   // Содержит фактически прочитанные параметры вычисления сохранённого XLSX.
   TReportCalculationState = record
