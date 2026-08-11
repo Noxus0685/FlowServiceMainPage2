@@ -1054,56 +1054,60 @@ begin
   end;
 end;
 
-// Формирует полный список колонок листа _DevicePoints для нового подготовленного шаблона.
-function BuildDevicePointsColumns: TArray<TReportColumn>;
-var Root, Row: TJSONObject; Rows: TJSONArray; Columns: TArray<TReportColumn>;
-  List: TList<TReportColumn>; Column, PointErrorColumn: TReportColumn;
-  I, QIndex: Integer;
+function BuildDataColumns(ARows: TJSONArray): TArray<TReportColumn>;
 begin
-  Root := TJSONObject.Create;
+  Result := MergeReportColumns(
+    JsonRowsToColumns(ARows, ['DeviceType', 'Device', 'Session'], False),
+    JsonRowsToColumns(ARows, ['DeviceType', 'Device', 'Session'], True));
+end;
+
+function BuildDevicePointsColumns(ARows: TJSONArray): TArray<TReportColumn>;
+begin
+  Result := MergeReportColumns(
+    JsonRowsToColumns(ARows, ['DevicePoint'], False),
+    JsonRowsToColumns(ARows, ['DevicePoint'], True));
+end;
+
+function BuildSpillageColumns(ARows: TJSONArray): TArray<TReportColumn>;
+begin
+  Result := MergeReportColumns(JsonRowsToColumns(ARows, ['Spillage'], False),
+    JsonRowsToColumns(ARows, ['Spillage'], True));
+end;
+
+function BuildCalibrCoefTableColumns(ARows: TJSONArray): TArray<TReportColumn>;
+begin
+  Result := MergeReportColumns(JsonRowsToColumns(ARows,
+    ['CalibrCoefTable', 'CalibrCoefItem'], False), JsonRowsToColumns(ARows,
+    ['CalibrCoefTable', 'CalibrCoefItem'], True));
+end;
+
+function BuildMetaColumns(ARoot: TJSONObject): TArray<TReportColumn>;
+var Pair: TJSONPair; List: TList<TReportColumn>; Column: TReportColumn;
+begin
+  List := TList<TReportColumn>.Create;
   try
-    Rows := TJSONArray.Create; Root.AddPair('Rows', Rows);
-    AddSchemaRow(Rows, 'DevicePoint', TDevicePoint);
-    Row := Rows.Items[0] as TJSONObject;
-    if Row.GetValue('Q') = nil then Row.AddPair('Q', TJSONNull.Create);
-    if Row.GetValue('PointError') = nil then Row.AddPair('PointError', TJSONNull.Create);
-    Columns := JsonRowsToColumns(Rows, ['DevicePoint'], True);
-    List := TList<TReportColumn>.Create;
-    try
-      QIndex := -1;
-      for Column in Columns do
-        if SameText(Column.TechnicalName, 'PointError') then
-          PointErrorColumn := Column
-        else
-        begin
-          List.Add(Column);
-          if SameText(Column.TechnicalName, 'Q') then QIndex := List.Count - 1;
-        end;
-      PointErrorColumn.TechnicalName := 'PointError';
-      if QIndex < 0 then
+    for Pair in ARoot do
+      if not SameText(Pair.JsonString.Value, 'Rows') then
       begin
-        Column.TechnicalName := 'Q'; List.Add(Column); QIndex := List.Count - 1;
+        Column.TechnicalName := Pair.JsonString.Value;
+        List.Add(Column);
       end;
-      List.Insert(QIndex + 1, PointErrorColumn);
-      Result := List.ToArray;
-    finally
-      List.Free;
-    end;
+    Result := List.ToArray;
   finally
-    Root.Free;
+    List.Free;
   end;
 end;
 
-// Формирует единственную неизменяемую схему колонок технического листа.
+// Возвращает актуальный порядок полей технического листа, используемый для заголовков, значений и definedName.
 function BuildTechnicalSheetColumns(const ASheetName: string;
   ARows: TJSONArray): TArray<TReportColumn>;
 begin
   if SameText(ASheetName, '_DevicePoints') then
-    Result := BuildDevicePointsColumns
+    Result := BuildDevicePointsColumns(ARows)
   else if SameText(ASheetName, '_Spillages') then
-    Result := JsonRowsToColumns(ARows, ['Spillage'], True)
+    Result := BuildSpillageColumns(ARows)
   else if SameText(ASheetName, '_CoefTables') then
-    Result := JsonRowsToColumns(ARows, ['CalibrCoefTable', 'CalibrCoefItem'], True)
+    Result := BuildCalibrCoefTableColumns(ARows)
   else
     raise EArgumentException.CreateFmt('Неизвестный технический лист: %s', [ASheetName]);
 end;
@@ -1393,9 +1397,9 @@ begin
   TotalRows := 2;
   for ObjectIndex := Low(ObjectTypes) to High(ObjectTypes) do
   begin
-    SchemaColumns := JsonRowsToColumns(ARows, [ObjectTypes[ObjectIndex]], True);
     ActualColumns := JsonRowsToColumns(ARows, [ObjectTypes[ObjectIndex]], False);
-    Columns := MergeReportColumns(SchemaColumns, ActualColumns);
+    SchemaColumns := JsonRowsToColumns(ARows, [ObjectTypes[ObjectIndex]], True);
+    Columns := MergeReportColumns(ActualColumns, SchemaColumns);
     for Column in Columns do
       if not MatchText(Column.TechnicalName, ServiceFields) then Inc(TotalRows);
   end;
@@ -1427,9 +1431,9 @@ begin
         if not IsSchemaRow(Row) and RowHasObjectType(Row, [ObjectType]) then
         begin ActualRow := Row; Break; end;
       end;
-      SchemaColumns := JsonRowsToColumns(ARows, [ObjectType], True);
       ActualColumns := JsonRowsToColumns(ARows, [ObjectType], False);
-      Columns := MergeReportColumns(SchemaColumns, ActualColumns);
+      SchemaColumns := JsonRowsToColumns(ARows, [ObjectType], True);
+      Columns := MergeReportColumns(ActualColumns, SchemaColumns);
       for Column in Columns do
       begin
         FieldName := Column.TechnicalName;
@@ -2236,16 +2240,21 @@ begin
   end;
 end;
 
+function ReplaceReportDefinedNames(const AWorkbookXml: string;
+  const ADefinedNames: TDictionary<string, string>): string; forward;
+procedure CopyXlsxReplacingWorkbook(const ASourceFileName, AOutputFileName,
+  AWorkbookXml: string); forward;
+
 procedure ExportTechnicalSheets(const ASourceFileName, AOutputFileName: string;
   ARoot: TJSONObject);
 const
   Titles: array[0..4] of string = ('Общие данные прибора', 'Точки прибора',
     'Проливки по точкам', 'Калибровочные таблицы и коэффициенты',
     'Метаданные отчёта');
-var Zip: TZipFile; WorkbookXml, RelsXml, TempOutput: string;
+var Zip: TZipFile; WorkbookXml, RelsXml, TempOutput, WorkbookOutput: string;
   Locations: TArray<TReportWorksheetLocation>; SheetXml: TArray<string>;
-  TemplateSharedStrings, GeneratedSharedStrings: TArray<string>;
-  Rows: TJSONArray; Names: TDictionary<string, string>; I: Integer;
+  Rows: TJSONArray; Names, TechnicalSheets: TDictionary<string, string>;
+  InlineSharedStrings: TArray<string>; I: Integer;
 begin
   if not FileExists(ASourceFileName) then
     raise EFileNotFoundException.CreateFmt('Шаблон не найден: %s', [ASourceFileName]);
@@ -2271,35 +2280,33 @@ begin
     SheetXml[3] := BuildSeparatedWorksheetXml(Titles[3], '_CoefTables', Rows,
       ['CalibrCoefTable', 'CalibrCoefItem'], Names);
     SheetXml[4] := BuildMetaWorksheetXml(ARoot, Names);
+    RegisterPreparedSeparatedNames(Rows, Names);
     for I := 0 to High(SheetXml) do
       ValidateSeparatedWorksheetXml(SheetXml[I], Locations[I].SheetName);
-    Zip := TZipFile.Create;
+    WorkbookXml := ReplaceReportDefinedNames(WorkbookXml, Names);
+    TechnicalSheets := TDictionary<string, string>.Create;
     try
-      Zip.Open(ASourceFileName, zmRead);
-      if ZipEntryExists(Zip, 'xl/sharedStrings.xml') then
-        TemplateSharedStrings := ParseSharedStrings(
-          ReadZipEntryUtf8(Zip, 'xl/sharedStrings.xml'))
-      else
-        SetLength(TemplateSharedStrings, 0);
-      SetLength(GeneratedSharedStrings, 0);
       for I := 0 to High(SheetXml) do
-        ValidateTechnicalSheetColumnOrder(
-          ReadZipEntryUtf8(Zip, Locations[I].ArchivePath), SheetXml[I],
-          Locations[I].SheetName, TemplateSharedStrings,
-          GeneratedSharedStrings);
+        TechnicalSheets.Add(Locations[I].SheetName, SheetXml[I]);
+      SetLength(InlineSharedStrings, 0);
+      ValidateReportDefinedNameBindings(WorkbookXml, TechnicalSheets,
+        InlineSharedStrings);
     finally
-      Zip.Free;
+      TechnicalSheets.Free;
     end;
   finally
     Names.Free;
   end;
   TempOutput := BuildTemporaryReportFileName(AOutputFileName);
+  WorkbookOutput := BuildTemporaryReportFileName(AOutputFileName);
   try
-    ReplaceTechnicalSheetEntries(ASourceFileName, TempOutput, Locations, SheetXml);
+    CopyXlsxReplacingWorkbook(ASourceFileName, WorkbookOutput, WorkbookXml);
+    ReplaceTechnicalSheetEntries(WorkbookOutput, TempOutput, Locations, SheetXml);
     ValidateGeneratedTechnicalSheets(TempOutput, Locations);
     ReplaceReportOutputFile(TempOutput, AOutputFileName);
   finally
     if FileExists(TempOutput) then TFile.Delete(TempOutput);
+    if FileExists(WorkbookOutput) then TFile.Delete(WorkbookOutput);
   end;
 end;
 
@@ -2332,6 +2339,37 @@ begin
   finally
     NameIndex.Free;
   end;
+end;
+
+// Полностью заменяет только управляемые приложением definedName, сохраняя
+// пользовательские имена книги без изменений.
+function ReplaceReportDefinedNames(const AWorkbookXml: string;
+  const ADefinedNames: TDictionary<string, string>): string;
+var
+  Doc: IXMLDocument;
+  NamesNode, NameNode: IXMLNode;
+  Pair: TPair<string, string>;
+  I: Integer;
+begin
+  Doc := LoadXMLData(AWorkbookXml);
+  Doc.Active := True;
+  NamesNode := EnsureDefinedNamesNode(Doc.DocumentElement);
+  for I := NamesNode.ChildNodes.Count - 1 downto 0 do
+  begin
+    NameNode := NamesNode.ChildNodes[I];
+    if SameText(NameNode.LocalName, 'definedName') and
+       IsReportDefinedName(VarToStr(NameNode.Attributes['name'])) then
+      NamesNode.DOMNode.removeChild(NameNode.DOMNode);
+  end;
+  for Pair in ADefinedNames do
+  begin
+    ValidateDefinedNameValues(Pair.Key, Pair.Value);
+    NameNode := NamesNode.AddChild('definedName', NamesNode.NamespaceURI);
+    NameNode.Attributes['name'] := Pair.Key;
+    NameNode.Text := Pair.Value;
+  end;
+  ValidateDefinedNameDuplicates(NamesNode);
+  Result := SerializeXmlDocumentUtf8(Doc);
 end;
 
 procedure AddUtf8ZipEntry(AZip: TZipFile; const AName, AText: string);
@@ -2485,74 +2523,31 @@ begin
   finally HeaderIndex.Free; Seen.Free; end;
 end;
 
-// Исправляет только служебные именованные диапазоны уже подготовленного шаблона.
+// Полностью пересоздаёт технические листы подготовленного шаблона по
+// актуальной JSON-схеме, не затрагивая пользовательские ZIP-entry.
 procedure RepairPreparedReportDefinedNames(const ASourceFileName,
   AOutputFileName: string);
-var Zip: TZipFile; WorkbookXml, RelsXml, Name, FieldName, SheetName: string;
-  Locations: TArray<TReportWorksheetLocation>; Sheets: TDictionary<string, string>;
-  Headers: TDictionary<string, Integer>; Doc: IXMLDocument; NamesNode, Node: IXMLNode;
-  Index: TDictionary<string, IXMLNode>;
-  I, PointIndex, ColumnIndex, RowIndex, ExpectedColumnIndex: Integer;
-  SharedStrings: TArray<string>;
-  DevicePointColumns: TArray<TReportColumn>;
-  DevicePointColumn: TReportColumn;
+var
+  Root: TJSONObject;
+  Rows: TJSONArray;
 begin
-  Sheets := TDictionary<string, string>.Create;
-  Zip := TZipFile.Create;
+  Root := TJSONObject.Create;
   try
-    Zip.Open(ASourceFileName, zmRead); ValidateZipEntries(Zip);
-    WorkbookXml := ReadZipEntryUtf8(Zip, 'xl/workbook.xml');
-    RelsXml := ReadZipEntryUtf8(Zip, 'xl/_rels/workbook.xml.rels');
-    Locations := ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
-    for I := 0 to High(Locations) do
-      Sheets.Add(Locations[I].SheetName, ReadZipEntryUtf8(Zip, Locations[I].ArchivePath));
-    if ZipEntryExists(Zip, 'xl/sharedStrings.xml') then
-      SharedStrings := ParseSharedStrings(
-        ReadZipEntryUtf8(Zip, 'xl/sharedStrings.xml'))
-    else
-      SetLength(SharedStrings, 0);
-  finally Zip.Free; end;
-  Headers := BuildWorksheetHeaderIndex(Sheets['_DevicePoints'], 2,
-    SharedStrings);
-  DevicePointColumns := BuildDevicePointsColumns;
-  try
-    Doc := LoadXMLData(WorkbookXml); Doc.Active := True;
-    NamesNode := EnsureDefinedNamesNode(Doc.DocumentElement);
-    Index := BuildDefinedNameIndex(NamesNode);
-    try
-      for PointIndex := 1 to TReportTemplateService.MAX_DEVICE_POINTS do
-        for DevicePointColumn in DevicePointColumns do
-        begin
-          FieldName := DevicePointColumn.TechnicalName;
-          if MatchText(FieldName, ['ObjectType', 'ObjectIndex', 'PointIndex',
-            'SpillageIndex', 'CoefTableType', 'CoefItemIndex', '_SchemaOnly']) then Continue;
-          if not Headers.TryGetValue(LowerCase(Trim(FieldName)),
-             ExpectedColumnIndex) then
-            raise EInvalidOpException.CreateFmt(
-              'Лист _DevicePoints не содержит технический заголовок %s',
-              [FieldName]);
-          Name := Format('DevicePoints_%.2d_%s', [PointIndex, FieldName]);
-          if not Index.TryGetValue(Name, Node) then
-          begin
-            Node := NamesNode.AddChild('definedName', NamesNode.NamespaceURI);
-            Node.Attributes['name'] := Name;
-            Index.Add(Name, Node);
-            Node.Text := BuildDefinedNameReference('_DevicePoints', FieldName,
-              PointIndex + 2, Headers);
-            Continue;
-          end;
-          if TryParseDefinedNameReference(Node.Text, SheetName, ColumnIndex,
-             RowIndex) and SameText(SheetName, '_DevicePoints') and
-             (ColumnIndex = ExpectedColumnIndex) and
-             (RowIndex = PointIndex + 2) then Continue;
-          Node.Text := BuildDefinedNameReference('_DevicePoints', FieldName,
-            PointIndex + 2, Headers);
-        end;
-      WorkbookXml := SerializeXmlDocumentUtf8(Doc);
-    finally Index.Free; end;
-    ValidateReportDefinedNameBindings(WorkbookXml, Sheets, SharedStrings);
-    CopyXlsxReplacingWorkbook(ASourceFileName, AOutputFileName, WorkbookXml);
-  finally Headers.Free; Sheets.Free; end;
+    Root.AddPair('SchemaVersion', TJSONNumber.Create(1));
+    Root.AddPair('GeneratedAt', FormatDateTime('yyyy-mm-dd hh:nn:ss', Now));
+    Root.AddPair('MaxDevicePoints',
+      TJSONNumber.Create(TReportTemplateService.MAX_DEVICE_POINTS));
+    Root.AddPair('MaxPointSpillages',
+      TJSONNumber.Create(TReportTemplateService.MAX_POINT_SPILLAGES));
+    Root.AddPair('MaxCoefItems',
+      TJSONNumber.Create(TReportTemplateService.MAX_COEF_ITEMS));
+    Rows := TJSONArray.Create;
+    Root.AddPair('Rows', Rows);
+    EnsureTechnicalSheetSchema(Root);
+    ExportTechnicalSheets(ASourceFileName, AOutputFileName, Root);
+  finally
+    Root.Free;
+  end;
 end;
 
 function MissingTechnicalSheetNames(const AWorkbookXml: string): TArray<string>;
