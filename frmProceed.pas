@@ -442,16 +442,7 @@ type
     FReportExportOperationId: Int64;
     FReportExportButtonText: string;
     // Переводит элементы отчётной вкладки в состояние выполняющейся выгрузки.
-    procedure BeginReportExportUi;
-    // Возвращает элементы отчётной вкладки в обычное состояние.
-    procedure EndReportExportUi;
-    // Обрабатывает успешное завершение фоновой выгрузки в UI-потоке.
-    procedure CompleteReportExport(const AOperationId: Int64;
-      const AOutputFileName: string; const ADurationMs: Int64);
-    // Обрабатывает ошибку фоновой выгрузки в UI-потоке.
-    procedure FailReportExport(const AOperationId: Int64;
-      const AErrorClass, AErrorMessage, AStage: string;
-      const ADurationMs: Int64);
+
     FLastResultsHintRow: Integer;
     FLastResultsHintCol: Integer;
     FLastDataPointsHintRow: Integer;
@@ -474,6 +465,16 @@ type
     function IsChartDeviceVisible(ADevice: TDevice): Boolean;
     // Обновляет список XLSX-шаблонов, доступных на вкладке «Отчёты».
     procedure RefreshReportTemplates;
+        procedure BeginReportExportUi;
+    // Возвращает элементы отчётной вкладки в обычное состояние.
+    procedure EndReportExportUi;
+    // Обрабатывает успешное завершение фоновой выгрузки в UI-потоке.
+    procedure CompleteReportExport(const AOperationId: Int64;
+      const AOutputFileName: string; const ADurationMs: Int64);
+    // Обрабатывает ошибку фоновой выгрузки в UI-потоке.
+    procedure FailReportExport(const AOperationId: Int64;
+      const AErrorClass, AErrorMessage, AStage: string;
+      const ADurationMs: Int64);
   public
     { Public declarations }
     procedure Initialize;
