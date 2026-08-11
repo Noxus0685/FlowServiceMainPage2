@@ -82,6 +82,12 @@ type
     LastWriteTimeUtc: TDateTime;
     CalculationState: TReportCalculationState;
   end;
+
+  // Содержит путь и подтверждённые свойства подготовленного шаблона.
+  TPreparedReportTemplate = record
+    FileName: string;
+    ValidationResult: TReportExportResult;
+  end;
 function GetReportStaticColumns: TArray<TReportStaticColumn>;
 // Возвращает пути ZIP-entry пяти существующих технических листов.
 function ResolveTechnicalSheetEntries(const AWorkbookXml: string;
@@ -120,8 +126,12 @@ type
   public
     // Возвращает общий каталог XLSX-шаблонов приложения и создаёт его при отсутствии.
     class function TemplatesPath: string; static;
+    // Нормализует сохранённое имя шаблона и запрещает выход за каталог ReportTemplates.
+    class function NormalizeTemplateFileName(const AStoredValue: string): string; static;
+    // Возвращает полный путь к подготовленному шаблону, назначенному типу прибора.
+    class function ResolveDeviceTypeTemplate(ADeviceType: TDeviceType): string; static;
     // Добавляет технические листы и именованные диапазоны в новый пользовательский XLSX-шаблон.
-    class function PrepareTemplate(const ASourceFileName: string): string; static;
+    class function PrepareTemplate(const ASourceFileName: string): TPreparedReportTemplate; static;
     // Формирует динамический JSON из объектов прибора для последующего заполнения _Data.
     class function BuildReportJson(ADevice: TDevice;
       ADeviceType: TDeviceType; AMeterValueError: TMeterValue = nil):
@@ -2613,34 +2623,33 @@ procedure ValidateReportDefinedNameBindings(const AWorkbookXml: string;
   const ATechnicalSheets: TDictionary<string, string>;
   const ASharedStrings: TArray<string>); forward;
 
-// Читает фактические параметры вычисления непосредственно из указанного XLSX.
-function ReadReportCalculationState(const AXlsxFileName: string): TReportCalculationState;
-var Archive: TZipFile; WorkbookXml, RelsXml, ContentTypesXml: string;
-  Document: IXMLDocument; Root, Node: IXMLNode; I: Integer;
+function ReadReportCalculationStateFromPackage(AArchive: TZipFile;
+  const AWorkbookXml, ARelsXml, AContentTypesXml: string):
+  TReportCalculationState;
+var
+  Document: IXMLDocument;
+  Root, Node: IXMLNode;
+  I: Integer;
   CalculationChainTarget: string;
 begin
   Result := Default(TReportCalculationState);
-  Archive := TZipFile.Create;
-  try
-    Archive.Open(AXlsxFileName, zmRead);
-    WorkbookXml := ReadZipEntryUtf8(Archive, 'xl/workbook.xml');
-    RelsXml := ReadZipEntryUtf8(Archive, 'xl/_rels/workbook.xml.rels');
-    ContentTypesXml := ReadZipEntryUtf8(Archive, '[Content_Types].xml');
-    Result.CalcChainEntryExists := ZipEntryExists(Archive, 'xl/calcChain.xml');
-  finally Archive.Free; end;
-  Document := LoadXMLData(WorkbookXml); Document.Active := True;
+  Result.CalcChainEntryExists := ZipEntryExists(AArchive, 'xl/calcChain.xml');
+  Document := LoadXMLData(AWorkbookXml);
+  Document.Active := True;
   Root := Document.DocumentElement;
   for I := 0 to Root.ChildNodes.Count - 1 do
     if SameText(Root.ChildNodes[I].LocalName, 'calcPr') then
     begin
-      Inc(Result.CalcPrCount); Node := Root.ChildNodes[I];
+      Inc(Result.CalcPrCount);
+      Node := Root.ChildNodes[I];
       Result.CalcMode := VarToStr(Node.Attributes['calcMode']);
       Result.FullCalcOnLoad := VarToStr(Node.Attributes['fullCalcOnLoad']) = '1';
       Result.ForceFullCalc := VarToStr(Node.Attributes['forceFullCalc']) = '1';
       Result.CalcOnSave := VarToStr(Node.Attributes['calcOnSave']) = '1';
       Result.CalcId := VarToStr(Node.Attributes['calcId']);
     end;
-  Document := LoadXMLData(RelsXml); Document.Active := True;
+  Document := LoadXMLData(ARelsXml);
+  Document.Active := True;
   Root := Document.DocumentElement;
   for I := 0 to Root.ChildNodes.Count - 1 do
     if SameText(Root.ChildNodes[I].LocalName, 'Relationship') and
@@ -2648,77 +2657,120 @@ begin
          CCalculationChainRelation) then
     begin
       Result.CalcChainRelationshipExists := True;
-      CalculationChainTarget := VarToStr(Root.ChildNodes[I].Attributes['Target']);
+      CalculationChainTarget :=
+        VarToStr(Root.ChildNodes[I].Attributes['Target']);
     end;
   if CalculationChainTarget <> '' then
-  begin
-    Archive := TZipFile.Create;
-    try
-      Archive.Open(AXlsxFileName, zmRead);
-      Result.CalcChainEntryExists := Result.CalcChainEntryExists or
-        ZipEntryExists(Archive,
-          ResolveWorkbookTargetArchivePath(CalculationChainTarget));
-    finally Archive.Free; end;
-  end;
-  Document := LoadXMLData(ContentTypesXml); Document.Active := True;
+    Result.CalcChainEntryExists := Result.CalcChainEntryExists or
+      ZipEntryExists(AArchive,
+        ResolveWorkbookTargetArchivePath(CalculationChainTarget));
+  Document := LoadXMLData(AContentTypesXml);
+  Document.Active := True;
   Root := Document.DocumentElement;
   for I := 0 to Root.ChildNodes.Count - 1 do
     if SameText(Root.ChildNodes[I].LocalName, 'Override') and
        SameText(VarToStr(Root.ChildNodes[I].Attributes['ContentType']),
-         CCalculationChainContentType) then Result.CalcChainOverrideExists := True;
+         CCalculationChainContentType) then
+      Result.CalcChainOverrideExists := True;
+end;
+
+// Читает фактические параметры вычисления непосредственно из указанного XLSX.
+function ReadReportCalculationState(const AXlsxFileName: string): TReportCalculationState;
+var
+  Archive: TZipFile;
+  WorkbookXml, RelsXml, ContentTypesXml: string;
+begin
+  Archive := TZipFile.Create;
+  try
+    Archive.Open(AXlsxFileName, zmRead);
+    ValidateZipEntries(Archive);
+    WorkbookXml := ReadZipEntryUtf8(Archive, 'xl/workbook.xml');
+    RelsXml := ReadZipEntryUtf8(Archive, 'xl/_rels/workbook.xml.rels');
+    ContentTypesXml := ReadZipEntryUtf8(Archive, '[Content_Types].xml');
+    Result := ReadReportCalculationStateFromPackage(Archive, WorkbookXml,
+      RelsXml, ContentTypesXml);
+  finally
+    Archive.Free;
+  end;
 end;
 
 // Проверяет окончательно сохранённый XLSX и возвращает подтверждённые сведения о нём.
 function ValidateFinalReportFile(const AXlsxFileName: string): TReportExportResult;
-var Archive: TZipFile; WorkbookXml, RelsXml: string;
-  Locations: TArray<TReportWorksheetLocation>; Names: TDictionary<string, string>;
-  Document: IXMLDocument; TechnicalSheets: TDictionary<string, string>;
-  SharedStrings: TArray<string>; I: Integer;
+var
+  Archive: TZipFile;
+  WorkbookXml, RelsXml, ContentTypesXml, WorksheetXml: string;
+  Locations: TArray<TReportWorksheetLocation>;
+  Names: TDictionary<string, string>;
+  Document, WorksheetDocument: IXMLDocument;
+  TechnicalSheets: TDictionary<string, string>;
+  SharedStrings: TArray<string>;
+  I: Integer;
 begin
   if not FileExists(AXlsxFileName) then
-    raise EFileNotFoundException.CreateFmt('Итоговый XLSX не найден: %s', [AXlsxFileName]);
-  if TFile.GetSize(AXlsxFileName) = 0 then raise EInvalidOpException.Create('Итоговый XLSX пуст');
-  Archive := TZipFile.Create;
-  try
-    Archive.Open(AXlsxFileName, zmRead); ValidateZipEntries(Archive);
-    WorkbookXml := ReadZipEntryUtf8(Archive, 'xl/workbook.xml');
-    RelsXml := ReadZipEntryUtf8(Archive, 'xl/_rels/workbook.xml.rels');
-  finally Archive.Free; end;
-  ValidateWorkbookXml(WorkbookXml, 'FinalOutputValidation');
-  Locations := ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
-  ValidateGeneratedTechnicalSheets(AXlsxFileName, Locations);
+    raise EFileNotFoundException.CreateFmt('Итоговый XLSX не найден: %s',
+      [AXlsxFileName]);
+  if TFile.GetSize(AXlsxFileName) = 0 then
+    raise EInvalidOpException.Create('Итоговый XLSX пуст');
   TechnicalSheets := TDictionary<string, string>.Create;
-  Archive := TZipFile.Create;
   try
-    Archive.Open(AXlsxFileName, zmRead);
-    for I := 0 to High(Locations) do
-      TechnicalSheets.Add(Locations[I].SheetName,
-        ReadZipEntryUtf8(Archive, Locations[I].ArchivePath));
+    Archive := TZipFile.Create;
+    try
+      Archive.Open(AXlsxFileName, zmRead);
+      ValidateZipEntries(Archive);
+      WorkbookXml := ReadZipEntryUtf8(Archive, 'xl/workbook.xml');
+      RelsXml := ReadZipEntryUtf8(Archive, 'xl/_rels/workbook.xml.rels');
+      ContentTypesXml := ReadZipEntryUtf8(Archive, '[Content_Types].xml');
+      ValidateWorkbookXml(WorkbookXml, 'FinalOutputValidation');
+      Locations := ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
+      for I := 0 to High(Locations) do
+      begin
+        if not ZipEntryExists(Archive, Locations[I].ArchivePath) then
+          raise EInvalidOpException.CreateFmt(
+            'Не записан технический лист: %s', [Locations[I].SheetName]);
+        WorksheetXml := ReadZipEntryUtf8(Archive, Locations[I].ArchivePath);
+        WorksheetDocument := LoadXMLData(WorksheetXml);
+        WorksheetDocument.Active := True;
+        if (WorksheetDocument.DocumentElement = nil) or
+           not SameText(WorksheetDocument.DocumentElement.LocalName,
+             'worksheet') then
+          raise EInvalidOpException.CreateFmt(
+            'Некорректный XML листа: %s', [Locations[I].SheetName]);
+        TechnicalSheets.Add(Locations[I].SheetName, WorksheetXml);
+      end;
+      Result.CalculationState := ReadReportCalculationStateFromPackage(Archive,
+        WorkbookXml, RelsXml, ContentTypesXml);
+    finally
+      Archive.Free;
+    end;
     SetLength(SharedStrings, 0);
     ValidateReportDefinedNameBindings(WorkbookXml, TechnicalSheets,
       SharedStrings);
   finally
-    Archive.Free;
     TechnicalSheets.Free;
   end;
   Names := CreateReportDefinedNames;
   try
     ValidateGeneratedDefinedNames(Names);
     ValidatePreparedStaticDefinedNames(WorkbookXml, Names);
-  finally Names.Free; end;
-  Document := LoadXMLData(WorkbookXml); Document.Active := True;
-  ValidateDefinedNameDuplicates(FindDirectChildNode(Document.DocumentElement, 'definedNames'));
+  finally
+    Names.Free;
+  end;
+  Document := LoadXMLData(WorkbookXml);
+  Document.Active := True;
+  ValidateDefinedNameDuplicates(FindDirectChildNode(Document.DocumentElement,
+    'definedNames'));
   ValidateWorkbookCalculationSettings(WorkbookXml);
-  ValidateCalculationChainRemoved(AXlsxFileName);
-  Result.CalculationState := ReadReportCalculationState(AXlsxFileName);
   if (Result.CalculationState.CalcPrCount <> 1) or
      not SameText(Result.CalculationState.CalcMode, 'auto') or
-     not Result.CalculationState.FullCalcOnLoad or not Result.CalculationState.ForceFullCalc or
-     not Result.CalculationState.CalcOnSave or (Result.CalculationState.CalcId <> '0') or
+     not Result.CalculationState.FullCalcOnLoad or
+     not Result.CalculationState.ForceFullCalc or
+     not Result.CalculationState.CalcOnSave or
+     (Result.CalculationState.CalcId <> '0') or
      Result.CalculationState.CalcChainEntryExists or
      Result.CalculationState.CalcChainRelationshipExists or
      Result.CalculationState.CalcChainOverrideExists then
-    raise EInvalidOpException.Create('Итоговый XLSX не настроен на полный автоматический пересчёт');
+    raise EInvalidOpException.Create(
+      'Итоговый XLSX не настроен на полный автоматический пересчёт');
   Result.OutputFileName := TPath.GetFullPath(AXlsxFileName);
   Result.FileSize := TFile.GetSize(AXlsxFileName);
   Result.FileHashSHA256 := THashSHA2.GetHashStringFromFile(AXlsxFileName);
@@ -2851,8 +2903,8 @@ begin
     raise EFileNotFoundException.CreateFmt('Шаблон не найден: %s', [ASourceFileName]);
   TemplateState := Default(TReportCalculationState);
   try
-    TemplateState := ReadReportCalculationState(ASourceFileName);
-    ValidateFinalReportFile(ASourceFileName);
+    TemplateState := ValidateFinalReportFile(
+      ASourceFileName).CalculationState;
   except
     on E: Exception do
       raise EInvalidOpException.CreateFmt(
@@ -2914,8 +2966,6 @@ begin
   TempOutput := BuildTemporaryReportFileName(AOutputFileName);
   try
     ReplaceTechnicalSheetEntries(ASourceFileName, TempOutput, Locations, SheetXml);
-    ValidateGeneratedTechnicalSheets(TempOutput, Locations);
-    ValidateCalculationChainRemoved(TempOutput);
     Result := ReplaceAndValidateReportOutputFile(TempOutput, AOutputFileName);
   finally
     if FileExists(TempOutput) then TFile.Delete(TempOutput);
@@ -3319,16 +3369,58 @@ begin
   ApplyReportErrorPrecision(Rows, AMeterValueError);
 end;
 
+// Нормализует сохранённое имя шаблона и запрещает выход за каталог ReportTemplates.
+class function TReportTemplateService.NormalizeTemplateFileName(
+  const AStoredValue: string): string;
+var
+  StoredValue: string;
+begin
+  StoredValue := Trim(AStoredValue);
+  if StoredValue = '' then
+    Exit('');
+  if ContainsText(StoredValue, '..') then
+    raise EArgumentException.Create('Некорректное имя шаблона отчёта.');
+  Result := TPath.GetFileName(StoredValue);
+  if (Result = '') or not SameText(ExtractFileExt(Result), '.xlsx') or
+     (Pos('/', Result) > 0) or (Pos('\', Result) > 0) then
+    raise EArgumentException.Create('Некорректное имя шаблона отчёта.');
+end;
+
+// Возвращает полный путь к подготовленному шаблону, назначенному типу прибора.
+class function TReportTemplateService.ResolveDeviceTypeTemplate(
+  ADeviceType: TDeviceType): string;
+var
+  FileName, RootPath: string;
+begin
+  if ADeviceType = nil then
+    raise EArgumentNilException.Create('Не найден тип выбранного прибора. ' +
+      'Невозможно определить шаблон отчёта.');
+  FileName := NormalizeTemplateFileName(ADeviceType.ReportingForm);
+  if FileName = '' then
+    raise EInvalidOpException.CreateFmt(
+      'Для типа прибора «%s» не назначен шаблон отчёта. ' +
+      'Укажите шаблон в поле «Отчётная форма» редактора типа прибора.',
+      [ADeviceType.Name]);
+  RootPath := IncludeTrailingPathDelimiter(TPath.GetFullPath(TemplatesPath));
+  Result := TPath.GetFullPath(TPath.Combine(RootPath, FileName));
+  if not StartsText(RootPath, Result) then
+    raise EArgumentException.CreateFmt(
+      'Для типа прибора «%s» указано некорректное имя шаблона отчёта.',
+      [ADeviceType.Name]);
+  if not FileExists(Result) then
+    raise EFileNotFoundException.CreateFmt(
+      'Шаблон отчёта «%s», назначенный типу прибора «%s», ' +
+      'не найден в папке ReportTemplates.', [FileName, ADeviceType.Name]);
+  ValidateFinalReportFile(Result);
+end;
+
 class function TReportTemplateService.PrepareTemplate(
-  const ASourceFileName: string): string;
+  const ASourceFileName: string): TPreparedReportTemplate;
 var
   BaseName, Extension, CleanFileName, PreparedFileName: string;
   Suffix: Integer;
   EmptyJson: TJSONObject;
   EmptyRows: TJSONArray;
-  Zip: TZipFile;
-  WorkbookXml, RelsXml: string;
-  PreparedLocations: TArray<TReportWorksheetLocation>;
 begin
   if not FileExists(ASourceFileName) then
     raise EFileNotFoundException.CreateFmt('Шаблон не найден: %s', [ASourceFileName]);
@@ -3336,18 +3428,18 @@ begin
     raise EArgumentException.Create('Поддерживаются только шаблоны XLSX');
   BaseName := TPath.GetFileNameWithoutExtension(ASourceFileName);
   Extension := ExtractFileExt(ASourceFileName);
-  Result := TPath.Combine(TemplatesPath, BaseName + Extension);
+  Result.FileName := TPath.Combine(TemplatesPath, BaseName + Extension);
   Suffix := 2;
-  while FileExists(Result) do
+  while FileExists(Result.FileName) do
   begin
-    Result := TPath.Combine(TemplatesPath,
+    Result.FileName := TPath.Combine(TemplatesPath,
       Format('%s_%d%s', [BaseName, Suffix, Extension]));
     Inc(Suffix);
   end;
 
   EmptyJson := TJSONObject.Create;
-  CleanFileName := BuildTemporaryReportFileName(Result);
-  PreparedFileName := BuildTemporaryReportFileName(Result);
+  CleanFileName := BuildTemporaryReportFileName(Result.FileName);
+  PreparedFileName := BuildTemporaryReportFileName(Result.FileName);
   try
     EmptyJson.AddPair('SchemaVersion', TJSONNumber.Create(2));
     EmptyJson.AddPair('GeneratedAt', '');
@@ -3362,19 +3454,8 @@ begin
       follows the same remove-then-add path. }
     RemoveReportTechnicalSheets(ASourceFileName, CleanFileName);
     AddReportTechnicalSheets(CleanFileName, PreparedFileName, EmptyJson);
-    Zip := TZipFile.Create;
-    try
-      Zip.Open(PreparedFileName, zmRead);
-      WorkbookXml := ReadZipEntryUtf8(Zip, 'xl/workbook.xml');
-      RelsXml := ReadZipEntryUtf8(Zip, 'xl/_rels/workbook.xml.rels');
-    finally
-      Zip.Free;
-    end;
-    PreparedLocations := ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
-    ValidateGeneratedTechnicalSheets(PreparedFileName, PreparedLocations);
-    ValidateWorkbookCalculationSettings(WorkbookXml);
-    ValidateCalculationChainRemoved(PreparedFileName);
-    TFile.Move(PreparedFileName, Result);
+    TFile.Move(PreparedFileName, Result.FileName);
+    Result.ValidationResult := ValidateFinalReportFile(Result.FileName);
   finally
     EmptyJson.Free;
     if FileExists(CleanFileName) then TFile.Delete(CleanFileName);

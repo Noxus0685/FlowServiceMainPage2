@@ -281,7 +281,6 @@ type
     procedure edtDocumentationExit(Sender: TObject);
     procedure EditAccuracyClassExit(Sender: TObject);
     procedure EditTempExit(Sender: TObject);
-    procedure EditReportingFormExit(Sender: TObject);
     procedure cbMeasuredDimensionChange(Sender: TObject);
     procedure ComboBoxUnitsChange(Sender: TObject);
     procedure EditQmaxExit(Sender: TObject);
@@ -621,6 +620,8 @@ procedure TFormDeviceEditor.ApplyMeasuredDimension;
 var
   Dim: TMeasuredDimension;
   ALoading:Boolean;
+  DeviceType: TDeviceType;
+  TypeRepo: TTypeRepository;
 begin
   if FDevice = nil then
     Exit;
@@ -2653,7 +2654,14 @@ begin
 
     cbProcedure.Text        := FDevice.ProcedureName;
     edtDocumentation.Text  := FDevice.VerificationMethod;
-    EditReportingForm.Text := FDevice.ReportingForm;
+    DeviceType := ResolveDeviceType(TypeRepo);
+    if DeviceType <> nil then
+      EditReportingForm.Text := DeviceType.ReportingForm
+    else
+      EditReportingForm.Text := '';
+    EditReportingForm.ReadOnly := True;
+    EditReportingForm.Hint := 'Шаблон назначается в редакторе типа прибора.';
+    sbReportingForm.Visible := False;
 
     // =====================================================
     // == Тип испытания / критерий остановки
@@ -3546,32 +3554,6 @@ begin
 end;
 
 
-procedure TFormDeviceEditor.EditReportingFormExit(Sender: TObject);
-var
-  S: string;
-begin
-  if FLoading then
-    Exit;
-
-  if FDevice = nil then
-    Exit;
-
-  S := Trim(EditReportingForm.Text);
-
-  { сохраняем в модель }
-  FDevice.ReportingForm := S;
-  EditReportingForm.Text := S;
-
-  { prompt, если пусто }
-  if S = '' then
-    EditReportingForm.TextPrompt := 'Отчетная форма'
-  else
-    EditReportingForm.TextPrompt := '';
-
-  SetModified;
-end;
-
-
 procedure TFormDeviceEditor.EditTypeNameExit(Sender: TObject);
 var
   S: string;
@@ -4460,8 +4442,6 @@ begin
     EditAccuracyClassExit(EditAccuracyClass)
   else if EditTemp.IsFocused or EditError.IsFocused then
     EditTempExit(EditTemp)
-  else if EditReportingForm.IsFocused then
-    EditReportingFormExit(EditReportingForm)
   else if EditQmax.IsFocused then
     EditQmaxExit(EditQmax)
   else if EditQnom.IsFocused then

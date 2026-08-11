@@ -464,11 +464,12 @@ object FormDeviceEditor: TFormDeviceEditor
           KillFocusByReturn = True
           ParentShowHint = False
           ShowHint = True
-          OnExit = EditReportingFormExit
+          ReadOnly = True
           Left = 276
           Top = 15
         end
         object sbReportingForm: TSpeedButton
+          Visible = False
           Align = MostRight
           Position.X = 288.000000000000000000
           Size.Width = 30.000000000000000000

@@ -189,10 +189,6 @@ type
     LayoutReportToolbar: TLayout;
     ButtonLoadReportTemplate: TButton;
     ButtonExportReportTemplate: TButton;
-    LayoutReportTemplatesHeader: TLayout;
-    LabelReportTemplates: TLabel;
-    ButtonClearReportTemplates: TButton;
-    ListBoxReportTemplates: TListBox;
     LayoutTop: TLayout;
     ToolBarDataPoints: TToolBar;
     Line4: TLine;
@@ -336,7 +332,6 @@ type
     procedure ButtonLoadReportTemplateClick(Sender: TObject);
     // Заполняет выбранный шаблон данными выбранного прибора и сохраняет копию отчёта.
     procedure ButtonExportReportTemplateClick(Sender: TObject);
-    procedure ButtonClearReportTemplatesClick(Sender: TObject);
     procedure MenuTreeViewDevicesClearClick(Sender: TObject);
     procedure SyncProcessingDevicesFromTable(AWorkTable: TWorkTable; const AClearBeforeSync: Boolean);
     procedure SyncProcessingDevicesWithNewPoints;
@@ -471,12 +466,6 @@ type
       const ADefaultIndex: Integer): TAlphaColor;
     // Возвращает сохранённую видимость прибора на графике.
     function IsChartDeviceVisible(ADevice: TDevice): Boolean;
-    // Обновляет список XLSX-шаблонов, доступных на вкладке «Отчёты».
-    procedure RefreshReportTemplates;
-    // Возвращает XLSX-шаблоны в порядке от последнего загруженного к самому раннему.
-    function GetSortedReportTemplateFiles: TArray<string>;
-    // Помечает подготовленный шаблон текущим временем загрузки для сортировки истории.
-    procedure MarkReportTemplateAsRecentlyLoaded(const AFileName: string);
     // Обновляет доступность действий вкладки отчётов по наличию загруженных шаблонов.
     procedure UpdateReportTemplateControls;
     procedure BeginReportExportUi;
@@ -727,7 +716,7 @@ begin
   RefreshResultsTab;
   UpdateSessionErrorChart;
   UpdateActionHints;
-  RefreshReportTemplates;
+  UpdateReportTemplateControls;
 end;
 
 procedure TFrameProceed.SetGridReadOnly(AGrid: TGrid);
@@ -5179,71 +5168,13 @@ begin
   end;
 end;
 
-procedure TFrameProceed.RefreshReportTemplates;
-var
-  FileName: string;
-begin
-  if ListBoxReportTemplates = nil then
-    Exit;
-
-  ListBoxReportTemplates.Items.BeginUpdate;
-  try
-    ListBoxReportTemplates.Items.Clear;
-    for FileName in GetSortedReportTemplateFiles do
-      ListBoxReportTemplates.Items.Add(TPath.GetFileName(FileName));
-    if ListBoxReportTemplates.Items.Count > 0 then
-      ListBoxReportTemplates.ItemIndex := 0
-    else
-      ListBoxReportTemplates.ItemIndex := -1;
-  finally
-    ListBoxReportTemplates.Items.EndUpdate;
-  end;
-  UpdateReportTemplateControls;
-end;
-
-function TFrameProceed.GetSortedReportTemplateFiles: TArray<string>;
-begin
-  Result := TDirectory.GetFiles(TReportTemplateService.TemplatesPath,
-    '*.xlsx', TSearchOption.soTopDirectoryOnly);
-  TArray.Sort<string>(Result, TComparer<string>.Construct(
-    function(const Left, Right: string): Integer
-    var
-      LeftTime, RightTime: TDateTime;
-    begin
-      LeftTime := TFile.GetLastWriteTimeUtc(Left);
-      RightTime := TFile.GetLastWriteTimeUtc(Right);
-      if LeftTime > RightTime then
-        Exit(-1);
-      if LeftTime < RightTime then
-        Exit(1);
-      Result := CompareText(TPath.GetFileName(Left), TPath.GetFileName(Right));
-      if Result = 0 then
-        Result := CompareStr(TPath.GetFileName(Left), TPath.GetFileName(Right));
-    end));
-end;
-
-procedure TFrameProceed.MarkReportTemplateAsRecentlyLoaded(
-  const AFileName: string);
-begin
-  TFile.SetLastWriteTime(AFileName, Now);
-end;
-
+// Обновляет доступность загрузки и выгрузки без общего списка шаблонов.
 procedure TFrameProceed.UpdateReportTemplateControls;
-var
-  HasTemplates: Boolean;
 begin
-  HasTemplates := (ListBoxReportTemplates <> nil) and
-    (ListBoxReportTemplates.Items.Count > 0);
   if ButtonLoadReportTemplate <> nil then
     ButtonLoadReportTemplate.Enabled := not FReportExportInProgress;
   if ButtonExportReportTemplate <> nil then
-    ButtonExportReportTemplate.Enabled := HasTemplates and
-      not FReportExportInProgress;
-  if ButtonClearReportTemplates <> nil then
-    ButtonClearReportTemplates.Enabled := HasTemplates and
-      not FReportExportInProgress;
-  if ListBoxReportTemplates <> nil then
-    ListBoxReportTemplates.Enabled := not FReportExportInProgress;
+    ButtonExportReportTemplate.Enabled := not FReportExportInProgress;
 end;
 
 procedure TFrameProceed.ButtonLoadReportTemplateClick(Sender: TObject);
@@ -5252,6 +5183,7 @@ var
   ImportedFileName, ImportStage: string;
   Stopwatch: TStopwatch;
   ImportResult: TReportExportResult;
+  PreparedTemplate: TPreparedReportTemplate;
 begin
   ImportStage := 'выбор файла';
   Dialog := TOpenDialog.Create(Self);
@@ -5266,12 +5198,9 @@ begin
       ImportStage := 'подготовка XLSX';
       ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateImportStarted',
         'Запущена подготовка шаблона отчёта', Dialog.FileName);
-      ImportedFileName := TReportTemplateService.PrepareTemplate(Dialog.FileName);
-      ImportResult := ValidateFinalReportFile(ImportedFileName);
-      MarkReportTemplateAsRecentlyLoaded(ImportedFileName);
-      RefreshReportTemplates;
-      ListBoxReportTemplates.ItemIndex := ListBoxReportTemplates.Items.IndexOf(
-        TPath.GetFileName(ImportedFileName));
+      PreparedTemplate := TReportTemplateService.PrepareTemplate(Dialog.FileName);
+      ImportedFileName := PreparedTemplate.FileName;
+      ImportResult := PreparedTemplate.ValidationResult;
       UpdateReportTemplateControls;
       ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateImport',
         'Загружен шаблон отчёта', Format(
@@ -5310,63 +5239,6 @@ begin
   end;
 end;
 
-procedure TFrameProceed.ButtonClearReportTemplatesClick(Sender: TObject);
-var
-  FileName: string;
-  Files: TArray<string>;
-  FailedFiles: TStringList;
-  DeletedCount: Integer;
-begin
-  Files := TDirectory.GetFiles(TReportTemplateService.TemplatesPath,
-    '*.xlsx', TSearchOption.soTopDirectoryOnly);
-  if Length(Files) = 0 then
-  begin
-    RefreshReportTemplates;
-    Exit;
-  end;
-  if MessageDlg(Format('Удалить все загруженные шаблоны отчётов?' +
-    sLineBreak + 'Будет удалено файлов: %d.' + sLineBreak +
-    'Отменить это действие будет невозможно.', [Length(Files)]),
-    TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <>
-    mrYes then
-    Exit;
-
-  ProtocolManager.AddMessage(pcAction, psForm,
-    'ReportTemplateHistoryClearStarted', 'Запущена очистка истории шаблонов',
-    Format('Files=%d', [Length(Files)]));
-  DeletedCount := 0;
-  FailedFiles := TStringList.Create;
-  try
-    for FileName in Files do
-      try
-        TFile.Delete(FileName);
-        Inc(DeletedCount);
-      except
-        on E: Exception do
-          FailedFiles.Add(Format('%s: %s', [TPath.GetFileName(FileName),
-            E.Message]));
-      end;
-    RefreshReportTemplates;
-    ListBoxReportTemplates.ItemIndex := -1;
-    UpdateReportTemplateControls;
-    if FailedFiles.Count = 0 then
-      ProtocolManager.AddMessage(pcAction, psForm,
-        'ReportTemplateHistoryClear', 'История шаблонов очищена',
-        Format('Deleted=%d', [DeletedCount]))
-    else
-    begin
-      ProtocolManager.AddMessage(pcError, psForm,
-        'ReportTemplateHistoryClear', 'История шаблонов очищена не полностью',
-        Format('Deleted=%d; Failed=%d; Errors=%s', [DeletedCount,
-          FailedFiles.Count, FailedFiles.Text]));
-      MessageDlg('Не удалось удалить следующие файлы:' + sLineBreak +
-        FailedFiles.Text, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
-    end;
-  finally
-    FailedFiles.Free;
-  end;
-end;
-
 procedure TFrameProceed.BeginReportExportUi;
 begin
   FReportExportInProgress := True;
@@ -5377,8 +5249,6 @@ begin
     ButtonExportReportTemplate.Enabled := False;
   end;
   if ButtonLoadReportTemplate <> nil then ButtonLoadReportTemplate.Enabled := False;
-  if ListBoxReportTemplates <> nil then ListBoxReportTemplates.Enabled := False;
-  if ButtonClearReportTemplates <> nil then ButtonClearReportTemplates.Enabled := False;
 end;
 
 procedure TFrameProceed.EndReportExportUi;
@@ -5447,11 +5317,6 @@ var
   OperationId, SnapshotMs: Int64;
 begin
   if FReportExportInProgress then Exit;
-  if (ListBoxReportTemplates = nil) or (ListBoxReportTemplates.ItemIndex < 0) then
-  begin
-    MessageDlg('Выберите шаблон отчёта', TMsgDlgType.mtInformation,
-      [TMsgDlgBtn.mbOK], 0); Exit;
-  end;
   Device := ResolveSelectedDevice;
   if Device = nil then
   begin
@@ -5462,8 +5327,27 @@ begin
   if (AppServices <> nil) and (AppServices.DataManager <> nil) then
     DeviceType := AppServices.DataManager.FindType(Device.DeviceTypeUUID,
       Device.DeviceTypeName, TypeRepo);
-  TemplateFileName := TPath.Combine(TReportTemplateService.TemplatesPath,
-    ListBoxReportTemplates.Items[ListBoxReportTemplates.ItemIndex]);
+  try
+    if DeviceType = nil then
+      raise EInvalidOpException.Create(
+        'Не найден тип выбранного прибора. Невозможно определить шаблон отчёта.');
+    TemplateFileName :=
+      TReportTemplateService.ResolveDeviceTypeTemplate(DeviceType);
+  except
+    on E: Exception do
+    begin
+      ProtocolManager.AddMessage(pcError, psForm, 'ReportTemplateResolveError',
+        'Не удалось определить шаблон отчёта', Format(
+          'DeviceUUID=%s; DeviceSerialNumber=%s; DeviceTypeUUID=%s; ' +
+          'DeviceTypeName=%s; ReportingForm=%s; ' +
+          'Stage=ResolveDeviceTypeTemplate; Message=%s',
+          [Device.UUID, Device.SerialNumber, Device.DeviceTypeUUID,
+           Device.DeviceTypeName,
+           IfThen(DeviceType <> nil, DeviceType.ReportingForm, ''), E.Message]));
+      MessageDlg(E.Message, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
+      Exit;
+    end;
+  end;
   SuggestedName := TPath.GetFileNameWithoutExtension(TemplateFileName);
   if Trim(Device.SerialNumber) <> '' then SuggestedName := SuggestedName + '_' + Device.SerialNumber;
   Dialog := TSaveDialog.Create(Self);
@@ -5491,9 +5375,13 @@ begin
   BeginReportExportUi;
   ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateExportStarted',
     'Запущена фоновая выгрузка отчёта', Format(
-      'OperationId=%d; Template=%s; TemplateSize=%d; TemplateHashSHA256=%s; ' +
+      'OperationId=%d; DeviceUUID=%s; DeviceSerialNumber=%s; ' +
+      'DeviceTypeUUID=%s; DeviceTypeName=%s; ReportingForm=%s; ' +
+      'Template=%s; TemplateSize=%d; TemplateHashSHA256=%s; ' +
       'Output=%s; SnapshotMs=%d; Stage=ExportStarted',
-      [OperationId, TPath.GetFullPath(TemplateFileName), TFile.GetSize(TemplateFileName),
+      [OperationId, Device.UUID, Device.SerialNumber, Device.DeviceTypeUUID,
+       Device.DeviceTypeName, DeviceType.ReportingForm,
+       TPath.GetFullPath(TemplateFileName), TFile.GetSize(TemplateFileName),
        THashSHA2.GetHashStringFromFile(TemplateFileName),
        TPath.GetFullPath(OutputFileName), SnapshotMs]));
   FReportExportTask := TTask.Run(

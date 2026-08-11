@@ -558,53 +558,6 @@ object FrameProceed: TFrameProceed
                 OnClick = ButtonExportReportTemplateClick
               end
             end
-            object LayoutReportTemplatesHeader: TLayout
-              Align = Top
-              Padding.Left = 8.000000000000000000
-              Padding.Right = 8.000000000000000000
-              Padding.Bottom = 8.000000000000000000
-              Position.Y = 48.000000000000000000
-              Size.Width = 348.000000000000000000
-              Size.Height = 40.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 1
-              object ButtonClearReportTemplates: TButton
-                Align = Right
-                Position.X = 220.000000000000000000
-                Size.Width = 120.000000000000000000
-                Size.Height = 32.000000000000000000
-                Size.PlatformDefault = False
-                TabOrder = 1
-                Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1080#1089#1090#1086#1088#1080#1102
-                TextSettings.Trimming = None
-                OnClick = ButtonClearReportTemplatesClick
-              end
-              object LabelReportTemplates: TLabel
-                Align = Client
-                Margins.Right = 8.000000000000000000
-                Size.Width = 204.000000000000000000
-                Size.Height = 32.000000000000000000
-                Size.PlatformDefault = False
-                Text = #1047#1072#1075#1088#1091#1078#1077#1085#1085#1099#1077' '#1096#1072#1073#1083#1086#1085#1099' '#1086#1090#1095#1105#1090#1086#1074' '#8212' '#1087#1086#1089#1083#1077#1076#1085#1080#1077' '#1089#1074#1077#1088#1093#1091
-                TabOrder = 0
-              end
-            end
-            object ListBoxReportTemplates: TListBox
-              Align = Client
-              Margins.Left = 8.000000000000000000
-              Margins.Right = 8.000000000000000000
-              Margins.Bottom = 8.000000000000000000
-              Size.Width = 332.000000000000000000
-              Size.Height = 508.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 2
-              DisableFocusEffect = True
-              DefaultItemStyles.ItemStyle = ''
-              DefaultItemStyles.GroupHeaderStyle = ''
-              DefaultItemStyles.GroupFooterStyle = ''
-              Viewport.Width = 328.000000000000000000
-              Viewport.Height = 483.000000000000000000
-            end
           end
         end
       end

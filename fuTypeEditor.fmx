@@ -1905,6 +1905,7 @@ object FormTypeEditor: TFormTypeEditor
               StyleLookup = 'searchtoolbutton'
               Text = 'arrowdowntoolbutton'
               TextSettings.Trimming = None
+              OnClick = sbReportingFormClick
             end
           end
           object Layout43: TLayout

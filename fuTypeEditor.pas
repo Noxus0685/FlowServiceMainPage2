@@ -51,7 +51,8 @@ uses
   uDeviceClass,
   uGridLayoutManager,
   uRepositories,
-  uProtocols;
+  uProtocols,
+  uReportTemplates;
 
 type
 
@@ -307,6 +308,8 @@ type
       const Value: TValue);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+    // Выбирает подготовленный XLSX-шаблон и назначает его редактируемому типу прибора.
+    procedure sbReportingFormClick(Sender: TObject);
     procedure ButtonDiameterAddClick(Sender: TObject);
     procedure ButtonDiameterDeleteClick(Sender: TObject);
     procedure ButtonDiameterClearClick(Sender: TObject);
@@ -1419,7 +1422,8 @@ begin
   FType.ProcedureName     := cbProcedure.Text;
 
   FType.VerificationMethod:= edtDocumentation.Text;
-  FType.ReportingForm     := EditReportingForm.Text;
+  FType.ReportingForm := Trim(EditReportingForm.Text);
+  EditReportingForm.Text := FType.ReportingForm;
 end;
 
 
@@ -2562,6 +2566,37 @@ begin
   SelectFileToLayoutEdit('Layout52');
 end;
 
+// Выбирает подготовленный XLSX-шаблон и назначает его редактируемому типу прибора.
+procedure TFormTypeEditor.sbReportingFormClick(Sender: TObject);
+var
+  Dialog: TOpenDialog;
+  FileName, TemplatesRoot: string;
+begin
+  if FType = nil then
+    Exit;
+  Dialog := TOpenDialog.Create(Self);
+  try
+    TemplatesRoot := IncludeTrailingPathDelimiter(
+      TPath.GetFullPath(TReportTemplateService.TemplatesPath));
+    Dialog.InitialDir := TReportTemplateService.TemplatesPath;
+    Dialog.Filter := 'Excel Workbook (*.xlsx)|*.xlsx';
+    Dialog.DefaultExt := 'xlsx';
+    if not Dialog.Execute then
+      Exit;
+    FileName := TPath.GetFullPath(Dialog.FileName);
+    if not StartsText(TemplatesRoot, FileName) then
+      raise EArgumentException.Create(
+        'Шаблон отчёта должен находиться в папке ReportTemplates.');
+    FType.ReportingForm :=
+      TReportTemplateService.NormalizeTemplateFileName(FileName);
+    TReportTemplateService.ResolveDeviceTypeTemplate(FType);
+    EditReportingForm.Text := FType.ReportingForm;
+    SetModified;
+  finally
+    Dialog.Free;
+  end;
+end;
+
  procedure TFormTypeEditor.SetModified;
 var
   OldState: TObjectState;
@@ -3298,6 +3333,19 @@ begin
   begin
     ShowMessage('Не задано наименование типа');
     Exit;
+  end;
+  try
+    FType.ReportingForm :=
+      TReportTemplateService.NormalizeTemplateFileName(FType.ReportingForm);
+    EditReportingForm.Text := FType.ReportingForm;
+    if FType.ReportingForm <> '' then
+      TReportTemplateService.ResolveDeviceTypeTemplate(FType);
+  except
+    on E: Exception do
+    begin
+      ShowMessage(E.Message);
+      Exit;
+    end;
   end;
 
   WriteTypeEditActionLog('Сохранён тип прибора', FType);
