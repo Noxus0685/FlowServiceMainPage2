@@ -1654,10 +1654,9 @@ begin
          not SameText(Doc.DocumentElement.LocalName, 'worksheet') then
         raise EInvalidOpException.CreateFmt('Некорректный XML листа: %s',
           [ALocations[I].SheetName]);
-    end;
-    if Result[I].ArchivePath = '' then
-      raise EInvalidOpException.CreateFmt(
-        'Шаблон не содержит обязательный технический лист: %s', [Result[I].SheetName]);
+   end;
+  finally
+    Zip.Free;
   end;
 end;
 
