@@ -5252,7 +5252,7 @@ begin
   FReportExportTask := nil;
   ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateExport',
     'Сформирован отчёт по шаблону', Format(
-      'Output=%s; DurationMs=%d; Thread=Worker; FullExtract=True; FullRepack=True',
+      'Output=%s; DurationMs=%d; Thread=Worker',
       [AOutputFileName, ADurationMs]));
 end;
 
@@ -5324,7 +5324,7 @@ begin
   SnapshotMs := Stopwatch.ElapsedMilliseconds;
   Inc(FReportExportOperationId); OperationId := FReportExportOperationId;
   BeginReportExportUi;
-  ProtocolManager.AddMessage(pcProc, psForm, 'ReportTemplateExportStarted',
+  ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateExportStarted',
     'Запущена фоновая выгрузка отчёта', Format(
       'Template=%s; Output=%s; SnapshotMs=%d; SourceSize=%d',
       [TemplateFileName, OutputFileName, SnapshotMs,
