@@ -1425,32 +1425,44 @@ var
   Counts: TDictionary<string, Integer>;
   I, Count: Integer;
   Child: IXMLNode;
-  Name, LocalSheetId: string;
+  Name, NormalizedName, LocalSheetId: string;
 begin
-  if ADefinedNamesNode = nil then Exit;
-  Counts := TDictionary<string, Integer>.Create(
-    TStringComparer.OrdinalIgnoreCase);
+  if ADefinedNamesNode = nil then
+    Exit;
+
+  Counts := TDictionary<string, Integer>.Create;
   try
     for I := 0 to ADefinedNamesNode.ChildNodes.Count - 1 do
     begin
       Child := ADefinedNamesNode.ChildNodes[I];
-      if not SameText(Child.LocalName, 'definedName') then Continue;
+
+      if not SameText(Child.LocalName, 'definedName') then
+        Continue;
+
       Name := VarToStr(Child.Attributes['name']);
-      if Counts.TryGetValue(Name, Count) then
+      NormalizedName := UpperCase(Name);
+
+      if Counts.TryGetValue(NormalizedName, Count) then
       begin
         LocalSheetId := VarToStr(Child.Attributes['localSheetId']);
+
         raise EInvalidOpException.CreateFmt(
           'Повтор definedName %s; Count=%d; localSheetId=%s; FlowService=%s',
-          [Name, Count + 1, LocalSheetId,
-           BoolToStr(IsReportDefinedName(Name), True)]);
+          [
+            Name,
+            Count + 1,
+            LocalSheetId,
+            BoolToStr(IsReportDefinedName(Name), True)
+          ]
+        );
       end;
-      Counts.Add(Name, 1);
+
+      Counts.Add(NormalizedName, 1);
     end;
   finally
     Counts.Free;
   end;
 end;
-
 function SerializeXmlDocumentUtf8(const ADocument: IXMLDocument): string;
 var
   Stream: TMemoryStream;
