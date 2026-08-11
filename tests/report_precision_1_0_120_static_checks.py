@@ -11,7 +11,7 @@ def implementation(start, end):
 
 
 def test_version_and_shared_precision_policy():
-    assert "APP_VERSION = '1.0.116'" in VERSION
+    assert "APP_VERSION = '1.0.120'" in VERSION
     rounding = implementation('function RoundReportValueByMeterPrecision',
                               'function ReportErrorDecimals')
     assert 'AMeterValue.GetStrNum(AValue)' in rounding
@@ -32,7 +32,7 @@ def test_snapshot_contains_raw_rounded_text_and_precision_metadata():
 
 def test_point_error_named_range_receives_rounded_number():
     build = implementation('class function TReportTemplateService.BuildReportJson',
-                           'class function TReportTemplateService.ImportTemplate')
+                           'class function TReportTemplateService.PrepareTemplate')
     assert 'TryGetDevicePointDisplayError' in build
     assert 'ApplyReportErrorPrecision(Rows, AMeterValueError)' in build
     sheet = implementation('function BuildSeparatedWorksheetXml',
