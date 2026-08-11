@@ -1596,33 +1596,80 @@ begin
   end;
 end;
 
-// Разбирает абсолютную ссылку definedName и возвращает лист, столбец и строку.
-function TryParseDefinedNameReference(const AReference: string;
-  out ASheetName: string; out AColumnIndex, ARowIndex: Integer): Boolean;
-var P, I: Integer; ColumnName, RowName: string; Ch: Char;
+// Разбирает абсолютную ссылку definedName с quoted и unquoted именем листа.
+function TryParseDefinedNameReference(
+  const AReference: string;
+  out ASheetName: string;
+  out AColumnIndex: Integer;
+  out ARowIndex: Integer
+): Boolean;
+var
+  S, ParsedSheetName, ColumnName, RowName: string;
+  P, I, ParsedColumnIndex, ParsedRowIndex, Digit: Integer;
+  Ch: Char;
 begin
-  Result := False; ASheetName := ''; AColumnIndex := 0; ARowIndex := 0;
-  if (Length(AReference) < 8) or (AReference[1] <> '''') then Exit;
-  I := 2;
-  while I <= Length(AReference) do
+  Result := False;
+  ASheetName := '';
+  AColumnIndex := 0;
+  ARowIndex := 0;
+  S := Trim(AReference);
+  if S = '' then Exit;
+  ParsedSheetName := '';
+  if S[1] = '''' then
   begin
-    if AReference[I] = '''' then
+    I := 2;
+    while I <= Length(S) do
     begin
-      if (I < Length(AReference)) and (AReference[I + 1] = '''') then
-      begin ASheetName := ASheetName + ''''; Inc(I, 2); Continue; end;
-      Break;
+      if S[I] = '''' then
+      begin
+        if (I < Length(S)) and (S[I + 1] = '''') then
+        begin
+          ParsedSheetName := ParsedSheetName + '''';
+          Inc(I, 2);
+          Continue;
+        end;
+        Break;
+      end;
+      ParsedSheetName := ParsedSheetName + S[I];
+      Inc(I);
     end;
-    ASheetName := ASheetName + AReference[I]; Inc(I);
+    if (ParsedSheetName = '') or (I > Length(S)) then Exit;
+    Inc(I);
+    if (I > Length(S)) or (S[I] <> '!') then Exit;
   end;
-  if (I > Length(AReference)) or (Copy(AReference, I, 3) <> '''!$') then Exit;
-  Inc(I, 3); P := I;
-  while (I <= Length(AReference)) and CharInSet(AReference[I], ['A'..'Z', 'a'..'z']) do Inc(I);
-  ColumnName := UpperCase(Copy(AReference, P, I - P));
-  if (ColumnName = '') or (I > Length(AReference)) or (AReference[I] <> '$') then Exit;
-  Inc(I); RowName := Copy(AReference, I, MaxInt);
-  if not TryStrToInt(RowName, ARowIndex) or (ARowIndex < 1) then Exit;
-  for Ch in ColumnName do AColumnIndex := AColumnIndex * 26 + Ord(Ch) - Ord('A') + 1;
-  Result := AColumnIndex > 0;
+  if S[1] <> '''' then
+  begin
+    I := Pos('!', S);
+    if I <= 1 then Exit;
+    ParsedSheetName := Copy(S, 1, I - 1);
+  end;
+  if (Pos('[', ParsedSheetName) > 0) or
+     (Pos(']', ParsedSheetName) > 0) then Exit;
+  Inc(I);
+  if (I > Length(S)) or (S[I] <> '$') then Exit;
+  Inc(I);
+  P := I;
+  while (I <= Length(S)) and CharInSet(S[I], ['A'..'Z', 'a'..'z']) do Inc(I);
+  ColumnName := UpperCase(Copy(S, P, I - P));
+  if (ColumnName = '') or (I > Length(S)) or (S[I] <> '$') then Exit;
+  Inc(I);
+  P := I;
+  while (I <= Length(S)) and CharInSet(S[I], ['0'..'9']) do Inc(I);
+  if (P = I) or (I <= Length(S)) then Exit;
+  RowName := Copy(S, P, I - P);
+  if not TryStrToInt(RowName, ParsedRowIndex) or (ParsedRowIndex < 1) then Exit;
+  ParsedColumnIndex := 0;
+  for Ch in ColumnName do
+  begin
+    Digit := Ord(Ch) - Ord('A') + 1;
+    if ParsedColumnIndex > (MaxInt - Digit) div 26 then Exit;
+    ParsedColumnIndex := ParsedColumnIndex * 26 + Digit;
+  end;
+  if ParsedColumnIndex < 1 then Exit;
+  ASheetName := ParsedSheetName;
+  AColumnIndex := ParsedColumnIndex;
+  ARowIndex := ParsedRowIndex;
+  Result := True;
 end;
 
 // Проверяет наличие имени в наборе FlowService без учёта регистра.
@@ -2306,7 +2353,11 @@ begin
         raise EInvalidOpException.CreateFmt('Повтор definedName %s', [Name]);
       Seen.Add(Name, 0); Reference := Node.Text;
       if not TryParseDefinedNameReference(Reference, SheetName, ColumnIndex, RowIndex) then
-        raise EInvalidOpException.CreateFmt('Некорректная ссылка definedName %s', [Name]);
+        raise EInvalidOpException.CreateFmt(
+          'Некорректная ссылка definedName %s:'#13#10 +
+          'Reference="%s".'#13#10 +
+          'Ожидается абсолютная ссылка вида Sheet!$A$1 или ''Sheet Name''!$A$1.',
+          [Name, Reference]);
       if not ATechnicalSheets.ContainsKey(SheetName) then
         raise EInvalidOpException.CreateFmt('definedName %s указывает на неизвестный лист %s', [Name, SheetName]);
       if TryDevicePointDefinedNameParts(Name, PointIndex, FieldName) then
@@ -2324,10 +2375,11 @@ end;
 // Исправляет только служебные именованные диапазоны уже подготовленного шаблона.
 procedure RepairPreparedReportDefinedNames(const ASourceFileName,
   AOutputFileName: string);
-var Zip: TZipFile; WorkbookXml, RelsXml, Name, FieldName: string;
+var Zip: TZipFile; WorkbookXml, RelsXml, Name, FieldName, SheetName: string;
   Locations: TArray<TReportWorksheetLocation>; Sheets: TDictionary<string, string>;
   Headers: TDictionary<string, Integer>; Doc: IXMLDocument; NamesNode, Node: IXMLNode;
-  Index: TDictionary<string, IXMLNode>; I, PointIndex: Integer;
+  Index: TDictionary<string, IXMLNode>;
+  I, PointIndex, ColumnIndex, RowIndex, ExpectedColumnIndex: Integer;
 begin
   Sheets := TDictionary<string, string>.Create;
   Zip := TZipFile.Create;
@@ -2354,8 +2406,17 @@ begin
           if not Index.TryGetValue(Name, Node) then
           begin
             Node := NamesNode.AddChild('definedName', NamesNode.NamespaceURI);
-            Node.Attributes['name'] := Name; Index.Add(Name, Node);
+            Node.Attributes['name'] := Name;
+            Index.Add(Name, Node);
+            Node.Text := BuildDefinedNameReference('_DevicePoints', FieldName,
+              PointIndex + 2, Headers);
+            Continue;
           end;
+          ExpectedColumnIndex := Headers[FieldName];
+          if TryParseDefinedNameReference(Node.Text, SheetName, ColumnIndex,
+             RowIndex) and SameText(SheetName, '_DevicePoints') and
+             (ColumnIndex = ExpectedColumnIndex) and
+             (RowIndex = PointIndex + 2) then Continue;
           Node.Text := BuildDefinedNameReference('_DevicePoints', FieldName,
             PointIndex + 2, Headers);
         end;

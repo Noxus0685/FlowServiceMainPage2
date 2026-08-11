@@ -3,7 +3,7 @@ unit uAppVersion;
 interface
 
 const
-  APP_VERSION = '1.0.122';
+  APP_VERSION = '1.0.123';
 
 implementation
 
