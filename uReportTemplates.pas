@@ -165,8 +165,6 @@ uses
 var
   GReportLogLock: TObject;
 
-var
-  GReportLogLock: TObject;
 
 type
   PSpillageStopCriteria = ^TSpillageStopCriteria;
