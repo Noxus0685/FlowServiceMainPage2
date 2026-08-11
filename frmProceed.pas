@@ -38,6 +38,8 @@ uses
   System.SysUtils,
   System.Types,
   System.UITypes,
+  System.Diagnostics,
+  System.Threading,
   System.Variants,
   uBaseProcedures,
   uClasses,
@@ -434,6 +436,22 @@ type
     FPointDeleteOwner: TObject;
     FProcessingChangesSaved: Boolean;
     FOnResultsSynchronized: TNotifyEvent;
+    FReportExportTask: ITask;
+    FReportExportQueueThread: TThread;
+    FReportExportInProgress: Boolean;
+    FReportExportOperationId: Int64;
+    FReportExportButtonText: string;
+    // Переводит элементы отчётной вкладки в состояние выполняющейся выгрузки.
+    procedure BeginReportExportUi;
+    // Возвращает элементы отчётной вкладки в обычное состояние.
+    procedure EndReportExportUi;
+    // Обрабатывает успешное завершение фоновой выгрузки в UI-потоке.
+    procedure CompleteReportExport(const AOperationId: Int64;
+      const AOutputFileName: string; const ADurationMs: Int64);
+    // Обрабатывает ошибку фоновой выгрузки в UI-потоке.
+    procedure FailReportExport(const AOperationId: Int64;
+      const AErrorClass, AErrorMessage, AStage: string;
+      const ADurationMs: Int64);
     FLastResultsHintRow: Integer;
     FLastResultsHintCol: Integer;
     FLastDataPointsHintRow: Integer;
@@ -553,6 +571,16 @@ begin
   SaveLayoutSettingsToWorkTable;
   if Assigned(AppServices) then
     AppServices.OnBeforeShutdown := nil;
+  Inc(FReportExportOperationId);
+  FReportExportInProgress := False;
+  if FReportExportQueueThread <> nil then
+    TThread.RemoveQueuedEvents(FReportExportQueueThread);
+  if FReportExportTask <> nil then
+    FReportExportTask.Wait;
+  if FReportExportQueueThread <> nil then
+    TThread.RemoveQueuedEvents(FReportExportQueueThread);
+  FReportExportQueueThread := nil;
+  FReportExportTask := nil;
 
   FreeAndNil(FFrameCalibrCoefs);
   FreeAndNil(FSessionDevice);
@@ -5188,68 +5216,145 @@ begin
   end;
 end;
 
+procedure TFrameProceed.BeginReportExportUi;
+begin
+  FReportExportInProgress := True;
+  if ButtonExportReportTemplate <> nil then
+  begin
+    FReportExportButtonText := ButtonExportReportTemplate.Text;
+    ButtonExportReportTemplate.Text := 'Выгрузка…';
+    ButtonExportReportTemplate.Enabled := False;
+  end;
+  if ButtonLoadReportTemplate <> nil then ButtonLoadReportTemplate.Enabled := False;
+  if ListBoxReportTemplates <> nil then ListBoxReportTemplates.Enabled := False;
+end;
+
+procedure TFrameProceed.EndReportExportUi;
+begin
+  FReportExportInProgress := False;
+  if ButtonExportReportTemplate <> nil then
+  begin
+    ButtonExportReportTemplate.Text := FReportExportButtonText;
+    ButtonExportReportTemplate.Enabled := True;
+  end;
+  if ButtonLoadReportTemplate <> nil then ButtonLoadReportTemplate.Enabled := True;
+  if ListBoxReportTemplates <> nil then ListBoxReportTemplates.Enabled := True;
+end;
+
+procedure TFrameProceed.CompleteReportExport(const AOperationId: Int64;
+  const AOutputFileName: string; const ADurationMs: Int64);
+begin
+  if AOperationId <> FReportExportOperationId then Exit;
+  EndReportExportUi;
+  FReportExportTask := nil;
+  ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateExport',
+    'Сформирован отчёт по шаблону', Format(
+      'Output=%s; DurationMs=%d; Thread=Worker; FullExtract=True; FullRepack=True',
+      [AOutputFileName, ADurationMs]));
+end;
+
+procedure TFrameProceed.FailReportExport(const AOperationId: Int64;
+  const AErrorClass, AErrorMessage, AStage: string; const ADurationMs: Int64);
+begin
+  if AOperationId <> FReportExportOperationId then Exit;
+  EndReportExportUi;
+  FReportExportTask := nil;
+  ProtocolManager.AddMessage(pcError, psForm, 'ReportTemplateExport',
+    'Не удалось сформировать отчёт', Format(
+      'Class=%s; Message=%s; Stage=%s; DurationMs=%d; Thread=Worker',
+      [AErrorClass, AErrorMessage, AStage, ADurationMs]));
+  MessageDlg(AErrorMessage, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
+end;
+
 procedure TFrameProceed.ButtonExportReportTemplateClick(Sender: TObject);
 var
   Device: TDevice;
   DeviceType: TDeviceType;
   TypeRepo: TTypeRepository;
   Dialog: TSaveDialog;
-  TemplateFileName, SuggestedName: string;
+  Json: TJSONObject;
+  Stopwatch: TStopwatch;
+  TemplateFileName, SuggestedName, OutputFileName, ReportJson: string;
+  OperationId, SnapshotMs: Int64;
 begin
-  if (ListBoxReportTemplates = nil) or
-     (ListBoxReportTemplates.ItemIndex < 0) then
+  if FReportExportInProgress then Exit;
+  if (ListBoxReportTemplates = nil) or (ListBoxReportTemplates.ItemIndex < 0) then
   begin
     MessageDlg('Выберите шаблон отчёта', TMsgDlgType.mtInformation,
-      [TMsgDlgBtn.mbOK], 0);
-    Exit;
+      [TMsgDlgBtn.mbOK], 0); Exit;
   end;
-
   Device := ResolveSelectedDevice;
   if Device = nil then
   begin
     MessageDlg('Выберите прибор или его сессию в дереве обработки',
-      TMsgDlgType.mtInformation, [TMsgDlgBtn.mbOK], 0);
-    Exit;
+      TMsgDlgType.mtInformation, [TMsgDlgBtn.mbOK], 0); Exit;
   end;
-
-  DeviceType := nil;
-  TypeRepo := nil;
+  DeviceType := nil; TypeRepo := nil;
   if (AppServices <> nil) and (AppServices.DataManager <> nil) then
     DeviceType := AppServices.DataManager.FindType(Device.DeviceTypeUUID,
       Device.DeviceTypeName, TypeRepo);
-
   TemplateFileName := TPath.Combine(TReportTemplateService.TemplatesPath,
     ListBoxReportTemplates.Items[ListBoxReportTemplates.ItemIndex]);
   SuggestedName := TPath.GetFileNameWithoutExtension(TemplateFileName);
-  if Trim(Device.SerialNumber) <> '' then
-    SuggestedName := SuggestedName + '_' + Device.SerialNumber;
-
+  if Trim(Device.SerialNumber) <> '' then SuggestedName := SuggestedName + '_' + Device.SerialNumber;
   Dialog := TSaveDialog.Create(Self);
   try
-    try
-      Dialog.Filter := 'Excel Workbook (*.xlsx)|*.xlsx';
-      Dialog.DefaultExt := 'xlsx';
-      Dialog.FileName := SuggestedName + '.xlsx';
-      if not Dialog.Execute then
-        Exit;
-
-      TReportTemplateService.ExportTemplate(TemplateFileName, Dialog.FileName,
-        Device, DeviceType);
-      ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateExport',
-        'Сформирован отчёт по шаблону',
-        Format('Template=%s; Device=%s; Output=%s',
-          [TPath.GetFileName(TemplateFileName), Device.UUID, Dialog.FileName]));
-    except
-      on E: Exception do
-      begin
-        ProtocolManager.AddMessage(pcError, psForm, 'ReportTemplateExport',
-          'Не удалось сформировать отчёт', E.Message);
-        MessageDlg(E.Message, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
-      end;
-    end;
+    Dialog.Filter := 'Excel Workbook (*.xlsx)|*.xlsx'; Dialog.DefaultExt := 'xlsx';
+    Dialog.FileName := SuggestedName + '.xlsx';
+    if not Dialog.Execute then Exit;
+    OutputFileName := Dialog.FileName;
   finally
     Dialog.Free;
   end;
+
+  Stopwatch := TStopwatch.StartNew;
+  Json := TReportTemplateService.BuildReportJson(Device, DeviceType);
+  try
+    ReportJson := Json.ToJSON;
+  finally
+    Json.Free;
+  end;
+  SnapshotMs := Stopwatch.ElapsedMilliseconds;
+  Inc(FReportExportOperationId); OperationId := FReportExportOperationId;
+  BeginReportExportUi;
+  ProtocolManager.AddMessage(pcProc, psForm, 'ReportTemplateExportStarted',
+    'Запущена фоновая выгрузка отчёта', Format(
+      'Template=%s; Output=%s; SnapshotMs=%d; SourceSize=%d',
+      [TemplateFileName, OutputFileName, SnapshotMs,
+       TFile.GetSize(TemplateFileName)]));
+  FReportExportTask := TTask.Run(
+    procedure
+    var
+      WorkerStopwatch: TStopwatch;
+      ErrorClass, ErrorMessage, ErrorStage: string;
+      DurationMs: Int64;
+    begin
+      WorkerStopwatch := TStopwatch.StartNew;
+      FReportExportQueueThread := TThread.CurrentThread;
+      try
+        ErrorStage := 'ExportTemplateFromJson';
+        TReportTemplateService.ExportTemplateFromJson(TemplateFileName,
+          OutputFileName, ReportJson);
+        DurationMs := WorkerStopwatch.ElapsedMilliseconds;
+        TThread.Queue(FReportExportQueueThread,
+          procedure
+          begin
+            CompleteReportExport(OperationId, OutputFileName, DurationMs);
+          end);
+      except
+        on E: Exception do
+        begin
+          ErrorClass := E.ClassName; ErrorMessage := E.Message;
+          DurationMs := WorkerStopwatch.ElapsedMilliseconds;
+          TThread.Queue(FReportExportQueueThread,
+            procedure
+            begin
+              FailReportExport(OperationId, ErrorClass, ErrorMessage,
+                ErrorStage, DurationMs);
+            end);
+        end;
+      end;
+    end);
 end;
 
 procedure TFrameProceed.MenuTreeViewDevicesClearClick(Sender: TObject);
