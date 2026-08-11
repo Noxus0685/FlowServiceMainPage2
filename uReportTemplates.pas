@@ -1766,6 +1766,7 @@ begin
   finally
     Seen.Free;
   end;
+end;
 
 // Проверяет наличие ZIP entry по нормализованному пути.
 function ZipEntryExists(AZip: TZipFile; const AArchivePath: string): Boolean;
@@ -1877,6 +1878,37 @@ begin
       finally
         Stream.Free;
       end;
+    end;
+    for I := 0 to High(Replaced) do
+      if not Replaced[I] then
+        raise EInvalidOpException.CreateFmt(
+          'Шаблон не содержит обязательный технический лист: %s',
+          [ALocations[I].SheetName]);
+  finally
+    OutputZip.Free; SourceZip.Free;
+  end;
+end;
+
+procedure ValidateTechnicalSheetOutput(const AFileName: string;
+  const ALocations: TArray<TReportWorksheetLocation>);
+var Zip: TZipFile; I: Integer; Xml: string; Doc: IXMLDocument;
+begin
+  if not FileExists(AFileName) or (TFile.GetSize(AFileName) = 0) then
+    raise EInvalidOpException.Create('Сформированный XLSX пуст или отсутствует');
+  Zip := TZipFile.Create;
+  try
+    Zip.Open(AFileName, zmRead);
+    for I := 0 to High(ALocations) do
+    begin
+      if not ZipEntryExists(Zip, ALocations[I].ArchivePath) then
+        raise EInvalidOpException.CreateFmt('Не записан технический лист: %s',
+          [ALocations[I].SheetName]);
+      Xml := ReadZipEntryUtf8(Zip, ALocations[I].ArchivePath);
+      Doc := LoadXMLData(Xml); Doc.Active := True;
+      if (Doc.DocumentElement = nil) or
+         not SameText(Doc.DocumentElement.LocalName, 'worksheet') then
+        raise EInvalidOpException.CreateFmt('Некорректный XML листа: %s',
+          [ALocations[I].SheetName]);
     end;
     for I := 0 to High(Replaced) do
       if not Replaced[I] then

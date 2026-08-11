@@ -78,3 +78,9 @@ def test_template_preparation_has_concise_duration_protocol():
     assert 'TStopwatch.StartNew' in load
     assert 'pcAction' in load and 'DurationMs=%d' in load
     assert 'pcError' in load and 'Stage=%s' in load
+
+
+def test_zip_validation_routine_is_closed_before_next_function():
+    validation = section('procedure ValidateZipEntries',
+                         '// Проверяет наличие ZIP entry')
+    assert validation.rstrip().endswith('end;')
