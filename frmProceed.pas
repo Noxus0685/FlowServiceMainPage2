@@ -3384,7 +3384,9 @@ begin
         Result := CompareValue(Left.ID, Right.ID);
       end));
 
-    CurrentBest := nil;
+    { Group membership remains owned by FindResultSpillagesForColumn.  The
+      final minimum-absolute-error selection is shared with XLSX reports. }
+    TrySelectDevicePointDisplaySpillage(Ordered.ToArray, CurrentBest);
     for Spillage in Ordered do
     begin
       if not IsValidSummaryResultSpillage(Spillage, SkipReason) then
@@ -3394,17 +3396,8 @@ begin
         Continue;
       end;
 
-      if (CurrentBest = nil) or
-         (Abs(Spillage.Error) < Abs(CurrentBest.Error)) or
-         (SameValue(Abs(Spillage.Error), Abs(CurrentBest.Error), 1E-9) and (Spillage.ID >= CurrentBest.ID)) then
-      begin
-        CurrentBest := Spillage;
-        LogSummaryResultSelection(AColumn.Header, Spillage, True, '',
-          Spillage, 'MinimumAbsoluteError');
-      end
-      else
-        LogSummaryResultSelection(AColumn.Header, Spillage, True, '',
-          CurrentBest, 'MinimumAbsoluteError');
+      LogSummaryResultSelection(AColumn.Header, Spillage, True, '',
+        CurrentBest, 'MinimumAbsoluteError');
     end;
 
     if CurrentBest <> nil then
