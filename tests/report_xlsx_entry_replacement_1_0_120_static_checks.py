@@ -33,9 +33,9 @@ def test_only_entries_are_replaced():
                       'IsPreparedReportTemplate', 'GReportLogLock'):
         assert forbidden not in REPORT
     replace = section('procedure ReplaceTechnicalSheetEntries',
-                      'procedure ValidateTechnicalSheetOutput')
-    assert 'for Name in SourceZip.FileNames' in replace
-    assert 'OutputZip.Add(Stream, Name)' in replace
+                      'procedure ValidateGeneratedTechnicalSheets')
+    assert 'for EntryName in InputArchive.FileNames' in replace
+    assert 'ResultArchive.Add(EntryStream, EntryName)' in replace
 
 def test_workbook_parts_are_read_only_and_missing_sheet_is_explicit():
     export = section('procedure ExportTechnicalSheets',
@@ -88,12 +88,12 @@ def test_zip_validation_routine_is_closed_before_next_function():
 
 def test_entry_replacement_and_validation_are_top_level_routines():
     replacement = section('procedure ReplaceTechnicalSheetEntries',
-                          'procedure ValidateTechnicalSheetOutput')
-    for declaration in ('Replaced: TArray<Boolean>',
-                        'SourceZip, OutputZip: TZipFile'):
+                          'procedure ValidateGeneratedTechnicalSheets')
+    for declaration in ('InputArchive: TZipFile',
+                        'ResultArchive: TZipFile'):
         assert declaration in replacement
     assert replacement.rstrip().endswith('end;')
-    assert REPORT.count('procedure ValidateTechnicalSheetOutput') == 1
-    validation = section('procedure ValidateTechnicalSheetOutput',
+    assert REPORT.count('procedure ValidateGeneratedTechnicalSheets') == 1
+    validation = section('procedure ValidateGeneratedTechnicalSheets',
                          '// Атомарно сохраняет сформированный XLSX')
     assert validation.rstrip().endswith('end;')

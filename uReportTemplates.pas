@@ -1847,133 +1847,97 @@ end;
 procedure ReplaceTechnicalSheetEntries(const ASourceFileName,
   AOutputFileName: string; const ALocations: TArray<TReportWorksheetLocation>;
   const ASheetXml: TArray<string>);
-var SourceZip, OutputZip: TZipFile; Name, Normalized: string; I, ReplaceIndex: Integer;
-  Stream: TStream; Header: TZipHeader; Bytes: TBytes; Replaced: TArray<Boolean>;
+var
+  InputArchive: TZipFile;
+  ResultArchive: TZipFile;
+  EntryName: string;
+  NormalizedEntryName: string;
+  LocationIndex: Integer;
+  ReplacementIndex: Integer;
+  EntryStream: TStream;
+  EntryHeader: TZipHeader;
+  XmlBytes: TBytes;
 begin
   if Length(ALocations) <> Length(ASheetXml) then
-    raise EArgumentException.Create('Число XML-листов не совпадает с числом ZIP-entry');
-  SetLength(Replaced, Length(ALocations));
-  SourceZip := TZipFile.Create; OutputZip := TZipFile.Create;
+    raise EArgumentException.Create(
+      'Число XML-листов не совпадает с числом ZIP-entry');
+
+  InputArchive := TZipFile.Create;
+  ResultArchive := TZipFile.Create;
   try
-    SourceZip.Open(ASourceFileName, zmRead);
-    OutputZip.Open(AOutputFileName, zmWrite);
-    for Name in SourceZip.FileNames do
+    InputArchive.Open(ASourceFileName, zmRead);
+    for LocationIndex := 0 to High(ALocations) do
+      if not ZipEntryExists(InputArchive, ALocations[LocationIndex].ArchivePath) then
+        raise EInvalidOpException.CreateFmt(
+          'Шаблон не содержит обязательный технический лист: %s',
+          [ALocations[LocationIndex].SheetName]);
+
+    ResultArchive.Open(AOutputFileName, zmWrite);
+    for EntryName in InputArchive.FileNames do
     begin
-      Normalized := NormalizeArchivePath(Name); ReplaceIndex := -1;
-      for I := 0 to High(ALocations) do
-        if SameText(Normalized, NormalizeArchivePath(ALocations[I].ArchivePath)) then
-        begin ReplaceIndex := I; Break; end;
-      if ReplaceIndex >= 0 then
+      NormalizedEntryName := NormalizeArchivePath(EntryName);
+      ReplacementIndex := -1;
+      for LocationIndex := 0 to High(ALocations) do
+        if SameText(NormalizedEntryName,
+          NormalizeArchivePath(ALocations[LocationIndex].ArchivePath)) then
+        begin
+          ReplacementIndex := LocationIndex;
+          Break;
+        end;
+
+      if ReplacementIndex >= 0 then
       begin
-        Bytes := TEncoding.UTF8.GetBytes(ASheetXml[ReplaceIndex]);
-        Stream := TBytesStream.Create(Bytes); Replaced[ReplaceIndex] := True;
+        XmlBytes := TEncoding.UTF8.GetBytes(ASheetXml[ReplacementIndex]);
+        EntryStream := TBytesStream.Create(XmlBytes);
       end
       else
       begin
-        Stream := nil; SourceZip.Read(Name, Stream, Header);
+        EntryStream := nil;
+        InputArchive.Read(EntryName, EntryStream, EntryHeader);
       end;
       try
-        Stream.Position := 0;
-        OutputZip.Add(Stream, Name);
+        EntryStream.Position := 0;
+        ResultArchive.Add(EntryStream, EntryName);
       finally
-        Stream.Free;
+        EntryStream.Free;
       end;
     end;
-    for I := 0 to High(Replaced) do
-      if not Replaced[I] then
-        raise EInvalidOpException.CreateFmt(
-          'Шаблон не содержит обязательный технический лист: %s',
-          [ALocations[I].SheetName]);
   finally
-    OutputZip.Free; SourceZip.Free;
+    ResultArchive.Free;
+    InputArchive.Free;
   end;
 end;
 
-procedure ValidateTechnicalSheetOutput(const AFileName: string;
+procedure ValidateGeneratedTechnicalSheets(const AFileName: string;
   const ALocations: TArray<TReportWorksheetLocation>);
-var Zip: TZipFile; I: Integer; Xml: string; Doc: IXMLDocument;
+var
+  Archive: TZipFile;
+  LocationIndex: Integer;
+  WorksheetXml: string;
+  WorksheetDocument: IXMLDocument;
 begin
   if not FileExists(AFileName) or (TFile.GetSize(AFileName) = 0) then
     raise EInvalidOpException.Create('Сформированный XLSX пуст или отсутствует');
-  Zip := TZipFile.Create;
+  Archive := TZipFile.Create;
   try
-    Zip.Open(AFileName, zmRead);
-    for I := 0 to High(ALocations) do
+    Archive.Open(AFileName, zmRead);
+    for LocationIndex := 0 to High(ALocations) do
     begin
-      if not ZipEntryExists(Zip, ALocations[I].ArchivePath) then
+      if not ZipEntryExists(Archive, ALocations[LocationIndex].ArchivePath) then
         raise EInvalidOpException.CreateFmt('Не записан технический лист: %s',
-          [ALocations[I].SheetName]);
-      Xml := ReadZipEntryUtf8(Zip, ALocations[I].ArchivePath);
-      Doc := LoadXMLData(Xml); Doc.Active := True;
-      if (Doc.DocumentElement = nil) or
-         not SameText(Doc.DocumentElement.LocalName, 'worksheet') then
+          [ALocations[LocationIndex].SheetName]);
+      WorksheetXml := ReadZipEntryUtf8(Archive,
+        ALocations[LocationIndex].ArchivePath);
+      WorksheetDocument := LoadXMLData(WorksheetXml);
+      WorksheetDocument.Active := True;
+      if (WorksheetDocument.DocumentElement = nil) or
+         not SameText(WorksheetDocument.DocumentElement.LocalName,
+           'worksheet') then
         raise EInvalidOpException.CreateFmt('Некорректный XML листа: %s',
-          [ALocations[I].SheetName]);
-    end;
-    for I := 0 to High(Replaced) do
-      if not Replaced[I] then
-        raise EInvalidOpException.CreateFmt(
-          'Шаблон не содержит обязательный технический лист: %s',
-          [ALocations[I].SheetName]);
-  finally
-    OutputZip.Free; SourceZip.Free;
-  end;
-end;
-
-procedure ValidateTechnicalSheetOutput(const AFileName: string;
-  const ALocations: TArray<TReportWorksheetLocation>);
-var Zip: TZipFile; I: Integer; Xml: string; Doc: IXMLDocument;
-begin
-  if not FileExists(AFileName) or (TFile.GetSize(AFileName) = 0) then
-    raise EInvalidOpException.Create('Сформированный XLSX пуст или отсутствует');
-  Zip := TZipFile.Create;
-  try
-    Zip.Open(AFileName, zmRead);
-    for I := 0 to High(ALocations) do
-    begin
-      if not ZipEntryExists(Zip, ALocations[I].ArchivePath) then
-        raise EInvalidOpException.CreateFmt('Не записан технический лист: %s',
-          [ALocations[I].SheetName]);
-      Xml := ReadZipEntryUtf8(Zip, ALocations[I].ArchivePath);
-      Doc := LoadXMLData(Xml); Doc.Active := True;
-      if (Doc.DocumentElement = nil) or
-         not SameText(Doc.DocumentElement.LocalName, 'worksheet') then
-        raise EInvalidOpException.CreateFmt('Некорректный XML листа: %s',
-          [ALocations[I].SheetName]);
-    end;
-    for I := 0 to High(Replaced) do
-      if not Replaced[I] then
-        raise EInvalidOpException.CreateFmt(
-          'Шаблон не содержит обязательный технический лист: %s',
-          [ALocations[I].SheetName]);
-  finally
-    OutputZip.Free; SourceZip.Free;
-  end;
-end;
-
-procedure ValidateTechnicalSheetOutput(const AFileName: string;
-  const ALocations: TArray<TReportWorksheetLocation>);
-var Zip: TZipFile; I: Integer; Xml: string; Doc: IXMLDocument;
-begin
-  if not FileExists(AFileName) or (TFile.GetSize(AFileName) = 0) then
-    raise EInvalidOpException.Create('Сформированный XLSX пуст или отсутствует');
-  Zip := TZipFile.Create;
-  try
-    Zip.Open(AFileName, zmRead);
-    for I := 0 to High(ALocations) do
-    begin
-      if not ZipEntryExists(Zip, ALocations[I].ArchivePath) then
-        raise EInvalidOpException.CreateFmt('Не записан технический лист: %s',
-          [ALocations[I].SheetName]);
-      Xml := ReadZipEntryUtf8(Zip, ALocations[I].ArchivePath);
-      Doc := LoadXMLData(Xml); Doc.Active := True;
-      if (Doc.DocumentElement = nil) or
-         not SameText(Doc.DocumentElement.LocalName, 'worksheet') then
-        raise EInvalidOpException.CreateFmt('Некорректный XML листа: %s',
-          [ALocations[I].SheetName]);
+          [ALocations[LocationIndex].SheetName]);
     end;
   finally
-    Zip.Free;
+    Archive.Free;
   end;
 end;
 
@@ -2043,7 +2007,7 @@ begin
   TempOutput := BuildTemporaryReportFileName(AOutputFileName);
   try
     ReplaceTechnicalSheetEntries(ASourceFileName, TempOutput, Locations, SheetXml);
-    ValidateTechnicalSheetOutput(TempOutput, Locations);
+    ValidateGeneratedTechnicalSheets(TempOutput, Locations);
     ReplaceReportOutputFile(TempOutput, AOutputFileName);
   finally
     if FileExists(TempOutput) then TFile.Delete(TempOutput);
@@ -2381,7 +2345,7 @@ begin
           Zip.Free;
         end;
         PreparedLocations := ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
-        ValidateTechnicalSheetOutput(TemporaryFileName, PreparedLocations);
+        ValidateGeneratedTechnicalSheets(TemporaryFileName, PreparedLocations);
         TFile.Move(TemporaryFileName, Result);
       finally
         if FileExists(TemporaryFileName) then TFile.Delete(TemporaryFileName);
