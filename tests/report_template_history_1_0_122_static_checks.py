@@ -43,7 +43,8 @@ def test_import_marks_timestamp_then_refreshes_and_selects_file():
     refresh = loading.index("RefreshReportTemplates", mark)
     select = loading.index("Items.IndexOf", refresh)
     assert prepare < mark < refresh < select
-    assert "TFile.SetLastWriteTimeUtc" in UI
+    assert "TFile.SetLastWriteTime(AFileName, Now)" in UI
+    assert "TTimeZone" not in UI
 
 
 def test_clear_deletes_only_top_level_xlsx_and_collects_failures():

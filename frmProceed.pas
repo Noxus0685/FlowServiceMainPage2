@@ -5223,7 +5223,7 @@ end;
 procedure TFrameProceed.MarkReportTemplateAsRecentlyLoaded(
   const AFileName: string);
 begin
-  TFile.SetLastWriteTimeUtc(AFileName, TTimeZone.Local.ToUniversalTime(Now));
+  TFile.SetLastWriteTime(AFileName, Now);
 end;
 
 procedure TFrameProceed.UpdateReportTemplateControls;
