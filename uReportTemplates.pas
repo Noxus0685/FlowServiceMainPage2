@@ -6,8 +6,32 @@ uses
   System.Classes,
   System.JSON,
   System.SysUtils,
+  Xml.XMLIntf,
   uClasses,
   uDeviceClass;
+
+// Возвращает перечень отсутствующих или не связанных служебных листов FlowService.
+function GetMissingReportTemplateSheets(const AWorkbookXml: string;
+  const AWorkbookRelsRoot: IXMLNode): TArray<string>;
+// Определяет наличие полного комплекта служебных листов FlowService и корректных связей на их XML.
+function IsPreparedReportTemplate(const AWorkbookXml: string;
+  const AWorkbookRelsRoot: IXMLNode): Boolean;
+// Исправляет только известные повреждения workbook.xml, созданные прежними версиями отчётной подсистемы.
+function RepairLegacyReportWorkbookXml(const AWorkbookXml: string;
+  out ARepaired: Boolean): string;
+function GetReportFlowUnitName(ADevice: TDevice): string;
+function GetReportBaseFlowUnitName(ADevice: TDevice): string;
+function ConvertBaseFlowToReportUnits(ADevice: TDevice;
+  const AValue: Double): Double;
+function ConvertBaseFlowDeltaToReportUnits(ADevice: TDevice;
+  const AValue: Double): Double;
+function IsBaseFlowReportField(const AObjectType, AFieldName: string): Boolean;
+function ConvertReportFieldValue(ADevice: TDevice;
+  const AObjectType, AFieldName: string; const AValue: Double): Double;
+function IsValidReportNumericValue(const AValue: Double): Boolean;
+function IsFlowCoefficientTable(const ATableType: Integer): Boolean;
+procedure NormalizeReportRowUnits(ADevice: TDevice;
+  const AObjectType: string; ARow: TJSONObject);
 
 type
   TReportTemplateService = class
@@ -43,7 +67,6 @@ uses
   System.Zip,
   System.Variants,
   Xml.XMLDoc,
-  Xml.XMLIntf,
   Xml.xmldom,
   uOpenXmlXlsx;
 
@@ -159,6 +182,99 @@ begin
   end;
 end;
 
+function GetMissingReportTemplateSheets(const AWorkbookXml: string;
+  const AWorkbookRelsRoot: IXMLNode): TArray<string>;
+const
+  CNames: array[0..4] of string = ('_Data', '_DevicePoints', '_Spillages',
+    '_CoefTables', '_Meta');
+var
+  Missing: TList<string>;
+  Name, RelationId, Target: string;
+begin
+  Missing := TList<string>.Create;
+  try
+    for Name in CNames do
+    begin
+      RelationId := FindSheetRelationId(AWorkbookXml, Name);
+      if RelationId = '' then
+        Missing.Add(Name + ' (лист отсутствует)')
+      else
+      begin
+        Target := FindRelationshipTarget(AWorkbookRelsRoot, RelationId);
+        if Target = '' then
+          Missing.Add(Name + ' (отсутствует связь ' + RelationId + ')');
+      end;
+    end;
+    Result := Missing.ToArray;
+  finally
+    Missing.Free;
+  end;
+end;
+
+function IsPreparedReportTemplate(const AWorkbookXml: string;
+  const AWorkbookRelsRoot: IXMLNode): Boolean;
+var
+  SeenNames, SeenIds: TDictionary<string, Byte>;
+  Match: TMatch;
+  Name, Id: string;
+begin
+  Result := Length(GetMissingReportTemplateSheets(AWorkbookXml,
+    AWorkbookRelsRoot)) = 0;
+  if not Result then
+    Exit;
+  SeenNames := TDictionary<string, Byte>.Create;
+  SeenIds := TDictionary<string, Byte>.Create;
+  try
+    for Match in TRegEx.Matches(AWorkbookXml, '<sheet\b[^>]*/?>',
+      [roIgnoreCase]) do
+    begin
+      Name := LowerCase(XmlAttribute(Match.Value, 'name'));
+      Id := XmlAttribute(Match.Value, 'sheetId');
+      if SeenNames.ContainsKey(Name) or SeenIds.ContainsKey(Id) then
+        Exit(False);
+      SeenNames.Add(Name, 0);
+      SeenIds.Add(Id, 0);
+    end;
+  finally
+    SeenIds.Free;
+    SeenNames.Free;
+  end;
+end;
+
+procedure ValidateWorkbookXml(const AWorkbookXml, AStage: string); forward;
+
+function RepairLegacyReportWorkbookXml(const AWorkbookXml: string;
+  out ARepaired: Boolean): string;
+var
+  StartPos, EndPos: Integer;
+  Fragment: string;
+begin
+  ARepaired := False;
+  Result := AWorkbookXml;
+  StartPos := Result.IndexOf('</definedNames>');
+  if StartPos < 0 then
+    StartPos := Result.IndexOf('</sheets>');
+  EndPos := Result.IndexOf('</workbook>', StartPos + 1);
+  if (StartPos < 0) or (EndPos < 0) then
+    Exit;
+  Fragment := Result.Substring(StartPos, EndPos - StartPos);
+  if Fragment.Contains('<<<calcPr') then
+    Fragment := Fragment.Replace('<<<calcPr', '<calcPr', [])
+  else if Fragment.Contains('<<calcPr') then
+    Fragment := Fragment.Replace('<<calcPr', '<calcPr', []);
+  if Fragment.Contains('</extLst>') and Fragment.Contains('/>xtLst>') then
+    Fragment := Fragment.Replace('/>xtLst>', '/><extLst>', [])
+  else if Fragment.Contains('</extLst>') and Fragment.Contains('/>extLst>') then
+    Fragment := Fragment.Replace('/>extLst>', '/><extLst>', []);
+  ARepaired := Fragment <> Result.Substring(StartPos, EndPos - StartPos);
+  if ARepaired then
+  begin
+    Delete(Result, StartPos + 1, EndPos - StartPos);
+    Insert(Fragment, Result, StartPos + 1);
+    ValidateWorkbookXml(Result, 'восстановление старого шаблона');
+  end;
+end;
+
 function NextSheetId(const AWorkbookXml: string): Integer;
 var
   Match: TMatch;
@@ -225,7 +341,7 @@ begin
   Node.Attributes['Target'] := ATarget;
 end;
 
-// Включает автоматический пересчёт книги без ручной работы с индексами совпадения.
+// Включает автоматический пересчёт книги, не изменяя соседние узлы workbook.xml.
 function EnsureAutomaticCalculation(const AWorkbookXml: string): string;
 const
   CCalcPrPattern = '<calcPr\b[^>]*/>';
@@ -240,9 +356,11 @@ begin
   CalcPrRegex := TRegEx.Create(CCalcPrPattern, [roIgnoreCase]);
   if CalcPrRegex.IsMatch(AWorkbookXml) then
     Result := CalcPrRegex.Replace(AWorkbookXml, CCalcPrXml, 1)
+  else if AWorkbookXml.Contains('<extLst') then
+    Result := AWorkbookXml.Replace('<extLst', CCalcPrXml + '<extLst', [])
   else
-    Result := InsertBeforeClosingTag(AWorkbookXml, '</workbook>',
-      CCalcPrXml);
+    Result := InsertBeforeClosingTag(AWorkbookXml, '</workbook>', CCalcPrXml);
+  ValidateWorkbookXml(Result, 'EnsureAutomaticCalculation');
 end;
 
 function WorkbookTemplateReloadHint(const AStage: string): string;
@@ -404,6 +522,21 @@ const
 var
   I: Integer;
 begin
+  if SameText(AFieldName, 'Q') then Exit('Расход (Q)');
+  if SameText(AFieldName, 'PointError') then
+    Exit('Погрешность точки (PointError)');
+  if SameText(AFieldName, 'FlowUnitName') then
+    Exit('Единица расхода (FlowUnitName)');
+  if SameText(AFieldName, 'FlowBaseUnitName') then
+    Exit('Базовая единица расхода (FlowBaseUnitName)');
+  if SameText(AFieldName, 'FlowUnitIndex') then
+    Exit('Индекс единицы расхода (FlowUnitIndex)');
+  if SameText(AFieldName, 'QavgEtalon') then
+    Exit('Средний расход по эталону (QavgEtalon)');
+  if SameText(AFieldName, 'QEtalonStd') then
+    Exit('СКО расхода эталона (QEtalonStd)');
+  if SameText(AFieldName, 'QStd') then
+    Exit('СКО расхода прибора (QStd)');
   Result := AFieldName;
   for I := Low(CNames) to High(CNames) do
     if SameText(CNames[I, 0], AFieldName) then
@@ -533,9 +666,127 @@ begin
   end;
 end;
 
+function GetReportFlowUnitName(ADevice: TDevice): string;
+begin
+  if ADevice = nil then Exit('');
+  Result := ADevice.GetDimensionName;
+end;
+
+function GetReportBaseFlowUnitName(ADevice: TDevice): string;
+begin
+  if ADevice = nil then Exit('');
+  if (ADevice.Dimensions = nil) or (ADevice.Dimensions.Count = 0) then
+    Exit('-');
+  Result := ADevice.Dimensions[0].Name;
+end;
+
+function IsValidReportNumericValue(const AValue: Double): Boolean;
+begin
+  Result := not IsNan(AValue) and not IsInfinite(AValue) and
+    (Abs(AValue) < MaxDouble);
+end;
+
+function ConvertBaseFlowToReportUnits(ADevice: TDevice;
+  const AValue: Double): Double;
+begin
+  if (ADevice = nil) or not IsValidReportNumericValue(AValue) then
+    Exit(AValue);
+  Result := ADevice.FromBaseUnits(AValue);
+end;
+
+function ConvertBaseFlowDeltaToReportUnits(ADevice: TDevice;
+  const AValue: Double): Double;
+begin
+  if (ADevice = nil) or not IsValidReportNumericValue(AValue) then
+    Exit(AValue);
+  { Difference conversion deliberately cancels any affine offset.  Flow
+    dimensions currently are linear; reciprocal/non-linear dimensions must
+    never be added to the delta rule table below. }
+  Result := ADevice.FromBaseUnits(AValue) - ADevice.FromBaseUnits(0);
+end;
+
+function IsBaseFlowReportField(const AObjectType, AFieldName: string): Boolean;
+begin
+  Result :=
+    (SameText(AObjectType, 'Device') and MatchText(AFieldName,
+      ['Qmin', 'Qmax', 'Qnom', 'Qtr', 'Q2tr', 'QFmax'])) or
+    (SameText(AObjectType, 'DevicePoint') and SameText(AFieldName, 'Q')) or
+    (SameText(AObjectType, 'Spillage') and MatchText(AFieldName,
+      ['QavgEtalon', 'EtalonVolumeFlow', 'EtalonMassFlow',
+       'DeviceVolumeFlow', 'DeviceMassFlow'])) or
+    (SameText(AObjectType, 'CalibrCoefItem') and MatchText(AFieldName,
+      ['Arg', 'QFrom', 'QTo', 'RangeArg']));
+end;
+
+function ConvertReportFieldValue(ADevice: TDevice;
+  const AObjectType, AFieldName: string; const AValue: Double): Double;
+begin
+  if SameText(AObjectType, 'Spillage') and
+     MatchText(AFieldName, ['QEtalonStd', 'QStd']) then
+    Exit(ConvertBaseFlowDeltaToReportUnits(ADevice, AValue));
+  if IsBaseFlowReportField(AObjectType, AFieldName) then
+    Exit(ConvertBaseFlowToReportUnits(ADevice, AValue));
+  Result := AValue;
+end;
+
+function IsFlowCoefficientTable(const ATableType: Integer): Boolean;
+begin
+  Result := ATableType = Ord(cctDeviceFlowRateCorrection);
+end;
+
+procedure NormalizeReportRowUnits(ADevice: TDevice;
+  const AObjectType: string; ARow: TJSONObject);
+const
+  CFields: array[0..20] of string = ('Qmin', 'Qmax', 'Qnom', 'Qtr',
+    'Q2tr', 'QFmax', 'Q', 'QavgEtalon', 'QEtalonStd', 'EtalonVolumeFlow',
+    'EtalonMassFlow', 'DeviceVolumeFlow', 'DeviceMassFlow', 'QStd', 'Arg',
+    'QFrom', 'QTo', 'RangeArg', 'CommonMinQ', 'CommonMaxQ',
+    'MinEtalonDeltaQ');
+var
+  FieldName: string;
+  Value: TJSONValue;
+  Pair: TJSONPair;
+  Number: Double;
+  TableType: Integer;
+begin
+  if (ADevice = nil) or (ARow = nil) or
+     (ARow.GetValue<Boolean>('_FlowUnitsNormalized', False)) then Exit;
+  TableType := ARow.GetValue<Integer>('CoefTableType', 0);
+  for FieldName in CFields do
+  begin
+    Value := ARow.GetValue(FieldName);
+    if not (Value is TJSONNumber) then Continue;
+    Number := TJSONNumber(Value).AsDouble;
+    if not IsValidReportNumericValue(Number) then
+    begin
+      Pair := ARow.RemovePair(FieldName); Pair.Free;
+      ARow.AddPair(FieldName, TJSONNull.Create);
+      Continue;
+    end;
+    if SameText(AObjectType, 'CalibrCoefItem') and
+       not IsFlowCoefficientTable(TableType) then Continue;
+    if IsBaseFlowReportField(AObjectType, FieldName) or
+       (SameText(AObjectType, 'Spillage') and
+        MatchText(FieldName, ['QEtalonStd', 'QStd'])) then
+    begin
+      Pair := ARow.RemovePair(FieldName); Pair.Free;
+      ARow.AddPair(FieldName, TJSONNumber.Create(ConvertReportFieldValue(
+        ADevice, AObjectType, FieldName, Number)));
+    end;
+  end;
+  ARow.AddPair('FlowUnitName', GetReportFlowUnitName(ADevice));
+  ARow.AddPair('FlowBaseUnitName', GetReportBaseFlowUnitName(ADevice));
+  if (ADevice.Dimensions = nil) or (ADevice.Units < 0) or
+     (ADevice.Units >= ADevice.Dimensions.Count) then
+    ARow.AddPair('FlowUnitIndex', TJSONNumber.Create(0))
+  else
+    ARow.AddPair('FlowUnitIndex', TJSONNumber.Create(ADevice.Units));
+  ARow.AddPair('_FlowUnitsNormalized', TJSONBool.Create(True));
+end;
+
 function NewObjectRow(const AObjectType: string; AObjectIndex,
   APointIndex, ASpillageIndex, ACoefTableType, ACoefItemIndex: Integer;
-  AObject: TObject): TJSONObject;
+  AObject: TObject; ADevice: TDevice): TJSONObject;
 begin
   Result := TJSONObject.Create;
   Result.AddPair('ObjectType', AObjectType);
@@ -545,6 +796,7 @@ begin
   Result.AddPair('CoefTableType', TJSONNumber.Create(ACoefTableType));
   Result.AddPair('CoefItemIndex', TJSONNumber.Create(ACoefItemIndex));
   AddScalarMembers(AObject, Result);
+  NormalizeReportRowUnits(ADevice, AObjectType, Result);
 end;
 
 function FindCoefTable(ADevice: TDevice; ATableType: Integer): TCalibrCoefTable;
@@ -625,6 +877,17 @@ begin
     if RowHasObjectType(Row, AObjectTypes) then
       for Pair in Row do
         AddUniqueColumn(Result, Pair.JsonString.Value);
+  end;
+  { PointError is a calculated report field, therefore its physical position
+    must not depend on RTTI enumeration order. }
+  if (Length(AObjectTypes) = 1) and SameText(AObjectTypes[0], 'DevicePoint') then
+  begin
+    I := Result.IndexOf('PointError');
+    if I >= 0 then
+      Result.Delete(I);
+    I := Result.IndexOf('Q');
+    if I >= 0 then
+      Result.Insert(I + 1, 'PointError');
   end;
 end;
 
@@ -1032,15 +1295,27 @@ end;
 
 procedure ValidateZipEntries(AZip: TZipFile);
 var
-  Names: TArray<string>;
   Name: string;
+  Seen: TDictionary<string, Byte>;
 begin
   if AZip = nil then
     raise EArgumentNilException.Create('Не задан ZIP-архив для проверки');
 
-  for Name in AZip.FileNames do
-    if Name.Contains('..') or Name.StartsWith('/') or Name.StartsWith('\') then
-      raise EInvalidOpException.CreateFmt('Недопустимый путь внутри XLSX: %s', [Name]);
+  Seen := TDictionary<string, Byte>.Create;
+  try
+    for Name in AZip.FileNames do
+    begin
+      if Name.Contains('..') or Name.StartsWith('/') or Name.StartsWith('\') then
+        raise EInvalidOpException.CreateFmt(
+          'Недопустимый путь внутри XLSX: %s', [Name]);
+      if Seen.ContainsKey(LowerCase(NormalizeArchivePath(Name))) then
+        raise EInvalidOpException.CreateFmt(
+          'Повторяющийся путь внутри XLSX: %s', [Name]);
+      Seen.Add(LowerCase(NormalizeArchivePath(Name)), 0);
+    end;
+  finally
+    Seen.Free;
+  end;
 end;
 
 procedure ZipDirectory(const ASourceDir, AFileName: string);
@@ -1065,7 +1340,7 @@ end;
 
 // Добавляет или обновляет пять раздельных служебных листов отчёта.
 procedure InjectDataSheet(const ASourceFileName, AOutputFileName: string;
-  ARoot: TJSONObject);
+  ARoot: TJSONObject; AInitializeStructure: Boolean);
 const
   CSheetNames: array[0..4] of string =
     ('_Data', '_DevicePoints', '_Spillages', '_CoefTables', '_Meta');
@@ -1091,6 +1366,7 @@ var
   Rows: TJSONArray;
   DefinedNames: TDictionary<string, string>;
   Stage: string;
+  NeedsPointErrorMigration: Boolean;
 begin
   Stage := 'начало выгрузки';
   LogReportStage(Stage);
@@ -1130,8 +1406,11 @@ begin
     WorkbookXml := ReadUtf8File(WorkbookFile);
     ValidateWorkbookXmlText(WorkbookXml, 'чтение исходного шаблона', False);
     ValidateWorkbookXml(WorkbookXml, 'чтение исходного шаблона');
+    NeedsPointErrorMigration := not AInitializeStructure and
+      not WorkbookXml.Contains('DevicePoints_01_PointError');
     ContentTypesXml := ReadUtf8File(ContentTypesFile);
-    RemoveLegacyReportTableArtifacts(TempDir, ContentTypesXml);
+    if AInitializeStructure then
+      RemoveLegacyReportTableArtifacts(TempDir, ContentTypesXml);
     WorkbookRelsDocument := LoadXMLDocument(WorkbookRelsFile);
     WorkbookRelsDocument.Active := True;
     WorkbookRelsRoot := WorkbookRelsDocument.DocumentElement;
@@ -1143,12 +1422,24 @@ begin
         'Некорректный корневой узел workbook.xml.rels: %s',
         [WorkbookRelsRoot.NodeName]);
 
+    if AInitializeStructure then
+    begin
+      if Length(GetMissingReportTemplateSheets(WorkbookXml,
+        WorkbookRelsRoot)) <> Length(CSheetNames) then
+        raise EInvalidOpException.Create(
+          'Исходный шаблон содержит часть служебных листов FlowService');
+    end
+    else if not IsPreparedReportTemplate(WorkbookXml, WorkbookRelsRoot) then
+      raise EInvalidOpException.Create('Шаблон не подготовлен FlowService: ' +
+        string.Join(', ', GetMissingReportTemplateSheets(WorkbookXml,
+          WorkbookRelsRoot)));
+
     for I := Low(CSheetNames) to High(CSheetNames) do
     begin
       Stage := 'обработка служебного листа ' + CSheetNames[I];
       LogReportStage(Stage);
       RelationId := FindSheetRelationId(WorkbookXml, CSheetNames[I]);
-      if RelationId = '' then
+      if (RelationId = '') and AInitializeStructure then
       begin
         SheetId := NextSheetId(WorkbookXml);
         RelationId := NextRelationId(WorkbookRelsRoot);
@@ -1184,11 +1475,14 @@ begin
         StringReplace(SheetArchivePath, '/', PathDelim, [rfReplaceAll]));
       SheetFile := TPath.Combine(ExtractFileDir(SheetFiles[I]), '_rels\' +
         ExtractFileName(SheetFiles[I]) + '.rels');
-      if FileExists(SheetFile) then
+      if AInitializeStructure and FileExists(SheetFile) then
         DeleteFile(SheetFile);
     end;
 
-    UpdatedWorkbookXml := EnsureAutomaticCalculation(WorkbookXml);
+    if AInitializeStructure then
+      UpdatedWorkbookXml := EnsureAutomaticCalculation(WorkbookXml)
+    else
+      UpdatedWorkbookXml := WorkbookXml;
     ValidateWorkbookXmlText(UpdatedWorkbookXml,
       'EnsureAutomaticCalculation', True);
     ValidateWorkbookXml(UpdatedWorkbookXml, 'EnsureAutomaticCalculation');
@@ -1217,7 +1511,8 @@ begin
     LogReportStage(Stage);
     SheetXml[4] := BuildMetaWorksheetXml(ARoot, DefinedNames);
 
-    UpdateReportDefinedNames(WorkbookXml, DefinedNames);
+    if AInitializeStructure or NeedsPointErrorMigration then
+      UpdateReportDefinedNames(WorkbookXml, DefinedNames);
     ValidateWorkbookXmlText(WorkbookXml, 'именованные диапазоны', True);
     ValidateWorkbookXml(WorkbookXml, 'именованные диапазоны');
 
@@ -1229,9 +1524,15 @@ begin
       LogReportStage(Stage);
       WriteUtf8File(SheetFiles[I], SheetXml[I]);
     end;
-    WriteUtf8File(WorkbookFile, WorkbookXml);
-    WorkbookRelsDocument.SaveToFile(WorkbookRelsFile);
-    WriteUtf8File(ContentTypesFile, ContentTypesXml);
+    if AInitializeStructure or NeedsPointErrorMigration then
+    begin
+      WriteUtf8File(WorkbookFile, WorkbookXml);
+    end;
+    if AInitializeStructure then
+    begin
+      WorkbookRelsDocument.SaveToFile(WorkbookRelsFile);
+      WriteUtf8File(ContentTypesFile, ContentTypesXml);
+    end;
 
     if FileExists(TempOutput) then
       DeleteFile(TempOutput);
@@ -1263,6 +1564,77 @@ begin
   end;
 end;
 
+// Подготавливает исходную XLSX-книгу, один раз добавляя служебные листы и именованные диапазоны.
+procedure InitializeReportTemplate(const ASourceFileName,
+  AOutputFileName: string; ARoot: TJSONObject);
+begin
+  InjectDataSheet(ASourceFileName, AOutputFileName, ARoot, True);
+end;
+
+// Заменяет только содержимое существующих служебных листов готового шаблона.
+procedure UpdatePreparedTemplateData(const ASourceFileName,
+  AOutputFileName: string; ARoot: TJSONObject);
+begin
+  InjectDataSheet(ASourceFileName, AOutputFileName, ARoot, False);
+end;
+
+// Проверяет и сохраняет уже подготовленный пользователем XLSX-шаблон без замены его данных пустым прибором.
+procedure ImportPreparedReportTemplate(const ASourceFileName,
+  AOutputFileName: string; out APrepared: Boolean);
+var
+  Zip: TZipFile;
+  TempDir, WorkbookFile, RelsFile, WorkbookXml: string;
+  RelsDoc: IXMLDocument;
+  Missing: TArray<string>;
+  Repaired: Boolean;
+begin
+  APrepared := False;
+  TempDir := TPath.Combine(TPath.GetTempPath,
+    'FlowServiceImport_' + TPath.GetRandomFileName.Replace('.', ''));
+  ForceDirectories(TempDir);
+  try
+    Zip := TZipFile.Create;
+    try
+      Zip.Open(ASourceFileName, zmRead);
+      ValidateZipEntries(Zip);
+      Zip.ExtractAll(TempDir);
+    finally
+      Zip.Free;
+    end;
+    WorkbookFile := TPath.Combine(TempDir, 'xl\workbook.xml');
+    RelsFile := TPath.Combine(TempDir, 'xl\_rels\workbook.xml.rels');
+    if not FileExists(WorkbookFile) or not FileExists(RelsFile) then
+      raise EInvalidOpException.Create('Файл не является корректной книгой XLSX');
+    WorkbookXml := RepairLegacyReportWorkbookXml(ReadUtf8File(WorkbookFile),
+      Repaired);
+    ValidateWorkbookXml(WorkbookXml, 'импорт шаблона');
+    RelsDoc := LoadXMLDocument(RelsFile);
+    RelsDoc.Active := True;
+    Missing := GetMissingReportTemplateSheets(WorkbookXml,
+      RelsDoc.DocumentElement);
+    if Length(Missing) = 5 then
+      Exit;
+    if Length(Missing) <> 0 then
+      raise EInvalidOpException.Create('Неполный шаблон FlowService: ' +
+        string.Join(', ', Missing));
+    if not IsPreparedReportTemplate(WorkbookXml, RelsDoc.DocumentElement) then
+      raise EInvalidOpException.Create(
+        'Шаблон FlowService содержит повторяющиеся sheetId или имена листов');
+    APrepared := True;
+    if Repaired then
+    begin
+      WorkbookXml := EnsureAutomaticCalculation(WorkbookXml);
+      WriteUtf8File(WorkbookFile, WorkbookXml);
+      ZipDirectory(TempDir, AOutputFileName);
+    end
+    else
+      TFile.Copy(ASourceFileName, AOutputFileName, False);
+  finally
+    if DirectoryExists(TempDir) then
+      TDirectory.Delete(TempDir, True);
+  end;
+end;
+
 class function TReportTemplateService.TemplatesPath: string;
 begin
   Result := TPath.Combine(ExtractFilePath(ParamStr(0)), 'ReportTemplates');
@@ -1277,6 +1649,10 @@ var
   Spillage: TPointSpillage;
   Table: TCalibrCoefTable;
   Item: TCalibrCoefItem;
+  ActiveSession: TSessionSpillage;
+  PointRow: TJSONObject;
+  PointError: Double;
+  Session: TSessionSpillage;
   PointIndex, SpillageIndex, TableIndex, ItemIndex, ActualSpillageIndex: Integer;
 begin
   Result := TJSONObject.Create;
@@ -1287,9 +1663,18 @@ begin
   Result.AddPair('MaxCoefItems', TJSONNumber.Create(MAX_COEF_ITEMS));
   Rows := TJSONArray.Create;
   Result.AddPair('Rows', Rows);
+  ActiveSession := nil;
+  if (ADevice <> nil) and (ADevice.Sessions <> nil) then
+    for Session in ADevice.Sessions do
+      if (Session <> nil) and (Session.State <> osDeleted) and
+         Session.Active then
+      begin
+        ActiveSession := Session;
+        Break;
+      end;
 
-  Rows.AddElement(NewObjectRow('DeviceType', 1, 0, 0, 0, 0, ADeviceType));
-  Rows.AddElement(NewObjectRow('Device', 1, 0, 0, 0, 0, ADevice));
+  Rows.AddElement(NewObjectRow('DeviceType', 1, 0, 0, 0, 0, ADeviceType, ADevice));
+  Rows.AddElement(NewObjectRow('Device', 1, 0, 0, 0, 0, ADevice, ADevice));
 
   for PointIndex := 1 to MAX_DEVICE_POINTS do
   begin
@@ -1297,8 +1682,14 @@ begin
     if (ADevice <> nil) and (ADevice.Points <> nil) and
        (PointIndex <= ADevice.Points.Count) then
       Point := ADevice.Points[PointIndex - 1];
-    Rows.AddElement(NewObjectRow('DevicePoint', PointIndex, PointIndex,
-      0, 0, 0, Point));
+    PointRow := NewObjectRow('DevicePoint', PointIndex, PointIndex,
+      0, 0, 0, Point, ADevice);
+    if TryGetDevicePointDisplayError(ADevice, Point, ActiveSession,
+      PointError) then
+      PointRow.AddPair('PointError', TJSONNumber.Create(PointError))
+    else
+      PointRow.AddPair('PointError', TJSONNull.Create);
+    Rows.AddElement(PointRow);
 
     ActualSpillageIndex := 0;
     for SpillageIndex := 1 to MAX_POINT_SPILLAGES do
@@ -1314,7 +1705,7 @@ begin
           end;
       Rows.AddElement(NewObjectRow('Spillage',
         (PointIndex - 1) * MAX_POINT_SPILLAGES + SpillageIndex,
-        PointIndex, SpillageIndex, 0, 0, Spillage));
+        PointIndex, SpillageIndex, 0, 0, Spillage, ADevice));
     end;
   end;
 
@@ -1322,7 +1713,7 @@ begin
   begin
     Table := FindCoefTable(ADevice, CCoefTableTypes[TableIndex]);
     Rows.AddElement(NewObjectRow('CalibrCoefTable', TableIndex + 1, 0, 0,
-      CCoefTableTypes[TableIndex], 0, Table));
+      CCoefTableTypes[TableIndex], 0, Table, ADevice));
     for ItemIndex := 1 to MAX_COEF_ITEMS do
     begin
       Item := nil;
@@ -1331,7 +1722,7 @@ begin
         Item := Table.Items[ItemIndex - 1];
       Rows.AddElement(NewObjectRow('CalibrCoefItem',
         TableIndex * MAX_COEF_ITEMS + ItemIndex, 0, 0,
-        CCoefTableTypes[TableIndex], ItemIndex, Item));
+        CCoefTableTypes[TableIndex], ItemIndex, Item, ADevice));
     end;
   end;
 end;
@@ -1344,6 +1735,7 @@ var
   EmptyJson: TJSONObject;
   EmptyDevice: TDevice;
   EmptyDeviceType: TDeviceType;
+  Prepared: Boolean;
 begin
   if not SameText(ExtractFileExt(ASourceFileName), '.xlsx') then
     raise EArgumentException.Create('Поддерживаются только шаблоны XLSX');
@@ -1359,6 +1751,10 @@ begin
     Inc(Suffix);
   end;
 
+  ImportPreparedReportTemplate(ASourceFileName, Result, Prepared);
+  if Prepared then
+    Exit;
+
   { Экземпляры без данных дают RTTI полную схему _Data уже
     при импорте; значения будут заменены при экспорте. }
   EmptyDevice := TDevice.Create;
@@ -1366,7 +1762,7 @@ begin
   try
     EmptyJson := BuildReportJson(EmptyDevice, EmptyDeviceType);
     try
-      InjectDataSheet(ASourceFileName, Result, EmptyJson);
+      InitializeReportTemplate(ASourceFileName, Result, EmptyJson);
     finally
       EmptyJson.Free;
     end;
@@ -1386,7 +1782,7 @@ begin
     raise EArgumentNilException.Create('Для отчёта не выбран прибор');
   Json := BuildReportJson(ADevice, ADeviceType);
   try
-    InjectDataSheet(ATemplateFileName, AOutputFileName, Json);
+    UpdatePreparedTemplateData(ATemplateFileName, AOutputFileName, Json);
   finally
     Json.Free;
   end;
