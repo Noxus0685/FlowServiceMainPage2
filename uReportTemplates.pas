@@ -1,4 +1,4 @@
-unit uReportTemplates;
+﻿unit uReportTemplates;
 
 interface
 
@@ -1582,7 +1582,7 @@ function BuildDefinedNameIndex(const ADefinedNamesNode: IXMLNode):
   TDictionary<string, IXMLNode>;
 var I: Integer; Child: IXMLNode; NameValue: string;
 begin
-  Result := TDictionary<string, IXMLNode>.Create(TStringComparer.OrdinalIgnoreCase);
+  Result := TDictionary<string, IXMLNode>.Create;
   if ADefinedNamesNode = nil then Exit;
   for I := 0 to ADefinedNamesNode.ChildNodes.Count - 1 do
   begin
@@ -1780,7 +1780,7 @@ var Doc: IXMLDocument; Root, SheetData, RowNode, CellNode, ValueNode,
   InlineNode, TextNode: IXMLNode; I, J, ColumnIndex: Integer;
   CellReference, Header: string;
 begin
-  Result := TDictionary<string, Integer>.Create(TStringComparer.OrdinalIgnoreCase);
+  Result := TDictionary<string, Integer>.Create;
   try
     Doc := LoadXMLData(AWorksheetXml); Doc.Active := True;
     Root := Doc.DocumentElement;
@@ -2290,7 +2290,7 @@ var Doc: IXMLDocument; NamesNode, Node: IXMLNode; Name, Reference, SheetName,
 begin
   Doc := LoadXMLData(AWorkbookXml); Doc.Active := True;
   NamesNode := FindDirectChildNode(Doc.DocumentElement, 'definedNames');
-  Seen := TDictionary<string, Byte>.Create(TStringComparer.OrdinalIgnoreCase);
+  Seen := TDictionary<string, Byte>.Create;
   HeaderIndex := nil;
   try
     if ATechnicalSheets.ContainsKey('_DevicePoints') then
@@ -2329,7 +2329,7 @@ var Zip: TZipFile; WorkbookXml, RelsXml, Name, FieldName: string;
   Headers: TDictionary<string, Integer>; Doc: IXMLDocument; NamesNode, Node: IXMLNode;
   Index: TDictionary<string, IXMLNode>; I, PointIndex: Integer;
 begin
-  Sheets := TDictionary<string, string>.Create(TStringComparer.OrdinalIgnoreCase);
+  Sheets := TDictionary<string, string>.Create;
   Zip := TZipFile.Create;
   try
     Zip.Open(ASourceFileName, zmRead); ValidateZipEntries(Zip);
