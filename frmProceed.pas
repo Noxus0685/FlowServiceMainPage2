@@ -5313,7 +5313,8 @@ var
   Json: TJSONObject;
   MeterValueError: TMeterValue;
   Stopwatch: TStopwatch;
-  TemplateFileName, SuggestedName, OutputFileName, ReportJson: string;
+  TemplateFileName, SuggestedName, OutputFileName, ReportJson,
+    ReportingForm: string;
   OperationId, SnapshotMs: Int64;
 begin
   if FReportExportInProgress then Exit;
@@ -5327,6 +5328,10 @@ begin
   if (AppServices <> nil) and (AppServices.DataManager <> nil) then
     DeviceType := AppServices.DataManager.FindType(Device.DeviceTypeUUID,
       Device.DeviceTypeName, TypeRepo);
+  if DeviceType <> nil then
+    ReportingForm := DeviceType.ReportingForm
+  else
+    ReportingForm := '';
   try
     if DeviceType = nil then
       raise EInvalidOpException.Create(
@@ -5342,8 +5347,7 @@ begin
           'DeviceTypeName=%s; ReportingForm=%s; ' +
           'Stage=ResolveDeviceTypeTemplate; Message=%s',
           [Device.UUID, Device.SerialNumber, Device.DeviceTypeUUID,
-           Device.DeviceTypeName,
-           IfThen(DeviceType <> nil, DeviceType.ReportingForm, ''), E.Message]));
+           Device.DeviceTypeName, ReportingForm, E.Message]));
       MessageDlg(E.Message, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
       Exit;
     end;

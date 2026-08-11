@@ -620,8 +620,6 @@ procedure TFormDeviceEditor.ApplyMeasuredDimension;
 var
   Dim: TMeasuredDimension;
   ALoading:Boolean;
-  DeviceType: TDeviceType;
-  TypeRepo: TTypeRepository;
 begin
   if FDevice = nil then
     Exit;
@@ -2580,6 +2578,8 @@ var
   Point: TDevicePoint;
   RepeatsValue: Integer;
   ALoading:Boolean;
+  DeviceType: TDeviceType;
+  TypeRepo: TTypeRepository;
 begin
   ALoading:= FLoading;
   FLoading := True;
