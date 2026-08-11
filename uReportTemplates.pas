@@ -479,6 +479,13 @@ begin
     Result := '_' + Result;
 end;
 
+// Создаёт регистронезависимый словарь служебных definedName Excel.
+function CreateReportDefinedNames: TDictionary<string, string>;
+begin
+  Result := TDictionary<string, string>.Create(
+    TStringComparer.OrdinalIgnoreCase);
+end;
+
 // Возвращает понятное русское название поля служебного отчёта.
 function GetReportFieldCaption(const AObjectType, AFieldName: string): string;
 const
@@ -1032,20 +1039,25 @@ begin
   end;
 end;
 
-// Объединяет схему и фактические поля без дублирования и с сохранением порядка схемы.
-function MergeReportColumns(const ASchemaColumns,
-  AActualColumns: TArray<TReportColumn>): TArray<TReportColumn>;
-var List: TList<TReportColumn>; Column, Existing: TReportColumn; Found: Boolean;
+// Объединяет фактические и схемные поля без учёта регистра, сохраняя порядок
+// фактического JSON и каноническое написание имени из актуальной схемы.
+function MergeReportColumns(const AActualColumns,
+  ASchemaColumns: TArray<TReportColumn>): TArray<TReportColumn>;
+var List: TList<TReportColumn>; Column: TReportColumn; I: Integer; Found: Boolean;
 begin
   List := TList<TReportColumn>.Create;
   try
-    for Column in ASchemaColumns do List.Add(Column);
-    for Column in AActualColumns do
+    for Column in AActualColumns do List.Add(Column);
+    for Column in ASchemaColumns do
     begin
       Found := False;
-      for Existing in List do
-        if SameText(Existing.TechnicalName, Column.TechnicalName) then
-        begin Found := True; Break; end;
+      for I := 0 to List.Count - 1 do
+        if SameText(List[I].TechnicalName, Column.TechnicalName) then
+        begin
+          List[I] := Column;
+          Found := True;
+          Break;
+        end;
       if not Found then List.Add(Column);
     end;
     Result := List.ToArray;
@@ -1581,12 +1593,13 @@ begin
       'Не удалось создать контейнер definedNames через XML DOM');
 end;
 
-// Строит регистронезависимый индекс существующих definedName за один проход.
+// Строит регистронезависимый индекс definedName по правилам Microsoft Excel.
 function BuildDefinedNameIndex(const ADefinedNamesNode: IXMLNode):
   TDictionary<string, IXMLNode>;
 var I: Integer; Child: IXMLNode; NameValue: string;
 begin
-  Result := TDictionary<string, IXMLNode>.Create;
+  Result := TDictionary<string, IXMLNode>.Create(
+    TStringComparer.OrdinalIgnoreCase);
   if ADefinedNamesNode = nil then Exit;
   for I := 0 to ADefinedNamesNode.ChildNodes.Count - 1 do
   begin
@@ -1597,6 +1610,39 @@ begin
       raise EInvalidOpException.CreateFmt(
         'Найдено несколько definedName с именем %s', [NameValue]);
     Result.Add(NameValue, Child);
+  end;
+end;
+
+procedure ValidateDefinedNameValues(const AName, AReference: string); forward;
+
+// Проверяет уникальность сформированных definedName без учёта регистра.
+procedure ValidateGeneratedDefinedNames(
+  const ADefinedNames: TDictionary<string, string>);
+var
+  Seen: TDictionary<string, string>;
+  Pair: TPair<string, string>;
+  ExistingName, NormalizedName: string;
+begin
+  if ADefinedNames = nil then
+    raise EArgumentNilException.Create(
+      'Не задан словарь сформированных definedName');
+  Seen := TDictionary<string, string>.Create(
+    TStringComparer.OrdinalIgnoreCase);
+  try
+    for Pair in ADefinedNames do
+    begin
+      ValidateDefinedNameValues(Pair.Key, Pair.Value);
+      NormalizedName := UpperCase(Pair.Key);
+      if Seen.TryGetValue(Pair.Key, ExistingName) then
+        raise EInvalidOpException.CreateFmt(
+          'Регистронезависимый повтор сформированного definedName: ' +
+          'Original=%s; Conflict=%s; Normalized=%s; Reference=%s; ' +
+          'Stage=GenerateDefinedNames',
+          [ExistingName, Pair.Key, NormalizedName, Pair.Value]);
+      Seen.Add(Pair.Key, Pair.Key);
+    end;
+  finally
+    Seen.Free;
   end;
 end;
 
@@ -2269,7 +2315,7 @@ begin
   Locations := ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
   Rows := ARoot.GetValue<TJSONArray>('Rows');
   if Rows = nil then raise EInvalidOpException.Create('В снимке отсутствует массив Rows');
-  Names := TDictionary<string, string>.Create;
+  Names := CreateReportDefinedNames;
   try
     SetLength(SheetXml, 5);
     SheetXml[0] := BuildDataWorksheetXml(Titles[0], Rows, Names);
@@ -2283,6 +2329,7 @@ begin
     RegisterPreparedSeparatedNames(Rows, Names);
     for I := 0 to High(SheetXml) do
       ValidateSeparatedWorksheetXml(SheetXml[I], Locations[I].SheetName);
+    ValidateGeneratedDefinedNames(Names);
     WorkbookXml := ReplaceReportDefinedNames(WorkbookXml, Names);
     TechnicalSheets := TDictionary<string, string>.Create;
     try
@@ -2322,6 +2369,7 @@ begin
   if (Root = nil) or not SameText(Root.LocalName, 'workbook') then
     raise EInvalidOpException.Create('Некорректный xl/workbook.xml');
   NamesNode := EnsureDefinedNamesNode(Root);
+  ValidateGeneratedDefinedNames(ADefinedNames);
   NameIndex := BuildDefinedNameIndex(NamesNode);
   try
     for Pair in ADefinedNames do
@@ -2329,7 +2377,12 @@ begin
       ValidateDefinedNameValues(Pair.Key, Pair.Value);
       if NameIndex.ContainsKey(Pair.Key) then
         raise EInvalidOpException.CreateFmt(
-          'В исходном шаблоне уже существует definedName %s', [Pair.Key]);
+          'Конфликт пользовательского и служебного definedName: ' +
+          'UserName=%s; ServiceName=%s; Normalized=%s; ' +
+          'UserReference=%s; ServiceReference=%s; ' +
+          'Stage=AddPreparedDefinedNames',
+          [VarToStr(NameIndex[Pair.Key].Attributes['name']), Pair.Key,
+           UpperCase(Pair.Key), NameIndex[Pair.Key].Text, Pair.Value]);
       NameNode := NamesNode.AddChild('definedName', NamesNode.NamespaceURI);
       NameNode.Attributes['name'] := Pair.Key;
       NameNode.Text := Pair.Value;
@@ -2349,6 +2402,9 @@ var
   Doc: IXMLDocument;
   NamesNode, NameNode: IXMLNode;
   Pair: TPair<string, string>;
+  UserIndex: TDictionary<string, IXMLNode>;
+  UserNode: IXMLNode;
+  UserName, UserReference, NormalizedName: string;
   I: Integer;
 begin
   Doc := LoadXMLData(AWorkbookXml);
@@ -2361,12 +2417,29 @@ begin
        IsReportDefinedName(VarToStr(NameNode.Attributes['name'])) then
       NamesNode.DOMNode.removeChild(NameNode.DOMNode);
   end;
-  for Pair in ADefinedNames do
-  begin
-    ValidateDefinedNameValues(Pair.Key, Pair.Value);
-    NameNode := NamesNode.AddChild('definedName', NamesNode.NamespaceURI);
-    NameNode.Attributes['name'] := Pair.Key;
-    NameNode.Text := Pair.Value;
+  UserIndex := BuildDefinedNameIndex(NamesNode);
+  try
+    for Pair in ADefinedNames do
+    begin
+      ValidateDefinedNameValues(Pair.Key, Pair.Value);
+      if UserIndex.TryGetValue(Pair.Key, UserNode) then
+      begin
+        UserName := VarToStr(UserNode.Attributes['name']);
+        UserReference := UserNode.Text;
+        NormalizedName := UpperCase(Pair.Key);
+        raise EInvalidOpException.CreateFmt(
+          'Конфликт пользовательского и служебного definedName: ' +
+          'UserName=%s; ServiceName=%s; Normalized=%s; ' +
+          'UserReference=%s; ServiceReference=%s; ' +
+          'Stage=ReplaceReportDefinedNames',
+          [UserName, Pair.Key, NormalizedName, UserReference, Pair.Value]);
+      end;
+      NameNode := NamesNode.AddChild('definedName', NamesNode.NamespaceURI);
+      NameNode.Attributes['name'] := Pair.Key;
+      NameNode.Text := Pair.Value;
+    end;
+  finally
+    UserIndex.Free;
   end;
   ValidateDefinedNameDuplicates(NamesNode);
   Result := SerializeXmlDocumentUtf8(Doc);
@@ -2595,7 +2668,7 @@ begin
   RelsRoot := RelsDoc.DocumentElement;
   if (RelsRoot = nil) or not SameText(RelsRoot.LocalName, 'Relationships') then
     raise EInvalidOpException.Create('Некорректный xl/_rels/workbook.xml.rels');
-  Names := TDictionary<string, string>.Create;
+  Names := CreateReportDefinedNames;
   try
     Rows := ARoot.GetValue<TJSONArray>('Rows');
     SetLength(SheetXml, 5);
