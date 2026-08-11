@@ -9,7 +9,8 @@ uses
   Xml.XMLIntf,
   uClasses,
   uBaseProcedures,
-  uDeviceClass;
+  uDeviceClass,
+  uMeterValue;
 
 // Возвращает перечень отсутствующих или не связанных служебных листов FlowService.
 function GetMissingReportTemplateSheets(const AWorkbookXml: string;
@@ -33,6 +34,9 @@ function IsValidReportNumericValue(const AValue: Double): Boolean;
 function IsFlowCoefficientTable(const ATableType: Integer): Boolean;
 procedure NormalizeReportRowUnits(ADevice: TDevice;
   const AObjectType: string; ARow: TJSONObject);
+// Возвращает числовое значение, округлённое по точности конкретной измеряемой величины прибора.
+function RoundReportValueByMeterPrecision(const AValue: Double;
+  const AMeterValue: TMeterValue): Double;
 
 type
   TPointErrorMigrationState = (pemsNotRequired, pemsRequired, pemsPartial,
@@ -130,7 +134,8 @@ type
     class function ImportTemplate(const ASourceFileName: string): string; static;
     // Формирует динамический JSON из объектов прибора для последующего заполнения _Data.
     class function BuildReportJson(ADevice: TDevice;
-      ADeviceType: TDeviceType): TJSONObject; static;
+      ADeviceType: TDeviceType; AMeterValueError: TMeterValue = nil):
+      TJSONObject; static;
     // Создаёт отчёт из выбранного шаблона, заменяя только содержимое таблицы _Data.
     class procedure ExportTemplate(const ATemplateFileName, AOutputFileName: string;
       ADevice: TDevice; ADeviceType: TDeviceType); static;
@@ -156,6 +161,9 @@ uses
   Xml.xmldom,
   uOpenXmlXlsx,
   uProtocols;
+
+var
+  GReportLogLock: TObject;
 
 var
   GReportLogLock: TObject;
@@ -968,6 +976,88 @@ end;
 function IsFlowCoefficientTable(const ATableType: Integer): Boolean;
 begin
   Result := ATableType = Ord(cctDeviceFlowRateCorrection);
+end;
+
+// Возвращает числовое значение, округлённое по точности конкретной измеряемой величины прибора.
+function RoundReportValueByMeterPrecision(const AValue: Double;
+  const AMeterValue: TMeterValue): Double;
+var
+  DisplayText: string;
+  FormatSettings: TFormatSettings;
+begin
+  if (AMeterValue = nil) or not IsValidReportNumericValue(AValue) then
+    Exit(AValue);
+  DisplayText := AMeterValue.GetStrNum(AValue);
+  FormatSettings := TFormatSettings.Create;
+  if TryStrToFloat(DisplayText, Result, FormatSettings) then Exit;
+  FormatSettings.DecimalSeparator := '.';
+  DisplayText := StringReplace(DisplayText, ',', '.', [rfReplaceAll]);
+  if not TryStrToFloat(DisplayText, Result, FormatSettings) then
+    raise EConvertError.CreateFmt(
+      'Штатное отображение погрешности не является числом: %s',
+      [AMeterValue.GetStrNum(AValue)]);
+end;
+
+function ReportErrorDecimals(const AText: string): Integer;
+var
+  SeparatorPosition, I: Integer;
+begin
+  Result := -1;
+  SeparatorPosition := LastDelimiter(',.', AText);
+  if SeparatorPosition = 0 then Exit(0);
+  Result := 0;
+  for I := SeparatorPosition + 1 to Length(AText) do
+    if CharInSet(AText[I], ['0'..'9']) then Inc(Result)
+    else begin Result := -1; Exit; end;
+end;
+
+procedure ReplaceJsonNumber(const ARow: TJSONObject; const AName: string;
+  const AValue: Double);
+var Pair: TJSONPair;
+begin
+  Pair := ARow.RemovePair(AName); Pair.Free;
+  ARow.AddPair(AName, TJSONNumber.Create(AValue));
+end;
+
+// Фиксирует в JSON исходную и отображаемую погрешность до запуска фоновой выгрузки.
+procedure ApplyReportErrorPrecision(const ARows: TJSONArray;
+  const AMeterValue: TMeterValue);
+var
+  I: Integer;
+  Row: TJSONObject;
+  Pair: TJSONPair;
+  Value: TJSONValue;
+  RawValue, RoundedValue: Double;
+  ErrorText, SourceField: string;
+begin
+  if (ARows = nil) or (AMeterValue = nil) then Exit;
+  for I := 0 to ARows.Count - 1 do
+  begin
+    Row := ARows.Items[I] as TJSONObject;
+    if SameText(Row.GetValue<string>('ObjectType'), 'DevicePoint') and
+       (Row.GetValue('PointError') is TJSONNumber) then
+      SourceField := 'PointError'
+    else if Row.GetValue('Error') is TJSONNumber then
+      SourceField := 'Error'
+    else
+      Continue;
+    Value := Row.GetValue(SourceField);
+    RawValue := TJSONNumber(Value).AsDouble;
+    if not IsValidReportNumericValue(RawValue) then
+    begin
+      Pair := Row.RemovePair(SourceField); Pair.Free;
+      Row.AddPair(SourceField, TJSONNull.Create);
+      Continue;
+    end;
+    ErrorText := AMeterValue.GetStrNum(RawValue);
+    RoundedValue := RoundReportValueByMeterPrecision(RawValue, AMeterValue);
+    ReplaceJsonNumber(Row, SourceField, RoundedValue);
+    ReplaceJsonNumber(Row, 'ErrorRaw', RawValue);
+    ReplaceJsonNumber(Row, 'Error', RoundedValue);
+    Row.AddPair('ErrorText', ErrorText);
+    Row.AddPair('ErrorDecimals', TJSONNumber.Create(
+      ReportErrorDecimals(ErrorText)));
+  end;
 end;
 
 procedure NormalizeReportRowUnits(ADevice: TDevice;
@@ -2680,7 +2770,7 @@ begin
 end;
 
 class function TReportTemplateService.BuildReportJson(ADevice: TDevice;
-  ADeviceType: TDeviceType): TJSONObject;
+  ADeviceType: TDeviceType; AMeterValueError: TMeterValue): TJSONObject;
 var
   Rows: TJSONArray;
   Point: TDevicePoint;
@@ -2763,6 +2853,7 @@ begin
         CCoefTableTypes[TableIndex], ItemIndex, Item, ADevice));
     end;
   end;
+  ApplyReportErrorPrecision(Rows, AMeterValueError);
 end;
 
 class function TReportTemplateService.ImportTemplate(

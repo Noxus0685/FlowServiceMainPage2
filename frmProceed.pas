@@ -443,7 +443,16 @@ type
     FReportExportOperationId: Int64;
     FReportExportButtonText: string;
     // Переводит элементы отчётной вкладки в состояние выполняющейся выгрузки.
-
+    procedure BeginReportExportUi;
+    // Возвращает элементы отчётной вкладки в обычное состояние.
+    procedure EndReportExportUi;
+    // Обрабатывает успешное завершение фоновой выгрузки в UI-потоке.
+    procedure CompleteReportExport(const AOperationId: Int64;
+      const AOutputFileName: string; const ADurationMs: Int64);
+    // Обрабатывает ошибку фоновой выгрузки в UI-потоке.
+    procedure FailReportExport(const AOperationId: Int64;
+      const AErrorClass, AErrorMessage, AStage: string;
+      const ADurationMs: Int64);
     FLastResultsHintRow: Integer;
     FLastResultsHintCol: Integer;
     FLastDataPointsHintRow: Integer;
@@ -5275,6 +5284,7 @@ var
   TypeRepo: TTypeRepository;
   Dialog: TSaveDialog;
   Json: TJSONObject;
+  MeterValueError: TMeterValue;
   Stopwatch: TStopwatch;
   TemplateFileName, SuggestedName, OutputFileName, ReportJson: string;
   OperationId, SnapshotMs: Int64;
@@ -5310,7 +5320,10 @@ begin
   end;
 
   Stopwatch := TStopwatch.StartNew;
-  Json := TReportTemplateService.BuildReportJson(Device, DeviceType);
+  MeterValueError := nil;
+  if FSessionDevice <> nil then MeterValueError := FSessionDevice.ValueError;
+  Json := TReportTemplateService.BuildReportJson(Device, DeviceType,
+    MeterValueError);
   try
     ReportJson := Json.ToJSON;
   finally
