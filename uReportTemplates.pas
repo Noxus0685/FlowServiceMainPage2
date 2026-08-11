@@ -154,7 +154,8 @@ uses
   System.Variants,
   Xml.XMLDoc,
   Xml.xmldom,
-  uOpenXmlXlsx;
+  uOpenXmlXlsx,
+  uProtocols;
 
 var
   GReportLogLock: TObject;
@@ -2477,6 +2478,15 @@ begin
             'Некорректная структура PointError: %s',
             [BuildPointErrorMigrationDiagnostic(PointErrorMigrationAnalysis)]);
       end;
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcProc, psForm, 'PointErrorMigrationAnalyzed',
+          'Проанализирована старая структура PointError', Format(
+          'State=%s; CanRepair=%s; Reason=%s; NeedsMigration=%s; OldColumn=%s',
+          [PointErrorMigrationStateToString(PointErrorMigrationAnalysis.State),
+           BoolToStr(PointErrorMigrationAnalysis.CanRepair, True),
+           PointErrorMigrationAnalysis.Reason,
+           BoolToStr(NeedsPointErrorMigration, True),
+           PointErrorMigrationAnalysis.PointErrorColumn]));
     end;
 
     if AInitializeStructure then
