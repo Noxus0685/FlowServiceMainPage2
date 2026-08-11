@@ -44,6 +44,7 @@ uses
   uBaseProcedures,
   uClasses,
   uDataManager,
+  System.JSON,
   uDeviceClass,
   uFlowMeter,
   uRepositories,
