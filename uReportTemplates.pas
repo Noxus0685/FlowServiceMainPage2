@@ -1,4 +1,4 @@
-﻿unit uReportTemplates;
+unit uReportTemplates;
 
 interface
 
@@ -11,6 +11,11 @@ uses
   uBaseProcedures,
   uDeviceClass,
   uMeterValue;
+
+// Добавляет в JSON-строку полный набор поддерживаемых скалярных полей класса со значениями null.
+procedure AddNullScalarMembersForClass(const ARow: TJSONObject; AClass: TClass);
+// Гарантирует наличие полной схемы колонок технических листов независимо от наличия данных.
+procedure EnsureTechnicalSheetSchema(const ARoot: TJSONObject);
 
 function GetReportFlowUnitName(ADevice: TDevice): string;
 function GetReportBaseFlowUnitName(ADevice: TDevice): string;
@@ -30,6 +35,10 @@ function RoundReportValueByMeterPrecision(const AValue: Double;
   const AMeterValue: TMeterValue): Double;
 
 type
+  TReportColumn = record
+    TechnicalName: string;
+  end;
+
   TReportWorksheetLocation = record
     SheetName: string;
     RelationId: string;
@@ -641,6 +650,78 @@ begin
   end;
 end;
 
+// Добавляет в JSON-строку полный набор поддерживаемых скалярных полей класса со значениями null.
+procedure AddNullScalarMembersForClass(const ARow: TJSONObject; AClass: TClass);
+var
+  Context: TRttiContext;
+  RttiType: TRttiType;
+  Field: TRttiField;
+  Prop: TRttiProperty;
+  Kind: TTypeKind;
+begin
+  if (ARow = nil) or (AClass = nil) then Exit;
+  Context := TRttiContext.Create;
+  try
+    RttiType := Context.GetType(AClass.ClassInfo);
+    if RttiType = nil then Exit;
+    for Field in RttiType.GetFields do
+      if Field.Visibility in [mvPublic, mvPublished] then
+      begin
+        Kind := Field.FieldType.TypeKind;
+        if (Kind in [tkInteger, tkInt64, tkFloat, tkEnumeration, tkChar,
+          tkWChar, tkString, tkLString, tkWString, tkUString, tkSet]) and
+          (ARow.GetValue(Field.Name) = nil) then
+          ARow.AddPair(Field.Name, TJSONNull.Create);
+      end;
+    for Prop in RttiType.GetProperties do
+      if (Prop.Visibility in [mvPublic, mvPublished]) and Prop.IsReadable then
+      begin
+        Kind := Prop.PropertyType.TypeKind;
+        if (Kind in [tkInteger, tkInt64, tkFloat, tkEnumeration, tkChar,
+          tkWChar, tkString, tkLString, tkWString, tkUString, tkSet]) and
+          (ARow.GetValue(Prop.Name) = nil) then
+          ARow.AddPair(Prop.Name, TJSONNull.Create);
+      end;
+  finally
+    Context.Free;
+  end;
+end;
+
+procedure AddSchemaRow(const ARows: TJSONArray; const AObjectType: string;
+  AClass: TClass);
+var Row: TJSONObject;
+begin
+  Row := TJSONObject.Create;
+  Row.AddPair('ObjectType', AObjectType);
+  Row.AddPair('_SchemaOnly', TJSONBool.Create(True));
+  AddNullScalarMembersForClass(Row, AClass);
+  ARows.AddElement(Row);
+end;
+
+// Гарантирует наличие полной схемы колонок технических листов независимо от наличия данных.
+procedure EnsureTechnicalSheetSchema(const ARoot: TJSONObject);
+var Rows: TJSONArray; Row: TJSONObject;
+begin
+  if ARoot = nil then Exit;
+  Rows := ARoot.GetValue<TJSONArray>('Rows');
+  if Rows = nil then
+  begin
+    Rows := TJSONArray.Create;
+    ARoot.AddPair('Rows', Rows);
+  end;
+  AddSchemaRow(Rows, 'Device', TDevice);
+  AddSchemaRow(Rows, 'DeviceType', TDeviceType);
+  AddSchemaRow(Rows, 'DevicePoint', TDevicePoint);
+  Row := Rows.Items[Rows.Count - 1] as TJSONObject;
+  if Row.GetValue('Q') = nil then Row.AddPair('Q', TJSONNull.Create);
+  if Row.GetValue('PointError') = nil then
+    Row.AddPair('PointError', TJSONNull.Create);
+  AddSchemaRow(Rows, 'Spillage', TPointSpillage);
+  AddSchemaRow(Rows, 'CalibrCoefTable', TCalibrCoefTable);
+  AddSchemaRow(Rows, 'CalibrCoefItem', TCalibrCoefItem);
+  AddSchemaRow(Rows, 'Session', TSessionSpillage);
+end;
+
 function GetReportFlowUnitName(ADevice: TDevice): string;
 begin
   if ADevice = nil then Exit('');
@@ -893,18 +974,6 @@ begin
   AColumns.Add(AName);
 end;
 
-// Возвращает индекс имени столбца без учёта регистра.
-function IndexOfColumnName(AColumns: TList<string>;
-  const AName: string): Integer;
-var
-  I: Integer;
-begin
-  Result := -1;
-  if AColumns = nil then Exit;
-  for I := 0 to AColumns.Count - 1 do
-    if SameText(AColumns[I], AName) then Exit(I);
-end;
-
 // Проверяет принадлежность строки JSON одному из типов служебного листа.
 function RowHasObjectType(ARow: TJSONObject;
   const AObjectTypes: array of string): Boolean;
@@ -925,41 +994,120 @@ begin
       Exit(True);
 end;
 
-// Возвращает набор столбцов по фактическим полям выбранных строк JSON.
+function IsSchemaRow(const ARow: TJSONObject): Boolean;
+begin
+  Result := (ARow <> nil) and ARow.GetValue<Boolean>('_SchemaOnly', False);
+end;
+
+function JsonRowsToColumns(ARows: TJSONArray;
+  const AObjectTypes: array of string; const ASchemaOnly: Boolean): TArray<TReportColumn>;
+var List: TList<TReportColumn>; I: Integer; Pair: TJSONPair;
+  Row: TJSONObject; Column: TReportColumn; Existing: TReportColumn;
+  Found: Boolean;
+begin
+  List := TList<TReportColumn>.Create;
+  try
+    for I := 0 to ARows.Count - 1 do
+    begin
+      Row := ARows.Items[I] as TJSONObject;
+      if (IsSchemaRow(Row) <> ASchemaOnly) or
+         not RowHasObjectType(Row, AObjectTypes) then Continue;
+      for Pair in Row do
+      begin
+        if SameText(Pair.JsonString.Value, '_SchemaOnly') then Continue;
+        Found := False;
+        for Existing in List do
+          if SameText(Existing.TechnicalName, Pair.JsonString.Value) then
+          begin Found := True; Break; end;
+        if not Found then
+        begin
+          Column.TechnicalName := Pair.JsonString.Value;
+          List.Add(Column);
+        end;
+      end;
+    end;
+    Result := List.ToArray;
+  finally
+    List.Free;
+  end;
+end;
+
+// Объединяет схему и фактические поля без дублирования и с сохранением порядка схемы.
+function MergeReportColumns(const ASchemaColumns,
+  AActualColumns: TArray<TReportColumn>): TArray<TReportColumn>;
+var List: TList<TReportColumn>; Column, Existing: TReportColumn; Found: Boolean;
+begin
+  List := TList<TReportColumn>.Create;
+  try
+    for Column in ASchemaColumns do List.Add(Column);
+    for Column in AActualColumns do
+    begin
+      Found := False;
+      for Existing in List do
+        if SameText(Existing.TechnicalName, Column.TechnicalName) then
+        begin Found := True; Break; end;
+      if not Found then List.Add(Column);
+    end;
+    Result := List.ToArray;
+  finally
+    List.Free;
+  end;
+end;
+
+// Формирует полный список колонок листа _DevicePoints для нового подготовленного шаблона.
+function BuildDevicePointsColumns: TArray<TReportColumn>;
+var Root, Row: TJSONObject; Rows: TJSONArray; Columns: TArray<TReportColumn>;
+  List: TList<TReportColumn>; Column, PointErrorColumn: TReportColumn;
+  I, QIndex: Integer;
+begin
+  Root := TJSONObject.Create;
+  try
+    Rows := TJSONArray.Create; Root.AddPair('Rows', Rows);
+    AddSchemaRow(Rows, 'DevicePoint', TDevicePoint);
+    Row := Rows.Items[0] as TJSONObject;
+    if Row.GetValue('Q') = nil then Row.AddPair('Q', TJSONNull.Create);
+    if Row.GetValue('PointError') = nil then Row.AddPair('PointError', TJSONNull.Create);
+    Columns := JsonRowsToColumns(Rows, ['DevicePoint'], True);
+    List := TList<TReportColumn>.Create;
+    try
+      QIndex := -1;
+      for Column in Columns do
+        if SameText(Column.TechnicalName, 'PointError') then
+          PointErrorColumn := Column
+        else
+        begin
+          List.Add(Column);
+          if SameText(Column.TechnicalName, 'Q') then QIndex := List.Count - 1;
+        end;
+      PointErrorColumn.TechnicalName := 'PointError';
+      if QIndex < 0 then
+      begin
+        Column.TechnicalName := 'Q'; List.Add(Column); QIndex := List.Count - 1;
+      end;
+      List.Insert(QIndex + 1, PointErrorColumn);
+      Result := List.ToArray;
+    finally
+      List.Free;
+    end;
+  finally
+    Root.Free;
+  end;
+end;
+
+// Возвращает устойчивый набор столбцов: сначала схема, затем новые фактические поля.
 function BuildSeparatedColumns(ARows: TJSONArray;
   const AObjectTypes: array of string): TList<string>;
-var
-  I: Integer;
-  Pair: TJSONPair;
-  Row: TJSONObject;
+var SchemaColumns, ActualColumns, Columns: TArray<TReportColumn>;
+  Column: TReportColumn;
 begin
-  Result := TList<string>.Create;
-  AddUniqueColumn(Result, 'ObjectType');
-  AddUniqueColumn(Result, 'ObjectIndex');
-  AddUniqueColumn(Result, 'PointIndex');
-  AddUniqueColumn(Result, 'SpillageIndex');
-  AddUniqueColumn(Result, 'CoefTableType');
-  AddUniqueColumn(Result, 'CoefItemIndex');
-  for I := 0 to ARows.Count - 1 do
-  begin
-    Row := ARows.Items[I] as TJSONObject;
-    if RowHasObjectType(Row, AObjectTypes) then
-      for Pair in Row do
-        AddUniqueColumn(Result, Pair.JsonString.Value);
-  end;
-  { PointError is a calculated report field, therefore its physical position
-    must not depend on RTTI enumeration order. }
   if (Length(AObjectTypes) = 1) and SameText(AObjectTypes[0], 'DevicePoint') then
-  begin
-    I := IndexOfColumnName(Result, 'PointError');
-    if I >= 0 then
-      Result.Delete(I);
-    I := IndexOfColumnName(Result, 'Q');
-    if I < 0 then
-      raise EInvalidOpException.Create(
-        'Нельзя добавить PointError: в _DevicePoints отсутствует столбец Q');
-    Result.Insert(I + 1, 'PointError');
-  end;
+    SchemaColumns := BuildDevicePointsColumns
+  else
+    SchemaColumns := JsonRowsToColumns(ARows, AObjectTypes, True);
+  ActualColumns := JsonRowsToColumns(ARows, AObjectTypes, False);
+  Columns := MergeReportColumns(SchemaColumns, ActualColumns);
+  Result := TList<string>.Create;
+  for Column in Columns do AddUniqueColumn(Result, Column.TechnicalName);
 end;
 
 // Возвращает ширину столбца по содержимому с ограничением для читаемости.
@@ -1023,6 +1171,100 @@ begin
   Result := BuildReportDefinedName(Result);
 end;
 
+procedure RegisterPreparedRowNames(const ASheetName: string;
+  const ARow: TJSONObject; AColumns: TList<string>; const AExcelRow: Integer;
+  ADefinedNames: TDictionary<string, string>);
+var I: Integer; FieldName: string;
+begin
+  for I := 0 to AColumns.Count - 1 do
+  begin
+    FieldName := AColumns[I];
+    if MatchText(FieldName, ['ObjectType', 'ObjectIndex', 'PointIndex',
+      'SpillageIndex', 'CoefTableType', 'CoefItemIndex', '_SchemaOnly']) then
+      Continue;
+    ADefinedNames.AddOrSetValue(SeparatedRowDefinedName(ARow, FieldName),
+      Format('''%s''!$%s$%d', [ASheetName, ExcelColumnName(I + 1), AExcelRow]));
+  end;
+end;
+
+// Создаёт диапазоны будущих строк без добавления фиктивных строк в worksheet XML.
+procedure RegisterPreparedSeparatedNames(ARows: TJSONArray;
+  ADefinedNames: TDictionary<string, string>);
+var Columns: TList<string>; Row: TJSONObject;
+  PointIndex, SpillageIndex, TableIndex, ItemIndex, ExcelRow: Integer;
+begin
+  Columns := BuildSeparatedColumns(ARows, ['DevicePoint']);
+  try
+    for PointIndex := 1 to TReportTemplateService.MAX_DEVICE_POINTS do
+    begin
+      Row := TJSONObject.Create;
+      try
+        Row.AddPair('ObjectType', 'DevicePoint');
+        Row.AddPair('PointIndex', TJSONNumber.Create(PointIndex));
+        Row.AddPair('SpillageIndex', TJSONNumber.Create(0));
+        Row.AddPair('CoefTableType', TJSONNumber.Create(0));
+        Row.AddPair('CoefItemIndex', TJSONNumber.Create(0));
+        RegisterPreparedRowNames('_DevicePoints', Row, Columns, PointIndex + 2,
+          ADefinedNames);
+      finally Row.Free; end;
+    end;
+  finally Columns.Free; end;
+
+  Columns := BuildSeparatedColumns(ARows, ['Spillage']);
+  try
+    ExcelRow := 3;
+    for PointIndex := 1 to TReportTemplateService.MAX_DEVICE_POINTS do
+      for SpillageIndex := 1 to TReportTemplateService.MAX_POINT_SPILLAGES do
+      begin
+        Row := TJSONObject.Create;
+        try
+          Row.AddPair('ObjectType', 'Spillage');
+          Row.AddPair('PointIndex', TJSONNumber.Create(PointIndex));
+          Row.AddPair('SpillageIndex', TJSONNumber.Create(SpillageIndex));
+          Row.AddPair('CoefTableType', TJSONNumber.Create(0));
+          Row.AddPair('CoefItemIndex', TJSONNumber.Create(0));
+          RegisterPreparedRowNames('_Spillages', Row, Columns, ExcelRow,
+            ADefinedNames);
+        finally Row.Free; end;
+        Inc(ExcelRow);
+      end;
+  finally Columns.Free; end;
+
+  Columns := BuildSeparatedColumns(ARows,
+    ['CalibrCoefTable', 'CalibrCoefItem']);
+  try
+    ExcelRow := 3;
+    for TableIndex := Low(CCoefTableTypes) to High(CCoefTableTypes) do
+    begin
+      Row := TJSONObject.Create;
+      try
+        Row.AddPair('ObjectType', 'CalibrCoefTable');
+        Row.AddPair('PointIndex', TJSONNumber.Create(0));
+        Row.AddPair('SpillageIndex', TJSONNumber.Create(0));
+        Row.AddPair('CoefTableType', TJSONNumber.Create(CCoefTableTypes[TableIndex]));
+        Row.AddPair('CoefItemIndex', TJSONNumber.Create(0));
+        RegisterPreparedRowNames('_CoefTables', Row, Columns, ExcelRow,
+          ADefinedNames);
+      finally Row.Free; end;
+      Inc(ExcelRow);
+      for ItemIndex := 1 to TReportTemplateService.MAX_COEF_ITEMS do
+      begin
+        Row := TJSONObject.Create;
+        try
+          Row.AddPair('ObjectType', 'CalibrCoefItem');
+          Row.AddPair('PointIndex', TJSONNumber.Create(0));
+          Row.AddPair('SpillageIndex', TJSONNumber.Create(0));
+          Row.AddPair('CoefTableType', TJSONNumber.Create(CCoefTableTypes[TableIndex]));
+          Row.AddPair('CoefItemIndex', TJSONNumber.Create(ItemIndex));
+          RegisterPreparedRowNames('_CoefTables', Row, Columns, ExcelRow,
+            ADefinedNames);
+        finally Row.Free; end;
+        Inc(ExcelRow);
+      end;
+    end;
+  finally Columns.Free; end;
+end;
+
 // Формирует читаемый XML повторяющихся служебных данных.
 function BuildSeparatedWorksheetXml(const ATitle, ASheetName: string;
   ARows: TJSONArray; const AObjectTypes: array of string;
@@ -1040,7 +1282,8 @@ begin
     Builder := TStringBuilder.Create;
     OutputRow := 2;
     for I := 0 to ARows.Count - 1 do
-      if RowHasObjectType(ARows.Items[I] as TJSONObject, AObjectTypes) then
+      if RowHasObjectType(ARows.Items[I] as TJSONObject, AObjectTypes) and
+         not IsSchemaRow(ARows.Items[I] as TJSONObject) then
         Inc(OutputRow);
     Builder.Append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
     Builder.Append('<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">');
@@ -1068,7 +1311,7 @@ begin
     for RowIndex := 0 to ARows.Count - 1 do
     begin
       Row := ARows.Items[RowIndex] as TJSONObject;
-      if not RowHasObjectType(Row, AObjectTypes) then
+      if IsSchemaRow(Row) or not RowHasObjectType(Row, AObjectTypes) then
         Continue;
       Builder.Append(Format('<row r="%d">', [OutputRow]));
       for I := 0 to Columns.Count - 1 do
@@ -1115,29 +1358,37 @@ begin
   end;
 end;
 
-// Формирует вертикальный XML листа общих данных прибора.
+// Формирует вертикальный XML листа общих данных по устойчивой схеме.
 function BuildDataWorksheetXml(const ATitle: string; ARows: TJSONArray;
   ADefinedNames: TDictionary<string, string>): string;
+const
+  ObjectTypes: array[0..2] of string = ('DeviceType', 'Device', 'Session');
+  ServiceFields: array[0..6] of string = ('ObjectType', 'ObjectIndex',
+    'PointIndex', 'SpillageIndex', 'CoefTableType', 'CoefItemIndex',
+    '_SchemaOnly');
 var
-  RowIndex, OutputRow: Integer;
-  Row: TJSONObject;
-  Pair: TJSONPair;
   ObjectType, FieldName, TechnicalName, ValueCell: string;
+  SchemaColumns, ActualColumns, Columns: TArray<TReportColumn>;
+  Column: TReportColumn;
+  ActualRow, Row: TJSONObject;
   Builder: TStringBuilder;
+  ObjectIndex, RowIndex, OutputRow, TotalRows: Integer;
+  Value: TJSONValue;
 begin
+  TotalRows := 2;
+  for ObjectIndex := Low(ObjectTypes) to High(ObjectTypes) do
+  begin
+    SchemaColumns := JsonRowsToColumns(ARows, [ObjectTypes[ObjectIndex]], True);
+    ActualColumns := JsonRowsToColumns(ARows, [ObjectTypes[ObjectIndex]], False);
+    Columns := MergeReportColumns(SchemaColumns, ActualColumns);
+    for Column in Columns do
+      if not MatchText(Column.TechnicalName, ServiceFields) then Inc(TotalRows);
+  end;
   Builder := TStringBuilder.Create;
   try
-    OutputRow := 2;
-    for RowIndex := 0 to ARows.Count - 1 do
-      if RowHasObjectType(ARows.Items[RowIndex] as TJSONObject,
-        ['DeviceType', 'Device']) then
-        for Pair in (ARows.Items[RowIndex] as TJSONObject) do
-          if not MatchText(Pair.JsonString.Value, ['ObjectType', 'ObjectIndex',
-            'PointIndex', 'SpillageIndex', 'CoefTableType', 'CoefItemIndex']) then
-            Inc(OutputRow);
     Builder.Append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
     Builder.Append('<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">');
-    Builder.Append(Format('<dimension ref="A1:D%d"/>', [OutputRow]));
+    Builder.Append(Format('<dimension ref="A1:D%d"/>', [TotalRows]));
     Builder.Append('<sheetViews><sheetView workbookViewId="0"/></sheetViews>');
     Builder.Append('<cols><col min="1" max="1" width="36" customWidth="1"/>');
     Builder.Append('<col min="2" max="2" width="38" customWidth="1"/>');
@@ -1151,18 +1402,23 @@ begin
     Builder.Append('<c r="C2" t="inlineStr"><is><t>Значение</t></is></c>');
     Builder.Append('<c r="D2" t="inlineStr"><is><t>Тип объекта</t></is></c></row>');
     OutputRow := 3;
-    for RowIndex := 0 to ARows.Count - 1 do
+    for ObjectIndex := Low(ObjectTypes) to High(ObjectTypes) do
     begin
-      Row := ARows.Items[RowIndex] as TJSONObject;
-      if not RowHasObjectType(Row, ['DeviceType', 'Device']) then
-        Continue;
-      ObjectType := Row.GetValue<string>('ObjectType');
-      for Pair in Row do
+      ObjectType := ObjectTypes[ObjectIndex];
+      ActualRow := nil;
+      for RowIndex := 0 to ARows.Count - 1 do
       begin
-        FieldName := Pair.JsonString.Value;
-        if MatchText(FieldName, ['ObjectType', 'ObjectIndex', 'PointIndex',
-          'SpillageIndex', 'CoefTableType', 'CoefItemIndex']) then
-          Continue;
+        Row := ARows.Items[RowIndex] as TJSONObject;
+        if not IsSchemaRow(Row) and RowHasObjectType(Row, [ObjectType]) then
+        begin ActualRow := Row; Break; end;
+      end;
+      SchemaColumns := JsonRowsToColumns(ARows, [ObjectType], True);
+      ActualColumns := JsonRowsToColumns(ARows, [ObjectType], False);
+      Columns := MergeReportColumns(SchemaColumns, ActualColumns);
+      for Column in Columns do
+      begin
+        FieldName := Column.TechnicalName;
+        if MatchText(FieldName, ServiceFields) then Continue;
         TechnicalName := BuildReportDefinedName(ObjectType + '_' + FieldName);
         ValueCell := 'C' + OutputRow.ToString;
         Builder.Append(Format('<row r="%d">', [OutputRow]));
@@ -1170,15 +1426,16 @@ begin
           [OutputRow, XmlEscape(TechnicalName)]));
         Builder.Append(Format('<c r="B%d" t="inlineStr"><is><t>%s</t></is></c>',
           [OutputRow, XmlEscape(GetReportFieldCaption(ObjectType, FieldName))]));
-        if Pair.JsonValue is TJSONNumber then
-          Builder.Append(Format('<c r="%s"><v>%s</v></c>',
-            [ValueCell, Pair.JsonValue.Value]))
-        else if Pair.JsonValue is TJSONBool then
+        Value := nil;
+        if ActualRow <> nil then Value := ActualRow.GetValue(FieldName);
+        if Value is TJSONNumber then
+          Builder.Append(Format('<c r="%s"><v>%s</v></c>', [ValueCell, Value.Value]))
+        else if Value is TJSONBool then
           Builder.Append(Format('<c r="%s" t="b"><v>%d</v></c>',
-            [ValueCell, Ord(TJSONBool(Pair.JsonValue).AsBoolean)]))
-        else if not (Pair.JsonValue is TJSONNull) then
+            [ValueCell, Ord(TJSONBool(Value).AsBoolean)]))
+        else if (Value <> nil) and not (Value is TJSONNull) then
           Builder.Append(Format('<c r="%s" t="inlineStr"><is><t>%s</t></is></c>',
-            [ValueCell, XmlEscape(JsonValueToText(Pair.JsonValue))]));
+            [ValueCell, XmlEscape(JsonValueToText(Value))]));
         Builder.Append(Format('<c r="D%d" t="inlineStr"><is><t>%s</t></is></c></row>',
           [OutputRow, XmlEscape(ObjectType)]));
         ADefinedNames.AddOrSetValue(TechnicalName,
@@ -1486,8 +1743,6 @@ begin
       'Некорректный корневой узел служебного листа %s', [ASheetName]);
 end;
 
-
-// Нормализует ссылку definedName для безопасного сравнения.
 procedure ValidateZipEntries(AZip: TZipFile);
 var
   Name: string;
@@ -1511,7 +1766,6 @@ begin
   finally
     Seen.Free;
   end;
-end;
 
 // Проверяет наличие ZIP entry по нормализованному пути.
 function ZipEntryExists(AZip: TZipFile; const AArchivePath: string): Boolean;
@@ -1654,7 +1908,7 @@ begin
          not SameText(Doc.DocumentElement.LocalName, 'worksheet') then
         raise EInvalidOpException.CreateFmt('Некорректный XML листа: %s',
           [ALocations[I].SheetName]);
-   end;
+    end;
   finally
     Zip.Free;
   end;
@@ -1875,6 +2129,7 @@ begin
     SheetXml[3] := BuildSeparatedWorksheetXml(Titles[3], '_CoefTables', Rows,
       ['CalibrCoefTable', 'CalibrCoefItem'], Names);
     SheetXml[4] := BuildMetaWorksheetXml(ARoot, Names);
+    RegisterPreparedSeparatedNames(Rows, Names);
     for I := 0 to 4 do
       ValidateSeparatedWorksheetXml(SheetXml[I], CReportTechnicalSheetNames[I]);
     for I := 0 to 4 do
@@ -1940,6 +2195,9 @@ begin
 
   Rows.AddElement(NewObjectRow('DeviceType', 1, 0, 0, 0, 0, ADeviceType, ADevice));
   Rows.AddElement(NewObjectRow('Device', 1, 0, 0, 0, 0, ADevice, ADevice));
+  if ActiveSession <> nil then
+    Rows.AddElement(NewObjectRow('Session', 1, 0, 0, 0, 0,
+      ActiveSession, ADevice));
 
   for PointIndex := 1 to MAX_DEVICE_POINTS do
   begin
@@ -1990,6 +2248,7 @@ begin
         CCoefTableTypes[TableIndex], ItemIndex, Item, ADevice));
     end;
   end;
+  EnsureTechnicalSheetSchema(Result);
   ApplyReportErrorPrecision(Rows, AMeterValueError);
 end;
 
@@ -2002,8 +2261,7 @@ var
   Missing: TArray<string>;
   PreparedLocations: TArray<TReportWorksheetLocation>;
   EmptyJson: TJSONObject;
-  EmptyDevice: TDevice;
-  EmptyDeviceType: TDeviceType;
+  EmptyRows: TJSONArray;
 begin
   if not FileExists(ASourceFileName) then
     raise EFileNotFoundException.CreateFmt('Шаблон не найден: %s', [ASourceFileName]);
@@ -2038,12 +2296,17 @@ begin
     TFile.Copy(ASourceFileName, Result, False);
     Exit;
   end;
-  EmptyDevice := TDevice.Create;
-  EmptyDeviceType := TDeviceType.Create;
+  EmptyJson := TJSONObject.Create;
   try
-    EmptyJson := BuildReportJson(EmptyDevice, EmptyDeviceType);
-    try
-      TemporaryFileName := BuildTemporaryReportFileName(Result);
+    EmptyJson.AddPair('SchemaVersion', TJSONNumber.Create(1));
+    EmptyJson.AddPair('GeneratedAt', FormatDateTime('yyyy-mm-dd hh:nn:ss', Now));
+    EmptyJson.AddPair('MaxDevicePoints', TJSONNumber.Create(MAX_DEVICE_POINTS));
+    EmptyJson.AddPair('MaxPointSpillages', TJSONNumber.Create(MAX_POINT_SPILLAGES));
+    EmptyJson.AddPair('MaxCoefItems', TJSONNumber.Create(MAX_COEF_ITEMS));
+    EmptyRows := TJSONArray.Create;
+    EmptyJson.AddPair('Rows', EmptyRows);
+    EnsureTechnicalSheetSchema(EmptyJson);
+    TemporaryFileName := BuildTemporaryReportFileName(Result);
       try
         PrepareNewTemplateFile(ASourceFileName, TemporaryFileName, EmptyJson);
         Zip := TZipFile.Create;
@@ -2060,12 +2323,8 @@ begin
       finally
         if FileExists(TemporaryFileName) then TFile.Delete(TemporaryFileName);
       end;
-    finally
-      EmptyJson.Free;
-    end;
   finally
-    EmptyDeviceType.Free;
-    EmptyDevice.Free;
+    EmptyJson.Free;
   end;
 end;
 
