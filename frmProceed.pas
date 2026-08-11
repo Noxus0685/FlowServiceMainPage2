@@ -5198,8 +5198,10 @@ end;
 procedure TFrameProceed.ButtonLoadReportTemplateClick(Sender: TObject);
 var
   Dialog: TOpenDialog;
-  ImportedFileName: string;
+  ImportedFileName, ImportStage: string;
+  Stopwatch: TStopwatch;
 begin
+  ImportStage := 'выбор файла';
   Dialog := TOpenDialog.Create(Self);
   try
     try
@@ -5208,17 +5210,23 @@ begin
       if not Dialog.Execute then
         Exit;
 
-      ImportedFileName := TReportTemplateService.ImportTemplate(Dialog.FileName);
+      Stopwatch := TStopwatch.StartNew;
+      ImportStage := 'подготовка XLSX';
+      ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateImportStarted',
+        'Запущена подготовка шаблона отчёта', Dialog.FileName);
+      ImportedFileName := TReportTemplateService.PrepareTemplate(Dialog.FileName);
       RefreshReportTemplates;
       ListBoxReportTemplates.ItemIndex := ListBoxReportTemplates.Items.IndexOf(
         TPath.GetFileName(ImportedFileName));
       ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateImport',
-        'Загружен шаблон отчёта', TPath.GetFileName(ImportedFileName));
+        'Загружен шаблон отчёта', Format('File=%s; DurationMs=%d',
+          [TPath.GetFileName(ImportedFileName), Stopwatch.ElapsedMilliseconds]));
     except
       on E: Exception do
       begin
         ProtocolManager.AddMessage(pcError, psForm, 'ReportTemplateImport',
-          'Не удалось загрузить шаблон отчёта', E.Message);
+          'Не удалось загрузить шаблон отчёта', Format('Stage=%s; Message=%s',
+            [ImportStage, E.Message]));
         MessageDlg(E.Message, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
       end;
     end;
@@ -5260,7 +5268,7 @@ begin
   FReportExportTask := nil;
   ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateExport',
     'Сформирован отчёт по шаблону', Format(
-      'Output=%s; DurationMs=%d; Thread=Worker; FullExtract=True; FullRepack=True',
+      'Output=%s; DurationMs=%d; Thread=Worker',
       [AOutputFileName, ADurationMs]));
 end;
 
@@ -5332,7 +5340,7 @@ begin
   SnapshotMs := Stopwatch.ElapsedMilliseconds;
   Inc(FReportExportOperationId); OperationId := FReportExportOperationId;
   BeginReportExportUi;
-  ProtocolManager.AddMessage(pcProc, psForm, 'ReportTemplateExportStarted',
+  ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateExportStarted',
     'Запущена фоновая выгрузка отчёта', Format(
       'Template=%s; Output=%s; SnapshotMs=%d; SourceSize=%d',
       [TemplateFileName, OutputFileName, SnapshotMs,
