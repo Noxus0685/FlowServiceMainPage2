@@ -163,7 +163,7 @@ type
     awtReadRegister,
     // Автоматический выбор эталонных каналов для текущего расхода.
     awtSelectEtalons,
-
+    awtFindHydraulicConfiguration,
     awtSetupHydraulicLine
   );
 
@@ -7923,32 +7923,85 @@ begin
 end;
 
 { Проверяет задание, создаёт новый OperationID и переводит линию в поиск. }
-function TWorkTable.BeginHydraulicConfigurationSearch(const APointUUID: string;
-  const APointIndex: Integer; const ATargetFlow: Double): Int64;
-var PointUUID: string;
+function TWorkTable.BeginHydraulicConfigurationSearch(
+  const APointUUID: string;
+  const APointIndex: Integer;
+  const ATargetFlow: Double
+): Int64;
+var
+  PointUUID: string;
 begin
   Result := 0;
   PointUUID := Trim(APointUUID);
-  if (PointUUID = '') or (APointIndex < 0) or (ATargetFlow <= 0) or
-    IsNan(ATargetFlow) or IsInfinite(ATargetFlow) then
+
+  if (PointUUID = '') or
+     (APointIndex < 0) or
+     (ATargetFlow <= 0) or
+     IsNan(ATargetFlow) or
+     IsInfinite(ATargetFlow) then
   begin
-    if ProtocolManager <> nil then ProtocolManager.AddMessage(pcError, psWorkTable,
-      'BeginHydraulicConfigurationSearch', 'Некорректные параметры поиска гидравлической конфигурации',
-      Format('PointUUID=%s; PointIndex=%d; TargetFlow=%.6f', [PointUUID, APointIndex, ATargetFlow]));
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(
+        pcError,
+        psWorkTable,
+        'BeginHydraulicConfigurationSearch',
+        'Некорректные параметры поиска гидравлической конфигурации',
+        Format(
+          'PointUUID=%s; PointIndex=%d; TargetFlow=%.6f',
+          [
+            PointUUID,
+            APointIndex,
+            ATargetFlow
+          ]
+        )
+      );
+
     Exit;
   end;
+
   TMonitor.Enter(FHydraulicStateLock);
   try
-    if FHydraulicOperationID = High(Int64) then FHydraulicOperationID := 1
-    else begin Inc(FHydraulicOperationID); if FHydraulicOperationID <= 0 then FHydraulicOperationID := 1; end;
+    if FHydraulicOperationID = High(Int64) then
+      FHydraulicOperationID := 1
+    else
+    begin
+      Inc(FHydraulicOperationID);
+
+      if FHydraulicOperationID <= 0 then
+        FHydraulicOperationID := 1;
+    end;
+
     ClearHydraulicStateLocked;
+
     FHydraulicPointUUID := PointUUID;
     FHydraulicPointIndex := APointIndex;
     FHydraulicTargetFlow := ATargetFlow;
     FHydraulicLineState := hlsSelecting;
+
     Result := FHydraulicOperationID;
-  finally TMonitor.Exit(FHydraulicStateLock); end;
+  finally
+    TMonitor.Exit(FHydraulicStateLock);
+  end;
+
+  { Сначала публикуем новое состояние. Обработчик действия после запуска
+    сможет получить полностью сформированный снимок операции. }
   NotifyHydraulicStateChanged;
+
+  { Запускаем обработчик асинхронного поиска только после регистрации
+    OperationID и перевода рабочего стола в hlsSelecting. }
+  FireAction(
+  awtFindHydraulicConfiguration,
+  'FindHydraulicConfiguration',
+  Format(
+    'OperationID=%d; PointUUID=%s; PointIndex=%d; TargetFlow=%.6f',
+    [
+      Result,
+      PointUUID,
+      APointIndex,
+      ATargetFlow
+    ]
+  )
+);
 end;
 
 { Проверяет актуальность и диапазон результата поиска перед его сохранением. }
@@ -8066,21 +8119,68 @@ end;
 
 { Инвалидирует callbacks активной операции и сохраняет причину отмены. }
 procedure TWorkTable.CancelHydraulicOperation(const AReason: string);
-var Reason: string; StateChanged: Boolean;
+var
+  Reason: string;
+  StateChanged: Boolean;
 begin
-  Reason := Trim(AReason); if Reason = '' then Reason := 'Гидравлическая операция отменена'; StateChanged := False;
+  Reason := Trim(AReason);
+  if Reason = '' then
+    Reason := 'Гидравлическая операция отменена';
+
+  StateChanged := False;
+
   TMonitor.Enter(FHydraulicStateLock);
   try
-    if not (FHydraulicLineState in [hlsSelecting, hlsSelected, hlsSettingUp]) then Exit;
-    if FHydraulicOperationID = High(Int64) then FHydraulicOperationID := 1 else begin Inc(FHydraulicOperationID); if FHydraulicOperationID <= 0 then FHydraulicOperationID := 1; end;
-    FHydraulicConfiguration := Default(RWorkTableHydraulicConfiguration);
-    FHydraulicConfiguration.ChartIndex := -1; FHydraulicConfiguration.RangeIndex := -1;
-    FHydraulicConfiguration.Range.IsValid := False; FHydraulicConfiguration.Range.Number := -1;
-    FHydraulicRange := Default(RWorkTableHydraulicRange); FHydraulicRange.IsValid := False; FHydraulicRange.Number := -1;
-    FHydraulicLineError := TErrorInfo.Empty(Integer(FState)); FHydraulicLineError.Msg := Reason; FHydraulicLineError.Time := Now;
-    FHydraulicLineState := hlsNone; StateChanged := True;
-  finally TMonitor.Exit(FHydraulicStateLock); end;
-  if StateChanged then NotifyHydraulicStateChanged;
+    { Отмена имеет смысл только пока выполняется поиск,
+      конфигурация выбрана либо устанавливается линия. }
+    if not (FHydraulicLineState in [
+      hlsSelecting,
+      hlsSelected,
+      hlsSettingUp
+    ]) then
+      Exit;
+
+    { Инвалидируем текущую операцию.
+      Все callbacks со старым OperationID будут отклонены. }
+    if FHydraulicOperationID = High(Int64) then
+      FHydraulicOperationID := 1
+    else
+    begin
+      Inc(FHydraulicOperationID);
+
+      if FHydraulicOperationID <= 0 then
+        FHydraulicOperationID := 1;
+    end;
+
+    { Найденная конфигурация больше не должна использоваться. }
+    FHydraulicConfiguration :=
+      Default(RWorkTableHydraulicConfiguration);
+
+    FHydraulicConfiguration.ChartIndex := -1;
+    FHydraulicConfiguration.RangeIndex := -1;
+    FHydraulicConfiguration.Range.IsValid := False;
+    FHydraulicConfiguration.Range.Number := -1;
+
+    FHydraulicRange := Default(RWorkTableHydraulicRange);
+    FHydraulicRange.IsValid := False;
+    FHydraulicRange.Number := -1;
+
+    { Причину сохраняем для диагностики.
+      Это не ошибка поиска или установки, поэтому состояние hlsFailed
+      не устанавливаем. }
+    FHydraulicLineError := TErrorInfo.Empty(Integer(FState));
+    FHydraulicLineError.Msg := Reason;
+    FHydraulicLineError.Time := Now;
+
+    FHydraulicLineState := hlsNone;
+    StateChanged := True;
+  finally
+    TMonitor.Exit(FHydraulicStateLock);
+  end;
+
+  { Уведомление публикуется только после освобождения блокировки. }
+  if StateChanged then
+    NotifyHydraulicStateChanged;
 end;
 
 { Инвалидирует callbacks и полностью очищает гидравлическое состояние. }

@@ -387,6 +387,10 @@ type
     FRequestStopCalled: Boolean;
     FFinalized: Boolean;
 
+    { Идентификатор гидравлической операции, запущенной текущим запуском
+  измерения для текущей точки. }
+    FHydraulicOperationID: Int64;
+
     procedure ResetRuntimeContext;
     procedure ResetPointSelectionContext;
     procedure FinalizeMeasurementRun(AResult: TMeasurementRunResult; AReason: TMeasurementRunDoneReason);
@@ -515,6 +519,9 @@ type
     function CheckFlowStable(out StableInfo: RStableInfo): Boolean;
     procedure ContinueAfterPointError(const AStatus: EMeasurementPointStatus; AEvent: EMeasurementEvent; const AError: TErrorInfo);
     function IsTerminated: Boolean;
+    function HydraulicSelection(APoint: TDevicePoint;
+      out ACompleted: Boolean; out AError: TErrorInfo): Boolean;
+    procedure CancelHydraulicOperation(const AReason: string);
   public
     constructor Create(AWorkTable: TWorkTable);
     destructor Destroy; override;
@@ -1562,21 +1569,66 @@ end;
 
 procedure TMeasurementRun.EnterSelectEtalon;
 var
+  Point: TDevicePoint;
   Error: TErrorInfo;
 begin
+  Point := GetCurrentPoint;
+
   SetCurrentPointStatus(mptsSelectEtalon);
+
   if IsStopRequested then
     Exit;
-  if SelectEtalons(GetCurrentPoint, Error) then
+
+  { Синхронный предварительный выбор эталонных каналов.
+    Метод изменяет состояние рабочего стола. }
+  if not SelectEtalons(Point, Error) then
   begin
-    FireEvent(meEtalonSelected);
-    SetStage(msSetupPoint);
-  end
-  else
-  begin
-    ContinueAfterPointError(mptsSetupError, meEtalonAbsent, Error);
+    ContinueAfterPointError(
+      mptsSetupError,
+      meEtalonAbsent,
+      Error
+    );
+    Exit;
   end;
+
+  if IsStopRequested then
+    Exit;
+
+ { Второй этап: регистрация и запуск асинхронного поиска
+    гидравлической конфигурации. }
+  FHydraulicOperationID :=
+    FWorkTable.BeginHydraulicConfigurationSearch(
+      Point.UUID,
+      FCurrentPointIndex,
+      Point.Q
+    );
+
+  if FHydraulicOperationID = 0 then
+  begin
+    ContinueAfterPointError(
+      mptsSetupError,
+      meEtalonAbsent,
+      BuildError(
+        1104,
+        Format(
+          'Не удалось запустить поиск гидравлической конфигурации: ' +
+          'PointUUID=%s; PointIndex=%d; TargetFlow=%.6f',
+          [
+            Point.UUID,
+            FCurrentPointIndex,
+            Point.Q
+          ]
+        )
+      )
+    );
+    Exit;
+  end;
+
 end;
+
+
+
+
 
 procedure TMeasurementRun.EnterSetupPoint;
 var
@@ -4627,6 +4679,11 @@ begin
     FCriticalSection.Release;
   end;
 
+  if not Duplicate then
+  CancelHydraulicOperation(
+    'Остановка измерительного запуска пользователем'
+    );
+
   if Duplicate then
   begin
     ProtocolManager.AddMessage(pcInfo, psMeasurement, 'RequestStop',
@@ -5476,9 +5533,291 @@ begin
   // Point selection is performed once in EnterSelectPoint.
 end;
 
-procedure TMeasurementRun.ProcessSelectEtalon;
+function TMeasurementRun.HydraulicSelection(
+  APoint: TDevicePoint;
+  out ACompleted: Boolean;
+  out AError: TErrorInfo
+): Boolean;
+var
+  HydraulicState: EHydraulicLineState;
+  HydraulicError: TErrorInfo;
+  OperationID: Int64;
+  PointUUID: string;
+  PointIndex: Integer;
+  TargetFlow: Double;
+  Configuration: RWorkTableHydraulicConfiguration;
+  Range: RWorkTableHydraulicRange;
+  FlowScale: Double;
+  FlowTolerance: Double;
 begin
-  // Etalon selection is performed once in EnterSelectEtalon.
+  Result := False;
+  ACompleted := False;
+  AError := TErrorInfo.Empty(Integer(msSelectEtalon));
+
+  if FWorkTable = nil then
+  begin
+    AError := BuildError(
+      1105,
+      'Рабочий стол не назначен при ожидании гидравлической конфигурации'
+    );
+    Exit;
+  end;
+
+  if APoint = nil then
+  begin
+    AError := BuildError(
+      1106,
+      'Текущая точка потеряна при ожидании гидравлической конфигурации'
+    );
+    Exit;
+  end;
+
+  if FHydraulicOperationID <= 0 then
+  begin
+    AError := BuildError(
+      1107,
+      'Не задан идентификатор ожидаемой гидравлической операции'
+    );
+    Exit;
+  end;
+
+  FWorkTable.GetHydraulicStateSnapshot(
+    HydraulicState,
+    HydraulicError,
+    OperationID,
+    PointUUID,
+    PointIndex,
+    TargetFlow,
+    Configuration,
+    Range
+  );
+
+  { Проверяем, что снимок относится именно к операции,
+    запущенной текущим TMeasurementRun. }
+  if OperationID <> FHydraulicOperationID then
+  begin
+    AError := BuildError(
+      1108,
+      Format(
+        'Изменился идентификатор гидравлической операции: ' +
+        'ExpectedOperationID=%d; ActualOperationID=%d',
+        [
+          FHydraulicOperationID,
+          OperationID
+        ]
+      )
+    );
+    Exit;
+  end;
+
+  { Дополнительно проверяем принадлежность операции текущей точке. }
+  if not SameText(Trim(PointUUID), Trim(APoint.UUID)) then
+  begin
+    AError := BuildError(
+      1109,
+      Format(
+        'Гидравлическая операция относится к другой точке: ' +
+        'ExpectedPointUUID=%s; ActualPointUUID=%s',
+        [
+          APoint.UUID,
+          PointUUID
+        ]
+      )
+    );
+    Exit;
+  end;
+
+  if PointIndex <> FCurrentPointIndex then
+  begin
+    AError := BuildError(
+      1110,
+      Format(
+        'Изменился индекс точки гидравлической операции: ' +
+        'ExpectedPointIndex=%d; ActualPointIndex=%d',
+        [
+          FCurrentPointIndex,
+          PointIndex
+        ]
+      )
+    );
+    Exit;
+  end;
+
+  { Расход сравниваем с относительным допуском, поскольку это Double. }
+  FlowScale := Max(
+    Max(Abs(TargetFlow), Abs(APoint.Q)),
+    1.0
+  );
+  FlowTolerance := FlowScale * 1E-9;
+
+  if not SameValue(TargetFlow, APoint.Q, FlowTolerance) then
+  begin
+    AError := BuildError(
+      1111,
+      Format(
+        'Гидравлическая операция запущена для другого расхода: ' +
+        'ExpectedFlow=%.6f; ActualFlow=%.6f',
+        [
+          APoint.Q,
+          TargetFlow
+        ]
+      )
+    );
+    Exit;
+  end;
+
+  case HydraulicState of
+    hlsSelecting:
+      begin
+        { Асинхронный поиск продолжается. }
+        Result := True;
+        ACompleted := False;
+      end;
+
+    hlsSelected:
+      begin
+        { Защита от ошибочного перехода в hlsSelected
+          с незаполненной конфигурацией. }
+        if (Configuration.ChartIndex < 0) or
+           (Configuration.RangeIndex < 0) or
+           not Configuration.Range.IsValid or
+           not Range.IsValid then
+        begin
+          AError := BuildError(
+            1112,
+            Format(
+              'Гидравлическая конфигурация выбрана, но содержит ' +
+              'некорректные данные: ChartIndex=%d; RangeIndex=%d; ' +
+              'ConfigurationRangeValid=%s; RangeValid=%s',
+              [
+                Configuration.ChartIndex,
+                Configuration.RangeIndex,
+                BoolToStr(Configuration.Range.IsValid, True),
+                BoolToStr(Range.IsValid, True)
+              ]
+            )
+          );
+          Exit;
+        end;
+
+        Result := True;
+        ACompleted := True;
+      end;
+
+    hlsFailed:
+      begin
+        AError := HydraulicError;
+
+        if AError.Code = 0 then
+          AError.Code := 1113;
+
+        if Trim(AError.Msg) = '' then
+          AError.Msg := 'Не удалось выбрать гидравлическую конфигурацию';
+
+        if AError.Time = 0 then
+          AError.Time := Now;
+
+        AError.Stage := Integer(msSelectEtalon);
+      end;
+
+    hlsNone:
+      begin
+        AError := BuildError(
+          1114,
+          'Поиск гидравлической конфигурации был сброшен или отменён'
+        );
+      end;
+
+    hlsSettingUp,
+    hlsConfigured:
+      begin
+        AError := BuildError(
+          1115,
+          Format(
+            'Недопустимое состояние гидравлической линии на этапе выбора: %s',
+            [
+              TWorkTable.HydraulicLineStateToString(HydraulicState)
+            ]
+          )
+        );
+      end;
+  else
+    AError := BuildError(
+      1116,
+      Format(
+        'Неизвестное состояние гидравлической линии: %d',
+        [
+          Ord(HydraulicState)
+        ]
+      )
+    );
+  end;
+end;
+
+procedure TMeasurementRun.CancelHydraulicOperation(
+  const AReason: string
+);
+begin
+  if FWorkTable <> nil then
+    FWorkTable.CancelHydraulicOperation(AReason);
+
+  { Больше не ожидаем результат отменённой операции. }
+  FHydraulicOperationID := 0;
+end;
+
+
+procedure TMeasurementRun.ProcessSelectEtalon;
+const
+  HYDRAULIC_SEARCH_TIMEOUT_MS = 30000;
+var
+  Point: TDevicePoint;
+  Error: TErrorInfo;
+  Completed: Boolean;
+begin
+  Point := GetCurrentPoint;
+
+  if (Point = nil) or (FWorkTable = nil) then
+  begin
+    ContinueAfterPointError(
+      mptsSetupError,
+      meEtalonAbsent,
+      BuildError(1100,
+        'Потерян контекст выбора гидравлической конфигурации')
+    );
+    Exit;
+  end;
+
+  if not HydraulicSelection(Point, Completed, Error) then
+  begin
+    ContinueAfterPointError(
+      mptsSetupError,
+      meEtalonAbsent,
+      Error
+    );
+    Exit;
+  end;
+
+  if Completed then
+  begin
+    FireEvent(meEtalonSelected);
+    SetStage(msSetupPoint);
+    Exit;
+  end;
+
+  if TMeterValue.GetMonotonicTimeMs - FWaitStartedTick >=
+     HYDRAULIC_SEARCH_TIMEOUT_MS then
+  begin
+    CancelHydraulicOperation(
+      'Тайм-аут поиска гидравлической конфигурации'
+    );
+
+    ContinueAfterPointError(
+      mptsSetupError,
+      meEtalonAbsent,
+      BuildError(1101,
+        'Превышено время поиска гидравлической конфигурации')
+    );
+  end;
 end;
 
 procedure TMeasurementRun.ProcessSetupPoint;

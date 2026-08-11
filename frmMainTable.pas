@@ -1950,15 +1950,26 @@ begin
           begin
 
          end;
+    awtFindHydraulicConfiguration:
 
+         begin
+         if Assigned(ProtocolManager) then
+          ProtocolManager.AddMessage(
+            pcProc,
+            psForm,
+            'FindHydraulicConfiguration',
+            'Подбор гидравлической схемы',
+            AWorkTable.Name
+          );
+         end;
     awtSelectEtalons:
       begin
         // Доменное действие уже выполнено в TWorkTable.SelectEtalons.
         // Обработчик только пишет протокол: он не меняет Enabled и не запускает измерение.
         if Assigned(ProtocolManager) then
           ProtocolManager.AddMessage(
-            pcAction,
-            psWorkTable,
+            pcProc,
+            psForm,
             'SelectEtalons',
             'Выполнен выбор эталонов рабочего стола',
             AWorkTable.Name
