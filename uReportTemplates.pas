@@ -1,4 +1,4 @@
-unit uReportTemplates;
+﻿unit uReportTemplates;
 
 interface
 
@@ -1486,104 +1486,6 @@ begin
       'Некорректный корневой узел служебного листа %s', [ASheetName]);
 end;
 
-// Возвращает буквенную часть столбца из ссылки Excel вида K2 или $K$2.
-function ExtractExcelColumnName(const ACellReference: string): string;
-var
-  CleanReference: string;
-  I, DigitStart: Integer;
-begin
-  Result := '';
-  CleanReference := StringReplace(Trim(ACellReference), '$', '', [rfReplaceAll]);
-  I := 1;
-  while (I <= Length(CleanReference)) and
-        CharInSet(UpCase(CleanReference[I]), ['A'..'Z']) do
-  begin
-    Result := Result + UpCase(CleanReference[I]);
-    Inc(I);
-  end;
-  DigitStart := I;
-  while (I <= Length(CleanReference)) and
-        CharInSet(CleanReference[I], ['0'..'9']) do Inc(I);
-  if (Result = '') or (DigitStart > Length(CleanReference)) or
-     (I <= Length(CleanReference)) then Result := '';
-end;
-
-function ExcelColumnIndex(const AColumnName: string): Integer;
-var
-  I: Integer;
-begin
-  Result := -1;
-  if AColumnName = '' then Exit;
-  Result := 0;
-  for I := 1 to Length(AColumnName) do
-  begin
-    if not CharInSet(UpCase(AColumnName[I]), ['A'..'Z']) then Exit(-1);
-    Result := Result * 26 + Ord(UpCase(AColumnName[I])) - Ord('A') + 1;
-  end;
-  Dec(Result);
-end;
-
-function GetWorksheetCellText(const ACell: IXMLNode): string;
-var InlineNode, TextNode: IXMLNode;
-begin
-  Result := '';
-  if ACell = nil then Exit;
-  InlineNode := FindDirectChildNode(ACell, 'is');
-  if InlineNode <> nil then
-  begin
-    TextNode := FindDirectChildNode(InlineNode, 't');
-    if TextNode <> nil then Exit(TextNode.Text);
-  end;
-  TextNode := FindDirectChildNode(ACell, 'v');
-  if TextNode <> nil then Result := TextNode.Text;
-end;
-
-// Читает строку заголовков _DevicePoints и определяет позиции Q и PointError.
-function GetDevicePointsHeaderInfo(
-  const ADevicePointsDocument: IXMLDocument): TDevicePointsHeaderInfo;
-var
-  Worksheet, SheetData, RowNode, Cell: IXMLNode;
-  I, ColumnIndex: Integer;
-  HeaderText, ColumnName: string;
-begin
-  Result := Default(TDevicePointsHeaderInfo);
-  Result.QIndex := -1;
-  Result.PointErrorIndex := -1;
-  if ADevicePointsDocument = nil then Exit;
-  Worksheet := ADevicePointsDocument.DocumentElement;
-  if (Worksheet = nil) or not SameText(Worksheet.LocalName, 'worksheet') then Exit;
-  SheetData := FindDirectChildNode(Worksheet, 'sheetData');
-  if SheetData = nil then Exit;
-  RowNode := nil;
-  for I := 0 to SheetData.ChildNodes.Count - 1 do
-    if SameText(SheetData.ChildNodes[I].LocalName, 'row') and
-       SameText(VarToStr(SheetData.ChildNodes[I].Attributes['r']), '2') then
-    begin RowNode := SheetData.ChildNodes[I]; Break; end;
-  if RowNode = nil then Exit;
-  Result.HeaderRowFound := True;
-  for I := 0 to RowNode.ChildNodes.Count - 1 do
-  begin
-    Cell := RowNode.ChildNodes[I];
-    if not SameText(Cell.LocalName, 'c') then Continue;
-    ColumnName := ExtractExcelColumnName(VarToStr(Cell.Attributes['r']));
-    HeaderText := Trim(GetWorksheetCellText(Cell));
-    ColumnIndex := ExcelColumnIndex(ColumnName);
-    if SameText(HeaderText, 'Q') then
-    begin
-      if Result.QIndex >= 0 then Result.QIndex := -2
-      else begin Result.QIndex := ColumnIndex; Result.QColumn := ColumnName; end;
-    end;
-    if SameText(HeaderText, 'PointError') then
-    begin
-      Inc(Result.PointErrorCount);
-      if Result.PointErrorCount = 1 then
-      begin
-        Result.PointErrorIndex := ColumnIndex;
-        Result.PointErrorColumn := ColumnName;
-      end;
-    end;
-  end;
-end;
 
 // Нормализует ссылку definedName для безопасного сравнения.
 procedure ValidateZipEntries(AZip: TZipFile);
@@ -1609,6 +1511,7 @@ begin
   finally
     Seen.Free;
   end;
+end;
 
 // Проверяет наличие ZIP entry по нормализованному пути.
 function ZipEntryExists(AZip: TZipFile; const AArchivePath: string): Boolean;
