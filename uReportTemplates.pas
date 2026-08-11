@@ -8,6 +8,7 @@ uses
   System.SysUtils,
   Xml.XMLIntf,
   uClasses,
+  uBaseProcedures,
   uDeviceClass;
 
 // Возвращает перечень отсутствующих или не связанных служебных листов FlowService.
