@@ -1752,8 +1752,9 @@ begin
         raise EInvalidOpException.CreateFmt('Некорректный XML листа: %s',
           [ALocations[I].SheetName]);
     end;
-  finally
-    Zip.Free;
+    if Result[I].ArchivePath = '' then
+      raise EInvalidOpException.CreateFmt(
+        'Шаблон не содержит обязательный технический лист: %s', [Result[I].SheetName]);
   end;
 end;
 
