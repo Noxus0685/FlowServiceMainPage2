@@ -10,7 +10,7 @@ def implementation(name, next_name):
 
 
 def test_common_repair_precedes_parser_on_import_and_export():
-    assert "APP_VERSION = '1.0.111'" in VERSION
+    assert "APP_VERSION = '1.0.112'" in VERSION
     loader = implementation("function LoadAndValidateReportWorkbookXml", "function WorkbookTargetToArchivePath")
     assert loader.index("RepairLegacyReportWorkbookXml") < loader.index("ValidateWorkbookXmlText") < loader.index("ValidateWorkbookXml(Result")
     assert "LoadAndValidateReportWorkbookXml(WorkbookFile,\n      'чтение исходного шаблона при выгрузке'" in SRC
@@ -31,7 +31,7 @@ def test_structural_insert_and_defined_names_are_validated():
     ensure = implementation("function EnsureAutomaticCalculation", "function WorkbookTemplateReloadHint")
     assert ".Replace('<extLst'" not in ensure
     names = implementation("procedure UpdateReportDefinedNames", "procedure ValidateSeparatedWorksheetXml")
-    assert "ValidateDefinedNameXmlFragment" in names
+    assert "ValidateDefinedNameValues" in names
     assert "ValidateWorkbookXmlText" in names and "ValidateWorkbookXml" in names
     assert ".Replace('<calcPr'" not in names
 

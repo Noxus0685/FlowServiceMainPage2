@@ -8,7 +8,7 @@ VERSION = (ROOT / "uAppVersion.pas").read_text(encoding="utf-8-sig")
 
 
 def test_version_and_shared_selection():
-    assert "APP_VERSION = '1.0.111'" in VERSION
+    assert "APP_VERSION = '1.0.112'" in VERSION
     assert "function TryGetDevicePointDisplayError" in DEVICE
     assert "function TrySelectDevicePointDisplaySpillage" in DEVICE
     merged = PROCEED.split("function TFrameProceed.FormatMergedSummarySeriesResults", 1)[1].split("procedure TFrameProceed.BuildSummaryColumnsWithoutMerge", 1)[0]

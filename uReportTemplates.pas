@@ -1270,105 +1270,266 @@ begin
       Exit(True);
 end;
 
-// Удаляет только устаревшие именованные диапазоны, созданные отчётной подсистемой.
-procedure RemoveObsoleteReportDefinedNames(var AWorkbookXml: string;
-  ADefinedNames: TDictionary<string, string>);
+// Возвращает непосредственный дочерний XML-узел с указанным LocalName.
+function FindDirectChildNode(const AParent: IXMLNode;
+  const ALocalName: string): IXMLNode;
 var
-  Match: TMatch;
-  Name: string;
-  Matches: TMatchCollection;
   I: Integer;
 begin
-  Matches := TRegEx.Matches(AWorkbookXml,
-    '<definedName\b[^>]*\bname="([^"]+)"[^>]*>.*?</definedName>',
-    [roIgnoreCase, roSingleLine]);
-  for I := Matches.Count - 1 downto 0 do
-  begin
-    Match := Matches[I];
-    Name := Match.Groups[1].Value;
-    if IsReportDefinedName(Name) and not ADefinedNames.ContainsKey(Name) then
-      Delete(AWorkbookXml, Match.Index + 1, Match.Length);
-  end;
+  Result := nil;
+  if AParent = nil then Exit;
+  for I := 0 to AParent.ChildNodes.Count - 1 do
+    if SameText(AParent.ChildNodes[I].LocalName, ALocalName) then
+      Exit(AParent.ChildNodes[I]);
 end;
 
-// Проверяет отдельный XML-фрагмент definedName перед добавлением в workbook.xml.
-procedure ValidateDefinedNameXmlFragment(const AName, AReference: string);
+// Создаёт контейнер definedNames в допустимой позиции структуры workbook.
+function EnsureDefinedNamesNode(const AWorkbookRoot: IXMLNode): IXMLNode;
+const
+  CFollowingNodes: array[0..4] of string = ('externalReferences',
+    'pivotCaches', 'calcPr', 'oleSize', 'extLst');
 var
-  Document: IXMLDocument;
-  Container: string;
+  I, ExistingCount: Integer;
+  Child, BeforeNode, NewNode: IXMLNode;
+begin
+  if AWorkbookRoot = nil then
+    raise EArgumentNilException.Create('Не задан корневой узел workbook');
+  if FindDirectChildNode(AWorkbookRoot, 'sheets') = nil then
+    raise EInvalidOpException.Create(
+      'Нельзя создать definedNames: в workbook отсутствует sheets');
+  Result := nil;
+  ExistingCount := 0;
+  BeforeNode := nil;
+  for I := 0 to AWorkbookRoot.ChildNodes.Count - 1 do
+  begin
+    Child := AWorkbookRoot.ChildNodes[I];
+    if SameText(Child.LocalName, 'definedNames') then
+    begin
+      Inc(ExistingCount);
+      Result := Child;
+    end
+    else if (BeforeNode = nil) and MatchText(Child.LocalName,
+      CFollowingNodes) then
+      BeforeNode := Child;
+  end;
+  if ExistingCount > 1 then
+    raise EInvalidOpException.CreateFmt(
+      'В workbook найдено несколько контейнеров definedNames: %d',
+      [ExistingCount]);
+  if Result <> nil then Exit;
+
+  NewNode := AWorkbookRoot.OwnerDocument.CreateNode('definedNames', ntElement,
+    AWorkbookRoot.NamespaceURI);
+  if BeforeNode <> nil then
+    AWorkbookRoot.DOMNode.insertBefore(NewNode.DOMNode, BeforeNode.DOMNode)
+  else
+    AWorkbookRoot.DOMNode.appendChild(NewNode.DOMNode);
+  Result := FindDirectChildNode(AWorkbookRoot, 'definedNames');
+  if Result = nil then
+    raise EInvalidOpException.Create(
+      'Не удалось создать контейнер definedNames через XML DOM');
+end;
+
+// Находит именованный диапазон по атрибуту name без учёта регистра.
+function FindDefinedNameNode(const ADefinedNamesNode: IXMLNode;
+  const AName: string): IXMLNode;
+var
+  I, FoundCount: Integer;
+  Child: IXMLNode;
+  NameValue: string;
+begin
+  Result := nil;
+  FoundCount := 0;
+  if ADefinedNamesNode = nil then Exit;
+  for I := 0 to ADefinedNamesNode.ChildNodes.Count - 1 do
+  begin
+    Child := ADefinedNamesNode.ChildNodes[I];
+    if not SameText(Child.LocalName, 'definedName') then Continue;
+    NameValue := VarToStr(Child.Attributes['name']);
+    if SameText(NameValue, AName) then
+    begin
+      Inc(FoundCount);
+      Result := Child;
+    end;
+  end;
+  if FoundCount > 1 then
+    raise EInvalidOpException.CreateFmt(
+      'Найдено несколько definedName с именем %s: %d', [AName, FoundCount]);
+end;
+
+// Проверяет наличие имени в наборе FlowService без учёта регистра.
+function ContainsDefinedName(ADefinedNames: TDictionary<string, string>;
+  const AName: string): Boolean;
+var
+  Pair: TPair<string, string>;
+begin
+  Result := False;
+  if ADefinedNames = nil then Exit;
+  for Pair in ADefinedNames do
+    if SameText(Pair.Key, AName) then Exit(True);
+end;
+
+// Проверяет допустимость имени и ссылки именованного диапазона до записи в DOM.
+procedure ValidateDefinedNameValues(const AName, AReference: string);
+var
+  I: Integer;
 begin
   if (AName = '') or (AName <> BuildReportDefinedName(AName)) or
-     CharInSet(AName[1], ['0'..'9', '.']) or
-     (AName.IndexOfAny([' ', ':', '"', '<', '>', '&', '/']) >= 0) then
+     CharInSet(AName[1], ['0'..'9', '.']) then
     raise EArgumentException.CreateFmt(
       'Недопустимое имя диапазона FlowService: %s', [AName]);
+  for I := 1 to Length(AName) do
+    if Ord(AName[I]) <= 32 then
+      raise EArgumentException.CreateFmt(
+        'Имя диапазона содержит пробельный или управляющий символ: %s',
+        [AName]);
   if AReference = '' then
     raise EArgumentException.CreateFmt('Пустая ссылка диапазона %s', [AName]);
-  Container := '<definedNames><definedName name="' + XmlEscape(AName) +
-    '">' + XmlEscape(AReference) + '</definedName></definedNames>';
-  try
-    Document := LoadXMLData(Container);
-    Document.Active := True;
-  except
-    on E: EDOMParseError do
-      raise EInvalidOpException.CreateFmt(
-        'Некорректный XML-фрагмент definedName %s: %s', [AName, E.Message]);
+  for I := 1 to Length(AReference) do
+    if (AReference[I] = #0) or
+       ((Ord(AReference[I]) < 32) and
+        not CharInSet(AReference[I], [#9, #10, #13])) then
+      raise EArgumentException.CreateFmt(
+        'Ссылка диапазона %s содержит недопустимый XML-символ', [AName]);
+  if not TRegEx.IsMatch(AReference,
+    '^''[^'']+''!\$[A-Z]+\$[1-9][0-9]*$') then
+    raise EArgumentException.CreateFmt(
+      'Недопустимый формат ссылки диапазона %s: %s', [AName, AReference]);
+end;
+
+// Удаляет через XML DOM только устаревшие именованные диапазоны FlowService.
+procedure RemoveObsoleteReportDefinedNames(
+  const ADefinedNamesNode: IXMLNode;
+  ADefinedNames: TDictionary<string, string>);
+var
+  I: Integer;
+  Child: IXMLNode;
+  Name: string;
+begin
+  if ADefinedNamesNode = nil then Exit;
+  for I := ADefinedNamesNode.ChildNodes.Count - 1 downto 0 do
+  begin
+    Child := ADefinedNamesNode.ChildNodes[I];
+    if not SameText(Child.LocalName, 'definedName') then Continue;
+    Name := VarToStr(Child.Attributes['name']);
+    if IsReportDefinedName(Name) and
+       not ContainsDefinedName(ADefinedNames, Name) then
+      ADefinedNamesNode.DOMNode.removeChild(Child.DOMNode);
   end;
 end;
 
-// Добавляет или обновляет именованные диапазоны служебных данных.
+// Проверяет отсутствие повторяющихся именованных диапазонов в workbook.
+procedure ValidateDefinedNameDuplicates(
+  const ADefinedNamesNode: IXMLNode);
+var
+  Counts: TDictionary<string, Integer>;
+  I, Count: Integer;
+  Child: IXMLNode;
+  Name, LocalSheetId: string;
+begin
+  if ADefinedNamesNode = nil then Exit;
+  Counts := TDictionary<string, Integer>.Create(
+    TStringComparer.OrdinalIgnoreCase);
+  try
+    for I := 0 to ADefinedNamesNode.ChildNodes.Count - 1 do
+    begin
+      Child := ADefinedNamesNode.ChildNodes[I];
+      if not SameText(Child.LocalName, 'definedName') then Continue;
+      Name := VarToStr(Child.Attributes['name']);
+      if Counts.TryGetValue(Name, Count) then
+      begin
+        LocalSheetId := VarToStr(Child.Attributes['localSheetId']);
+        raise EInvalidOpException.CreateFmt(
+          'Повтор definedName %s; Count=%d; localSheetId=%s; FlowService=%s',
+          [Name, Count + 1, LocalSheetId,
+           BoolToStr(IsReportDefinedName(Name), True)]);
+      end;
+      Counts.Add(Name, 1);
+    end;
+  finally
+    Counts.Free;
+  end;
+end;
+
+function SerializeXmlDocumentUtf8(const ADocument: IXMLDocument): string;
+var
+  Stream: TMemoryStream;
+  Bytes: TBytes;
+  Offset: Integer;
+begin
+  if ADocument = nil then
+    raise EArgumentNilException.Create('Не задан XML-документ для сериализации');
+  ADocument.Encoding := 'UTF-8';
+  Stream := TMemoryStream.Create;
+  try
+    ADocument.SaveToStream(Stream);
+    if Stream.Size > MaxInt then
+      raise EInvalidOpException.Create('XML-документ слишком велик');
+    SetLength(Bytes, Integer(Stream.Size));
+    Stream.Position := 0;
+    if Length(Bytes) > 0 then
+      Stream.ReadBuffer(Bytes[0], Length(Bytes));
+  finally
+    Stream.Free;
+  end;
+  Offset := 0;
+  if (Length(Bytes) >= 3) and (Bytes[0] = $EF) and (Bytes[1] = $BB) and
+     (Bytes[2] = $BF) then
+    Offset := 3;
+  Result := TEncoding.UTF8.GetString(Bytes, Offset, Length(Bytes) - Offset);
+end;
+
+// Добавляет, обновляет и удаляет только именованные диапазоны FlowService через XML DOM.
 procedure UpdateReportDefinedNames(var AWorkbookXml: string;
   ADefinedNames: TDictionary<string, string>);
 var
+  Document: IXMLDocument;
+  WorkbookRoot, DefinedNamesNode, DefinedNameNode: IXMLNode;
   Pair: TPair<string, string>;
-  Match: TMatch;
-  Pattern, Node, Fragment: string;
+  SerializedXml: string;
 begin
-  RemoveObsoleteReportDefinedNames(AWorkbookXml, ADefinedNames);
-  ValidateWorkbookXmlText(AWorkbookXml,
-    'удаление устаревших FlowService definedName', False);
-  ValidateWorkbookXml(AWorkbookXml,
-    'удаление устаревших FlowService definedName');
+  if ADefinedNames = nil then
+    raise EArgumentNilException.Create('Не задан набор definedName FlowService');
+  ValidateWorkbookXmlText(AWorkbookXml, 'до обновления definedNames DOM', False);
+  ValidateWorkbookXml(AWorkbookXml, 'до обновления definedNames DOM');
+
+  Document := LoadXMLData(AWorkbookXml);
+  Document.Active := True;
+  Document.Encoding := 'UTF-8';
+  WorkbookRoot := Document.DocumentElement;
+  if (WorkbookRoot = nil) or not SameText(WorkbookRoot.LocalName, 'workbook') then
+    raise EInvalidOpException.Create('Некорректный корневой узел workbook');
+  DefinedNamesNode := EnsureDefinedNamesNode(WorkbookRoot);
+  RemoveObsoleteReportDefinedNames(DefinedNamesNode, ADefinedNames);
+
   for Pair in ADefinedNames do
   begin
-    ValidateDefinedNameXmlFragment(Pair.Key, Pair.Value);
-    Pattern := '<definedName\b([^>]*\bname="' +
-      TRegEx.Escape(Pair.Key) + '"[^>]*)>.*?</definedName>';
-    Match := TRegEx.Match(AWorkbookXml, Pattern,
-      [roIgnoreCase, roSingleLine]);
-    Node := Format('<definedName name="%s">%s</definedName>',
-      [XmlEscape(Pair.Key), XmlEscape(Pair.Value)]);
-    if Match.Success then
-    begin
-      if not SameText(Match.Value, Node) then
-      begin
-        Delete(AWorkbookXml, Match.Index + 1, Match.Length);
-        Insert(Node, AWorkbookXml, Match.Index + 1);
-      end;
-    end
-    else if AWorkbookXml.Contains('</definedNames>') then
-      AWorkbookXml := InsertBeforeClosingTag(AWorkbookXml,
-        '</definedNames>', Node)
-    else
-    begin
-      Fragment := '<definedNames>' + Node + '</definedNames>';
-      if AWorkbookXml.Contains('<calcPr') then
-        AWorkbookXml := InsertBeforeUniqueXmlNode(AWorkbookXml, '<calcPr',
-          Fragment, 'добавление definedNames')
-      else
-        AWorkbookXml := InsertBeforeClosingTag(AWorkbookXml,
-          '</workbook>', Fragment);
-    end;
-    try
-      ValidateWorkbookXmlText(AWorkbookXml,
-        'добавление definedName ' + Pair.Key, False);
-      ValidateWorkbookXml(AWorkbookXml, 'добавление definedName ' + Pair.Key);
-    except
-      on E: Exception do
-        raise EInvalidOpException.CreateFmt(
-          'Ошибка после добавления definedName %s: %s', [Pair.Key, E.Message]);
-    end;
+    ValidateDefinedNameValues(Pair.Key, Pair.Value);
+    DefinedNameNode := FindDefinedNameNode(DefinedNamesNode, Pair.Key);
+    if DefinedNameNode = nil then
+      DefinedNameNode := DefinedNamesNode.AddChild('definedName',
+        WorkbookRoot.NamespaceURI);
+    DefinedNameNode.Attributes['name'] := Pair.Key;
+    DefinedNameNode.Text := Pair.Value;
+    if not SameText(DefinedNameNode.LocalName, 'definedName') or
+       not SameText(VarToStr(DefinedNameNode.Attributes['name']), Pair.Key) or
+       (DefinedNameNode.Text <> Pair.Value) then
+      raise EInvalidOpException.CreateFmt(
+        'DOM не сохранил definedName %s внутри %s',
+        [Pair.Key, DefinedNamesNode.LocalName]);
   end;
+
+  ValidateDefinedNameDuplicates(DefinedNamesNode);
+  if ContainsDefinedName(ADefinedNames, 'ReportMeta_GeneratedAt') and
+     (FindDefinedNameNode(DefinedNamesNode,
+       'ReportMeta_GeneratedAt') = nil) then
+    raise EInvalidOpException.Create(
+      'DOM не содержит обязательный ReportMeta_GeneratedAt после обновления');
+  SerializedXml := SerializeXmlDocumentUtf8(Document);
+  ValidateWorkbookXmlText(SerializedXml,
+    'после обновления definedNames DOM', False);
+  ValidateWorkbookXml(SerializedXml, 'после обновления definedNames DOM');
+  AWorkbookXml := SerializedXml;
 end;
 
 // Проверяет XML сформированного отдельного служебного листа.
