@@ -5200,7 +5200,7 @@ begin
       if not Dialog.Execute then
         Exit;
 
-      ImportedFileName := TReportTemplateService.ImportTemplate(Dialog.FileName);
+      ImportedFileName := TReportTemplateService.PrepareTemplate(Dialog.FileName);
       RefreshReportTemplates;
       ListBoxReportTemplates.ItemIndex := ListBoxReportTemplates.Items.IndexOf(
         TPath.GetFileName(ImportedFileName));

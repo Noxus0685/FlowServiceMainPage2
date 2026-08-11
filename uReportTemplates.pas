@@ -58,8 +58,8 @@ type
   public
     // Возвращает общий каталог XLSX-шаблонов приложения и создаёт его при отсутствии.
     class function TemplatesPath: string; static;
-    // Сохраняет выбранный готовый XLSX-шаблон в каталог ReportTemplates без изменения его содержимого.
-    class function ImportTemplate(const ASourceFileName: string): string; static;
+    // Добавляет технические листы и именованные диапазоны в новый пользовательский XLSX-шаблон.
+    class function PrepareTemplate(const ASourceFileName: string): string; static;
     // Формирует динамический JSON из объектов прибора для последующего заполнения _Data.
     class function BuildReportJson(ADevice: TDevice;
       ADeviceType: TDeviceType; AMeterValueError: TMeterValue = nil):
@@ -87,12 +87,7 @@ uses
   System.Variants,
   Xml.XMLDoc,
   Xml.xmldom,
-  uOpenXmlXlsx,
-  uProtocols;
-
-var
-  GReportLogLock: TObject;
-
+  uOpenXmlXlsx;
 
 type
   PSpillageStopCriteria = ^TSpillageStopCriteria;
@@ -101,6 +96,8 @@ const
   CCoefTableTypes: array[0..4] of Integer = (10, 11, 12, 13, 14);
   CWorksheetRelation: string =
     'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet';
+  CWorksheetContentType: string =
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml';
   CReportTechnicalSheetNames: array[0..4] of string =
     ('_Data', '_DevicePoints', '_Spillages', '_CoefTables', '_Meta');
 
@@ -1612,7 +1609,6 @@ begin
   finally
     Seen.Free;
   end;
-end;
 
 // Проверяет наличие ZIP entry по нормализованному пути.
 function ZipEntryExists(AZip: TZipFile; const AArchivePath: string): Boolean;
@@ -1756,8 +1752,9 @@ begin
         raise EInvalidOpException.CreateFmt('Некорректный XML листа: %s',
           [ALocations[I].SheetName]);
     end;
-  finally
-    Zip.Free;
+    if Result[I].ArchivePath = '' then
+      raise EInvalidOpException.CreateFmt(
+        'Шаблон не содержит обязательный технический лист: %s', [Result[I].SheetName]);
   end;
 end;
 
@@ -1831,6 +1828,173 @@ begin
     ReplaceReportOutputFile(TempOutput, AOutputFileName);
   finally
     if FileExists(TempOutput) then TFile.Delete(TempOutput);
+  end;
+end;
+
+// Добавляет сформированные именованные диапазоны только при первичной подготовке книги.
+function AddPreparedDefinedNames(const AWorkbookXml: string;
+  const ADefinedNames: TDictionary<string, string>): string;
+var Doc: IXMLDocument; Root, NamesNode, NameNode: IXMLNode;
+  Pair: TPair<string, string>;
+begin
+  Doc := LoadXMLData(AWorkbookXml); Doc.Active := True;
+  Root := Doc.DocumentElement;
+  if (Root = nil) or not SameText(Root.LocalName, 'workbook') then
+    raise EInvalidOpException.Create('Некорректный xl/workbook.xml');
+  NamesNode := EnsureDefinedNamesNode(Root);
+  for Pair in ADefinedNames do
+  begin
+    ValidateDefinedNameValues(Pair.Key, Pair.Value);
+    if FindDefinedNameNode(NamesNode, Pair.Key) <> nil then
+      raise EInvalidOpException.CreateFmt(
+        'В исходном шаблоне уже существует definedName %s', [Pair.Key]);
+    NameNode := NamesNode.AddChild('definedName', NamesNode.NamespaceURI);
+    NameNode.Attributes['name'] := Pair.Key;
+    NameNode.Text := Pair.Value;
+  end;
+  ValidateDefinedNameDuplicates(NamesNode);
+  Result := SerializeXmlDocumentUtf8(Doc);
+end;
+
+procedure AddUtf8ZipEntry(AZip: TZipFile; const AName, AText: string);
+var Bytes: TBytes; Stream: TBytesStream;
+begin
+  Bytes := TEncoding.UTF8.GetBytes(AText);
+  Stream := TBytesStream.Create(Bytes);
+  try
+    AZip.Add(Stream, AName);
+  finally
+    Stream.Free;
+  end;
+end;
+
+procedure CopyOrReplaceZipEntries(const ASourceFileName, AOutputFileName,
+  AWorkbookXml, ARelsXml, AContentTypesXml: string;
+  const ASheetXml: TArray<string>);
+const
+  SheetPaths: array[0..4] of string =
+    ('xl/worksheets/flowServiceData.xml',
+     'xl/worksheets/flowServiceDevicePoints.xml',
+     'xl/worksheets/flowServiceSpillages.xml',
+     'xl/worksheets/flowServiceCoefTables.xml',
+     'xl/worksheets/flowServiceMeta.xml');
+var SourceZip, OutputZip: TZipFile; Name, Normalized: string;
+  Stream: TStream; Header: TZipHeader; I: Integer;
+begin
+  SourceZip := TZipFile.Create; OutputZip := TZipFile.Create;
+  try
+    SourceZip.Open(ASourceFileName, zmRead);
+    for I := Low(SheetPaths) to High(SheetPaths) do
+      if ZipEntryExists(SourceZip, SheetPaths[I]) then
+        raise EInvalidOpException.CreateFmt(
+          'Исходный XLSX уже содержит ZIP-entry технического листа: %s',
+          [SheetPaths[I]]);
+    OutputZip.Open(AOutputFileName, zmWrite);
+    for Name in SourceZip.FileNames do
+    begin
+      Normalized := NormalizeArchivePath(Name);
+      if SameText(Normalized, 'xl/workbook.xml') then
+        AddUtf8ZipEntry(OutputZip, Name, AWorkbookXml)
+      else if SameText(Normalized, 'xl/_rels/workbook.xml.rels') then
+        AddUtf8ZipEntry(OutputZip, Name, ARelsXml)
+      else if SameText(Normalized, '[Content_Types].xml') then
+        AddUtf8ZipEntry(OutputZip, Name, AContentTypesXml)
+      else
+      begin
+        Stream := nil; SourceZip.Read(Name, Stream, Header);
+        try
+          Stream.Position := 0; OutputZip.Add(Stream, Name);
+        finally
+          Stream.Free;
+        end;
+      end;
+    end;
+    for I := Low(SheetPaths) to High(SheetPaths) do
+      AddUtf8ZipEntry(OutputZip, SheetPaths[I], ASheetXml[I]);
+  finally
+    OutputZip.Free; SourceZip.Free;
+  end;
+end;
+
+function MissingTechnicalSheetNames(const AWorkbookXml: string): TArray<string>;
+var Missing: TList<string>; I: Integer;
+begin
+  Missing := TList<string>.Create;
+  try
+    for I := Low(CReportTechnicalSheetNames) to High(CReportTechnicalSheetNames) do
+      if FindSheetRelationId(AWorkbookXml, CReportTechnicalSheetNames[I]) = '' then
+        Missing.Add(CReportTechnicalSheetNames[I]);
+    Result := Missing.ToArray;
+  finally
+    Missing.Free;
+  end;
+end;
+
+// Один раз добавляет пять технических листов в исходный пользовательский XLSX.
+procedure PrepareNewTemplateFile(const ASourceFileName, AOutputFileName: string;
+  ARoot: TJSONObject);
+const
+  Titles: array[0..4] of string = ('Общие данные прибора', 'Точки прибора',
+    'Проливки по точкам', 'Калибровочные таблицы и коэффициенты',
+    'Метаданные отчёта');
+  Targets: array[0..4] of string =
+    ('worksheets/flowServiceData.xml',
+     'worksheets/flowServiceDevicePoints.xml',
+     'worksheets/flowServiceSpillages.xml',
+     'worksheets/flowServiceCoefTables.xml',
+     'worksheets/flowServiceMeta.xml');
+var Zip: TZipFile; WorkbookXml, RelsXml, ContentTypesXml, Fragment,
+  RelationId: string; RelsDoc: IXMLDocument; RelsRoot: IXMLNode;
+  SheetXml: TArray<string>; Names: TDictionary<string, string>;
+  Rows: TJSONArray; I, SheetId: Integer;
+begin
+  Zip := TZipFile.Create;
+  try
+    Zip.Open(ASourceFileName, zmRead);
+    WorkbookXml := ReadZipEntryUtf8(Zip, 'xl/workbook.xml');
+    RelsXml := ReadZipEntryUtf8(Zip, 'xl/_rels/workbook.xml.rels');
+    ContentTypesXml := ReadZipEntryUtf8(Zip, '[Content_Types].xml');
+  finally
+    Zip.Free;
+  end;
+  RelsDoc := LoadXMLData(RelsXml); RelsDoc.Active := True;
+  RelsRoot := RelsDoc.DocumentElement;
+  if (RelsRoot = nil) or not SameText(RelsRoot.LocalName, 'Relationships') then
+    raise EInvalidOpException.Create('Некорректный xl/_rels/workbook.xml.rels');
+  Names := TDictionary<string, string>.Create;
+  try
+    Rows := ARoot.GetValue<TJSONArray>('Rows');
+    SetLength(SheetXml, 5);
+    SheetXml[0] := BuildDataWorksheetXml(Titles[0], Rows, Names);
+    SheetXml[1] := BuildSeparatedWorksheetXml(Titles[1], '_DevicePoints', Rows,
+      ['DevicePoint'], Names);
+    SheetXml[2] := BuildSeparatedWorksheetXml(Titles[2], '_Spillages', Rows,
+      ['Spillage'], Names);
+    SheetXml[3] := BuildSeparatedWorksheetXml(Titles[3], '_CoefTables', Rows,
+      ['CalibrCoefTable', 'CalibrCoefItem'], Names);
+    SheetXml[4] := BuildMetaWorksheetXml(ARoot, Names);
+    for I := 0 to 4 do
+      ValidateSeparatedWorksheetXml(SheetXml[I], CReportTechnicalSheetNames[I]);
+    for I := 0 to 4 do
+    begin
+      SheetId := NextSheetId(WorkbookXml);
+      RelationId := NextRelationId(RelsRoot);
+      Fragment := Format('<sheet name="%s" sheetId="%d" state="hidden" r:id="%s"/>',
+        [CReportTechnicalSheetNames[I], SheetId, RelationId]);
+      WorkbookXml := InsertBeforeUniqueXmlNode(WorkbookXml, '</sheets>',
+        Fragment, 'добавление ' + CReportTechnicalSheetNames[I]);
+      AddWorksheetRelationship(RelsRoot, RelationId, Targets[I]);
+      Fragment := Format('<Override PartName="/xl/%s" ContentType="%s"/>',
+        [Targets[I], CWorksheetContentType]);
+      ContentTypesXml := InsertBeforeUniqueXmlNode(ContentTypesXml, '</Types>',
+        Fragment, 'добавление ContentType ' + CReportTechnicalSheetNames[I]);
+    end;
+    WorkbookXml := AddPreparedDefinedNames(WorkbookXml, Names);
+    RelsXml := SerializeXmlDocumentUtf8(RelsDoc);
+    CopyOrReplaceZipEntries(ASourceFileName, AOutputFileName, WorkbookXml,
+      RelsXml, ContentTypesXml, SheetXml);
+  finally
+    Names.Free;
   end;
 end;
 
@@ -1927,16 +2091,35 @@ begin
   ApplyReportErrorPrecision(Rows, AMeterValueError);
 end;
 
-class function TReportTemplateService.ImportTemplate(
+class function TReportTemplateService.PrepareTemplate(
   const ASourceFileName: string): string;
 var
-  BaseName, Extension: string;
+  BaseName, Extension, WorkbookXml, RelsXml, TemporaryFileName: string;
   Suffix: Integer;
+  Zip: TZipFile;
+  Missing: TArray<string>;
+  PreparedLocations: TArray<TReportWorksheetLocation>;
+  EmptyJson: TJSONObject;
+  EmptyDevice: TDevice;
+  EmptyDeviceType: TDeviceType;
 begin
   if not FileExists(ASourceFileName) then
     raise EFileNotFoundException.CreateFmt('Шаблон не найден: %s', [ASourceFileName]);
   if not SameText(ExtractFileExt(ASourceFileName), '.xlsx') then
     raise EArgumentException.Create('Поддерживаются только шаблоны XLSX');
+  Zip := TZipFile.Create;
+  try
+    Zip.Open(ASourceFileName, zmRead);
+    WorkbookXml := ReadZipEntryUtf8(Zip, 'xl/workbook.xml');
+    RelsXml := ReadZipEntryUtf8(Zip, 'xl/_rels/workbook.xml.rels');
+  finally
+    Zip.Free;
+  end;
+  Missing := MissingTechnicalSheetNames(WorkbookXml);
+  if (Length(Missing) <> 0) and
+     (Length(Missing) <> Length(CReportTechnicalSheetNames)) then
+    raise EInvalidOpException.Create('Шаблон содержит только часть технических листов. ' +
+      'Отсутствуют: ' + string.Join(', ', Missing));
   BaseName := TPath.GetFileNameWithoutExtension(ASourceFileName);
   Extension := ExtractFileExt(ASourceFileName);
   Result := TPath.Combine(TemplatesPath, BaseName + Extension);
@@ -1947,7 +2130,41 @@ begin
       Format('%s_%d%s', [BaseName, Suffix, Extension]));
     Inc(Suffix);
   end;
-  TFile.Copy(ASourceFileName, Result, False);
+  if Length(Missing) = 0 then
+  begin
+    ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
+    TFile.Copy(ASourceFileName, Result, False);
+    Exit;
+  end;
+  EmptyDevice := TDevice.Create;
+  EmptyDeviceType := TDeviceType.Create;
+  try
+    EmptyJson := BuildReportJson(EmptyDevice, EmptyDeviceType);
+    try
+      TemporaryFileName := BuildTemporaryReportFileName(Result);
+      try
+        PrepareNewTemplateFile(ASourceFileName, TemporaryFileName, EmptyJson);
+        Zip := TZipFile.Create;
+        try
+          Zip.Open(TemporaryFileName, zmRead);
+          WorkbookXml := ReadZipEntryUtf8(Zip, 'xl/workbook.xml');
+          RelsXml := ReadZipEntryUtf8(Zip, 'xl/_rels/workbook.xml.rels');
+        finally
+          Zip.Free;
+        end;
+        PreparedLocations := ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
+        ValidateTechnicalSheetOutput(TemporaryFileName, PreparedLocations);
+        TFile.Move(TemporaryFileName, Result);
+      finally
+        if FileExists(TemporaryFileName) then TFile.Delete(TemporaryFileName);
+      end;
+    finally
+      EmptyJson.Free;
+    end;
+  finally
+    EmptyDeviceType.Free;
+    EmptyDevice.Free;
+  end;
 end;
 
 class procedure TReportTemplateService.ExportTemplate(
