@@ -45,6 +45,29 @@ type
     PointErrorIndex: Integer;
     HeaderRowFound: Boolean;
   end;
+  // Содержит состояние и точные причины необходимости миграции PointError.
+  TPointErrorMigrationAnalysis = record
+    State: TPointErrorMigrationState;
+    XmlValid: Boolean;
+    WorkbookValid: Boolean;
+    DevicePointsValid: Boolean;
+    HeaderRowFound: Boolean;
+    QColumn: string;
+    QIndex: Integer;
+    PointErrorColumn: string;
+    PointErrorIndex: Integer;
+    PointErrorHeaderCount: Integer;
+    ExpectedDefinedNameCount: Integer;
+    ExistingDefinedNameCount: Integer;
+    CorrectDefinedNameCount: Integer;
+    DuplicateCount: Integer;
+    InvalidReferenceCount: Integer;
+    MalformedReferenceCount: Integer;
+    CanRepair: Boolean;
+    Reason: string;
+    MissingNames: string;
+    InvalidReferences: string;
+  end;
   TPointErrorDefinedNameInfo = record
     ExpectedCount: Integer;
     ExistingCount: Integer;
@@ -54,6 +77,16 @@ type
     MalformedReferenceCount: Integer;
   end;
 
+// Анализирует старую структуру PointError и определяет возможность автоматического исправления.
+function AnalyzePointErrorMigration(const AWorkbookXml,
+  ADevicePointsXml: string): TPointErrorMigrationAnalysis;
+function GetPointErrorMigrationState(const AWorkbookXml,
+  ADevicePointsXml: string): TPointErrorMigrationState;
+// Удаляет только принадлежащие FlowService диапазоны PointError.
+procedure RemoveFlowServicePointErrorDefinedNames(
+  const ADefinedNamesNode: IXMLNode);
+
+type
   TReportTemplateService = class
   public const
     MAX_DEVICE_POINTS = 7;
@@ -88,7 +121,8 @@ uses
   System.Variants,
   Xml.XMLDoc,
   Xml.xmldom,
-  uOpenXmlXlsx;
+  uOpenXmlXlsx,
+  uProtocols;
 
 type
   PSpillageStopCriteria = ^TSpillageStopCriteria;
@@ -1616,6 +1650,21 @@ begin
      (I <= Length(CleanReference)) then Result := '';
 end;
 
+function ExcelColumnIndex(const AColumnName: string): Integer;
+var
+  I: Integer;
+begin
+  Result := -1;
+  if AColumnName = '' then Exit;
+  Result := 0;
+  for I := 1 to Length(AColumnName) do
+  begin
+    if not CharInSet(UpCase(AColumnName[I]), ['A'..'Z']) then Exit(-1);
+    Result := Result * 26 + Ord(UpCase(AColumnName[I])) - Ord('A') + 1;
+  end;
+  Dec(Result);
+end;
+
 function GetWorksheetCellText(const ACell: IXMLNode): string;
 var InlineNode, TextNode: IXMLNode;
 begin
@@ -1636,7 +1685,7 @@ function GetDevicePointsHeaderInfo(
   const ADevicePointsDocument: IXMLDocument): TDevicePointsHeaderInfo;
 var
   Worksheet, SheetData, RowNode, Cell: IXMLNode;
-  I, CellIndex: Integer;
+  I, ColumnIndex: Integer;
   HeaderText, ColumnName: string;
 begin
   Result := Default(TDevicePointsHeaderInfo);
@@ -1654,28 +1703,27 @@ begin
     begin RowNode := SheetData.ChildNodes[I]; Break; end;
   if RowNode = nil then Exit;
   Result.HeaderRowFound := True;
-  CellIndex := 0;
   for I := 0 to RowNode.ChildNodes.Count - 1 do
   begin
     Cell := RowNode.ChildNodes[I];
     if not SameText(Cell.LocalName, 'c') then Continue;
     ColumnName := ExtractExcelColumnName(VarToStr(Cell.Attributes['r']));
     HeaderText := Trim(GetWorksheetCellText(Cell));
+    ColumnIndex := ExcelColumnIndex(ColumnName);
     if SameText(HeaderText, 'Q') then
     begin
       if Result.QIndex >= 0 then Result.QIndex := -2
-      else begin Result.QIndex := CellIndex; Result.QColumn := ColumnName; end;
+      else begin Result.QIndex := ColumnIndex; Result.QColumn := ColumnName; end;
     end;
     if SameText(HeaderText, 'PointError') then
     begin
       Inc(Result.PointErrorCount);
       if Result.PointErrorCount = 1 then
       begin
-        Result.PointErrorIndex := CellIndex;
+        Result.PointErrorIndex := ColumnIndex;
         Result.PointErrorColumn := ColumnName;
       end;
     end;
-    Inc(CellIndex);
   end;
 end;
 
@@ -1767,114 +1815,178 @@ begin
   end;
 end;
 
-// Проверяет полноту структуры PointError по XML-узлам workbook и _DevicePoints.
-function GetPointErrorMigrationState(const AWorkbookXml,
-  ADevicePointsXml: string): TPointErrorMigrationState;
-var
-  WorkbookDocument, DevicePointsDocument: IXMLDocument;
-  Header: TDevicePointsHeaderInfo;
-  Names: TPointErrorDefinedNameInfo;
-  Worksheet, SheetData: IXMLNode;
-  I, RowNumber, RequiredRowsFound: Integer;
+// Проверяет, принадлежит ли имя управляемому набору PointError FlowService.
+function IsFlowServicePointErrorDefinedName(const AName: string): Boolean;
+var PointIndex: Integer;
 begin
-  Result := pemsInvalid;
-  try
-    WorkbookDocument := LoadXMLData(AWorkbookXml); WorkbookDocument.Active := True;
-    DevicePointsDocument := LoadXMLData(ADevicePointsXml); DevicePointsDocument.Active := True;
-  except Exit(pemsInvalid); end;
-  Header := GetDevicePointsHeaderInfo(DevicePointsDocument);
-  Names := GetPointErrorDefinedNameInfo(WorkbookDocument, Header.PointErrorColumn);
-  Worksheet := DevicePointsDocument.DocumentElement;
-  SheetData := FindDirectChildNode(Worksheet, 'sheetData');
-  RequiredRowsFound := 0;
-  if SheetData <> nil then
-    for I := 0 to SheetData.ChildNodes.Count - 1 do
-      if SameText(SheetData.ChildNodes[I].LocalName, 'row') and
-         TryStrToInt(VarToStr(SheetData.ChildNodes[I].Attributes['r']),
-           RowNumber) and (RowNumber >= 3) and
-         (RowNumber <= TReportTemplateService.MAX_DEVICE_POINTS + 2) then
-        Inc(RequiredRowsFound);
-  if not Header.HeaderRowFound or (Header.QIndex = -2) or
-     (Header.PointErrorCount > 1) or
-     (Header.QIndex < 0) or
-     ((Header.PointErrorCount = 1) and (Header.PointErrorColumn = '')) or
-     (RequiredRowsFound <> TReportTemplateService.MAX_DEVICE_POINTS) or
-     (Names.DuplicateCount > 0) or
-     (Names.MalformedReferenceCount > 0) then Exit(pemsInvalid);
-  if (Header.QIndex >= 0) and (Header.PointErrorCount = 0) and
-     (Names.ExistingCount = 0) then Exit(pemsRequired);
-  if (Header.QIndex >= 0) and (Header.PointErrorCount = 1) and
-     (Header.PointErrorIndex = Header.QIndex + 1) and
-     (Header.PointErrorColumn <> '') and
-     not SameText(Header.PointErrorColumn, Header.QColumn) and
-     (Names.ExistingCount = Names.ExpectedCount) and
-     (Names.CorrectCount = Names.ExpectedCount) and
-     (Names.InvalidReferenceCount = 0) then Exit(pemsNotRequired);
-  Result := pemsPartial;
+  Result := (Length(AName) = Length('DevicePoints_01_PointError')) and
+    SameText(Copy(AName, 1, 13), 'DevicePoints_') and
+    CharInSet(AName[14], ['0'..'9']) and CharInSet(AName[15], ['0'..'9']) and
+    SameText(Copy(AName, 16, MaxInt), '_PointError') and
+    TryStrToInt(Copy(AName, 14, 2), PointIndex) and (PointIndex >= 1) and
+    (PointIndex <= TReportTemplateService.MAX_DEVICE_POINTS);
 end;
 
-// Возвращает техническое имя состояния миграции PointError.
-function PointErrorMigrationStateToString(
-  const AState: TPointErrorMigrationState): string;
+// Удаляет только принадлежащие FlowService диапазоны DevicePoints_XX_PointError перед их пересозданием.
+procedure RemoveFlowServicePointErrorDefinedNames(const ADefinedNamesNode: IXMLNode);
+var I: Integer; Child: IXMLNode; Name, LocalSheetId: string;
 begin
-  case AState of
-    pemsNotRequired: Result := 'pemsNotRequired';
-    pemsRequired: Result := 'pemsRequired';
-    pemsPartial: Result := 'pemsPartial';
-    pemsInvalid: Result := 'pemsInvalid';
-  else Result := 'pemsInvalid'; end;
+  if ADefinedNamesNode = nil then Exit;
+  for I := ADefinedNamesNode.ChildNodes.Count - 1 downto 0 do
+  begin
+    Child := ADefinedNamesNode.ChildNodes[I];
+    if not SameText(Child.LocalName, 'definedName') then Continue;
+    Name := VarToStr(Child.Attributes['name']);
+    LocalSheetId := VarToStr(Child.Attributes['localSheetId']);
+    if IsFlowServicePointErrorDefinedName(Name) and (LocalSheetId = '') then
+    begin
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcProc, psForm, 'PointErrorDefinedNameRemoved',
+          'Удалён диапазон PointError FlowService', 'Name=' + Name);
+      ADefinedNamesNode.DOMNode.removeChild(Child.DOMNode);
+    end;
+  end;
 end;
 
-// Формирует диагностику структуры PointError без изменения XML.
-function BuildPointErrorMigrationDiagnostic(const AWorkbookXml,
-  ADevicePointsXml: string): string;
+procedure RemoveFlowServicePointErrorDefinedNamesFromWorkbook(var AWorkbookXml: string);
+var Document: IXMLDocument; Root, DefinedNamesNode: IXMLNode;
+begin
+  Document := LoadXMLData(AWorkbookXml); Document.Active := True;
+  Root := Document.DocumentElement;
+  if (Root = nil) or not SameText(Root.LocalName, 'workbook') then
+    raise EInvalidOpException.Create('Некорректный корневой узел workbook');
+  DefinedNamesNode := FindDirectChildNode(Root, 'definedNames');
+  RemoveFlowServicePointErrorDefinedNames(DefinedNamesNode);
+  ValidateDefinedNameDuplicates(DefinedNamesNode);
+  AWorkbookXml := SerializeXmlDocumentUtf8(Document);
+end;
+
+// Анализирует старую структуру PointError и определяет возможность автоматического исправления.
+function AnalyzePointErrorMigration(const AWorkbookXml,
+  ADevicePointsXml: string): TPointErrorMigrationAnalysis;
 var
   WorkbookDocument, DevicePointsDocument: IXMLDocument;
-  Header: TDevicePointsHeaderInfo;
-  Names: TPointErrorDefinedNameInfo;
-  DefinedNamesNode, Child: IXMLNode;
-  I, J, Count: Integer;
-  ExpectedName, ExpectedReference, ActualReference, Missing, Invalid: string;
+  WorkbookRoot, DevicePointsRoot, DefinedNamesNode, Child: IXMLNode;
+  Header: TDevicePointsHeaderInfo; Names: TPointErrorDefinedNameInfo;
+  I, J, Count, DefinedNamesContainerCount: Integer;
+  ExpectedName, ExpectedReference, ActualReference, LocalSheetId: string;
 begin
+  Result := Default(TPointErrorMigrationAnalysis);
+  Result.State := pemsInvalid; Result.QIndex := -1; Result.PointErrorIndex := -1;
+  Result.ExpectedDefinedNameCount := TReportTemplateService.MAX_DEVICE_POINTS;
   try
     WorkbookDocument := LoadXMLData(AWorkbookXml); WorkbookDocument.Active := True;
+  except on E: Exception do begin Result.Reason := 'workbook.xml: ' + E.Message; Exit; end; end;
+  WorkbookRoot := WorkbookDocument.DocumentElement;
+  if (WorkbookRoot = nil) or not SameText(WorkbookRoot.LocalName, 'workbook') then
+  begin Result.Reason := 'Отсутствует корневой узел workbook'; Exit; end;
+  Result.WorkbookValid := True;
+  try
     DevicePointsDocument := LoadXMLData(ADevicePointsXml); DevicePointsDocument.Active := True;
-  except on E: Exception do Exit('XML parse error: ' + E.Message); end;
+  except on E: Exception do begin Result.Reason := '_DevicePoints XML: ' + E.Message; Exit; end; end;
+  DevicePointsRoot := DevicePointsDocument.DocumentElement;
+  if (DevicePointsRoot = nil) or not SameText(DevicePointsRoot.LocalName, 'worksheet') then
+  begin Result.Reason := 'Отсутствует корневой узел worksheet'; Exit; end;
+  Result.DevicePointsValid := True; Result.XmlValid := True;
+  DefinedNamesContainerCount := 0; DefinedNamesNode := nil;
+  for I := 0 to WorkbookRoot.ChildNodes.Count - 1 do
+    if SameText(WorkbookRoot.ChildNodes[I].LocalName, 'definedNames') then
+    begin Inc(DefinedNamesContainerCount); DefinedNamesNode := WorkbookRoot.ChildNodes[I]; end;
+  if DefinedNamesContainerCount > 1 then
+  begin Result.Reason := 'В workbook найдено несколько контейнеров definedNames'; Exit; end;
   Header := GetDevicePointsHeaderInfo(DevicePointsDocument);
   Names := GetPointErrorDefinedNameInfo(WorkbookDocument, Header.PointErrorColumn);
-  Missing := ''; Invalid := '';
-  DefinedNamesNode := FindDirectChildNode(WorkbookDocument.DocumentElement, 'definedNames');
-  for I := 1 to TReportTemplateService.MAX_DEVICE_POINTS do
+  Result.HeaderRowFound := Header.HeaderRowFound; Result.QColumn := Header.QColumn;
+  Result.QIndex := Header.QIndex; Result.PointErrorColumn := Header.PointErrorColumn;
+  Result.PointErrorIndex := Header.PointErrorIndex;
+  Result.PointErrorHeaderCount := Header.PointErrorCount;
+  Result.ExistingDefinedNameCount := Names.ExistingCount;
+  Result.CorrectDefinedNameCount := Names.CorrectCount;
+  Result.DuplicateCount := Names.DuplicateCount;
+  Result.InvalidReferenceCount := Names.InvalidReferenceCount;
+  Result.MalformedReferenceCount := Names.MalformedReferenceCount;
+  for I := 1 to Result.ExpectedDefinedNameCount do
   begin
     ExpectedName := Format('DevicePoints_%.2d_PointError', [I]);
     ExpectedReference := NormalizeDefinedNameReference(Format(
       '''_DevicePoints''!$%s$%d', [Header.PointErrorColumn, I + 2]));
     Count := 0;
-    if DefinedNamesNode <> nil then
-      for J := 0 to DefinedNamesNode.ChildNodes.Count - 1 do
+    if DefinedNamesNode <> nil then for J := 0 to DefinedNamesNode.ChildNodes.Count - 1 do
+    begin
+      Child := DefinedNamesNode.ChildNodes[J];
+      if not SameText(Child.LocalName, 'definedName') or
+         not SameText(VarToStr(Child.Attributes['name']), ExpectedName) then Continue;
+      Inc(Count); LocalSheetId := VarToStr(Child.Attributes['localSheetId']);
+      if LocalSheetId <> '' then
       begin
-        Child := DefinedNamesNode.ChildNodes[J];
-        if SameText(Child.LocalName, 'definedName') and
-           SameText(VarToStr(Child.Attributes['name']), ExpectedName) then
-        begin
-          Inc(Count);
-          ActualReference := NormalizeDefinedNameReference(Child.Text);
-          if not SameText(ActualReference, ExpectedReference) then
-            Invalid := Invalid + Format('%s expected=%s actual=%s; ',
-              [ExpectedName, ExpectedReference, ActualReference]);
-        end;
+        Result.Reason := Result.Reason + Format('Конфликт %s с localSheetId=%s; ',
+          [ExpectedName, LocalSheetId]);
+        Result.InvalidReferences := Result.InvalidReferences + Format('%s localSheetId=%s; ',
+          [ExpectedName, LocalSheetId]);
       end;
-    if Count = 0 then Missing := Missing + ExpectedName + '; ';
+      ActualReference := NormalizeDefinedNameReference(Child.Text);
+      if not SameText(ActualReference, ExpectedReference) then
+        Result.InvalidReferences := Result.InvalidReferences + Format(
+          '%s expected=%s actual=%s; ', [ExpectedName, ExpectedReference, ActualReference]);
+    end;
+    if Count = 0 then Result.MissingNames := Result.MissingNames + ExpectedName + '; ';
   end;
-  Result := Format('HeaderRowFound=%s; QColumn=%s; QIndex=%d; ' +
-    'PointErrorColumn=%s; PointErrorIndex=%d; PointErrorHeaderCount=%d; ' +
-    'ExpectedDefinedNameCount=%d; ExistingDefinedNameCount=%d; ' +
-    'CorrectDefinedNameCount=%d; DuplicateCount=%d; InvalidReferenceCount=%d; ' +
-    'Missing=%s; Invalid=%s',
-    [BoolToStr(Header.HeaderRowFound, True), Header.QColumn, Header.QIndex,
-     Header.PointErrorColumn, Header.PointErrorIndex, Header.PointErrorCount,
-     Names.ExpectedCount, Names.ExistingCount, Names.CorrectCount,
-     Names.DuplicateCount, Names.InvalidReferenceCount, Missing, Invalid]);
+  if Pos('localSheetId=', Result.Reason) > 0 then
+  begin Result.CanRepair := False; Result.State := pemsInvalid; Exit; end;
+  Result.CanRepair := True;
+  if Header.HeaderRowFound and (Header.QIndex >= 0) and
+     (Header.PointErrorCount = 1) and (Header.PointErrorIndex = Header.QIndex + 1) and
+     (Header.PointErrorColumn <> '') and not SameText(Header.PointErrorColumn, Header.QColumn) and
+     (Names.ExistingCount = Names.ExpectedCount) and (Names.CorrectCount = Names.ExpectedCount) and
+     (Names.DuplicateCount = 0) and (Names.InvalidReferenceCount = 0) then
+  begin Result.State := pemsNotRequired; Result.Reason := 'Структура PointError актуальна'; end
+  else
+  begin Result.State := pemsRequired;
+    Result.Reason := 'Разбираемая структура PointError отсутствует, устарела или неполна; ' + Result.Reason; end;
+end;
+
+function GetPointErrorMigrationState(const AWorkbookXml,
+  ADevicePointsXml: string): TPointErrorMigrationState;
+begin
+  Result := AnalyzePointErrorMigration(AWorkbookXml, ADevicePointsXml).State;
+end;
+
+function PointErrorMigrationStateToString(const AState: TPointErrorMigrationState): string;
+begin
+  case AState of
+    pemsNotRequired: Result := 'pemsNotRequired'; pemsRequired: Result := 'pemsRequired';
+    pemsPartial: Result := 'pemsPartial'; pemsInvalid: Result := 'pemsInvalid';
+  else Result := 'pemsInvalid'; end;
+end;
+
+function BuildPointErrorMigrationDiagnostic(const AWorkbookXml,
+  ADevicePointsXml: string): string;
+var Analysis: TPointErrorMigrationAnalysis; WorkbookDocument: IXMLDocument;
+  Root: IXMLNode; I, DefinedNamesContainerCount: Integer;
+begin
+  Analysis := AnalyzePointErrorMigration(AWorkbookXml, ADevicePointsXml);
+  DefinedNamesContainerCount := 0;
+  try
+    WorkbookDocument := LoadXMLData(AWorkbookXml); WorkbookDocument.Active := True;
+    Root := WorkbookDocument.DocumentElement;
+    if Root <> nil then for I := 0 to Root.ChildNodes.Count - 1 do
+      if SameText(Root.ChildNodes[I].LocalName, 'definedNames') then Inc(DefinedNamesContainerCount);
+  except DefinedNamesContainerCount := 0; end;
+  Result := Format('State=%s; CanRepair=%s; Reason=%s; XmlValid=%s; WorkbookValid=%s; ' +
+    'DevicePointsValid=%s; HeaderRowFound=%s; QColumn=%s; QIndex=%d; PointErrorColumn=%s; ' +
+    'PointErrorIndex=%d; PointErrorHeaderCount=%d; ExpectedDefinedNameCount=%d; ' +
+    'ExistingDefinedNameCount=%d; CorrectDefinedNameCount=%d; DuplicateCount=%d; ' +
+    'InvalidReferenceCount=%d; MalformedReferenceCount=%d; MissingNames=%s; ' +
+    'InvalidReferences=%s; DefinedNamesPresent=%s; DefinedNamesContainerCount=%d; LocalSheetIdConflicts=%s',
+    [PointErrorMigrationStateToString(Analysis.State), BoolToStr(Analysis.CanRepair, True),
+     Analysis.Reason, BoolToStr(Analysis.XmlValid, True), BoolToStr(Analysis.WorkbookValid, True),
+     BoolToStr(Analysis.DevicePointsValid, True), BoolToStr(Analysis.HeaderRowFound, True),
+     Analysis.QColumn, Analysis.QIndex, Analysis.PointErrorColumn, Analysis.PointErrorIndex,
+     Analysis.PointErrorHeaderCount, Analysis.ExpectedDefinedNameCount,
+     Analysis.ExistingDefinedNameCount, Analysis.CorrectDefinedNameCount, Analysis.DuplicateCount,
+     Analysis.InvalidReferenceCount, Analysis.MalformedReferenceCount, Analysis.MissingNames,
+     Analysis.InvalidReferences, BoolToStr(DefinedNamesContainerCount > 0, True),
+     DefinedNamesContainerCount, BoolToStr(Pos('localSheetId=', Analysis.InvalidReferences) > 0, True)]);
 end;
 
 // Удаляет артефакты прежней однотабличной схемы, не затрагивая таблицы шаблона.
@@ -2051,6 +2163,8 @@ var
   NeedsPointErrorMigration: Boolean;
   WorkbookRepaired: Boolean;
   PointErrorMigrationState: TPointErrorMigrationState;
+  PointErrorMigrationAnalysis, NewPointErrorMigrationAnalysis:
+    TPointErrorMigrationAnalysis;
   ExistingDevicePointsXml: string;
 begin
   Stage := 'начало выгрузки';
@@ -2168,19 +2282,37 @@ begin
         raise EInvalidOpException.Create(
           'Не найден XML технического листа _DevicePoints');
       ExistingDevicePointsXml := ReadUtf8File(SheetFiles[1]);
-      ValidateSeparatedWorksheetXml(ExistingDevicePointsXml, '_DevicePoints');
-      PointErrorMigrationState := GetPointErrorMigrationState(WorkbookXml,
+      PointErrorMigrationAnalysis := AnalyzePointErrorMigration(WorkbookXml,
         ExistingDevicePointsXml);
-      case PointErrorMigrationState of
+      PointErrorMigrationState := PointErrorMigrationAnalysis.State;
+      case PointErrorMigrationAnalysis.State of
         pemsNotRequired: NeedsPointErrorMigration := False;
         pemsRequired: NeedsPointErrorMigration := True;
         pemsPartial:
-          raise EInvalidOpException.Create(
-            'Шаблон содержит частично выполненную миграцию PointError');
+          begin
+            if PointErrorMigrationAnalysis.CanRepair then
+              NeedsPointErrorMigration := True
+            else
+              raise EInvalidOpException.CreateFmt(
+                'Частичная миграция PointError не может быть исправлена автоматически: %s',
+                [BuildPointErrorMigrationDiagnostic(WorkbookXml,
+                  ExistingDevicePointsXml)]);
+          end;
         pemsInvalid:
-          raise EInvalidOpException.Create(
-            'Шаблон содержит некорректную или дублированную структуру PointError');
+          raise EInvalidOpException.CreateFmt(
+            'Некорректная структура PointError: %s',
+            [BuildPointErrorMigrationDiagnostic(WorkbookXml,
+              ExistingDevicePointsXml)]);
       end;
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcProc, psForm, 'PointErrorMigrationAnalyzed',
+          'Проанализирована старая структура PointError', Format(
+          'State=%s; CanRepair=%s; Reason=%s; NeedsMigration=%s; OldColumn=%s',
+          [PointErrorMigrationStateToString(PointErrorMigrationAnalysis.State),
+           BoolToStr(PointErrorMigrationAnalysis.CanRepair, True),
+           PointErrorMigrationAnalysis.Reason,
+           BoolToStr(NeedsPointErrorMigration, True),
+           PointErrorMigrationAnalysis.PointErrorColumn]));
     end;
 
     if AInitializeStructure then
@@ -2215,17 +2347,48 @@ begin
     LogReportStage(Stage);
     SheetXml[4] := BuildMetaWorksheetXml(ARoot, DefinedNames);
 
+    NewPointErrorMigrationAnalysis := AnalyzePointErrorMigration(WorkbookXml,
+      SheetXml[1]);
+    if not NewPointErrorMigrationAnalysis.HeaderRowFound or
+       (NewPointErrorMigrationAnalysis.QIndex < 0) or
+       (NewPointErrorMigrationAnalysis.PointErrorHeaderCount <> 1) or
+       (NewPointErrorMigrationAnalysis.PointErrorIndex <>
+         NewPointErrorMigrationAnalysis.QIndex + 1) or
+       (NewPointErrorMigrationAnalysis.PointErrorColumn = '') or
+       SameText(NewPointErrorMigrationAnalysis.PointErrorColumn,
+         NewPointErrorMigrationAnalysis.QColumn) then
+      raise EInvalidOpException.CreateFmt(
+        'Новый лист _DevicePoints имеет некорректные заголовки: %s',
+        [BuildPointErrorMigrationDiagnostic(WorkbookXml, SheetXml[1])]);
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'PointErrorNewSheetAnalyzed',
+        'Проверен новый лист PointError', 'NewColumn=' +
+        NewPointErrorMigrationAnalysis.PointErrorColumn);
+
+    if NeedsPointErrorMigration then
+    begin
+      RemoveFlowServicePointErrorDefinedNamesFromWorkbook(WorkbookXml);
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcProc, psForm, 'PointErrorNamesCleaned',
+          'Очищены диапазоны PointError FlowService',
+          BuildPointErrorMigrationDiagnostic(WorkbookXml, SheetXml[1]));
+    end;
     if AInitializeStructure or NeedsPointErrorMigration then
       UpdateReportDefinedNames(WorkbookXml, DefinedNames);
     ValidateWorkbookXmlText(WorkbookXml, 'именованные диапазоны', True);
     ValidateWorkbookXml(WorkbookXml, 'именованные диапазоны');
-    PointErrorMigrationState := GetPointErrorMigrationState(WorkbookXml,
+    PointErrorMigrationAnalysis := AnalyzePointErrorMigration(WorkbookXml,
       SheetXml[1]);
-    if NeedsPointErrorMigration and
-       (PointErrorMigrationState <> pemsNotRequired) then
+    PointErrorMigrationState := PointErrorMigrationAnalysis.State;
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcProc, psForm, 'PointErrorMigrationValidated',
+        'Проверен результат миграции PointError',
+        BuildPointErrorMigrationDiagnostic(WorkbookXml, SheetXml[1]));
+    if (AInitializeStructure or NeedsPointErrorMigration) and
+       (PointErrorMigrationAnalysis.State <> pemsNotRequired) then
       raise EInvalidOpException.CreateFmt(
         'Миграция PointError завершилась некорректно: State=%s; %s',
-        [PointErrorMigrationStateToString(PointErrorMigrationState),
+        [PointErrorMigrationStateToString(PointErrorMigrationAnalysis.State),
          BuildPointErrorMigrationDiagnostic(WorkbookXml, SheetXml[1])]);
 
     for I := Low(CSheetNames) to High(CSheetNames) do
