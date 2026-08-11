@@ -6,7 +6,7 @@ VERSION = (ROOT / "uAppVersion.pas").read_text(encoding="utf-8-sig")
 
 
 def test_release_and_template_state_api():
-    assert "APP_VERSION = '1.0.112'" in VERSION
+    assert "APP_VERSION = '1.0.113'" in VERSION
     for name in ("IsPreparedReportTemplate", "GetMissingReportTemplateSheets",
                  "RepairLegacyReportWorkbookXml", "ImportPreparedReportTemplate"):
         assert name in SRC

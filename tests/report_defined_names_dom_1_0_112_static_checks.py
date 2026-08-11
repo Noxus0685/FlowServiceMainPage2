@@ -10,7 +10,7 @@ def section(start, end):
 
 
 def test_version_and_dom_helpers():
-    assert "APP_VERSION = '1.0.112'" in VERSION
+    assert "APP_VERSION = '1.0.113'" in VERSION
     for helper in ("FindDirectChildNode", "EnsureDefinedNamesNode",
                    "FindDefinedNameNode", "ContainsDefinedName",
                    "ValidateDefinedNameValues", "ValidateDefinedNameDuplicates"):

@@ -37,6 +37,22 @@ procedure NormalizeReportRowUnits(ADevice: TDevice;
 type
   TPointErrorMigrationState = (pemsNotRequired, pemsRequired, pemsPartial,
     pemsInvalid);
+  TDevicePointsHeaderInfo = record
+    QColumn: string;
+    PointErrorColumn: string;
+    PointErrorCount: Integer;
+    QIndex: Integer;
+    PointErrorIndex: Integer;
+    HeaderRowFound: Boolean;
+  end;
+  TPointErrorDefinedNameInfo = record
+    ExpectedCount: Integer;
+    ExistingCount: Integer;
+    CorrectCount: Integer;
+    DuplicateCount: Integer;
+    InvalidReferenceCount: Integer;
+    MalformedReferenceCount: Integer;
+  end;
 
   TReportTemplateService = class
   public const
@@ -932,6 +948,18 @@ begin
   AColumns.Add(AName);
 end;
 
+// Возвращает индекс имени столбца без учёта регистра.
+function IndexOfColumnName(AColumns: TList<string>;
+  const AName: string): Integer;
+var
+  I: Integer;
+begin
+  Result := -1;
+  if AColumns = nil then Exit;
+  for I := 0 to AColumns.Count - 1 do
+    if SameText(AColumns[I], AName) then Exit(I);
+end;
+
 // Проверяет принадлежность строки JSON одному из типов служебного листа.
 function RowHasObjectType(ARow: TJSONObject;
   const AObjectTypes: array of string): Boolean;
@@ -978,12 +1006,14 @@ begin
     must not depend on RTTI enumeration order. }
   if (Length(AObjectTypes) = 1) and SameText(AObjectTypes[0], 'DevicePoint') then
   begin
-    I := Result.IndexOf('PointError');
+    I := IndexOfColumnName(Result, 'PointError');
     if I >= 0 then
       Result.Delete(I);
-    I := Result.IndexOf('Q');
-    if I >= 0 then
-      Result.Insert(I + 1, 'PointError');
+    I := IndexOfColumnName(Result, 'Q');
+    if I < 0 then
+      raise EInvalidOpException.Create(
+        'Нельзя добавить PointError: в _DevicePoints отсутствует столбец Q');
+    Result.Insert(I + 1, 'PointError');
   end;
 end;
 
@@ -1425,44 +1455,32 @@ var
   Counts: TDictionary<string, Integer>;
   I, Count: Integer;
   Child: IXMLNode;
-  Name, NormalizedName, LocalSheetId: string;
+  Name, LocalSheetId: string;
 begin
-  if ADefinedNamesNode = nil then
-    Exit;
-
-  Counts := TDictionary<string, Integer>.Create;
+  if ADefinedNamesNode = nil then Exit;
+  Counts := TDictionary<string, Integer>.Create(
+    TStringComparer.OrdinalIgnoreCase);
   try
     for I := 0 to ADefinedNamesNode.ChildNodes.Count - 1 do
     begin
       Child := ADefinedNamesNode.ChildNodes[I];
-
-      if not SameText(Child.LocalName, 'definedName') then
-        Continue;
-
+      if not SameText(Child.LocalName, 'definedName') then Continue;
       Name := VarToStr(Child.Attributes['name']);
-      NormalizedName := UpperCase(Name);
-
-      if Counts.TryGetValue(NormalizedName, Count) then
+      if Counts.TryGetValue(Name, Count) then
       begin
         LocalSheetId := VarToStr(Child.Attributes['localSheetId']);
-
         raise EInvalidOpException.CreateFmt(
           'Повтор definedName %s; Count=%d; localSheetId=%s; FlowService=%s',
-          [
-            Name,
-            Count + 1,
-            LocalSheetId,
-            BoolToStr(IsReportDefinedName(Name), True)
-          ]
-        );
+          [Name, Count + 1, LocalSheetId,
+           BoolToStr(IsReportDefinedName(Name), True)]);
       end;
-
-      Counts.Add(NormalizedName, 1);
+      Counts.Add(Name, 1);
     end;
   finally
     Counts.Free;
   end;
 end;
+
 function SerializeXmlDocumentUtf8(const ADocument: IXMLDocument): string;
 var
   Stream: TMemoryStream;
@@ -1564,48 +1582,287 @@ begin
       'Некорректный корневой узел служебного листа %s', [ASheetName]);
 end;
 
-// Проверяет полноту структуры PointError в подготовленном шаблоне.
+// Возвращает буквенную часть столбца из ссылки Excel вида K2 или $K$2.
+function ExtractExcelColumnName(const ACellReference: string): string;
+var
+  CleanReference: string;
+  I, DigitStart: Integer;
+begin
+  Result := '';
+  CleanReference := StringReplace(Trim(ACellReference), '$', '', [rfReplaceAll]);
+  I := 1;
+  while (I <= Length(CleanReference)) and
+        CharInSet(UpCase(CleanReference[I]), ['A'..'Z']) do
+  begin
+    Result := Result + UpCase(CleanReference[I]);
+    Inc(I);
+  end;
+  DigitStart := I;
+  while (I <= Length(CleanReference)) and
+        CharInSet(CleanReference[I], ['0'..'9']) do Inc(I);
+  if (Result = '') or (DigitStart > Length(CleanReference)) or
+     (I <= Length(CleanReference)) then Result := '';
+end;
+
+function GetWorksheetCellText(const ACell: IXMLNode): string;
+var InlineNode, TextNode: IXMLNode;
+begin
+  Result := '';
+  if ACell = nil then Exit;
+  InlineNode := FindDirectChildNode(ACell, 'is');
+  if InlineNode <> nil then
+  begin
+    TextNode := FindDirectChildNode(InlineNode, 't');
+    if TextNode <> nil then Exit(TextNode.Text);
+  end;
+  TextNode := FindDirectChildNode(ACell, 'v');
+  if TextNode <> nil then Result := TextNode.Text;
+end;
+
+// Читает строку заголовков _DevicePoints и определяет позиции Q и PointError.
+function GetDevicePointsHeaderInfo(
+  const ADevicePointsDocument: IXMLDocument): TDevicePointsHeaderInfo;
+var
+  Worksheet, SheetData, RowNode, Cell: IXMLNode;
+  I, CellIndex: Integer;
+  HeaderText, ColumnName: string;
+begin
+  Result := Default(TDevicePointsHeaderInfo);
+  Result.QIndex := -1;
+  Result.PointErrorIndex := -1;
+  if ADevicePointsDocument = nil then Exit;
+  Worksheet := ADevicePointsDocument.DocumentElement;
+  if (Worksheet = nil) or not SameText(Worksheet.LocalName, 'worksheet') then Exit;
+  SheetData := FindDirectChildNode(Worksheet, 'sheetData');
+  if SheetData = nil then Exit;
+  RowNode := nil;
+  for I := 0 to SheetData.ChildNodes.Count - 1 do
+    if SameText(SheetData.ChildNodes[I].LocalName, 'row') and
+       SameText(VarToStr(SheetData.ChildNodes[I].Attributes['r']), '2') then
+    begin RowNode := SheetData.ChildNodes[I]; Break; end;
+  if RowNode = nil then Exit;
+  Result.HeaderRowFound := True;
+  CellIndex := 0;
+  for I := 0 to RowNode.ChildNodes.Count - 1 do
+  begin
+    Cell := RowNode.ChildNodes[I];
+    if not SameText(Cell.LocalName, 'c') then Continue;
+    ColumnName := ExtractExcelColumnName(VarToStr(Cell.Attributes['r']));
+    HeaderText := Trim(GetWorksheetCellText(Cell));
+    if SameText(HeaderText, 'Q') then
+    begin
+      if Result.QIndex >= 0 then Result.QIndex := -2
+      else begin Result.QIndex := CellIndex; Result.QColumn := ColumnName; end;
+    end;
+    if SameText(HeaderText, 'PointError') then
+    begin
+      Inc(Result.PointErrorCount);
+      if Result.PointErrorCount = 1 then
+      begin
+        Result.PointErrorIndex := CellIndex;
+        Result.PointErrorColumn := ColumnName;
+      end;
+    end;
+    Inc(CellIndex);
+  end;
+end;
+
+// Нормализует ссылку definedName для безопасного сравнения.
+function NormalizeDefinedNameReference(const AReference: string): string;
+var
+  Value, ColumnName: string;
+  MarkerPos, ColumnStart, ColumnEnd: Integer;
+begin
+  Value := Trim(AReference);
+  Value := StringReplace(Value, #13, '', [rfReplaceAll]);
+  Value := StringReplace(Value, #10, '', [rfReplaceAll]);
+  Value := StringReplace(Value, #9, '', [rfReplaceAll]);
+  MarkerPos := Pos('!$', Value);
+  if MarkerPos > 0 then
+  begin
+    ColumnStart := MarkerPos + 2;
+    ColumnEnd := ColumnStart;
+    while (ColumnEnd <= Length(Value)) and
+          CharInSet(UpCase(Value[ColumnEnd]), ['A'..'Z']) do Inc(ColumnEnd);
+    ColumnName := UpperCase(Copy(Value, ColumnStart, ColumnEnd - ColumnStart));
+    if ColumnName <> '' then
+      Value := Copy(Value, 1, ColumnStart - 1) + ColumnName +
+        Copy(Value, ColumnEnd, MaxInt);
+  end;
+  Result := Value;
+end;
+
+function IsValidPointErrorReferenceSyntax(const AReference: string): Boolean;
+const
+  CPrefix = '''_DevicePoints''!$';
+var
+  Value: string;
+  I: Integer;
+begin
+  Result := False;
+  Value := NormalizeDefinedNameReference(AReference);
+  if not Value.StartsWith(CPrefix, True) then Exit;
+  I := Length(CPrefix) + 1;
+  while (I <= Length(Value)) and CharInSet(Value[I], ['A'..'Z']) do Inc(I);
+  if (I = Length(CPrefix) + 1) or (I > Length(Value)) or
+     (Value[I] <> '$') then Exit;
+  Inc(I);
+  if I > Length(Value) then Exit;
+  while (I <= Length(Value)) and CharInSet(Value[I], ['0'..'9']) do Inc(I);
+  Result := I > Length(Value);
+end;
+
+// Проверяет диапазоны DevicePoints_XX_PointError по узлам definedName.
+function GetPointErrorDefinedNameInfo(
+  const AWorkbookDocument: IXMLDocument;
+  const APointErrorColumn: string): TPointErrorDefinedNameInfo;
+var
+  Root, DefinedNamesNode, Child: IXMLNode;
+  I, J, PerNameCount: Integer;
+  ExpectedName, ExpectedReference, ActualReference: string;
+begin
+  Result := Default(TPointErrorDefinedNameInfo);
+  Result.ExpectedCount := TReportTemplateService.MAX_DEVICE_POINTS;
+  if AWorkbookDocument = nil then Exit;
+  Root := AWorkbookDocument.DocumentElement;
+  if (Root = nil) or not SameText(Root.LocalName, 'workbook') then Exit;
+  DefinedNamesNode := FindDirectChildNode(Root, 'definedNames');
+  if DefinedNamesNode = nil then Exit;
+  for I := 1 to Result.ExpectedCount do
+  begin
+    ExpectedName := Format('DevicePoints_%.2d_PointError', [I]);
+    ExpectedReference := NormalizeDefinedNameReference(Format(
+      '''_DevicePoints''!$%s$%d', [APointErrorColumn, I + 2]));
+    PerNameCount := 0;
+    for J := 0 to DefinedNamesNode.ChildNodes.Count - 1 do
+    begin
+      Child := DefinedNamesNode.ChildNodes[J];
+      if not SameText(Child.LocalName, 'definedName') or
+         not SameText(VarToStr(Child.Attributes['name']), ExpectedName) then Continue;
+      Inc(PerNameCount);
+      Inc(Result.ExistingCount);
+      ActualReference := NormalizeDefinedNameReference(Child.Text);
+      if not IsValidPointErrorReferenceSyntax(ActualReference) then
+      begin
+        Inc(Result.InvalidReferenceCount);
+        Inc(Result.MalformedReferenceCount);
+      end
+      else if SameText(ActualReference, ExpectedReference) then
+        Inc(Result.CorrectCount)
+      else Inc(Result.InvalidReferenceCount);
+    end;
+    if PerNameCount > 1 then Inc(Result.DuplicateCount, PerNameCount - 1);
+  end;
+end;
+
+// Проверяет полноту структуры PointError по XML-узлам workbook и _DevicePoints.
 function GetPointErrorMigrationState(const AWorkbookXml,
   ADevicePointsXml: string): TPointErrorMigrationState;
 var
-  HeaderCount, NameCount, I, Occurrences, TotalOccurrences: Integer;
-  ExpectedName, PointErrorColumn, ExpectedReference: string;
-  HeaderOrderValid: Boolean;
-  HeaderMatch: TMatch;
+  WorkbookDocument, DevicePointsDocument: IXMLDocument;
+  Header: TDevicePointsHeaderInfo;
+  Names: TPointErrorDefinedNameInfo;
+  Worksheet, SheetData: IXMLNode;
+  I, RowNumber, RequiredRowsFound: Integer;
 begin
-  HeaderCount := TRegEx.Matches(ADevicePointsXml,
-    '<t>PointError</t>', [roIgnoreCase]).Count;
-  HeaderOrderValid := TRegEx.IsMatch(ADevicePointsXml,
-    '<t>Q</t>\s*</is>\s*</c>\s*<c\b[^>]*>.*?<t>PointError</t>',
-    [roIgnoreCase, roSingleLine]);
-  HeaderMatch := TRegEx.Match(ADevicePointsXml,
-    '<c\b[^>]*\br="([A-Z]+)2"[^>]*>.*?<t>PointError</t>',
-    [roIgnoreCase, roSingleLine]);
-  if HeaderMatch.Success then
-    PointErrorColumn := HeaderMatch.Groups[1].Value
-  else
-    PointErrorColumn := '';
-  NameCount := 0;
+  Result := pemsInvalid;
+  try
+    WorkbookDocument := LoadXMLData(AWorkbookXml); WorkbookDocument.Active := True;
+    DevicePointsDocument := LoadXMLData(ADevicePointsXml); DevicePointsDocument.Active := True;
+  except Exit(pemsInvalid); end;
+  Header := GetDevicePointsHeaderInfo(DevicePointsDocument);
+  Names := GetPointErrorDefinedNameInfo(WorkbookDocument, Header.PointErrorColumn);
+  Worksheet := DevicePointsDocument.DocumentElement;
+  SheetData := FindDirectChildNode(Worksheet, 'sheetData');
+  RequiredRowsFound := 0;
+  if SheetData <> nil then
+    for I := 0 to SheetData.ChildNodes.Count - 1 do
+      if SameText(SheetData.ChildNodes[I].LocalName, 'row') and
+         TryStrToInt(VarToStr(SheetData.ChildNodes[I].Attributes['r']),
+           RowNumber) and (RowNumber >= 3) and
+         (RowNumber <= TReportTemplateService.MAX_DEVICE_POINTS + 2) then
+        Inc(RequiredRowsFound);
+  if not Header.HeaderRowFound or (Header.QIndex = -2) or
+     (Header.PointErrorCount > 1) or
+     (Header.QIndex < 0) or
+     ((Header.PointErrorCount = 1) and (Header.PointErrorColumn = '')) or
+     (RequiredRowsFound <> TReportTemplateService.MAX_DEVICE_POINTS) or
+     (Names.DuplicateCount > 0) or
+     (Names.MalformedReferenceCount > 0) then Exit(pemsInvalid);
+  if (Header.QIndex >= 0) and (Header.PointErrorCount = 0) and
+     (Names.ExistingCount = 0) then Exit(pemsRequired);
+  if (Header.QIndex >= 0) and (Header.PointErrorCount = 1) and
+     (Header.PointErrorIndex = Header.QIndex + 1) and
+     (Header.PointErrorColumn <> '') and
+     not SameText(Header.PointErrorColumn, Header.QColumn) and
+     (Names.ExistingCount = Names.ExpectedCount) and
+     (Names.CorrectCount = Names.ExpectedCount) and
+     (Names.InvalidReferenceCount = 0) then Exit(pemsNotRequired);
+  Result := pemsPartial;
+end;
+
+// Возвращает техническое имя состояния миграции PointError.
+function PointErrorMigrationStateToString(
+  const AState: TPointErrorMigrationState): string;
+begin
+  case AState of
+    pemsNotRequired: Result := 'pemsNotRequired';
+    pemsRequired: Result := 'pemsRequired';
+    pemsPartial: Result := 'pemsPartial';
+    pemsInvalid: Result := 'pemsInvalid';
+  else Result := 'pemsInvalid'; end;
+end;
+
+// Формирует диагностику структуры PointError без изменения XML.
+function BuildPointErrorMigrationDiagnostic(const AWorkbookXml,
+  ADevicePointsXml: string): string;
+var
+  WorkbookDocument, DevicePointsDocument: IXMLDocument;
+  Header: TDevicePointsHeaderInfo;
+  Names: TPointErrorDefinedNameInfo;
+  DefinedNamesNode, Child: IXMLNode;
+  I, J, Count: Integer;
+  ExpectedName, ExpectedReference, ActualReference, Missing, Invalid: string;
+begin
+  try
+    WorkbookDocument := LoadXMLData(AWorkbookXml); WorkbookDocument.Active := True;
+    DevicePointsDocument := LoadXMLData(ADevicePointsXml); DevicePointsDocument.Active := True;
+  except on E: Exception do Exit('XML parse error: ' + E.Message); end;
+  Header := GetDevicePointsHeaderInfo(DevicePointsDocument);
+  Names := GetPointErrorDefinedNameInfo(WorkbookDocument, Header.PointErrorColumn);
+  Missing := ''; Invalid := '';
+  DefinedNamesNode := FindDirectChildNode(WorkbookDocument.DocumentElement, 'definedNames');
   for I := 1 to TReportTemplateService.MAX_DEVICE_POINTS do
   begin
     ExpectedName := Format('DevicePoints_%.2d_PointError', [I]);
-    TotalOccurrences := TRegEx.Matches(AWorkbookXml,
-      '\bname="' + TRegEx.Escape(ExpectedName) + '"', [roIgnoreCase]).Count;
-    if TotalOccurrences > 1 then Exit(pemsInvalid);
-    ExpectedReference := Format('''_DevicePoints''!$%s$%d',
-      [PointErrorColumn, I + 2]);
-    Occurrences := TRegEx.Matches(AWorkbookXml, '<definedName\b[^>]*\bname="' +
-      TRegEx.Escape(ExpectedName) + '"[^>]*>' +
-      TRegEx.Escape(ExpectedReference) + '</definedName>',
-      [roIgnoreCase]).Count;
-    Inc(NameCount, Occurrences);
+    ExpectedReference := NormalizeDefinedNameReference(Format(
+      '''_DevicePoints''!$%s$%d', [Header.PointErrorColumn, I + 2]));
+    Count := 0;
+    if DefinedNamesNode <> nil then
+      for J := 0 to DefinedNamesNode.ChildNodes.Count - 1 do
+      begin
+        Child := DefinedNamesNode.ChildNodes[J];
+        if SameText(Child.LocalName, 'definedName') and
+           SameText(VarToStr(Child.Attributes['name']), ExpectedName) then
+        begin
+          Inc(Count);
+          ActualReference := NormalizeDefinedNameReference(Child.Text);
+          if not SameText(ActualReference, ExpectedReference) then
+            Invalid := Invalid + Format('%s expected=%s actual=%s; ',
+              [ExpectedName, ExpectedReference, ActualReference]);
+        end;
+      end;
+    if Count = 0 then Missing := Missing + ExpectedName + '; ';
   end;
-  if HeaderCount > 1 then Exit(pemsInvalid);
-  if (HeaderCount = 0) and (NameCount = 0) then Exit(pemsRequired);
-  if (HeaderCount = 1) and HeaderOrderValid and
-     (NameCount = TReportTemplateService.MAX_DEVICE_POINTS) then
-    Exit(pemsNotRequired);
-  Result := pemsPartial;
+  Result := Format('HeaderRowFound=%s; QColumn=%s; QIndex=%d; ' +
+    'PointErrorColumn=%s; PointErrorIndex=%d; PointErrorHeaderCount=%d; ' +
+    'ExpectedDefinedNameCount=%d; ExistingDefinedNameCount=%d; ' +
+    'CorrectDefinedNameCount=%d; DuplicateCount=%d; InvalidReferenceCount=%d; ' +
+    'Missing=%s; Invalid=%s',
+    [BoolToStr(Header.HeaderRowFound, True), Header.QColumn, Header.QIndex,
+     Header.PointErrorColumn, Header.PointErrorIndex, Header.PointErrorCount,
+     Names.ExpectedCount, Names.ExistingCount, Names.CorrectCount,
+     Names.DuplicateCount, Names.InvalidReferenceCount, Missing, Invalid]);
 end;
 
 // Удаляет артефакты прежней однотабличной схемы, не затрагивая таблицы шаблона.
@@ -1950,11 +2207,14 @@ begin
       UpdateReportDefinedNames(WorkbookXml, DefinedNames);
     ValidateWorkbookXmlText(WorkbookXml, 'именованные диапазоны', True);
     ValidateWorkbookXml(WorkbookXml, 'именованные диапазоны');
+    PointErrorMigrationState := GetPointErrorMigrationState(WorkbookXml,
+      SheetXml[1]);
     if NeedsPointErrorMigration and
-       (GetPointErrorMigrationState(WorkbookXml, SheetXml[1]) <>
-        pemsNotRequired) then
-      raise EInvalidOpException.Create(
-        'Миграция PointError не сформировала полную корректную структуру');
+       (PointErrorMigrationState <> pemsNotRequired) then
+      raise EInvalidOpException.CreateFmt(
+        'Миграция PointError завершилась некорректно: State=%s; %s',
+        [PointErrorMigrationStateToString(PointErrorMigrationState),
+         BuildPointErrorMigrationDiagnostic(WorkbookXml, SheetXml[1])]);
 
     for I := Low(CSheetNames) to High(CSheetNames) do
       ValidateSeparatedWorksheetXml(SheetXml[I], CSheetNames[I]);
