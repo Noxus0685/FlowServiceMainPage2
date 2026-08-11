@@ -39,6 +39,26 @@ type
     TechnicalName: string;
   end;
 
+  // Описывает постоянное положение поля на техническом листе отчёта.
+  TReportStaticColumn = record
+    SheetName: string;
+    ObjectType: string;
+    FieldName: string;
+    TechnicalName: string;
+    RussianCaption: string;
+    ColumnIndex: Integer;
+  end;
+
+// Возвращает полный неизменяемый набор столбцов технических листов отчёта.
+function GetReportStaticColumns: TArray<TReportStaticColumn>;
+
+// Полностью удаляет из XLSX все технические листы FlowService и связанные с ними служебные элементы.
+procedure RemoveReportTechnicalSheets(const ASourceFileName,
+  AOutputFileName: string);
+// Создаёт полный статичный комплект технических листов и служебных definedName.
+procedure AddReportTechnicalSheets(const ASourceFileName,
+  AOutputFileName: string; ARoot: TJSONObject);
+
   TReportWorksheetLocation = record
     SheetName: string;
     RelationId: string;
@@ -1127,8 +1147,8 @@ end;
 // Возвращает устойчивый набор столбцов канонической схемы.
 function BuildSeparatedColumns(ARows: TJSONArray;
   const AObjectTypes: array of string): TList<string>;
-var Columns: TArray<TReportColumn>; SheetName: string;
-  Column: TReportColumn;
+var Columns: TArray<TReportStaticColumn>; SheetName: string;
+  Column: TReportStaticColumn;
 begin
   if (Length(AObjectTypes) = 1) and SameText(AObjectTypes[0], 'DevicePoint') then
     SheetName := '_DevicePoints'
@@ -1136,9 +1156,63 @@ begin
     SheetName := '_Spillages'
   else
     SheetName := '_CoefTables';
-  Columns := BuildTechnicalSheetColumns(SheetName, ARows);
+  Columns := GetReportStaticColumns;
   Result := TList<string>.Create;
-  for Column in Columns do AddUniqueColumn(Result, Column.TechnicalName);
+  for Column in Columns do
+    if SameText(Column.SheetName, SheetName) then
+      AddUniqueColumn(Result, Column.FieldName);
+end;
+
+// Возвращает полный неизменяемый набор столбцов технических листов отчёта.
+function GetReportStaticColumns: TArray<TReportStaticColumn>;
+const
+  CTypes: array[0..3] of string = ('DevicePoint', 'Spillage',
+    'CalibrCoefTable', 'CalibrCoefItem');
+  CSheets: array[0..3] of string = ('_DevicePoints', '_Spillages',
+    '_CoefTables', '_CoefTables');
+var
+  Root: TJSONObject;
+  Rows: TJSONArray;
+  Source: TArray<TReportColumn>;
+  Item: TReportStaticColumn;
+  List: TList<TReportStaticColumn>;
+  TypeIndex, ColumnIndex: Integer;
+  Column: TReportColumn;
+begin
+  { EnsureTechnicalSheetSchema is used only as the single, versioned schema
+    catalogue.  Actual report rows are deliberately never inspected here. }
+  Root := TJSONObject.Create;
+  List := TList<TReportStaticColumn>.Create;
+  try
+    Rows := TJSONArray.Create;
+    Root.AddPair('Rows', Rows);
+    EnsureTechnicalSheetSchema(Root);
+    for TypeIndex := Low(CTypes) to High(CTypes) do
+    begin
+      Source := JsonRowsToColumns(Rows, [CTypes[TypeIndex]], True);
+      ColumnIndex := 0;
+      for Column in Source do
+      begin
+        if SameText(Column.TechnicalName, '_SchemaOnly') then Continue;
+        Inc(ColumnIndex);
+        Item.SheetName := CSheets[TypeIndex];
+        Item.ObjectType := CTypes[TypeIndex];
+        Item.FieldName := Column.TechnicalName;
+        Item.TechnicalName := Column.TechnicalName;
+        Item.RussianCaption := GetReportFieldCaption(Item.ObjectType,
+          Item.FieldName);
+        Item.ColumnIndex := ColumnIndex;
+        if (List.Count = 0) or
+           not SameText(List[List.Count - 1].SheetName, Item.SheetName) or
+           not SameText(List[List.Count - 1].FieldName, Item.FieldName) then
+          List.Add(Item);
+      end;
+    end;
+    Result := List.ToArray;
+  finally
+    List.Free;
+    Root.Free;
+  end;
 end;
 
 // Возвращает ширину столбца по содержимому с ограничением для читаемости.
@@ -1409,9 +1483,8 @@ begin
   TotalRows := 2;
   for ObjectIndex := Low(ObjectTypes) to High(ObjectTypes) do
   begin
-    ActualColumns := JsonRowsToColumns(ARows, [ObjectTypes[ObjectIndex]], False);
     SchemaColumns := JsonRowsToColumns(ARows, [ObjectTypes[ObjectIndex]], True);
-    Columns := MergeReportColumns(ActualColumns, SchemaColumns);
+    Columns := SchemaColumns;
     for Column in Columns do
       if not MatchText(Column.TechnicalName, ServiceFields) then Inc(TotalRows);
   end;
@@ -1443,9 +1516,8 @@ begin
         if not IsSchemaRow(Row) and RowHasObjectType(Row, [ObjectType]) then
         begin ActualRow := Row; Break; end;
       end;
-      ActualColumns := JsonRowsToColumns(ARows, [ObjectType], False);
       SchemaColumns := JsonRowsToColumns(ARows, [ObjectType], True);
-      Columns := MergeReportColumns(ActualColumns, SchemaColumns);
+      Columns := SchemaColumns;
       for Column in Columns do
       begin
         FieldName := Column.TechnicalName;
@@ -1484,8 +1556,12 @@ end;
 // Формирует служебный лист метаданных отчёта.
 function BuildMetaWorksheetXml(ARoot: TJSONObject;
   ADefinedNames: TDictionary<string, string>): string;
+const
+  CMetaFields: array[0..4] of string = ('SchemaVersion', 'GeneratedAt',
+    'MaxDevicePoints', 'MaxPointSpillages', 'MaxCoefItems');
 var
-  Pair: TJSONPair;
+  FieldName: string;
+  Value: TJSONValue;
   RowIndex: Integer;
   Builder: TStringBuilder;
 begin
@@ -1500,16 +1576,16 @@ begin
     Builder.Append('<row r="2"><c r="A2" t="inlineStr"><is><t>Параметр</t></is></c>');
     Builder.Append('<c r="B2" t="inlineStr"><is><t>Значение</t></is></c></row>');
     RowIndex := 3;
-    for Pair in ARoot do
-      if not SameText(Pair.JsonString.Value, 'Rows') then
+    for FieldName in CMetaFields do
       begin
+        Value := ARoot.GetValue(FieldName);
         Builder.Append(Format(
           '<row r="%d"><c r="A%d" t="inlineStr"><is><t>%s</t></is></c>' +
           '<c r="B%d" t="inlineStr"><is><t>%s</t></is></c></row>',
-          [RowIndex, RowIndex, XmlEscape(Pair.JsonString.Value), RowIndex,
-           XmlEscape(JsonValueToText(Pair.JsonValue))]));
+          [RowIndex, RowIndex, XmlEscape(FieldName), RowIndex,
+           XmlEscape(JsonValueToText(Value))]));
         ADefinedNames.AddOrSetValue(
-          BuildReportDefinedName('ReportMeta_' + Pair.JsonString.Value),
+          BuildReportDefinedName('ReportMeta_' + FieldName),
           Format('''_Meta''!$B$%d', [RowIndex]));
         Inc(RowIndex);
       end;
@@ -1828,6 +1904,33 @@ begin
     end;
   finally
     Counts.Free;
+  end;
+end;
+
+procedure ValidatePreparedStaticDefinedNames(const AWorkbookXml: string;
+  const AExpected: TDictionary<string, string>);
+var
+  Document: IXMLDocument;
+  NamesNode: IXMLNode;
+  Index: TDictionary<string, IXMLNode>;
+  Pair: TPair<string, string>;
+begin
+  Document := LoadXMLData(AWorkbookXml);
+  Document.Active := True;
+  NamesNode := FindDirectChildNode(Document.DocumentElement, 'definedNames');
+  if NamesNode = nil then
+    raise EInvalidOpException.Create(
+      'Шаблон отчёта не подготовлен или повреждён. Загрузите шаблон повторно.');
+  ValidateDefinedNameDuplicates(NamesNode);
+  Index := BuildDefinedNameIndex(NamesNode);
+  try
+    for Pair in AExpected do
+      if not Index.ContainsKey(Pair.Key) or
+         (Index[Pair.Key].Text <> Pair.Value) then
+        raise EInvalidOpException.Create(
+          'Шаблон отчёта не подготовлен или повреждён. Загрузите шаблон повторно.');
+  finally
+    Index.Free;
   end;
 end;
 function SerializeXmlDocumentUtf8(const ADocument: IXMLDocument): string;
@@ -2358,18 +2461,13 @@ begin
 end;
 
 
-function ReplaceReportDefinedNames(const AWorkbookXml: string;
-  const ADefinedNames: TDictionary<string, string>): string; forward;
-procedure CopyXlsxReplacingWorkbook(const ASourceFileName, AOutputFileName,
-  AWorkbookXml: string); forward;
-
 procedure ExportTechnicalSheets(const ASourceFileName, AOutputFileName: string;
   ARoot: TJSONObject);
 const
   Titles: array[0..4] of string = ('Общие данные прибора', 'Точки прибора',
     'Проливки по точкам', 'Калибровочные таблицы и коэффициенты',
     'Метаданные отчёта');
-var Zip: TZipFile; WorkbookXml, RelsXml, TempOutput, WorkbookOutput: string;
+var Zip: TZipFile; WorkbookXml, RelsXml, TempOutput: string;
   Locations: TArray<TReportWorksheetLocation>; SheetXml: TArray<string>;
   Rows: TJSONArray; Names, TechnicalSheets: TDictionary<string, string>;
   InlineSharedStrings: TArray<string>; I: Integer;
@@ -2402,7 +2500,7 @@ begin
     for I := 0 to High(SheetXml) do
       ValidateSeparatedWorksheetXml(SheetXml[I], Locations[I].SheetName);
     ValidateGeneratedDefinedNames(Names);
-    WorkbookXml := ReplaceReportDefinedNames(WorkbookXml, Names);
+    ValidatePreparedStaticDefinedNames(WorkbookXml, Names);
     TechnicalSheets := TDictionary<string, string>.Create;
     try
       for I := 0 to High(SheetXml) do
@@ -2417,15 +2515,145 @@ begin
     Names.Free;
   end;
   TempOutput := BuildTemporaryReportFileName(AOutputFileName);
-  WorkbookOutput := BuildTemporaryReportFileName(AOutputFileName);
   try
-    CopyXlsxReplacingWorkbook(ASourceFileName, WorkbookOutput, WorkbookXml);
-    ReplaceTechnicalSheetEntries(WorkbookOutput, TempOutput, Locations, SheetXml);
+    ReplaceTechnicalSheetEntries(ASourceFileName, TempOutput, Locations, SheetXml);
     ValidateGeneratedTechnicalSheets(TempOutput, Locations);
     ReplaceReportOutputFile(TempOutput, AOutputFileName);
   finally
     if FileExists(TempOutput) then TFile.Delete(TempOutput);
-    if FileExists(WorkbookOutput) then TFile.Delete(WorkbookOutput);
+  end;
+end;
+
+
+procedure AddUtf8ZipEntry(AZip: TZipFile; const AName, AText: string); forward;
+
+function ReferenceUsesTechnicalSheet(const AReference: string): Boolean;
+var SheetName: string;
+begin
+  Result := False;
+  for SheetName in CReportTechnicalSheetNames do
+    if TRegEx.IsMatch(AReference, '(^|[^A-Za-z0-9_])''?' +
+      TRegEx.Escape(SheetName) + '''?!', [roIgnoreCase]) then
+      Exit(True);
+end;
+
+// Полностью удаляет из XLSX все технические листы FlowService и связанные с ними служебные элементы.
+procedure RemoveReportTechnicalSheets(const ASourceFileName,
+  AOutputFileName: string);
+var
+  SourceZip, OutputZip: TZipFile;
+  WorkbookXml, RelsXml, ContentXml, RelationId, Target, ArchivePath: string;
+  SheetName, EntryName, Normalized: string;
+  RelationIds, RemovedEntries: TList<string>;
+  RemovedSheetIndexes: TList<Integer>;
+  Match: TMatch;
+  Stream: TStream;
+  Header: TZipHeader;
+  I, SheetIndex, LocalSheetId, NewLocalSheetId: Integer;
+  Tag, LocalValue: string;
+begin
+  SourceZip := TZipFile.Create;
+  OutputZip := TZipFile.Create;
+  RelationIds := TList<string>.Create;
+  RemovedEntries := TList<string>.Create;
+  RemovedSheetIndexes := TList<Integer>.Create;
+  try
+    SourceZip.Open(ASourceFileName, zmRead);
+    WorkbookXml := ReadZipEntryUtf8(SourceZip, 'xl/workbook.xml');
+    RelsXml := ReadZipEntryUtf8(SourceZip, 'xl/_rels/workbook.xml.rels');
+    ContentXml := ReadZipEntryUtf8(SourceZip, '[Content_Types].xml');
+    SheetIndex := 0;
+    for Match in TRegEx.Matches(WorkbookXml, '<sheet\b[^>]*/?>',
+      [roIgnoreCase]) do
+    begin
+      Tag := Match.Value;
+      for SheetName in CReportTechnicalSheetNames do
+        if SameText(XmlAttribute(Tag, 'name'), SheetName) then
+        begin RemovedSheetIndexes.Add(SheetIndex); Break; end;
+      Inc(SheetIndex);
+    end;
+    for SheetName in CReportTechnicalSheetNames do
+    begin
+      RelationId := FindSheetRelationId(WorkbookXml, SheetName);
+      if RelationId = '' then Continue;
+      RelationIds.Add(RelationId);
+      Match := TRegEx.Match(RelsXml, '<Relationship\b(?=[^>]*\bId="' +
+        TRegEx.Escape(RelationId) + '")[^>]*/>', [roIgnoreCase]);
+      if Match.Success then
+      begin
+        Target := XmlAttribute(Match.Value, 'Target');
+        if Target <> '' then
+        begin
+          ArchivePath := WorkbookTargetToArchivePath(Target);
+          RemovedEntries.Add(ArchivePath);
+          RemovedEntries.Add(ExtractFilePath(ArchivePath).Replace('\', '/') +
+            '_rels/' + ExtractFileName(ArchivePath) + '.rels');
+          ContentXml := TRegEx.Replace(ContentXml,
+            '<Override\b(?=[^>]*\bPartName="/?' +
+            TRegEx.Escape(ArchivePath) + '")[^>]*/>', '', [roIgnoreCase]);
+        end;
+        RelsXml := StringReplace(RelsXml, Match.Value, '', []);
+      end;
+      WorkbookXml := TRegEx.Replace(WorkbookXml,
+        '<sheet\b(?=[^>]*\bname="' + TRegEx.Escape(SheetName) +
+        '")[^>]*/?>', '', [roIgnoreCase]);
+    end;
+    { A definedName belongs to a technical sheet by its reference, never by
+      its (possibly obsolete or differently cased) name. }
+    for Match in TRegEx.Matches(WorkbookXml,
+      '<definedName\b[^>]*>.*?</definedName>', [roIgnoreCase, roSingleLine]) do
+    begin
+      LocalValue := XmlAttribute(Match.Value, 'localSheetId');
+      if ReferenceUsesTechnicalSheet(Match.Value) or
+         (TryStrToInt(LocalValue, LocalSheetId) and
+          (RemovedSheetIndexes.IndexOf(LocalSheetId) >= 0)) then
+        WorkbookXml := StringReplace(WorkbookXml, Match.Value, '', []);
+    end;
+    { Local names of user sheets retain their original DOM node and attributes;
+      only the positional localSheetId is shifted past removed sheets. }
+    for Match in TRegEx.Matches(WorkbookXml,
+      '<definedName\b[^>]*>.*?</definedName>', [roIgnoreCase, roSingleLine]) do
+    begin
+      Tag := Match.Value;
+      LocalValue := XmlAttribute(Tag, 'localSheetId');
+      if not TryStrToInt(LocalValue, LocalSheetId) then Continue;
+      NewLocalSheetId := LocalSheetId;
+      for I := 0 to RemovedSheetIndexes.Count - 1 do
+        if RemovedSheetIndexes[I] < LocalSheetId then Dec(NewLocalSheetId);
+      if NewLocalSheetId <> LocalSheetId then
+      begin
+        Tag := TRegEx.Replace(Tag, '(\blocalSheetId=")' + LocalValue + '"',
+          '$1' + NewLocalSheetId.ToString + '"', [roIgnoreCase]);
+        WorkbookXml := StringReplace(WorkbookXml, Match.Value, Tag, []);
+      end;
+    end;
+
+    OutputZip.Open(AOutputFileName, zmWrite);
+    for EntryName in SourceZip.FileNames do
+    begin
+      Normalized := NormalizeArchivePath(EntryName);
+      I := RemovedEntries.IndexOf(Normalized);
+      if I >= 0 then Continue;
+      if SameText(Normalized, 'xl/workbook.xml') then
+        AddUtf8ZipEntry(OutputZip, EntryName, WorkbookXml)
+      else if SameText(Normalized, 'xl/_rels/workbook.xml.rels') then
+        AddUtf8ZipEntry(OutputZip, EntryName, RelsXml)
+      else if SameText(Normalized, '[Content_Types].xml') then
+        AddUtf8ZipEntry(OutputZip, EntryName, ContentXml)
+      else
+      begin
+        Stream := nil;
+        SourceZip.Read(EntryName, Stream, Header);
+        try Stream.Position := 0; OutputZip.Add(Stream, EntryName);
+        finally Stream.Free; end;
+      end;
+    end;
+  finally
+    RemovedSheetIndexes.Free;
+    RemovedEntries.Free;
+    RelationIds.Free;
+    OutputZip.Free;
+    SourceZip.Free;
   end;
 end;
 
@@ -2464,57 +2692,6 @@ begin
   finally
     NameIndex.Free;
   end;
-end;
-
-// Полностью заменяет только управляемые приложением definedName, сохраняя
-// пользовательские имена книги без изменений.
-function ReplaceReportDefinedNames(const AWorkbookXml: string;
-  const ADefinedNames: TDictionary<string, string>): string;
-var
-  Doc: IXMLDocument;
-  NamesNode, NameNode: IXMLNode;
-  Pair: TPair<string, string>;
-  UserIndex: TDictionary<string, IXMLNode>;
-  UserNode: IXMLNode;
-  UserName, UserReference, NormalizedName: string;
-  I: Integer;
-begin
-  Doc := LoadXMLData(AWorkbookXml);
-  Doc.Active := True;
-  NamesNode := EnsureDefinedNamesNode(Doc.DocumentElement);
-  for I := NamesNode.ChildNodes.Count - 1 downto 0 do
-  begin
-    NameNode := NamesNode.ChildNodes[I];
-    if SameText(NameNode.LocalName, 'definedName') and
-       IsReportDefinedName(VarToStr(NameNode.Attributes['name'])) then
-      NamesNode.DOMNode.removeChild(NameNode.DOMNode);
-  end;
-  UserIndex := BuildDefinedNameIndex(NamesNode);
-  try
-    for Pair in ADefinedNames do
-    begin
-      ValidateDefinedNameValues(Pair.Key, Pair.Value);
-      if UserIndex.TryGetValue(Pair.Key, UserNode) then
-      begin
-        UserName := VarToStr(UserNode.Attributes['name']);
-        UserReference := UserNode.Text;
-        NormalizedName := UpperCase(Pair.Key);
-        raise EInvalidOpException.CreateFmt(
-          'Конфликт пользовательского и служебного definedName: ' +
-          'UserName=%s; ServiceName=%s; Normalized=%s; ' +
-          'UserReference=%s; ServiceReference=%s; ' +
-          'Stage=ReplaceReportDefinedNames',
-          [UserName, Pair.Key, NormalizedName, UserReference, Pair.Value]);
-      end;
-      NameNode := NamesNode.AddChild('definedName', NamesNode.NamespaceURI);
-      NameNode.Attributes['name'] := Pair.Key;
-      NameNode.Text := Pair.Value;
-    end;
-  finally
-    UserIndex.Free;
-  end;
-  ValidateDefinedNameDuplicates(NamesNode);
-  Result := SerializeXmlDocumentUtf8(Doc);
 end;
 
 procedure AddUtf8ZipEntry(AZip: TZipFile; const AName, AText: string);
@@ -2577,73 +2754,8 @@ begin
   end;
 end;
 
-procedure CopyXlsxReplacingWorkbook(const ASourceFileName, AOutputFileName,
-  AWorkbookXml: string);
-var SourceZip, OutputZip: TZipFile; Name: string; Stream: TStream;
-  Header: TZipHeader;
-begin
-  SourceZip := TZipFile.Create; OutputZip := TZipFile.Create;
-  try
-    SourceZip.Open(ASourceFileName, zmRead);
-    OutputZip.Open(AOutputFileName, zmWrite);
-    for Name in SourceZip.FileNames do
-      if SameText(NormalizeArchivePath(Name), 'xl/workbook.xml') then
-        AddUtf8ZipEntry(OutputZip, Name, AWorkbookXml)
-      else
-      begin
-        Stream := nil; SourceZip.Read(Name, Stream, Header);
-        try Stream.Position := 0; OutputZip.Add(Stream, Name); finally Stream.Free; end;
-      end;
-  finally
-    OutputZip.Free; SourceZip.Free;
-  end;
-end;
-
-
-
-// Полностью пересоздаёт технические листы подготовленного шаблона по
-// актуальной JSON-схеме, не затрагивая пользовательские ZIP-entry.
-procedure RepairPreparedReportDefinedNames(const ASourceFileName,
-  AOutputFileName: string);
-var
-  Root: TJSONObject;
-  Rows: TJSONArray;
-begin
-  Root := TJSONObject.Create;
-  try
-    Root.AddPair('SchemaVersion', TJSONNumber.Create(1));
-    Root.AddPair('GeneratedAt', FormatDateTime('yyyy-mm-dd hh:nn:ss', Now));
-    Root.AddPair('MaxDevicePoints',
-      TJSONNumber.Create(TReportTemplateService.MAX_DEVICE_POINTS));
-    Root.AddPair('MaxPointSpillages',
-      TJSONNumber.Create(TReportTemplateService.MAX_POINT_SPILLAGES));
-    Root.AddPair('MaxCoefItems',
-      TJSONNumber.Create(TReportTemplateService.MAX_COEF_ITEMS));
-    Rows := TJSONArray.Create;
-    Root.AddPair('Rows', Rows);
-    EnsureTechnicalSheetSchema(Root);
-    ExportTechnicalSheets(ASourceFileName, AOutputFileName, Root);
-  finally
-    Root.Free;
-  end;
-end;
-
-function MissingTechnicalSheetNames(const AWorkbookXml: string): TArray<string>;
-var Missing: TList<string>; I: Integer;
-begin
-  Missing := TList<string>.Create;
-  try
-    for I := Low(CReportTechnicalSheetNames) to High(CReportTechnicalSheetNames) do
-      if FindSheetRelationId(AWorkbookXml, CReportTechnicalSheetNames[I]) = '' then
-        Missing.Add(CReportTechnicalSheetNames[I]);
-    Result := Missing.ToArray;
-  finally
-    Missing.Free;
-  end;
-end;
-
-// Один раз добавляет пять технических листов в исходный пользовательский XLSX.
-procedure PrepareNewTemplateFile(const ASourceFileName, AOutputFileName: string;
+// Создаёт полный статичный комплект технических листов и служебных definedName.
+procedure AddReportTechnicalSheets(const ASourceFileName, AOutputFileName: string;
   ARoot: TJSONObject);
 const
   Titles: array[0..4] of string = ('Общие данные прибора', 'Точки прибора',
@@ -2811,31 +2923,18 @@ end;
 class function TReportTemplateService.PrepareTemplate(
   const ASourceFileName: string): string;
 var
-  BaseName, Extension, WorkbookXml, RelsXml, TemporaryFileName: string;
+  BaseName, Extension, CleanFileName, PreparedFileName: string;
   Suffix: Integer;
-  Zip: TZipFile;
-  Missing: TArray<string>;
-  PreparedLocations: TArray<TReportWorksheetLocation>;
   EmptyJson: TJSONObject;
   EmptyRows: TJSONArray;
+  Zip: TZipFile;
+  WorkbookXml, RelsXml: string;
+  PreparedLocations: TArray<TReportWorksheetLocation>;
 begin
   if not FileExists(ASourceFileName) then
     raise EFileNotFoundException.CreateFmt('Шаблон не найден: %s', [ASourceFileName]);
   if not SameText(ExtractFileExt(ASourceFileName), '.xlsx') then
     raise EArgumentException.Create('Поддерживаются только шаблоны XLSX');
-  Zip := TZipFile.Create;
-  try
-    Zip.Open(ASourceFileName, zmRead);
-    WorkbookXml := ReadZipEntryUtf8(Zip, 'xl/workbook.xml');
-    RelsXml := ReadZipEntryUtf8(Zip, 'xl/_rels/workbook.xml.rels');
-  finally
-    Zip.Free;
-  end;
-  Missing := MissingTechnicalSheetNames(WorkbookXml);
-  if (Length(Missing) <> 0) and
-     (Length(Missing) <> Length(CReportTechnicalSheetNames)) then
-    raise EInvalidOpException.Create('Шаблон содержит только часть технических листов. ' +
-      'Отсутствуют: ' + string.Join(', ', Missing));
   BaseName := TPath.GetFileNameWithoutExtension(ASourceFileName);
   Extension := ExtractFileExt(ASourceFileName);
   Result := TPath.Combine(TemplatesPath, BaseName + Extension);
@@ -2846,47 +2945,39 @@ begin
       Format('%s_%d%s', [BaseName, Suffix, Extension]));
     Inc(Suffix);
   end;
-  if Length(Missing) = 0 then
-  begin
-    ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
-    TemporaryFileName := BuildTemporaryReportFileName(Result);
-    try
-      RepairPreparedReportDefinedNames(ASourceFileName, TemporaryFileName);
-      TFile.Move(TemporaryFileName, Result);
-    finally
-      if FileExists(TemporaryFileName) then TFile.Delete(TemporaryFileName);
-    end;
-    Exit;
-  end;
+
   EmptyJson := TJSONObject.Create;
+  CleanFileName := BuildTemporaryReportFileName(Result);
+  PreparedFileName := BuildTemporaryReportFileName(Result);
   try
-    EmptyJson.AddPair('SchemaVersion', TJSONNumber.Create(1));
-    EmptyJson.AddPair('GeneratedAt', FormatDateTime('yyyy-mm-dd hh:nn:ss', Now));
+    EmptyJson.AddPair('SchemaVersion', TJSONNumber.Create(2));
+    EmptyJson.AddPair('GeneratedAt', '');
     EmptyJson.AddPair('MaxDevicePoints', TJSONNumber.Create(MAX_DEVICE_POINTS));
     EmptyJson.AddPair('MaxPointSpillages', TJSONNumber.Create(MAX_POINT_SPILLAGES));
     EmptyJson.AddPair('MaxCoefItems', TJSONNumber.Create(MAX_COEF_ITEMS));
     EmptyRows := TJSONArray.Create;
     EmptyJson.AddPair('Rows', EmptyRows);
     EnsureTechnicalSheetSchema(EmptyJson);
-    TemporaryFileName := BuildTemporaryReportFileName(Result);
-      try
-        PrepareNewTemplateFile(ASourceFileName, TemporaryFileName, EmptyJson);
-        Zip := TZipFile.Create;
-        try
-          Zip.Open(TemporaryFileName, zmRead);
-          WorkbookXml := ReadZipEntryUtf8(Zip, 'xl/workbook.xml');
-          RelsXml := ReadZipEntryUtf8(Zip, 'xl/_rels/workbook.xml.rels');
-        finally
-          Zip.Free;
-        end;
-        PreparedLocations := ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
-        ValidateGeneratedTechnicalSheets(TemporaryFileName, PreparedLocations);
-        TFile.Move(TemporaryFileName, Result);
-      finally
-        if FileExists(TemporaryFileName) then TFile.Delete(TemporaryFileName);
-      end;
+
+    { There is deliberately no partial/already-prepared branch.  Every input
+      follows the same remove-then-add path. }
+    RemoveReportTechnicalSheets(ASourceFileName, CleanFileName);
+    AddReportTechnicalSheets(CleanFileName, PreparedFileName, EmptyJson);
+    Zip := TZipFile.Create;
+    try
+      Zip.Open(PreparedFileName, zmRead);
+      WorkbookXml := ReadZipEntryUtf8(Zip, 'xl/workbook.xml');
+      RelsXml := ReadZipEntryUtf8(Zip, 'xl/_rels/workbook.xml.rels');
+    finally
+      Zip.Free;
+    end;
+    PreparedLocations := ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
+    ValidateGeneratedTechnicalSheets(PreparedFileName, PreparedLocations);
+    TFile.Move(PreparedFileName, Result);
   finally
     EmptyJson.Free;
+    if FileExists(CleanFileName) then TFile.Delete(CleanFileName);
+    if FileExists(PreparedFileName) then TFile.Delete(PreparedFileName);
   end;
 end;
 
