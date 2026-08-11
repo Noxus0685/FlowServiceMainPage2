@@ -5271,7 +5271,10 @@ begin
       UpdateReportTemplateControls;
       ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateImport',
         'Загружен шаблон отчёта', Format('File=%s; DurationMs=%d',
-          [TPath.GetFileName(ImportedFileName), Stopwatch.ElapsedMilliseconds]));
+          [TPath.GetFileName(ImportedFileName), Stopwatch.ElapsedMilliseconds]) +
+          '; CalcMode=auto; FullCalcOnLoad=True; ForceFullCalc=True; ' +
+          'CalcOnSave=True; CalcId=0; CalcChainRemoved=True; ' +
+          'Stage=EnableFullWorkbookRecalculation');
     except
       on E: Exception do
       begin
@@ -5375,7 +5378,9 @@ begin
   FReportExportTask := nil;
   ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateExport',
     'Сформирован отчёт по шаблону', Format(
-      'Output=%s; DurationMs=%d; Thread=Worker',
+      'Output=%s; DurationMs=%d; Thread=Worker; CalcMode=auto; ' +
+      'FullCalcOnLoad=True; ForceFullCalc=True; CalcOnSave=True; CalcId=0; ' +
+      'CalcChainRemoved=True; Stage=EnableFullWorkbookRecalculation',
       [AOutputFileName, ADurationMs]));
 end;
 
