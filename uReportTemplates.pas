@@ -483,7 +483,7 @@ end;
 function CreateReportDefinedNames: TDictionary<string, string>;
 begin
   Result := TDictionary<string, string>.Create(
-    TStringComparer.OrdinalIgnoreCase);
+    TIStringComparer.Ordinal);
 end;
 
 // Возвращает понятное русское название поля служебного отчёта.
@@ -1599,7 +1599,7 @@ function BuildDefinedNameIndex(const ADefinedNamesNode: IXMLNode):
 var I: Integer; Child: IXMLNode; NameValue: string;
 begin
   Result := TDictionary<string, IXMLNode>.Create(
-    TStringComparer.OrdinalIgnoreCase);
+    TIStringComparer.Ordinal);
   if ADefinedNamesNode = nil then Exit;
   for I := 0 to ADefinedNamesNode.ChildNodes.Count - 1 do
   begin
@@ -1627,7 +1627,7 @@ begin
     raise EArgumentNilException.Create(
       'Не задан словарь сформированных definedName');
   Seen := TDictionary<string, string>.Create(
-    TStringComparer.OrdinalIgnoreCase);
+    TIStringComparer.Ordinal);
   try
     for Pair in ADefinedNames do
     begin
