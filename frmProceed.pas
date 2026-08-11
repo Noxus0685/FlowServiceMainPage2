@@ -54,7 +54,8 @@ uses
   uWorkTable,
   uMKSDebug,
   uMeasurementRun,
-  uGridLayoutManager;
+  uGridLayoutManager,
+  uReportTemplates;
 
 type
   // Направление сортировки таблицы обработки.
@@ -519,8 +520,7 @@ implementation
     uAppServices,
     uMeterValue,
     fuDeviceEdit,
-    uGridXlsxExporter,
-    uReportTemplates;
+    uGridXlsxExporter;
 {$R *.fmx}
 
 const

@@ -59,7 +59,7 @@ type
     ArchivePath: string;
   end;
 // Возвращает полный неизменяемый набор столбцов технических листов отчёта.
-function GetReportStaticColumns: TArray<TReportStaticColumn>;
+
 
   // Содержит фактически прочитанные параметры вычисления сохранённого XLSX.
   TReportCalculationState = record
@@ -82,7 +82,7 @@ function GetReportStaticColumns: TArray<TReportStaticColumn>;
     LastWriteTimeUtc: TDateTime;
     CalculationState: TReportCalculationState;
   end;
-
+function GetReportStaticColumns: TArray<TReportStaticColumn>;
 // Возвращает пути ZIP-entry пяти существующих технических листов.
 function ResolveTechnicalSheetEntries(const AWorkbookXml: string;
   const AWorkbookRelsXml: string): TArray<TReportWorksheetLocation>;
