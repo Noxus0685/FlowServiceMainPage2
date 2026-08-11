@@ -49,6 +49,14 @@ type
     ColumnIndex: Integer;
   end;
 
+
+
+  TReportWorksheetLocation = record
+    SheetName: string;
+    RelationId: string;
+    RelationshipTarget: string;
+    ArchivePath: string;
+  end;
 // Возвращает полный неизменяемый набор столбцов технических листов отчёта.
 function GetReportStaticColumns: TArray<TReportStaticColumn>;
 
@@ -58,14 +66,6 @@ procedure RemoveReportTechnicalSheets(const ASourceFileName,
 // Создаёт полный статичный комплект технических листов и служебных definedName.
 procedure AddReportTechnicalSheets(const ASourceFileName,
   AOutputFileName: string; ARoot: TJSONObject);
-
-  TReportWorksheetLocation = record
-    SheetName: string;
-    RelationId: string;
-    RelationshipTarget: string;
-    ArchivePath: string;
-  end;
-
 // Возвращает пути ZIP-entry пяти существующих технических листов.
 function ResolveTechnicalSheetEntries(const AWorkbookXml: string;
   const AWorkbookRelsXml: string): TArray<TReportWorksheetLocation>;
