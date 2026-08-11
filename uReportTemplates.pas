@@ -1,4 +1,4 @@
-﻿unit uReportTemplates;
+unit uReportTemplates;
 
 interface
 
@@ -12,15 +12,6 @@ uses
   uDeviceClass,
   uMeterValue;
 
-// Возвращает перечень отсутствующих или не связанных служебных листов FlowService.
-function GetMissingReportTemplateSheets(const AWorkbookXml: string;
-  const AWorkbookRelsRoot: IXMLNode): TArray<string>;
-// Определяет наличие полного комплекта служебных листов FlowService и корректных связей на их XML.
-function IsPreparedReportTemplate(const AWorkbookXml: string;
-  const AWorkbookRelsRoot: IXMLNode): Boolean;
-// Исправляет только известные повреждения workbook.xml, созданные прежними версиями отчётной подсистемы.
-function RepairLegacyReportWorkbookXml(const AWorkbookXml: string;
-  out ARepaired: Boolean): string;
 function GetReportFlowUnitName(ADevice: TDevice): string;
 function GetReportBaseFlowUnitName(ADevice: TDevice): string;
 function ConvertBaseFlowToReportUnits(ADevice: TDevice;
@@ -39,86 +30,23 @@ function RoundReportValueByMeterPrecision(const AValue: Double;
   const AMeterValue: TMeterValue): Double;
 
 type
-  TPointErrorMigrationState = (pemsNotRequired, pemsRequired, pemsPartial,
-    pemsInvalid);
-  TDevicePointsHeaderInfo = record
-    QColumn: string;
-    PointErrorColumn: string;
-    PointErrorCount: Integer;
-    QIndex: Integer;
-    PointErrorIndex: Integer;
-    HeaderRowFound: Boolean;
-  end;
-  // Содержит состояние и точные причины необходимости миграции PointError.
-  TPointErrorMigrationAnalysis = record
-    State: TPointErrorMigrationState;
-    XmlValid: Boolean;
-    WorkbookValid: Boolean;
-    DevicePointsValid: Boolean;
-    HeaderRowFound: Boolean;
-    QColumn: string;
-    QIndex: Integer;
-    PointErrorColumn: string;
-    PointErrorIndex: Integer;
-    PointErrorHeaderCount: Integer;
-    ExpectedDefinedNameCount: Integer;
-    ExistingDefinedNameCount: Integer;
-    CorrectDefinedNameCount: Integer;
-    DuplicateCount: Integer;
-    InvalidReferenceCount: Integer;
-    MalformedReferenceCount: Integer;
-    CanRepair: Boolean;
-    Reason: string;
-    MissingNames: string;
-    InvalidReferences: string;
-  end;
-  // Содержит имя служебного листа и его фактический путь внутри XLSX.
   TReportWorksheetLocation = record
     SheetName: string;
     RelationId: string;
     RelationshipTarget: string;
     ArchivePath: string;
   end;
-  // Содержит длительности основных этапов формирования XLSX.
-  TReportExportTiming = record
-    SnapshotMs: Int64;
-    OpenArchiveMs: Int64;
-    ReadXmlMs: Int64;
-    BuildSheetsMs: Int64;
-    PointErrorMigrationMs: Int64;
-    WriteArchiveMs: Int64;
-    ValidationMs: Int64;
-    ReplaceOutputMs: Int64;
-    TotalMs: Int64;
-  end;
-  TPointErrorDefinedNameInfo = record
-    ExpectedCount: Integer;
-    ExistingCount: Integer;
-    CorrectCount: Integer;
-    DuplicateCount: Integer;
-    InvalidReferenceCount: Integer;
-    MalformedReferenceCount: Integer;
-  end;
 
-// Анализирует старую структуру PointError и определяет возможность автоматического исправления.
-function AnalyzePointErrorMigration(const AWorkbookXml,
-  ADevicePointsXml: string): TPointErrorMigrationAnalysis;
-function GetPointErrorMigrationState(const AWorkbookXml,
-  ADevicePointsXml: string): TPointErrorMigrationState;
-// Преобразует Target связи workbook в безопасный нормализованный путь ZIP.
-function ResolveWorkbookTargetArchivePath(const ATarget: string): string;
-// Определяет фактический XML-файл листа через workbook.xml и workbook.xml.rels.
-function ResolveReportWorksheetLocation(const AWorkbookXml: string;
-  const AWorkbookRelsRoot: IXMLNode;
-  const ASheetName: string): TReportWorksheetLocation;
-// Удаляет только принадлежащие FlowService диапазоны PointError.
-procedure RemoveFlowServicePointErrorDefinedNames(
-  const ADefinedNamesNode: IXMLNode);
-// Формирует диагностику из готового анализа без повторного разбора XML.
-function BuildPointErrorMigrationDiagnostic(
-  const AAnalysis: TPointErrorMigrationAnalysis): string; overload;
-function BuildPointErrorMigrationDiagnostic(const AWorkbookXml,
-  ADevicePointsXml: string): string; overload;
+// Возвращает пути ZIP-entry пяти существующих технических листов.
+function ResolveTechnicalSheetEntries(const AWorkbookXml: string;
+  const AWorkbookRelsXml: string): TArray<TReportWorksheetLocation>;
+// Заменяет данные только в существующих технических листах XLSX.
+procedure ReplaceTechnicalSheetEntries(const ASourceFileName,
+  AOutputFileName: string; const ALocations: TArray<TReportWorksheetLocation>;
+  const ASheetXml: TArray<string>);
+// Атомарно сохраняет сформированный XLSX и сохраняет резервную копию при ошибке замены.
+procedure ReplaceReportOutputFile(const ATemporaryFileName,
+  AOutputFileName: string);
 
 type
   TReportTemplateService = class
@@ -130,13 +58,13 @@ type
   public
     // Возвращает общий каталог XLSX-шаблонов приложения и создаёт его при отсутствии.
     class function TemplatesPath: string; static;
-    // Копирует XLSX в каталог шаблонов и добавляет фиксированную таблицу ответа _Data.
-    class function ImportTemplate(const ASourceFileName: string): string; static;
+    // Добавляет технические листы и именованные диапазоны в новый пользовательский XLSX-шаблон.
+    class function PrepareTemplate(const ASourceFileName: string): string; static;
     // Формирует динамический JSON из объектов прибора для последующего заполнения _Data.
     class function BuildReportJson(ADevice: TDevice;
       ADeviceType: TDeviceType; AMeterValueError: TMeterValue = nil):
       TJSONObject; static;
-    // Создаёт отчёт из выбранного шаблона, заменяя только содержимое таблицы _Data.
+    // Создаёт отчёт, заменяя только пять существующих технических листов.
     class procedure ExportTemplate(const ATemplateFileName, AOutputFileName: string;
       ADevice: TDevice; ADeviceType: TDeviceType); static;
     // Формирует XLSX по заранее созданному неизменяемому JSON-снимку.
@@ -159,14 +87,7 @@ uses
   System.Variants,
   Xml.XMLDoc,
   Xml.xmldom,
-  uOpenXmlXlsx,
-  uProtocols;
-
-var
-  GReportLogLock: TObject;
-
-var
-  GReportLogLock: TObject;
+  uOpenXmlXlsx;
 
 type
   PSpillageStopCriteria = ^TSpillageStopCriteria;
@@ -175,7 +96,7 @@ const
   CCoefTableTypes: array[0..4] of Integer = (10, 11, 12, 13, 14);
   CWorksheetRelation: string =
     'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet';
-  CWorksheetContentType =
+  CWorksheetContentType: string =
     'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml';
   CReportTechnicalSheetNames: array[0..4] of string =
     ('_Data', '_DevicePoints', '_Spillages', '_CoefTables', '_Meta');
@@ -185,17 +106,6 @@ begin
   Result := StringReplace(APath, '\', '/', [rfReplaceAll]);
   while Result.StartsWith('/') do
     Delete(Result, 1, 1);
-end;
-
-function ReadUtf8File(const AFileName: string): string;
-begin
-  Result := TFile.ReadAllText(AFileName, TEncoding.UTF8);
-end;
-
-procedure WriteUtf8File(const AFileName, AText: string);
-begin
-  ForceDirectories(ExtractFileDir(AFileName));
-  TFile.WriteAllText(AFileName, AText, TEncoding.UTF8);
 end;
 
 // Возвращает уникальное имя временного XLSX рядом с итоговым файлом.
@@ -210,44 +120,6 @@ begin
     Result := TPath.Combine(DirectoryName, BaseName + '.' +
       TPath.GetRandomFileName.Replace('.', '') + '.tmp.xlsx');
   until not FileExists(Result);
-end;
-
-// Записывает этап формирования отчёта в отдельный технический журнал.
-procedure LogReportStage(const AStage: string);
-var
-  LogFileName: string;
-begin
-  TMonitor.Enter(GReportLogLock);
-  try
-    LogFileName := TPath.Combine(TPath.GetTempPath, 'FlowServiceReport.log');
-    TFile.AppendAllText(LogFileName,
-      FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now) + ' ' + AStage + sLineBreak,
-      TEncoding.UTF8);
-  finally
-    TMonitor.Exit(GReportLogLock);
-  end;
-end;
-
-function InsertBeforeClosingTag(const AXml, AClosingTag,
-  AFragment: string): string;
-var
-  P: Integer;
-  Builder: TStringBuilder;
-begin
-  // Создаёт новую XML-строку через TStringBuilder без изменения входной строки.
-  P := AXml.LastIndexOf(AClosingTag);
-  if (P < 0) or (P > AXml.Length) then
-    raise EInvalidOpException.CreateFmt('В XLSX не найден XML-узел %s',
-      [AClosingTag]);
-  Builder := TStringBuilder.Create(AXml.Length + AFragment.Length);
-  try
-    Builder.Append(AXml, 0, P);
-    Builder.Append(AFragment);
-    Builder.Append(AXml, P, AXml.Length - P);
-    Result := Builder.ToString;
-  finally
-    Builder.Free;
-  end;
 end;
 
 function XmlAttribute(const ATag, AName: string): string;
@@ -301,98 +173,7 @@ begin
   end;
 end;
 
-function GetMissingReportTemplateSheets(const AWorkbookXml: string;
-  const AWorkbookRelsRoot: IXMLNode): TArray<string>;
-const
-  CNames: array[0..4] of string = ('_Data', '_DevicePoints', '_Spillages',
-    '_CoefTables', '_Meta');
-var
-  Missing: TList<string>;
-  Name, RelationId, Target: string;
-begin
-  Missing := TList<string>.Create;
-  try
-    for Name in CNames do
-    begin
-      RelationId := FindSheetRelationId(AWorkbookXml, Name);
-      if RelationId = '' then
-        Missing.Add(Name + ' (лист отсутствует)')
-      else
-      begin
-        Target := FindRelationshipTarget(AWorkbookRelsRoot, RelationId);
-        if Target = '' then
-          Missing.Add(Name + ' (отсутствует связь ' + RelationId + ')');
-      end;
-    end;
-    Result := Missing.ToArray;
-  finally
-    Missing.Free;
-  end;
-end;
-
-function IsPreparedReportTemplate(const AWorkbookXml: string;
-  const AWorkbookRelsRoot: IXMLNode): Boolean;
-var
-  SeenNames, SeenIds: TDictionary<string, Byte>;
-  Match: TMatch;
-  Name, Id: string;
-begin
-  Result := Length(GetMissingReportTemplateSheets(AWorkbookXml,
-    AWorkbookRelsRoot)) = 0;
-  if not Result then
-    Exit;
-  SeenNames := TDictionary<string, Byte>.Create;
-  SeenIds := TDictionary<string, Byte>.Create;
-  try
-    for Match in TRegEx.Matches(AWorkbookXml, '<sheet\b[^>]*/?>',
-      [roIgnoreCase]) do
-    begin
-      Name := LowerCase(XmlAttribute(Match.Value, 'name'));
-      Id := XmlAttribute(Match.Value, 'sheetId');
-      if SeenNames.ContainsKey(Name) or SeenIds.ContainsKey(Id) then
-        Exit(False);
-      SeenNames.Add(Name, 0);
-      SeenIds.Add(Id, 0);
-    end;
-  finally
-    SeenIds.Free;
-    SeenNames.Free;
-  end;
-end;
-
 procedure ValidateWorkbookXml(const AWorkbookXml, AStage: string); forward;
-
-function RepairLegacyReportWorkbookXml(const AWorkbookXml: string;
-  out ARepaired: Boolean): string;
-var
-  StartPos, EndPos: Integer;
-  Fragment: string;
-begin
-  ARepaired := False;
-  Result := AWorkbookXml;
-  StartPos := Result.IndexOf('</definedNames>');
-  if StartPos < 0 then
-    StartPos := Result.IndexOf('</sheets>');
-  EndPos := Result.IndexOf('</workbook>', StartPos + 1);
-  if (StartPos < 0) or (EndPos < 0) then
-    Exit;
-  Fragment := Result.Substring(StartPos, EndPos - StartPos);
-  if Fragment.Contains('<<<calcPr') then
-    Fragment := Fragment.Replace('<<<calcPr', '<calcPr', [])
-  else if Fragment.Contains('<<calcPr') then
-    Fragment := Fragment.Replace('<<calcPr', '<calcPr', []);
-  if Fragment.Contains('</extLst>') and Fragment.Contains('/>xtLst>') then
-    Fragment := Fragment.Replace('/>xtLst>', '/><extLst>', [])
-  else if Fragment.Contains('</extLst>') and Fragment.Contains('/>extLst>') then
-    Fragment := Fragment.Replace('/>extLst>', '/><extLst>', []);
-  ARepaired := Fragment <> Result.Substring(StartPos, EndPos - StartPos);
-  if ARepaired then
-  begin
-    Delete(Result, StartPos + 1, EndPos - StartPos);
-    Insert(Fragment, Result, StartPos + 1);
-    ValidateWorkbookXml(Result, 'восстановление старого шаблона');
-  end;
-end;
 
 function NextSheetId(const AWorkbookXml: string): Integer;
 var
@@ -479,33 +260,6 @@ begin
 end;
 
 // Включает автоматический пересчёт книги, не изменяя соседние узлы workbook.xml.
-function EnsureAutomaticCalculation(const AWorkbookXml: string): string;
-const
-  CCalcPrPattern = '<calcPr\b[^>]*/>';
-  CCalcPrXml =
-    '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>';
-var
-  CalcPrRegex: TRegEx;
-  CalcPrCount: Integer;
-begin
-  if AWorkbookXml = '' then
-    raise EArgumentException.Create('Не задано содержимое xl/workbook.xml');
-
-  CalcPrRegex := TRegEx.Create(CCalcPrPattern, [roIgnoreCase]);
-  CalcPrCount := CalcPrRegex.Matches(AWorkbookXml).Count;
-  if CalcPrCount > 1 then
-    raise EInvalidOpException.CreateFmt(
-      'В workbook.xml найдено несколько узлов calcPr: %d', [CalcPrCount]);
-  if CalcPrCount = 1 then
-    Result := CalcPrRegex.Replace(AWorkbookXml, CCalcPrXml, 1)
-  else if AWorkbookXml.Contains('<extLst') then
-    Result := InsertBeforeUniqueXmlNode(AWorkbookXml, '<extLst', CCalcPrXml,
-      'EnsureAutomaticCalculation')
-  else
-    Result := InsertBeforeClosingTag(AWorkbookXml, '</workbook>', CCalcPrXml);
-  ValidateWorkbookXml(Result, 'EnsureAutomaticCalculation');
-end;
-
 function WorkbookTemplateReloadHint(const AStage: string): string;
 begin
   if SameText(AStage, 'чтение исходного шаблона') then
@@ -650,29 +404,6 @@ begin
 end;
 
 // Читает workbook.xml, исправляет только известные повреждения и проверяет результат через XML-парсер.
-function LoadAndValidateReportWorkbookXml(const AWorkbookFileName,
-  AStage: string; out ARepaired: Boolean): string;
-var
-  Bytes: TBytes;
-  Offset: Integer;
-  OriginalXml: string;
-begin
-  if not FileExists(AWorkbookFileName) then
-    raise EFileNotFoundException.CreateFmt('Не найден xl/workbook.xml: %s',
-      [AWorkbookFileName]);
-  Bytes := TFile.ReadAllBytes(AWorkbookFileName);
-  Offset := 0;
-  if (Length(Bytes) >= 3) and (Bytes[0] = $EF) and (Bytes[1] = $BB) and
-     (Bytes[2] = $BF) then
-    Offset := 3;
-  OriginalXml := TEncoding.UTF8.GetString(Bytes, Offset, Length(Bytes) - Offset);
-  Result := RepairLegacyReportWorkbookXml(OriginalXml, ARepaired);
-  ARepaired := ARepaired and (Result <> OriginalXml);
-  ValidateWorkbookXmlText(Result, AStage, False);
-  ValidateWorkbookXml(Result, AStage);
-end;
-
-// Преобразует Target связи workbook в безопасный нормализованный путь ZIP.
 function ResolveWorkbookTargetArchivePath(const ATarget: string): string;
 var
   Source, Part: string;
@@ -1736,59 +1467,6 @@ begin
 end;
 
 // Добавляет, обновляет и удаляет только именованные диапазоны FlowService через XML DOM.
-procedure UpdateReportDefinedNames(var AWorkbookXml: string;
-  ADefinedNames: TDictionary<string, string>);
-var
-  Document: IXMLDocument;
-  WorkbookRoot, DefinedNamesNode, DefinedNameNode: IXMLNode;
-  Pair: TPair<string, string>;
-  SerializedXml: string;
-begin
-  if ADefinedNames = nil then
-    raise EArgumentNilException.Create('Не задан набор definedName FlowService');
-  ValidateWorkbookXmlText(AWorkbookXml, 'до обновления definedNames DOM', False);
-  ValidateWorkbookXml(AWorkbookXml, 'до обновления definedNames DOM');
-
-  Document := LoadXMLData(AWorkbookXml);
-  Document.Active := True;
-  Document.Encoding := 'UTF-8';
-  WorkbookRoot := Document.DocumentElement;
-  if (WorkbookRoot = nil) or not SameText(WorkbookRoot.LocalName, 'workbook') then
-    raise EInvalidOpException.Create('Некорректный корневой узел workbook');
-  DefinedNamesNode := EnsureDefinedNamesNode(WorkbookRoot);
-  RemoveObsoleteReportDefinedNames(DefinedNamesNode, ADefinedNames);
-
-  for Pair in ADefinedNames do
-  begin
-    ValidateDefinedNameValues(Pair.Key, Pair.Value);
-    DefinedNameNode := FindDefinedNameNode(DefinedNamesNode, Pair.Key);
-    if DefinedNameNode = nil then
-      DefinedNameNode := DefinedNamesNode.AddChild('definedName',
-        WorkbookRoot.NamespaceURI);
-    DefinedNameNode.Attributes['name'] := Pair.Key;
-    DefinedNameNode.Text := Pair.Value;
-    if not SameText(DefinedNameNode.LocalName, 'definedName') or
-       not SameText(VarToStr(DefinedNameNode.Attributes['name']), Pair.Key) or
-       (DefinedNameNode.Text <> Pair.Value) then
-      raise EInvalidOpException.CreateFmt(
-        'DOM не сохранил definedName %s внутри %s',
-        [Pair.Key, DefinedNamesNode.LocalName]);
-  end;
-
-  ValidateDefinedNameDuplicates(DefinedNamesNode);
-  if ContainsDefinedName(ADefinedNames, 'ReportMeta_GeneratedAt') and
-     (FindDefinedNameNode(DefinedNamesNode,
-       'ReportMeta_GeneratedAt') = nil) then
-    raise EInvalidOpException.Create(
-      'DOM не содержит обязательный ReportMeta_GeneratedAt после обновления');
-  SerializedXml := SerializeXmlDocumentUtf8(Document);
-  ValidateWorkbookXmlText(SerializedXml,
-    'после обновления definedNames DOM', False);
-  ValidateWorkbookXml(SerializedXml, 'после обновления definedNames DOM');
-  AWorkbookXml := SerializedXml;
-end;
-
-// Проверяет XML сформированного отдельного служебного листа.
 procedure ValidateSeparatedWorksheetXml(const AXml, ASheetName: string);
 var
   Document: IXMLDocument;
@@ -1908,299 +1586,6 @@ begin
 end;
 
 // Нормализует ссылку definedName для безопасного сравнения.
-function NormalizeDefinedNameReference(const AReference: string): string;
-var
-  Value, ColumnName: string;
-  MarkerPos, ColumnStart, ColumnEnd: Integer;
-begin
-  Value := Trim(AReference);
-  Value := StringReplace(Value, #13, '', [rfReplaceAll]);
-  Value := StringReplace(Value, #10, '', [rfReplaceAll]);
-  Value := StringReplace(Value, #9, '', [rfReplaceAll]);
-  MarkerPos := Pos('!$', Value);
-  if MarkerPos > 0 then
-  begin
-    ColumnStart := MarkerPos + 2;
-    ColumnEnd := ColumnStart;
-    while (ColumnEnd <= Length(Value)) and
-          CharInSet(UpCase(Value[ColumnEnd]), ['A'..'Z']) do Inc(ColumnEnd);
-    ColumnName := UpperCase(Copy(Value, ColumnStart, ColumnEnd - ColumnStart));
-    if ColumnName <> '' then
-      Value := Copy(Value, 1, ColumnStart - 1) + ColumnName +
-        Copy(Value, ColumnEnd, MaxInt);
-  end;
-  Result := Value;
-end;
-
-function IsValidPointErrorReferenceSyntax(const AReference: string): Boolean;
-const
-  CPrefix = '''_DevicePoints''!$';
-var
-  Value: string;
-  I: Integer;
-begin
-  Result := False;
-  Value := NormalizeDefinedNameReference(AReference);
-  if not Value.StartsWith(CPrefix, True) then Exit;
-  I := Length(CPrefix) + 1;
-  while (I <= Length(Value)) and CharInSet(Value[I], ['A'..'Z']) do Inc(I);
-  if (I = Length(CPrefix) + 1) or (I > Length(Value)) or
-     (Value[I] <> '$') then Exit;
-  Inc(I);
-  if I > Length(Value) then Exit;
-  while (I <= Length(Value)) and CharInSet(Value[I], ['0'..'9']) do Inc(I);
-  Result := I > Length(Value);
-end;
-
-// Проверяет диапазоны DevicePoints_XX_PointError по узлам definedName.
-function GetPointErrorDefinedNameInfo(
-  const AWorkbookDocument: IXMLDocument;
-  const APointErrorColumn: string): TPointErrorDefinedNameInfo;
-var
-  Root, DefinedNamesNode, Child: IXMLNode;
-  I, J, PerNameCount: Integer;
-  ExpectedName, ExpectedReference, ActualReference: string;
-begin
-  Result := Default(TPointErrorDefinedNameInfo);
-  Result.ExpectedCount := TReportTemplateService.MAX_DEVICE_POINTS;
-  if AWorkbookDocument = nil then Exit;
-  Root := AWorkbookDocument.DocumentElement;
-  if (Root = nil) or not SameText(Root.LocalName, 'workbook') then Exit;
-  DefinedNamesNode := FindDirectChildNode(Root, 'definedNames');
-  if DefinedNamesNode = nil then Exit;
-  for I := 1 to Result.ExpectedCount do
-  begin
-    ExpectedName := Format('DevicePoints_%.2d_PointError', [I]);
-    ExpectedReference := NormalizeDefinedNameReference(Format(
-      '''_DevicePoints''!$%s$%d', [APointErrorColumn, I + 2]));
-    PerNameCount := 0;
-    for J := 0 to DefinedNamesNode.ChildNodes.Count - 1 do
-    begin
-      Child := DefinedNamesNode.ChildNodes[J];
-      if not SameText(Child.LocalName, 'definedName') or
-         not SameText(VarToStr(Child.Attributes['name']), ExpectedName) then Continue;
-      Inc(PerNameCount);
-      Inc(Result.ExistingCount);
-      ActualReference := NormalizeDefinedNameReference(Child.Text);
-      if not IsValidPointErrorReferenceSyntax(ActualReference) then
-      begin
-        Inc(Result.InvalidReferenceCount);
-        Inc(Result.MalformedReferenceCount);
-      end
-      else if SameText(ActualReference, ExpectedReference) then
-        Inc(Result.CorrectCount)
-      else Inc(Result.InvalidReferenceCount);
-    end;
-    if PerNameCount > 1 then Inc(Result.DuplicateCount, PerNameCount - 1);
-  end;
-end;
-
-// Проверяет, принадлежит ли имя управляемому набору PointError FlowService.
-function IsFlowServicePointErrorDefinedName(const AName: string): Boolean;
-var PointIndex: Integer;
-begin
-  Result := (Length(AName) = Length('DevicePoints_01_PointError')) and
-    SameText(Copy(AName, 1, 13), 'DevicePoints_') and
-    CharInSet(AName[14], ['0'..'9']) and CharInSet(AName[15], ['0'..'9']) and
-    SameText(Copy(AName, 16, MaxInt), '_PointError') and
-    TryStrToInt(Copy(AName, 14, 2), PointIndex) and (PointIndex >= 1) and
-    (PointIndex <= TReportTemplateService.MAX_DEVICE_POINTS);
-end;
-
-// Удаляет только принадлежащие FlowService диапазоны DevicePoints_XX_PointError перед их пересозданием.
-procedure RemoveFlowServicePointErrorDefinedNames(const ADefinedNamesNode: IXMLNode);
-var I: Integer; Child: IXMLNode; Name, LocalSheetId: string;
-begin
-  if ADefinedNamesNode = nil then Exit;
-  for I := ADefinedNamesNode.ChildNodes.Count - 1 downto 0 do
-  begin
-    Child := ADefinedNamesNode.ChildNodes[I];
-    if not SameText(Child.LocalName, 'definedName') then Continue;
-    Name := VarToStr(Child.Attributes['name']);
-    LocalSheetId := VarToStr(Child.Attributes['localSheetId']);
-    if IsFlowServicePointErrorDefinedName(Name) and (LocalSheetId = '') then
-    begin
-      ADefinedNamesNode.DOMNode.removeChild(Child.DOMNode);
-    end;
-  end;
-end;
-
-procedure RemoveFlowServicePointErrorDefinedNamesFromWorkbook(var AWorkbookXml: string);
-var Document: IXMLDocument; Root, DefinedNamesNode: IXMLNode;
-begin
-  Document := LoadXMLData(AWorkbookXml); Document.Active := True;
-  Root := Document.DocumentElement;
-  if (Root = nil) or not SameText(Root.LocalName, 'workbook') then
-    raise EInvalidOpException.Create('Некорректный корневой узел workbook');
-  DefinedNamesNode := FindDirectChildNode(Root, 'definedNames');
-  RemoveFlowServicePointErrorDefinedNames(DefinedNamesNode);
-  ValidateDefinedNameDuplicates(DefinedNamesNode);
-  AWorkbookXml := SerializeXmlDocumentUtf8(Document);
-end;
-
-// Анализирует старую структуру PointError и определяет возможность автоматического исправления.
-function AnalyzePointErrorMigration(const AWorkbookXml,
-  ADevicePointsXml: string): TPointErrorMigrationAnalysis;
-var
-  WorkbookDocument, DevicePointsDocument: IXMLDocument;
-  WorkbookRoot, DevicePointsRoot, DefinedNamesNode, Child: IXMLNode;
-  Header: TDevicePointsHeaderInfo; Names: TPointErrorDefinedNameInfo;
-  I, J, Count, DefinedNamesContainerCount: Integer;
-  ExpectedName, ExpectedReference, ActualReference, LocalSheetId: string;
-begin
-  Result := Default(TPointErrorMigrationAnalysis);
-  Result.State := pemsInvalid; Result.QIndex := -1; Result.PointErrorIndex := -1;
-  Result.ExpectedDefinedNameCount := TReportTemplateService.MAX_DEVICE_POINTS;
-  try
-    WorkbookDocument := LoadXMLData(AWorkbookXml); WorkbookDocument.Active := True;
-  except on E: Exception do begin Result.Reason := 'workbook.xml: ' + E.Message; Exit; end; end;
-  WorkbookRoot := WorkbookDocument.DocumentElement;
-  if (WorkbookRoot = nil) or not SameText(WorkbookRoot.LocalName, 'workbook') then
-  begin Result.Reason := 'Отсутствует корневой узел workbook'; Exit; end;
-  Result.WorkbookValid := True;
-  try
-    DevicePointsDocument := LoadXMLData(ADevicePointsXml); DevicePointsDocument.Active := True;
-  except on E: Exception do begin Result.Reason := '_DevicePoints XML: ' + E.Message; Exit; end; end;
-  DevicePointsRoot := DevicePointsDocument.DocumentElement;
-  if (DevicePointsRoot = nil) or not SameText(DevicePointsRoot.LocalName, 'worksheet') then
-  begin Result.Reason := 'Отсутствует корневой узел worksheet'; Exit; end;
-  Result.DevicePointsValid := True; Result.XmlValid := True;
-  DefinedNamesContainerCount := 0; DefinedNamesNode := nil;
-  for I := 0 to WorkbookRoot.ChildNodes.Count - 1 do
-    if SameText(WorkbookRoot.ChildNodes[I].LocalName, 'definedNames') then
-    begin Inc(DefinedNamesContainerCount); DefinedNamesNode := WorkbookRoot.ChildNodes[I]; end;
-  if DefinedNamesContainerCount > 1 then
-  begin Result.Reason := 'В workbook найдено несколько контейнеров definedNames'; Exit; end;
-  Header := GetDevicePointsHeaderInfo(DevicePointsDocument);
-  Names := GetPointErrorDefinedNameInfo(WorkbookDocument, Header.PointErrorColumn);
-  Result.HeaderRowFound := Header.HeaderRowFound; Result.QColumn := Header.QColumn;
-  Result.QIndex := Header.QIndex; Result.PointErrorColumn := Header.PointErrorColumn;
-  Result.PointErrorIndex := Header.PointErrorIndex;
-  Result.PointErrorHeaderCount := Header.PointErrorCount;
-  Result.ExistingDefinedNameCount := Names.ExistingCount;
-  Result.CorrectDefinedNameCount := Names.CorrectCount;
-  Result.DuplicateCount := Names.DuplicateCount;
-  Result.InvalidReferenceCount := Names.InvalidReferenceCount;
-  Result.MalformedReferenceCount := Names.MalformedReferenceCount;
-  for I := 1 to Result.ExpectedDefinedNameCount do
-  begin
-    ExpectedName := Format('DevicePoints_%.2d_PointError', [I]);
-    ExpectedReference := NormalizeDefinedNameReference(Format(
-      '''_DevicePoints''!$%s$%d', [Header.PointErrorColumn, I + 2]));
-    Count := 0;
-    if DefinedNamesNode <> nil then for J := 0 to DefinedNamesNode.ChildNodes.Count - 1 do
-    begin
-      Child := DefinedNamesNode.ChildNodes[J];
-      if not SameText(Child.LocalName, 'definedName') or
-         not SameText(VarToStr(Child.Attributes['name']), ExpectedName) then Continue;
-      Inc(Count); LocalSheetId := VarToStr(Child.Attributes['localSheetId']);
-      if LocalSheetId <> '' then
-      begin
-        Result.Reason := Result.Reason + Format('Конфликт %s с localSheetId=%s; ',
-          [ExpectedName, LocalSheetId]);
-        Result.InvalidReferences := Result.InvalidReferences + Format('%s localSheetId=%s; ',
-          [ExpectedName, LocalSheetId]);
-      end;
-      ActualReference := NormalizeDefinedNameReference(Child.Text);
-      if not SameText(ActualReference, ExpectedReference) then
-        Result.InvalidReferences := Result.InvalidReferences + Format(
-          '%s expected=%s actual=%s; ', [ExpectedName, ExpectedReference, ActualReference]);
-    end;
-    if Count = 0 then Result.MissingNames := Result.MissingNames + ExpectedName + '; ';
-  end;
-  if Pos('localSheetId=', Result.Reason) > 0 then
-  begin Result.CanRepair := False; Result.State := pemsInvalid; Exit; end;
-  Result.CanRepair := True;
-  if Header.HeaderRowFound and (Header.QIndex >= 0) and
-     (Header.PointErrorCount = 1) and (Header.PointErrorIndex = Header.QIndex + 1) and
-     (Header.PointErrorColumn <> '') and not SameText(Header.PointErrorColumn, Header.QColumn) and
-     (Names.ExistingCount = Names.ExpectedCount) and (Names.CorrectCount = Names.ExpectedCount) and
-     (Names.DuplicateCount = 0) and (Names.InvalidReferenceCount = 0) then
-  begin Result.State := pemsNotRequired; Result.Reason := 'Структура PointError актуальна'; end
-  else
-  begin Result.State := pemsRequired;
-    Result.Reason := 'Разбираемая структура PointError отсутствует, устарела или неполна; ' + Result.Reason; end;
-end;
-
-function GetPointErrorMigrationState(const AWorkbookXml,
-  ADevicePointsXml: string): TPointErrorMigrationState;
-begin
-  Result := AnalyzePointErrorMigration(AWorkbookXml, ADevicePointsXml).State;
-end;
-
-function PointErrorMigrationStateToString(const AState: TPointErrorMigrationState): string;
-begin
-  case AState of
-    pemsNotRequired: Result := 'pemsNotRequired'; pemsRequired: Result := 'pemsRequired';
-    pemsPartial: Result := 'pemsPartial'; pemsInvalid: Result := 'pemsInvalid';
-  else Result := 'pemsInvalid'; end;
-end;
-
-// Формирует диагностику из готового анализа без повторного разбора XML.
-function BuildPointErrorMigrationDiagnostic(
-  const AAnalysis: TPointErrorMigrationAnalysis): string; overload;
-begin
-  Result := Format('State=%s; CanRepair=%s; Reason=%s; XmlValid=%s; WorkbookValid=%s; ' +
-    'DevicePointsValid=%s; HeaderRowFound=%s; QColumn=%s; QIndex=%d; PointErrorColumn=%s; ' +
-    'PointErrorIndex=%d; PointErrorHeaderCount=%d; ExpectedDefinedNameCount=%d; ' +
-    'ExistingDefinedNameCount=%d; CorrectDefinedNameCount=%d; DuplicateCount=%d; ' +
-    'InvalidReferenceCount=%d; MalformedReferenceCount=%d; MissingNames=%s; InvalidReferences=%s',
-    [PointErrorMigrationStateToString(AAnalysis.State), BoolToStr(AAnalysis.CanRepair, True),
-     AAnalysis.Reason, BoolToStr(AAnalysis.XmlValid, True),
-     BoolToStr(AAnalysis.WorkbookValid, True), BoolToStr(AAnalysis.DevicePointsValid, True),
-     BoolToStr(AAnalysis.HeaderRowFound, True), AAnalysis.QColumn, AAnalysis.QIndex,
-     AAnalysis.PointErrorColumn, AAnalysis.PointErrorIndex, AAnalysis.PointErrorHeaderCount,
-     AAnalysis.ExpectedDefinedNameCount, AAnalysis.ExistingDefinedNameCount,
-     AAnalysis.CorrectDefinedNameCount, AAnalysis.DuplicateCount,
-     AAnalysis.InvalidReferenceCount, AAnalysis.MalformedReferenceCount,
-     AAnalysis.MissingNames, AAnalysis.InvalidReferences]);
-end;
-
-function BuildPointErrorMigrationDiagnostic(const AWorkbookXml,
-  ADevicePointsXml: string): string; overload;
-begin
-  Result := BuildPointErrorMigrationDiagnostic(
-    AnalyzePointErrorMigration(AWorkbookXml, ADevicePointsXml));
-end;
-
-// Удаляет артефакты прежней однотабличной схемы, не затрагивая таблицы шаблона.
-procedure RemoveLegacyReportTableArtifacts(const ATempDir: string;
-  var AContentTypesXml: string);
-var
-  Document: IXMLDocument;
-  Root: IXMLNode;
-  FileName, LegacyName, PartName, TablesDirectory: string;
-begin
-  LegacyName := 'tblReport' + 'Data';
-  TablesDirectory := TPath.Combine(ATempDir, 'xl\tables');
-  if not DirectoryExists(TablesDirectory) then
-    Exit;
-  for FileName in TDirectory.GetFiles(TablesDirectory, '*.xml') do
-  begin
-    try
-      Document := LoadXMLData(ReadUtf8File(FileName));
-      Document.Active := True;
-    except
-      on E: EDOMParseError do
-        raise EInvalidOpException.CreateFmt(
-          'Некорректный XML существующей Excel-таблицы %s: %s',
-          [FileName, E.Message]);
-    end;
-    Root := Document.DocumentElement;
-    if (Root <> nil) and
-       (SameText(VarToStr(Root.Attributes['name']), LegacyName) or
-        SameText(VarToStr(Root.Attributes['displayName']), LegacyName)) then
-    begin
-      PartName := NormalizeArchivePath(FileName.Substring(
-        IncludeTrailingPathDelimiter(ATempDir).Length));
-      AContentTypesXml := TRegEx.Replace(AContentTypesXml,
-        '<Override\b[^>]*PartName="/' + TRegEx.Escape(PartName) +
-        '"[^>]*/>', '', [roIgnoreCase]);
-      DeleteFile(FileName);
-    end;
-  end;
-end;
-
 procedure ValidateZipEntries(AZip: TZipFile);
 var
   Name: string;
@@ -2224,35 +1609,12 @@ begin
   finally
     Seen.Free;
   end;
-end;
-
-procedure ZipDirectory(const ASourceDir, AFileName: string);
-var
-  Zip: TZipFile;
-  FileName, ArchiveName: string;
-begin
-  Zip := TZipFile.Create;
-  try
-    Zip.Open(AFileName, zmWrite);
-    for FileName in TDirectory.GetFiles(ASourceDir, '*',
-      TSearchOption.soAllDirectories) do
-    begin
-      ArchiveName := NormalizeArchivePath(FileName.Substring(
-        IncludeTrailingPathDelimiter(ASourceDir).Length));
-      Zip.Add(FileName, ArchiveName);
-    end;
-  finally
-    Zip.Free;
-  end;
-end;
 
 // Проверяет наличие ZIP entry по нормализованному пути.
 function ZipEntryExists(AZip: TZipFile; const AArchivePath: string): Boolean;
-var
-  Name, Wanted: string;
+var Name, Wanted: string;
 begin
   Result := False;
-  if AZip = nil then Exit;
   Wanted := NormalizeArchivePath(AArchivePath);
   for Name in AZip.FileNames do
     if SameText(NormalizeArchivePath(Name), Wanted) then Exit(True);
@@ -2266,16 +1628,9 @@ begin
     if SameText(NormalizeArchivePath(Name), Wanted) then Exit(Name);
 end;
 
-// Читает UTF-8 XML непосредственно из ZIP entry без полной распаковки архива.
 function ReadZipEntryUtf8(AZip: TZipFile; const AArchivePath: string): string;
-var
-  Bytes: TBytes;
-  ActualName: string;
-  Stream: TStream;
-  Header: TZipHeader;
-  Offset: Integer;
+var Bytes: TBytes; ActualName: string; Stream: TStream; Header: TZipHeader;
 begin
-  if AZip = nil then raise EArgumentNilException.Create('Не задан ZIP-архив');
   ActualName := FindActualZipEntryName(AZip, AArchivePath);
   if ActualName = '' then
     raise EFileNotFoundException.CreateFmt('В XLSX отсутствует ZIP entry %s', [AArchivePath]);
@@ -2289,477 +1644,356 @@ begin
   finally
     Stream.Free;
   end;
-  Offset := 0;
-  if (Length(Bytes) >= 3) and (Bytes[0] = $EF) and (Bytes[1] = $BB) and
-     (Bytes[2] = $BF) then Offset := 3;
-  Result := TEncoding.UTF8.GetString(Bytes, Offset, Length(Bytes) - Offset);
+  Result := TEncoding.UTF8.GetString(Bytes);
+  if (Result <> '') and (Result[1] = #$FEFF) then Delete(Result, 1, 1);
 end;
 
-// Определяет фактический XML-файл листа через workbook.xml и workbook.xml.rels.
-function ResolveReportWorksheetLocation(const AWorkbookXml: string;
-  const AWorkbookRelsRoot: IXMLNode;
-  const ASheetName: string): TReportWorksheetLocation;
-var
-  I: Integer;
-  Node: IXMLNode;
-  RelationType: string;
+// Возвращает пути ZIP-entry пяти существующих технических листов.
+function ResolveTechnicalSheetEntries(const AWorkbookXml: string;
+  const AWorkbookRelsXml: string): TArray<TReportWorksheetLocation>;
+var Doc: IXMLDocument; Root, Node: IXMLNode; I, J: Integer; RelationType: string;
 begin
-  Result := Default(TReportWorksheetLocation);
-  Result.SheetName := ASheetName;
-  Result.RelationId := FindSheetRelationId(AWorkbookXml, ASheetName);
-  if Result.RelationId = '' then
-    raise EInvalidOpException.CreateFmt(
-      'Не найдена связь технического листа: SheetName=%s; RelationId=; Target=',
-      [ASheetName]);
-  if AWorkbookRelsRoot = nil then
-    raise EInvalidOpException.CreateFmt(
-      'Отсутствует корень workbook.xml.rels: SheetName=%s; RelationId=%s; Target=',
-      [ASheetName, Result.RelationId]);
-  for I := 0 to AWorkbookRelsRoot.ChildNodes.Count - 1 do
+  Doc := LoadXMLData(AWorkbookRelsXml); Doc.Active := True;
+  Root := Doc.DocumentElement;
+  if (Root = nil) or not SameText(Root.LocalName, 'Relationships') then
+    raise EInvalidOpException.Create('Некорректный xl/_rels/workbook.xml.rels');
+  SetLength(Result, Length(CReportTechnicalSheetNames));
+  for I := Low(CReportTechnicalSheetNames) to High(CReportTechnicalSheetNames) do
   begin
-    Node := AWorkbookRelsRoot.ChildNodes[I];
-    if not SameText(Node.LocalName, 'Relationship') or
-       not SameText(VarToStr(Node.Attributes['Id']), Result.RelationId) then Continue;
-    Result.RelationshipTarget := VarToStr(Node.Attributes['Target']);
-    RelationType := VarToStr(Node.Attributes['Type']);
-    if not SameText(RelationType, CWorksheetRelation) then
+    Result[I].SheetName := CReportTechnicalSheetNames[I];
+    Result[I].RelationId := FindSheetRelationId(AWorkbookXml, Result[I].SheetName);
+    if Result[I].RelationId = '' then
       raise EInvalidOpException.CreateFmt(
-        'Некорректный тип связи: SheetName=%s; RelationId=%s; Target=%s; Type=%s',
-        [ASheetName, Result.RelationId, Result.RelationshipTarget, RelationType]);
-    if Result.RelationshipTarget = '' then
+        'Шаблон не содержит обязательный технический лист: %s', [Result[I].SheetName]);
+    for J := 0 to Root.ChildNodes.Count - 1 do
+    begin
+      Node := Root.ChildNodes[J];
+      if SameText(Node.LocalName, 'Relationship') and
+         SameText(VarToStr(Node.Attributes['Id']), Result[I].RelationId) then
+      begin
+        RelationType := VarToStr(Node.Attributes['Type']);
+        if not SameText(RelationType, CWorksheetRelation) then Break;
+        Result[I].RelationshipTarget := VarToStr(Node.Attributes['Target']);
+        Result[I].ArchivePath := ResolveWorkbookTargetArchivePath(
+          Result[I].RelationshipTarget);
+        Break;
+      end;
+    end;
+    if Result[I].ArchivePath = '' then
       raise EInvalidOpException.CreateFmt(
-        'Пустой Target связи: SheetName=%s; RelationId=%s; Target=',
-        [ASheetName, Result.RelationId]);
-    Result.ArchivePath := ResolveWorkbookTargetArchivePath(Result.RelationshipTarget);
-    Exit;
+        'Шаблон не содержит обязательный технический лист: %s', [Result[I].SheetName]);
   end;
-  raise EInvalidOpException.CreateFmt(
-    'Relationship отсутствует: SheetName=%s; RelationId=%s; Target=',
-    [ASheetName, Result.RelationId]);
 end;
 
-// Проверяет структуру готового XLSX непосредственно внутри ZIP без полной распаковки.
-procedure ValidateGeneratedReportXlsx(const AFileName: string;
-  out AWorksheetLocations: TArray<TReportWorksheetLocation>);
-var
-  Zip: TZipFile;
-  WorkbookXml, RelsXml, ContentTypesXml, SheetXml: string;
-  RelsDocument, ContentTypesDocument: IXMLDocument;
-  Location: TReportWorksheetLocation;
-  Analysis: TPointErrorMigrationAnalysis;
-  I: Integer;
+// Заменяет данные только в существующих технических листах XLSX.
+procedure ReplaceTechnicalSheetEntries(const ASourceFileName,
+  AOutputFileName: string; const ALocations: TArray<TReportWorksheetLocation>;
+  const ASheetXml: TArray<string>);
+var SourceZip, OutputZip: TZipFile; Name, Normalized: string; I, ReplaceIndex: Integer;
+  Stream: TStream; Header: TZipHeader; Bytes: TBytes; Replaced: TArray<Boolean>;
 begin
-  if not FileExists(AFileName) then
-    raise EFileNotFoundException.CreateFmt('Не найден сформированный XLSX: %s', [AFileName]);
+  if Length(ALocations) <> Length(ASheetXml) then
+    raise EArgumentException.Create('Число XML-листов не совпадает с числом ZIP-entry');
+  SetLength(Replaced, Length(ALocations));
+  SourceZip := TZipFile.Create; OutputZip := TZipFile.Create;
+  try
+    SourceZip.Open(ASourceFileName, zmRead);
+    OutputZip.Open(AOutputFileName, zmWrite);
+    for Name in SourceZip.FileNames do
+    begin
+      Normalized := NormalizeArchivePath(Name); ReplaceIndex := -1;
+      for I := 0 to High(ALocations) do
+        if SameText(Normalized, NormalizeArchivePath(ALocations[I].ArchivePath)) then
+        begin ReplaceIndex := I; Break; end;
+      if ReplaceIndex >= 0 then
+      begin
+        Bytes := TEncoding.UTF8.GetBytes(ASheetXml[ReplaceIndex]);
+        Stream := TBytesStream.Create(Bytes); Replaced[ReplaceIndex] := True;
+      end
+      else
+      begin
+        Stream := nil; SourceZip.Read(Name, Stream, Header);
+      end;
+      try
+        Stream.Position := 0;
+        OutputZip.Add(Stream, Name);
+      finally
+        Stream.Free;
+      end;
+    end;
+    for I := 0 to High(Replaced) do
+      if not Replaced[I] then
+        raise EInvalidOpException.CreateFmt(
+          'Шаблон не содержит обязательный технический лист: %s',
+          [ALocations[I].SheetName]);
+  finally
+    OutputZip.Free; SourceZip.Free;
+  end;
+end;
+
+procedure ValidateTechnicalSheetOutput(const AFileName: string;
+  const ALocations: TArray<TReportWorksheetLocation>);
+var Zip: TZipFile; I: Integer; Xml: string; Doc: IXMLDocument;
+begin
+  if not FileExists(AFileName) or (TFile.GetSize(AFileName) = 0) then
+    raise EInvalidOpException.Create('Сформированный XLSX пуст или отсутствует');
   Zip := TZipFile.Create;
   try
     Zip.Open(AFileName, zmRead);
-    ValidateZipEntries(Zip);
-    WorkbookXml := ReadZipEntryUtf8(Zip, 'xl/workbook.xml');
-    ValidateWorkbookXmlText(WorkbookXml, 'FinalValidation', False);
-    ValidateWorkbookXml(WorkbookXml, 'FinalValidation');
-    RelsXml := ReadZipEntryUtf8(Zip, 'xl/_rels/workbook.xml.rels');
-    ContentTypesXml := ReadZipEntryUtf8(Zip, '[Content_Types].xml');
-    RelsDocument := LoadXMLData(RelsXml); RelsDocument.Active := True;
-    ContentTypesDocument := LoadXMLData(ContentTypesXml); ContentTypesDocument.Active := True;
-    if (RelsDocument.DocumentElement = nil) or
-       not SameText(RelsDocument.DocumentElement.LocalName, 'Relationships') then
-      raise EInvalidOpException.Create('Некорректный корень xl/_rels/workbook.xml.rels');
-    if (ContentTypesDocument.DocumentElement = nil) or
-       not SameText(ContentTypesDocument.DocumentElement.LocalName, 'Types') then
-      raise EInvalidOpException.Create('Некорректный корень [Content_Types].xml');
-    SetLength(AWorksheetLocations, Length(CReportTechnicalSheetNames));
-    for I := Low(CReportTechnicalSheetNames) to High(CReportTechnicalSheetNames) do
+    for I := 0 to High(ALocations) do
     begin
-      Location := ResolveReportWorksheetLocation(WorkbookXml,
-        RelsDocument.DocumentElement, CReportTechnicalSheetNames[I]);
-      AWorksheetLocations[I] := Location;
-      if not ZipEntryExists(Zip, Location.ArchivePath) then
-        raise EFileNotFoundException.CreateFmt(
-          'Не найден XML технического листа: SheetName=%s; RelationId=%s; Target=%s; ' +
-          'ArchivePath=%s; Exists=False; SimilarEntry=False; Stage=FinalValidation; File=%s',
-          [Location.SheetName, Location.RelationId, Location.RelationshipTarget,
-           Location.ArchivePath, AFileName]);
-      SheetXml := ReadZipEntryUtf8(Zip, Location.ArchivePath);
-      ValidateSeparatedWorksheetXml(SheetXml,
-        Location.SheetName + ' (' + Location.ArchivePath + ')');
-      if SameText(Location.SheetName, '_DevicePoints') then
-      begin
-        Analysis := AnalyzePointErrorMigration(WorkbookXml, SheetXml);
-        if Analysis.State <> pemsNotRequired then
-          raise EInvalidOpException.CreateFmt(
-            'Финальная структура PointError некорректна: %s',
-            [BuildPointErrorMigrationDiagnostic(Analysis)]);
-      end;
+      if not ZipEntryExists(Zip, ALocations[I].ArchivePath) then
+        raise EInvalidOpException.CreateFmt('Не записан технический лист: %s',
+          [ALocations[I].SheetName]);
+      Xml := ReadZipEntryUtf8(Zip, ALocations[I].ArchivePath);
+      Doc := LoadXMLData(Xml); Doc.Active := True;
+      if (Doc.DocumentElement = nil) or
+         not SameText(Doc.DocumentElement.LocalName, 'worksheet') then
+        raise EInvalidOpException.CreateFmt('Некорректный XML листа: %s',
+          [ALocations[I].SheetName]);
     end;
   finally
     Zip.Free;
   end;
 end;
 
-// Добавляет или обновляет пять раздельных служебных листов отчёта.
-procedure InjectDataSheet(const ASourceFileName, AOutputFileName: string;
-  ARoot: TJSONObject; AInitializeStructure: Boolean);
+// Атомарно сохраняет сформированный XLSX и сохраняет резервную копию при ошибке замены.
+procedure ReplaceReportOutputFile(const ATemporaryFileName,
+  AOutputFileName: string);
+var BackupFileName: string;
+begin
+  if ExtractFileDir(AOutputFileName) <> '' then
+    ForceDirectories(ExtractFileDir(AOutputFileName));
+  if not FileExists(AOutputFileName) then
+  begin
+    TFile.Move(ATemporaryFileName, AOutputFileName); Exit;
+  end;
+  BackupFileName := AOutputFileName + '.backup-' +
+    TPath.GetRandomFileName.Replace('.', '') + '.xlsx';
+  try
+    TFile.Replace(ATemporaryFileName, AOutputFileName, BackupFileName);
+    if FileExists(BackupFileName) then TFile.Delete(BackupFileName);
+  except
+    on E: Exception do
+      raise EInOutError.CreateFmt(
+        'Не удалось заменить итоговый XLSX. Закройте файл в Excel и повторите. ' +
+        'Резервная копия сохранена: %s. %s', [BackupFileName, E.Message]);
+  end;
+end;
+
+procedure ExportTechnicalSheets(const ASourceFileName, AOutputFileName: string;
+  ARoot: TJSONObject);
 const
-  CSheetNames: array[0..4] of string =
-    ('_Data', '_DevicePoints', '_Spillages', '_CoefTables', '_Meta');
-  CSheetTitles: array[0..4] of string =
-    ('Общие данные прибора', 'Точки прибора', 'Проливки по точкам',
-     'Калибровочные таблицы и коэффициенты', 'Метаданные отчёта');
-  CSheetTargets: array[0..4] of string =
+  Titles: array[0..4] of string = ('Общие данные прибора', 'Точки прибора',
+    'Проливки по точкам', 'Калибровочные таблицы и коэффициенты',
+    'Метаданные отчёта');
+var Zip: TZipFile; WorkbookXml, RelsXml, TempOutput: string;
+  Locations: TArray<TReportWorksheetLocation>; SheetXml: TArray<string>;
+  Rows: TJSONArray; Names: TDictionary<string, string>; I: Integer;
+begin
+  if not FileExists(ASourceFileName) then
+    raise EFileNotFoundException.CreateFmt('Шаблон не найден: %s', [ASourceFileName]);
+  Zip := TZipFile.Create;
+  try
+    Zip.Open(ASourceFileName, zmRead);
+    WorkbookXml := ReadZipEntryUtf8(Zip, 'xl/workbook.xml');
+    RelsXml := ReadZipEntryUtf8(Zip, 'xl/_rels/workbook.xml.rels');
+  finally
+    Zip.Free;
+  end;
+  Locations := ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
+  Rows := ARoot.GetValue<TJSONArray>('Rows');
+  if Rows = nil then raise EInvalidOpException.Create('В снимке отсутствует массив Rows');
+  Names := TDictionary<string, string>.Create;
+  try
+    SetLength(SheetXml, 5);
+    SheetXml[0] := BuildDataWorksheetXml(Titles[0], Rows, Names);
+    SheetXml[1] := BuildSeparatedWorksheetXml(Titles[1], '_DevicePoints', Rows,
+      ['DevicePoint'], Names);
+    SheetXml[2] := BuildSeparatedWorksheetXml(Titles[2], '_Spillages', Rows,
+      ['Spillage'], Names);
+    SheetXml[3] := BuildSeparatedWorksheetXml(Titles[3], '_CoefTables', Rows,
+      ['CalibrCoefTable', 'CalibrCoefItem'], Names);
+    SheetXml[4] := BuildMetaWorksheetXml(ARoot, Names);
+    for I := 0 to High(SheetXml) do
+      ValidateSeparatedWorksheetXml(SheetXml[I], Locations[I].SheetName);
+  finally
+    Names.Free;
+  end;
+  TempOutput := BuildTemporaryReportFileName(AOutputFileName);
+  try
+    ReplaceTechnicalSheetEntries(ASourceFileName, TempOutput, Locations, SheetXml);
+    ValidateTechnicalSheetOutput(TempOutput, Locations);
+    ReplaceReportOutputFile(TempOutput, AOutputFileName);
+  finally
+    if FileExists(TempOutput) then TFile.Delete(TempOutput);
+  end;
+end;
+
+// Добавляет сформированные именованные диапазоны только при первичной подготовке книги.
+function AddPreparedDefinedNames(const AWorkbookXml: string;
+  const ADefinedNames: TDictionary<string, string>): string;
+var Doc: IXMLDocument; Root, NamesNode, NameNode: IXMLNode;
+  Pair: TPair<string, string>;
+begin
+  Doc := LoadXMLData(AWorkbookXml); Doc.Active := True;
+  Root := Doc.DocumentElement;
+  if (Root = nil) or not SameText(Root.LocalName, 'workbook') then
+    raise EInvalidOpException.Create('Некорректный xl/workbook.xml');
+  NamesNode := EnsureDefinedNamesNode(Root);
+  for Pair in ADefinedNames do
+  begin
+    ValidateDefinedNameValues(Pair.Key, Pair.Value);
+    if FindDefinedNameNode(NamesNode, Pair.Key) <> nil then
+      raise EInvalidOpException.CreateFmt(
+        'В исходном шаблоне уже существует definedName %s', [Pair.Key]);
+    NameNode := NamesNode.AddChild('definedName', NamesNode.NamespaceURI);
+    NameNode.Attributes['name'] := Pair.Key;
+    NameNode.Text := Pair.Value;
+  end;
+  ValidateDefinedNameDuplicates(NamesNode);
+  Result := SerializeXmlDocumentUtf8(Doc);
+end;
+
+procedure AddUtf8ZipEntry(AZip: TZipFile; const AName, AText: string);
+var Bytes: TBytes; Stream: TBytesStream;
+begin
+  Bytes := TEncoding.UTF8.GetBytes(AText);
+  Stream := TBytesStream.Create(Bytes);
+  try
+    AZip.Add(Stream, AName);
+  finally
+    Stream.Free;
+  end;
+end;
+
+procedure CopyOrReplaceZipEntries(const ASourceFileName, AOutputFileName,
+  AWorkbookXml, ARelsXml, AContentTypesXml: string;
+  const ASheetXml: TArray<string>);
+const
+  SheetPaths: array[0..4] of string =
+    ('xl/worksheets/flowServiceData.xml',
+     'xl/worksheets/flowServiceDevicePoints.xml',
+     'xl/worksheets/flowServiceSpillages.xml',
+     'xl/worksheets/flowServiceCoefTables.xml',
+     'xl/worksheets/flowServiceMeta.xml');
+var SourceZip, OutputZip: TZipFile; Name, Normalized: string;
+  Stream: TStream; Header: TZipHeader; I: Integer;
+begin
+  SourceZip := TZipFile.Create; OutputZip := TZipFile.Create;
+  try
+    SourceZip.Open(ASourceFileName, zmRead);
+    for I := Low(SheetPaths) to High(SheetPaths) do
+      if ZipEntryExists(SourceZip, SheetPaths[I]) then
+        raise EInvalidOpException.CreateFmt(
+          'Исходный XLSX уже содержит ZIP-entry технического листа: %s',
+          [SheetPaths[I]]);
+    OutputZip.Open(AOutputFileName, zmWrite);
+    for Name in SourceZip.FileNames do
+    begin
+      Normalized := NormalizeArchivePath(Name);
+      if SameText(Normalized, 'xl/workbook.xml') then
+        AddUtf8ZipEntry(OutputZip, Name, AWorkbookXml)
+      else if SameText(Normalized, 'xl/_rels/workbook.xml.rels') then
+        AddUtf8ZipEntry(OutputZip, Name, ARelsXml)
+      else if SameText(Normalized, '[Content_Types].xml') then
+        AddUtf8ZipEntry(OutputZip, Name, AContentTypesXml)
+      else
+      begin
+        Stream := nil; SourceZip.Read(Name, Stream, Header);
+        try
+          Stream.Position := 0; OutputZip.Add(Stream, Name);
+        finally
+          Stream.Free;
+        end;
+      end;
+    end;
+    for I := Low(SheetPaths) to High(SheetPaths) do
+      AddUtf8ZipEntry(OutputZip, SheetPaths[I], ASheetXml[I]);
+  finally
+    OutputZip.Free; SourceZip.Free;
+  end;
+end;
+
+function MissingTechnicalSheetNames(const AWorkbookXml: string): TArray<string>;
+var Missing: TList<string>; I: Integer;
+begin
+  Missing := TList<string>.Create;
+  try
+    for I := Low(CReportTechnicalSheetNames) to High(CReportTechnicalSheetNames) do
+      if FindSheetRelationId(AWorkbookXml, CReportTechnicalSheetNames[I]) = '' then
+        Missing.Add(CReportTechnicalSheetNames[I]);
+    Result := Missing.ToArray;
+  finally
+    Missing.Free;
+  end;
+end;
+
+// Один раз добавляет пять технических листов в исходный пользовательский XLSX.
+procedure PrepareNewTemplateFile(const ASourceFileName, AOutputFileName: string;
+  ARoot: TJSONObject);
+const
+  Titles: array[0..4] of string = ('Общие данные прибора', 'Точки прибора',
+    'Проливки по точкам', 'Калибровочные таблицы и коэффициенты',
+    'Метаданные отчёта');
+  Targets: array[0..4] of string =
     ('worksheets/flowServiceData.xml',
      'worksheets/flowServiceDevicePoints.xml',
      'worksheets/flowServiceSpillages.xml',
      'worksheets/flowServiceCoefTables.xml',
      'worksheets/flowServiceMeta.xml');
-var
-  Zip: TZipFile;
-  WorkbookRelsDocument: IXMLDocument;
-  WorkbookRelsRoot: IXMLNode;
-  TempDir, TempOutput, WorkbookFile, WorkbookRelsFile, ContentTypesFile,
-    WorkbookXml, ContentTypesXml, RelationId, SheetFragment,
-    ContentTypeFragment, UpdatedWorkbookXml, UpdatedContentTypesXml,
-    SheetArchivePath, SheetFile: string;
-  SheetTargets, SheetFiles, SheetXml: array[0..4] of string;
-  SheetId, I: Integer;
-  Rows: TJSONArray;
-  DefinedNames: TDictionary<string, string>;
-  Stage: string;
-  NeedsPointErrorMigration: Boolean;
-  WorkbookRepaired: Boolean;
-  PointErrorMigrationState: TPointErrorMigrationState;
-  PointErrorMigrationAnalysis, NewPointErrorMigrationAnalysis:
-    TPointErrorMigrationAnalysis;
-  ExistingDevicePointsXml: string;
-  ValidatedWorksheetLocations: TArray<TReportWorksheetLocation>;
+var Zip: TZipFile; WorkbookXml, RelsXml, ContentTypesXml, Fragment,
+  RelationId: string; RelsDoc: IXMLDocument; RelsRoot: IXMLNode;
+  SheetXml: TArray<string>; Names: TDictionary<string, string>;
+  Rows: TJSONArray; I, SheetId: Integer;
 begin
-  Stage := 'начало выгрузки';
-  LogReportStage(Stage);
-  if not FileExists(ASourceFileName) then
-    raise EFileNotFoundException.CreateFmt('Шаблон не найден: %s', [ASourceFileName]);
-  if ARoot = nil then
-    raise EArgumentNilException.Create(
-      'Не заданы данные для формирования служебных листов отчёта');
-
-  TempDir := TPath.Combine(TPath.GetTempPath,
-    'FlowServiceReport_' + TPath.GetRandomFileName.Replace('.', ''));
-  ForceDirectories(TempDir);
-  TempOutput := BuildTemporaryReportFileName(AOutputFileName);
-  DefinedNames := TDictionary<string, string>.Create;
+  Zip := TZipFile.Create;
   try
-    try
-    Stage := 'распаковка XLSX';
-    LogReportStage(Stage);
-    Zip := TZipFile.Create;
-    try
-      Zip.Open(ASourceFileName, zmRead);
-      ValidateZipEntries(Zip);
-      Zip.ExtractAll(TempDir);
-    finally
-      Zip.Free;
-    end;
-
-    WorkbookFile := TPath.Combine(TempDir, 'xl\workbook.xml');
-    WorkbookRelsFile := TPath.Combine(TempDir, 'xl\_rels\workbook.xml.rels');
-    ContentTypesFile := TPath.Combine(TempDir, '[Content_Types].xml');
-    if not FileExists(WorkbookFile) or not FileExists(WorkbookRelsFile) or
-       not FileExists(ContentTypesFile) then
-      raise EInvalidOpException.Create('Файл не является корректной книгой XLSX');
-
-    Stage := 'чтение workbook.xml';
-    LogReportStage(Stage);
-    WorkbookXml := LoadAndValidateReportWorkbookXml(WorkbookFile,
-      'чтение исходного шаблона при выгрузке', WorkbookRepaired);
-    NeedsPointErrorMigration := False;
-    ContentTypesXml := ReadUtf8File(ContentTypesFile);
-    if AInitializeStructure then
-      RemoveLegacyReportTableArtifacts(TempDir, ContentTypesXml);
-    WorkbookRelsDocument := LoadXMLDocument(WorkbookRelsFile);
-    WorkbookRelsDocument.Active := True;
-    WorkbookRelsRoot := WorkbookRelsDocument.DocumentElement;
-    if WorkbookRelsRoot = nil then
-      raise EInvalidOpException.Create(
-        'В workbook.xml.rels отсутствует корневой XML-узел');
-    if not SameText(WorkbookRelsRoot.LocalName, 'Relationships') then
-      raise EInvalidOpException.CreateFmt(
-        'Некорректный корневой узел workbook.xml.rels: %s',
-        [WorkbookRelsRoot.NodeName]);
-
-    if AInitializeStructure then
-    begin
-      if Length(GetMissingReportTemplateSheets(WorkbookXml,
-        WorkbookRelsRoot)) <> Length(CSheetNames) then
-        raise EInvalidOpException.Create(
-          'Исходный шаблон содержит часть служебных листов FlowService');
-    end
-    else if not IsPreparedReportTemplate(WorkbookXml, WorkbookRelsRoot) then
-      raise EInvalidOpException.Create('Шаблон не подготовлен FlowService: ' +
-        string.Join(', ', GetMissingReportTemplateSheets(WorkbookXml,
-          WorkbookRelsRoot)));
-
-    for I := Low(CSheetNames) to High(CSheetNames) do
-    begin
-      Stage := 'обработка служебного листа ' + CSheetNames[I];
-      LogReportStage(Stage);
-      RelationId := FindSheetRelationId(WorkbookXml, CSheetNames[I]);
-      if (RelationId = '') and AInitializeStructure then
-      begin
-        SheetId := NextSheetId(WorkbookXml);
-        RelationId := NextRelationId(WorkbookRelsRoot);
-        SheetTargets[I] := CSheetTargets[I];
-        SheetFragment := Format(
-          '<sheet name="%s" sheetId="%d" r:id="%s"/>',
-          [CSheetNames[I], SheetId, RelationId]);
-        UpdatedWorkbookXml := InsertBeforeClosingTag(
-          WorkbookXml, '</sheets>', SheetFragment);
-        ValidateWorkbookXmlText(UpdatedWorkbookXml,
-          'добавление листа ' + CSheetNames[I], False);
-        ValidateWorkbookXml(UpdatedWorkbookXml,
-          'добавление листа ' + CSheetNames[I]);
-        WorkbookXml := UpdatedWorkbookXml;
-        AddWorksheetRelationship(WorkbookRelsRoot, RelationId, SheetTargets[I]);
-        ContentTypeFragment := Format(
-          '<Override PartName="/xl/%s" ContentType="%s"/>',
-          [SheetTargets[I], CWorksheetContentType]);
-        UpdatedContentTypesXml := InsertBeforeClosingTag(
-          ContentTypesXml, '</Types>', ContentTypeFragment);
-        ContentTypesXml := UpdatedContentTypesXml;
-      end
-      else
-      begin
-        SheetTargets[I] := FindRelationshipTarget(WorkbookRelsRoot, RelationId);
-        if SheetTargets[I] = '' then
-          raise EInvalidOpException.CreateFmt(
-            'Не найдена связь служебного листа %s', [CSheetNames[I]]);
-      end;
-
-      SheetArchivePath := WorkbookTargetToArchivePath(SheetTargets[I]);
-      SheetFiles[I] := TPath.Combine(TempDir,
-        StringReplace(SheetArchivePath, '/', PathDelim, [rfReplaceAll]));
-      SheetFile := TPath.Combine(ExtractFileDir(SheetFiles[I]), '_rels\' +
-        ExtractFileName(SheetFiles[I]) + '.rels');
-      if AInitializeStructure and FileExists(SheetFile) then
-        DeleteFile(SheetFile);
-    end;
-
-    if not AInitializeStructure then
-    begin
-      if not FileExists(SheetFiles[1]) then
-        raise EInvalidOpException.Create(
-          'Не найден XML технического листа _DevicePoints');
-      ExistingDevicePointsXml := ReadUtf8File(SheetFiles[1]);
-      PointErrorMigrationAnalysis := AnalyzePointErrorMigration(WorkbookXml,
-        ExistingDevicePointsXml);
-      PointErrorMigrationState := PointErrorMigrationAnalysis.State;
-      case PointErrorMigrationAnalysis.State of
-        pemsNotRequired: NeedsPointErrorMigration := False;
-        pemsRequired: NeedsPointErrorMigration := True;
-        pemsPartial:
-          begin
-            if PointErrorMigrationAnalysis.CanRepair then
-              NeedsPointErrorMigration := True
-            else
-              raise EInvalidOpException.CreateFmt(
-                'Частичная миграция PointError не может быть исправлена автоматически: %s',
-                [BuildPointErrorMigrationDiagnostic(PointErrorMigrationAnalysis)]);
-          end;
-        pemsInvalid:
-          raise EInvalidOpException.CreateFmt(
-            'Некорректная структура PointError: %s',
-            [BuildPointErrorMigrationDiagnostic(PointErrorMigrationAnalysis)]);
-      end;
-      if Assigned(ProtocolManager) then
-        ProtocolManager.AddMessage(pcProc, psForm, 'PointErrorMigrationAnalyzed',
-          'Проанализирована старая структура PointError', Format(
-          'State=%s; CanRepair=%s; Reason=%s; NeedsMigration=%s; OldColumn=%s',
-          [PointErrorMigrationStateToString(PointErrorMigrationAnalysis.State),
-           BoolToStr(PointErrorMigrationAnalysis.CanRepair, True),
-           PointErrorMigrationAnalysis.Reason,
-           BoolToStr(NeedsPointErrorMigration, True),
-           PointErrorMigrationAnalysis.PointErrorColumn]));
-    end;
-
-    if AInitializeStructure then
-      UpdatedWorkbookXml := EnsureAutomaticCalculation(WorkbookXml)
-    else
-      UpdatedWorkbookXml := WorkbookXml;
-    ValidateWorkbookXmlText(UpdatedWorkbookXml,
-      'EnsureAutomaticCalculation', True);
-    ValidateWorkbookXml(UpdatedWorkbookXml, 'EnsureAutomaticCalculation');
-    WorkbookXml := UpdatedWorkbookXml;
-
-    Rows := ARoot.GetValue<TJSONArray>('Rows');
-    if Rows = nil then
-      raise EInvalidOpException.Create(
-        'В данных отчёта отсутствует массив Rows');
-    Stage := 'формирование листа _Data';
-    LogReportStage(Stage);
-    SheetXml[0] := BuildDataWorksheetXml(CSheetTitles[0], Rows, DefinedNames);
-    Stage := 'формирование листа _DevicePoints';
-    LogReportStage(Stage);
-    SheetXml[1] := BuildSeparatedWorksheetXml(CSheetTitles[1], CSheetNames[1],
-      Rows, ['DevicePoint'], DefinedNames);
-    Stage := 'формирование листа _Spillages';
-    LogReportStage(Stage);
-    SheetXml[2] := BuildSeparatedWorksheetXml(CSheetTitles[2], CSheetNames[2],
-      Rows, ['Spillage'], DefinedNames);
-    Stage := 'формирование листа _CoefTables';
-    LogReportStage(Stage);
-    SheetXml[3] := BuildSeparatedWorksheetXml(CSheetTitles[3], CSheetNames[3],
-      Rows, ['CalibrCoefTable', 'CalibrCoefItem'], DefinedNames);
-    Stage := 'формирование листа _Meta';
-    LogReportStage(Stage);
-    SheetXml[4] := BuildMetaWorksheetXml(ARoot, DefinedNames);
-
-    NewPointErrorMigrationAnalysis := AnalyzePointErrorMigration(WorkbookXml,
-      SheetXml[1]);
-    if not NewPointErrorMigrationAnalysis.HeaderRowFound or
-       (NewPointErrorMigrationAnalysis.QIndex < 0) or
-       (NewPointErrorMigrationAnalysis.PointErrorHeaderCount <> 1) or
-       (NewPointErrorMigrationAnalysis.PointErrorIndex <>
-         NewPointErrorMigrationAnalysis.QIndex + 1) or
-       (NewPointErrorMigrationAnalysis.PointErrorColumn = '') or
-       SameText(NewPointErrorMigrationAnalysis.PointErrorColumn,
-         NewPointErrorMigrationAnalysis.QColumn) then
-      raise EInvalidOpException.CreateFmt(
-        'Новый лист _DevicePoints имеет некорректные заголовки: %s',
-        [BuildPointErrorMigrationDiagnostic(NewPointErrorMigrationAnalysis)]);
-    if NeedsPointErrorMigration then
-    begin
-      RemoveFlowServicePointErrorDefinedNamesFromWorkbook(WorkbookXml);
-    end;
-    if AInitializeStructure or NeedsPointErrorMigration then
-      UpdateReportDefinedNames(WorkbookXml, DefinedNames);
-    ValidateWorkbookXmlText(WorkbookXml, 'именованные диапазоны', True);
-    ValidateWorkbookXml(WorkbookXml, 'именованные диапазоны');
-    PointErrorMigrationAnalysis := AnalyzePointErrorMigration(WorkbookXml,
-      SheetXml[1]);
-    PointErrorMigrationState := PointErrorMigrationAnalysis.State;
-    if (AInitializeStructure or NeedsPointErrorMigration) and
-       (PointErrorMigrationAnalysis.State <> pemsNotRequired) then
-      raise EInvalidOpException.CreateFmt(
-        'Миграция PointError завершилась некорректно: State=%s; %s',
-        [PointErrorMigrationStateToString(PointErrorMigrationAnalysis.State),
-         BuildPointErrorMigrationDiagnostic(PointErrorMigrationAnalysis)]);
-
-    for I := Low(CSheetNames) to High(CSheetNames) do
-      ValidateSeparatedWorksheetXml(SheetXml[I], CSheetNames[I]);
-    for I := Low(CSheetNames) to High(CSheetNames) do
-    begin
-      Stage := 'запись XML листа ' + CSheetNames[I];
-      LogReportStage(Stage);
-      WriteUtf8File(SheetFiles[I], SheetXml[I]);
-    end;
-    if AInitializeStructure or NeedsPointErrorMigration or WorkbookRepaired then
-    begin
-      WriteUtf8File(WorkbookFile, WorkbookXml);
-    end;
-    if AInitializeStructure then
-    begin
-      WorkbookRelsDocument.SaveToFile(WorkbookRelsFile);
-      WriteUtf8File(ContentTypesFile, ContentTypesXml);
-    end;
-
-    if FileExists(TempOutput) then
-      DeleteFile(TempOutput);
-    Stage := 'упаковка XLSX';
-    LogReportStage(Stage);
-    ZipDirectory(TempDir, TempOutput);
-    Stage := 'финальная проверка XLSX';
-    LogReportStage(Stage);
-    ValidateGeneratedReportXlsx(TempOutput, ValidatedWorksheetLocations);
-    ForceDirectories(ExtractFileDir(AOutputFileName));
-    Stage := 'замена итогового файла';
-    LogReportStage(Stage);
-    if FileExists(AOutputFileName) then
-      TFile.Replace(TempOutput, AOutputFileName, '')
-    else
-      TFile.Move(TempOutput, AOutputFileName);
-    Stage := 'завершение выгрузки';
-    LogReportStage(Stage);
-    except
-      on E: Exception do
-      begin
-        LogReportStage(Format('ошибка на этапе "%s": %s', [Stage, E.Message]));
-        raise;
-      end;
-    end;
+    Zip.Open(ASourceFileName, zmRead);
+    WorkbookXml := ReadZipEntryUtf8(Zip, 'xl/workbook.xml');
+    RelsXml := ReadZipEntryUtf8(Zip, 'xl/_rels/workbook.xml.rels');
+    ContentTypesXml := ReadZipEntryUtf8(Zip, '[Content_Types].xml');
   finally
-    DefinedNames.Free;
-    if FileExists(TempOutput) then
-      DeleteFile(TempOutput);
-    if DirectoryExists(TempDir) then
-      TDirectory.Delete(TempDir, True);
+    Zip.Free;
   end;
-end;
-
-// Подготавливает исходную XLSX-книгу, один раз добавляя служебные листы и именованные диапазоны.
-procedure InitializeReportTemplate(const ASourceFileName,
-  AOutputFileName: string; ARoot: TJSONObject);
-begin
-  InjectDataSheet(ASourceFileName, AOutputFileName, ARoot, True);
-end;
-
-// Заменяет только содержимое существующих служебных листов готового шаблона.
-procedure UpdatePreparedTemplateData(const ASourceFileName,
-  AOutputFileName: string; ARoot: TJSONObject);
-begin
-  InjectDataSheet(ASourceFileName, AOutputFileName, ARoot, False);
-end;
-
-// Проверяет и сохраняет уже подготовленный пользователем XLSX-шаблон без замены его данных пустым прибором.
-procedure ImportPreparedReportTemplate(const ASourceFileName,
-  AOutputFileName: string; out APrepared: Boolean);
-var
-  Zip: TZipFile;
-  TempDir, WorkbookFile, RelsFile, WorkbookXml: string;
-  RelsDoc: IXMLDocument;
-  Missing: TArray<string>;
-  Repaired: Boolean;
-begin
-  APrepared := False;
-  TempDir := TPath.Combine(TPath.GetTempPath,
-    'FlowServiceImport_' + TPath.GetRandomFileName.Replace('.', ''));
-  ForceDirectories(TempDir);
+  RelsDoc := LoadXMLData(RelsXml); RelsDoc.Active := True;
+  RelsRoot := RelsDoc.DocumentElement;
+  if (RelsRoot = nil) or not SameText(RelsRoot.LocalName, 'Relationships') then
+    raise EInvalidOpException.Create('Некорректный xl/_rels/workbook.xml.rels');
+  Names := TDictionary<string, string>.Create;
   try
-    Zip := TZipFile.Create;
-    try
-      Zip.Open(ASourceFileName, zmRead);
-      ValidateZipEntries(Zip);
-      Zip.ExtractAll(TempDir);
-    finally
-      Zip.Free;
-    end;
-    WorkbookFile := TPath.Combine(TempDir, 'xl\workbook.xml');
-    RelsFile := TPath.Combine(TempDir, 'xl\_rels\workbook.xml.rels');
-    if not FileExists(WorkbookFile) or not FileExists(RelsFile) then
-      raise EInvalidOpException.Create('Файл не является корректной книгой XLSX');
-    WorkbookXml := LoadAndValidateReportWorkbookXml(WorkbookFile,
-      'импорт подготовленного шаблона', Repaired);
-    RelsDoc := LoadXMLDocument(RelsFile);
-    RelsDoc.Active := True;
-    Missing := GetMissingReportTemplateSheets(WorkbookXml,
-      RelsDoc.DocumentElement);
-    if Length(Missing) = 5 then
-      Exit;
-    if Length(Missing) <> 0 then
-      raise EInvalidOpException.Create('Неполный шаблон FlowService: ' +
-        string.Join(', ', Missing));
-    if not IsPreparedReportTemplate(WorkbookXml, RelsDoc.DocumentElement) then
-      raise EInvalidOpException.Create(
-        'Шаблон FlowService содержит повторяющиеся sheetId или имена листов');
-    APrepared := True;
-    if Repaired then
+    Rows := ARoot.GetValue<TJSONArray>('Rows');
+    SetLength(SheetXml, 5);
+    SheetXml[0] := BuildDataWorksheetXml(Titles[0], Rows, Names);
+    SheetXml[1] := BuildSeparatedWorksheetXml(Titles[1], '_DevicePoints', Rows,
+      ['DevicePoint'], Names);
+    SheetXml[2] := BuildSeparatedWorksheetXml(Titles[2], '_Spillages', Rows,
+      ['Spillage'], Names);
+    SheetXml[3] := BuildSeparatedWorksheetXml(Titles[3], '_CoefTables', Rows,
+      ['CalibrCoefTable', 'CalibrCoefItem'], Names);
+    SheetXml[4] := BuildMetaWorksheetXml(ARoot, Names);
+    for I := 0 to 4 do
+      ValidateSeparatedWorksheetXml(SheetXml[I], CReportTechnicalSheetNames[I]);
+    for I := 0 to 4 do
     begin
-      WorkbookXml := EnsureAutomaticCalculation(WorkbookXml);
-      WriteUtf8File(WorkbookFile, WorkbookXml);
-      ZipDirectory(TempDir, AOutputFileName);
-    end
-    else
-      TFile.Copy(ASourceFileName, AOutputFileName, False);
+      SheetId := NextSheetId(WorkbookXml);
+      RelationId := NextRelationId(RelsRoot);
+      Fragment := Format('<sheet name="%s" sheetId="%d" state="hidden" r:id="%s"/>',
+        [CReportTechnicalSheetNames[I], SheetId, RelationId]);
+      WorkbookXml := InsertBeforeUniqueXmlNode(WorkbookXml, '</sheets>',
+        Fragment, 'добавление ' + CReportTechnicalSheetNames[I]);
+      AddWorksheetRelationship(RelsRoot, RelationId, Targets[I]);
+      Fragment := Format('<Override PartName="/xl/%s" ContentType="%s"/>',
+        [Targets[I], CWorksheetContentType]);
+      ContentTypesXml := InsertBeforeUniqueXmlNode(ContentTypesXml, '</Types>',
+        Fragment, 'добавление ContentType ' + CReportTechnicalSheetNames[I]);
+    end;
+    WorkbookXml := AddPreparedDefinedNames(WorkbookXml, Names);
+    RelsXml := SerializeXmlDocumentUtf8(RelsDoc);
+    CopyOrReplaceZipEntries(ASourceFileName, AOutputFileName, WorkbookXml,
+      RelsXml, ContentTypesXml, SheetXml);
   finally
-    if DirectoryExists(TempDir) then
-      TDirectory.Delete(TempDir, True);
+    Names.Free;
   end;
 end;
 
@@ -2856,19 +2090,35 @@ begin
   ApplyReportErrorPrecision(Rows, AMeterValueError);
 end;
 
-class function TReportTemplateService.ImportTemplate(
+class function TReportTemplateService.PrepareTemplate(
   const ASourceFileName: string): string;
 var
-  BaseName, Extension: string;
+  BaseName, Extension, WorkbookXml, RelsXml, TemporaryFileName: string;
   Suffix: Integer;
+  Zip: TZipFile;
+  Missing: TArray<string>;
+  PreparedLocations: TArray<TReportWorksheetLocation>;
   EmptyJson: TJSONObject;
   EmptyDevice: TDevice;
   EmptyDeviceType: TDeviceType;
-  Prepared: Boolean;
 begin
+  if not FileExists(ASourceFileName) then
+    raise EFileNotFoundException.CreateFmt('Шаблон не найден: %s', [ASourceFileName]);
   if not SameText(ExtractFileExt(ASourceFileName), '.xlsx') then
     raise EArgumentException.Create('Поддерживаются только шаблоны XLSX');
-
+  Zip := TZipFile.Create;
+  try
+    Zip.Open(ASourceFileName, zmRead);
+    WorkbookXml := ReadZipEntryUtf8(Zip, 'xl/workbook.xml');
+    RelsXml := ReadZipEntryUtf8(Zip, 'xl/_rels/workbook.xml.rels');
+  finally
+    Zip.Free;
+  end;
+  Missing := MissingTechnicalSheetNames(WorkbookXml);
+  if (Length(Missing) <> 0) and
+     (Length(Missing) <> Length(CReportTechnicalSheetNames)) then
+    raise EInvalidOpException.Create('Шаблон содержит только часть технических листов. ' +
+      'Отсутствуют: ' + string.Join(', ', Missing));
   BaseName := TPath.GetFileNameWithoutExtension(ASourceFileName);
   Extension := ExtractFileExt(ASourceFileName);
   Result := TPath.Combine(TemplatesPath, BaseName + Extension);
@@ -2879,19 +2129,34 @@ begin
       Format('%s_%d%s', [BaseName, Suffix, Extension]));
     Inc(Suffix);
   end;
-
-  ImportPreparedReportTemplate(ASourceFileName, Result, Prepared);
-  if Prepared then
+  if Length(Missing) = 0 then
+  begin
+    ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
+    TFile.Copy(ASourceFileName, Result, False);
     Exit;
-
-  { Экземпляры без данных дают RTTI полную схему _Data уже
-    при импорте; значения будут заменены при экспорте. }
+  end;
   EmptyDevice := TDevice.Create;
   EmptyDeviceType := TDeviceType.Create;
   try
     EmptyJson := BuildReportJson(EmptyDevice, EmptyDeviceType);
     try
-      InitializeReportTemplate(ASourceFileName, Result, EmptyJson);
+      TemporaryFileName := BuildTemporaryReportFileName(Result);
+      try
+        PrepareNewTemplateFile(ASourceFileName, TemporaryFileName, EmptyJson);
+        Zip := TZipFile.Create;
+        try
+          Zip.Open(TemporaryFileName, zmRead);
+          WorkbookXml := ReadZipEntryUtf8(Zip, 'xl/workbook.xml');
+          RelsXml := ReadZipEntryUtf8(Zip, 'xl/_rels/workbook.xml.rels');
+        finally
+          Zip.Free;
+        end;
+        PreparedLocations := ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
+        ValidateTechnicalSheetOutput(TemporaryFileName, PreparedLocations);
+        TFile.Move(TemporaryFileName, Result);
+      finally
+        if FileExists(TemporaryFileName) then TFile.Delete(TemporaryFileName);
+      end;
     finally
       EmptyJson.Free;
     end;
@@ -2911,7 +2176,7 @@ begin
     raise EArgumentNilException.Create('Для отчёта не выбран прибор');
   Json := BuildReportJson(ADevice, ADeviceType);
   try
-    UpdatePreparedTemplateData(ATemplateFileName, AOutputFileName, Json);
+    ExportTechnicalSheets(ATemplateFileName, AOutputFileName, Json);
   finally
     Json.Free;
   end;
@@ -2936,16 +2201,11 @@ begin
   end;
   Json := TJSONObject(JsonValue);
   try
-    UpdatePreparedTemplateData(ATemplateFileName, AOutputFileName, Json);
+    ExportTechnicalSheets(ATemplateFileName, AOutputFileName, Json);
   finally
     Json.Free;
   end;
 end;
 
-initialization
-  GReportLogLock := TObject.Create;
-
-finalization
-  GReportLogLock.Free;
 
 end.

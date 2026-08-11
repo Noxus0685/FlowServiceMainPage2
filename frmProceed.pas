@@ -5208,7 +5208,7 @@ begin
       if not Dialog.Execute then
         Exit;
 
-      ImportedFileName := TReportTemplateService.ImportTemplate(Dialog.FileName);
+      ImportedFileName := TReportTemplateService.PrepareTemplate(Dialog.FileName);
       RefreshReportTemplates;
       ListBoxReportTemplates.ItemIndex := ListBoxReportTemplates.Items.IndexOf(
         TPath.GetFileName(ImportedFileName));
@@ -5260,7 +5260,7 @@ begin
   FReportExportTask := nil;
   ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateExport',
     'Сформирован отчёт по шаблону', Format(
-      'Output=%s; DurationMs=%d; Thread=Worker; FullExtract=True; FullRepack=True',
+      'Output=%s; DurationMs=%d; Thread=Worker',
       [AOutputFileName, ADurationMs]));
 end;
 
@@ -5332,7 +5332,7 @@ begin
   SnapshotMs := Stopwatch.ElapsedMilliseconds;
   Inc(FReportExportOperationId); OperationId := FReportExportOperationId;
   BeginReportExportUi;
-  ProtocolManager.AddMessage(pcProc, psForm, 'ReportTemplateExportStarted',
+  ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateExportStarted',
     'Запущена фоновая выгрузка отчёта', Format(
       'Template=%s; Output=%s; SnapshotMs=%d; SourceSize=%d',
       [TemplateFileName, OutputFileName, SnapshotMs,
