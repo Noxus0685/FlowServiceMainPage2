@@ -2286,6 +2286,78 @@ begin
   end;
 end;
 
+
+function TryDevicePointDefinedNameParts(const AName: string;
+  out APointIndex: Integer; out AFieldName: string): Boolean;
+var Parts: TArray<string>;
+begin
+  Parts := AName.Split(['_']);
+  Result := (Length(Parts) = 3) and SameText(Parts[0], 'DevicePoints') and
+    TryStrToInt(Parts[1], APointIndex) and (APointIndex >= 1) and
+    (APointIndex <= TReportTemplateService.MAX_DEVICE_POINTS);
+  if Result then AFieldName := Parts[2] else AFieldName := '';
+end;
+
+
+// Проверяет, что каждый служебный definedName указывает на поле с соответствующим техническим заголовком.
+procedure ValidateReportDefinedNameBindings(const AWorkbookXml: string;
+  const ATechnicalSheets: TDictionary<string, string>;
+  const ASharedStrings: TArray<string>);
+var Doc: IXMLDocument; NamesNode, Node: IXMLNode; Name, Reference, SheetName,
+  FieldName: string; I, ColumnIndex, RowIndex, PointIndex, ActualColumn: Integer;
+  HeaderIndex: TDictionary<string, Integer>; Seen: TDictionary<string, Byte>;
+begin
+  Doc := LoadXMLData(AWorkbookXml); Doc.Active := True;
+  NamesNode := FindDirectChildNode(Doc.DocumentElement, 'definedNames');
+  Seen := TDictionary<string, Byte>.Create;
+  HeaderIndex := nil;
+  try
+    if ATechnicalSheets.ContainsKey('_DevicePoints') then
+      HeaderIndex := BuildWorksheetHeaderIndex(
+        ATechnicalSheets['_DevicePoints'], 2, ASharedStrings);
+    if NamesNode = nil then raise EInvalidOpException.Create('workbook не содержит definedNames');
+    for I := 0 to NamesNode.ChildNodes.Count - 1 do
+    begin
+      Node := NamesNode.ChildNodes[I];
+      if not SameText(Node.LocalName, 'definedName') then Continue;
+      Name := VarToStr(Node.Attributes['name']);
+      if not IsReportDefinedName(Name) then Continue;
+      if Seen.ContainsKey(Name) then
+        raise EInvalidOpException.CreateFmt('Повтор definedName %s', [Name]);
+      Seen.Add(Name, 0); Reference := Node.Text;
+      if not TryParseDefinedNameReference(Reference, SheetName, ColumnIndex, RowIndex) then
+        raise EInvalidOpException.CreateFmt(
+          'Некорректная ссылка definedName %s:'#13#10 +
+          'Reference="%s".'#13#10 +
+          'Ожидается абсолютная ссылка вида Sheet!$A$1 или ''Sheet Name''!$A$1.',
+          [Name, Reference]);
+      if not ATechnicalSheets.ContainsKey(SheetName) then
+        raise EInvalidOpException.CreateFmt('definedName %s указывает на неизвестный лист %s', [Name, SheetName]);
+      if TryDevicePointDefinedNameParts(Name, PointIndex, FieldName) then
+      begin
+        if not SameText(SheetName, '_DevicePoints') or (RowIndex <> PointIndex + 2) then
+          raise EInvalidOpException.CreateFmt('Неверная строка definedName %s', [Name]);
+        if (HeaderIndex = nil) or not HeaderIndex.TryGetValue(
+           LowerCase(Trim(FieldName)), ActualColumn) then
+          raise EInvalidOpException.CreateFmt(
+            'definedName %s: Reference="%s"; на листе %s ' +
+            'отсутствует технический заголовок %s; ' +
+            'столбец ссылки=%s.',
+            [Name, Reference, SheetName, FieldName,
+             ExcelColumnName(ColumnIndex)]);
+        if ActualColumn <> ColumnIndex then
+          raise EInvalidOpException.CreateFmt(
+            'definedName %s: Reference="%s"; лист=%s; поле=%s; ' +
+            'ссылка указывает на столбец %s, но заголовок ' +
+            'находится в столбце %s.',
+            [Name, Reference, SheetName, FieldName,
+             ExcelColumnName(ColumnIndex), ExcelColumnName(ActualColumn)]);
+      end;
+    end;
+  finally HeaderIndex.Free; Seen.Free; end;
+end;
+
+
 function ReplaceReportDefinedNames(const AWorkbookXml: string;
   const ADefinedNames: TDictionary<string, string>): string; forward;
 procedure CopyXlsxReplacingWorkbook(const ASourceFileName, AOutputFileName,
@@ -2527,74 +2599,7 @@ begin
   end;
 end;
 
-function TryDevicePointDefinedNameParts(const AName: string;
-  out APointIndex: Integer; out AFieldName: string): Boolean;
-var Parts: TArray<string>;
-begin
-  Parts := AName.Split(['_']);
-  Result := (Length(Parts) = 3) and SameText(Parts[0], 'DevicePoints') and
-    TryStrToInt(Parts[1], APointIndex) and (APointIndex >= 1) and
-    (APointIndex <= TReportTemplateService.MAX_DEVICE_POINTS);
-  if Result then AFieldName := Parts[2] else AFieldName := '';
-end;
 
-// Проверяет, что каждый служебный definedName указывает на поле с соответствующим техническим заголовком.
-procedure ValidateReportDefinedNameBindings(const AWorkbookXml: string;
-  const ATechnicalSheets: TDictionary<string, string>;
-  const ASharedStrings: TArray<string>);
-var Doc: IXMLDocument; NamesNode, Node: IXMLNode; Name, Reference, SheetName,
-  FieldName: string; I, ColumnIndex, RowIndex, PointIndex, ActualColumn: Integer;
-  HeaderIndex: TDictionary<string, Integer>; Seen: TDictionary<string, Byte>;
-begin
-  Doc := LoadXMLData(AWorkbookXml); Doc.Active := True;
-  NamesNode := FindDirectChildNode(Doc.DocumentElement, 'definedNames');
-  Seen := TDictionary<string, Byte>.Create;
-  HeaderIndex := nil;
-  try
-    if ATechnicalSheets.ContainsKey('_DevicePoints') then
-      HeaderIndex := BuildWorksheetHeaderIndex(
-        ATechnicalSheets['_DevicePoints'], 2, ASharedStrings);
-    if NamesNode = nil then raise EInvalidOpException.Create('workbook не содержит definedNames');
-    for I := 0 to NamesNode.ChildNodes.Count - 1 do
-    begin
-      Node := NamesNode.ChildNodes[I];
-      if not SameText(Node.LocalName, 'definedName') then Continue;
-      Name := VarToStr(Node.Attributes['name']);
-      if not IsReportDefinedName(Name) then Continue;
-      if Seen.ContainsKey(Name) then
-        raise EInvalidOpException.CreateFmt('Повтор definedName %s', [Name]);
-      Seen.Add(Name, 0); Reference := Node.Text;
-      if not TryParseDefinedNameReference(Reference, SheetName, ColumnIndex, RowIndex) then
-        raise EInvalidOpException.CreateFmt(
-          'Некорректная ссылка definedName %s:'#13#10 +
-          'Reference="%s".'#13#10 +
-          'Ожидается абсолютная ссылка вида Sheet!$A$1 или ''Sheet Name''!$A$1.',
-          [Name, Reference]);
-      if not ATechnicalSheets.ContainsKey(SheetName) then
-        raise EInvalidOpException.CreateFmt('definedName %s указывает на неизвестный лист %s', [Name, SheetName]);
-      if TryDevicePointDefinedNameParts(Name, PointIndex, FieldName) then
-      begin
-        if not SameText(SheetName, '_DevicePoints') or (RowIndex <> PointIndex + 2) then
-          raise EInvalidOpException.CreateFmt('Неверная строка definedName %s', [Name]);
-        if (HeaderIndex = nil) or not HeaderIndex.TryGetValue(
-           LowerCase(Trim(FieldName)), ActualColumn) then
-          raise EInvalidOpException.CreateFmt(
-            'definedName %s: Reference="%s"; на листе %s ' +
-            'отсутствует технический заголовок %s; ' +
-            'столбец ссылки=%s.',
-            [Name, Reference, SheetName, FieldName,
-             ExcelColumnName(ColumnIndex)]);
-        if ActualColumn <> ColumnIndex then
-          raise EInvalidOpException.CreateFmt(
-            'definedName %s: Reference="%s"; лист=%s; поле=%s; ' +
-            'ссылка указывает на столбец %s, но заголовок ' +
-            'находится в столбце %s.',
-            [Name, Reference, SheetName, FieldName,
-             ExcelColumnName(ColumnIndex), ExcelColumnName(ActualColumn)]);
-      end;
-    end;
-  finally HeaderIndex.Free; Seen.Free; end;
-end;
 
 // Полностью пересоздаёт технические листы подготовленного шаблона по
 // актуальной JSON-схеме, не затрагивая пользовательские ZIP-entry.
