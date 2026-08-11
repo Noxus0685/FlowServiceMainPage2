@@ -1820,12 +1820,107 @@ begin
   end;
 end;
 
+procedure AppendDescendantTextNodes(const ANode: IXMLNode;
+  var AText: string);
+var
+  I: Integer;
+  Child: IXMLNode;
+begin
+  if ANode = nil then Exit;
+  for I := 0 to ANode.ChildNodes.Count - 1 do
+  begin
+    Child := ANode.ChildNodes[I];
+    if SameText(Child.LocalName, 't') then
+      AText := AText + Child.Text
+    else
+      AppendDescendantTextNodes(Child, AText);
+  end;
+end;
+
+// Разбирает таблицу общих строк XLSX и возвращает текст каждого элемента si.
+function ParseSharedStrings(
+  const ASharedStringsXml: string
+): TArray<string>;
+var
+  Doc: IXMLDocument;
+  Root, Node: IXMLNode;
+  Values: TList<string>;
+  I: Integer;
+  Value: string;
+begin
+  SetLength(Result, 0);
+  if ASharedStringsXml = '' then Exit;
+  try
+    Doc := LoadXMLData(ASharedStringsXml);
+    Doc.Active := True;
+  except
+    on E: Exception do
+      raise EInvalidOpException.CreateFmt(
+        'Некорректный XML ZIP-entry xl/sharedStrings.xml: %s',
+        [E.Message]);
+  end;
+  Root := Doc.DocumentElement;
+  if (Root = nil) or not SameText(Root.LocalName, 'sst') then
+    raise EInvalidOpException.Create(
+      'Некорректный XML ZIP-entry xl/sharedStrings.xml: отсутствует sst');
+  Values := TList<string>.Create;
+  try
+    for I := 0 to Root.ChildNodes.Count - 1 do
+    begin
+      Node := Root.ChildNodes[I];
+      if not SameText(Node.LocalName, 'si') then Continue;
+      Value := '';
+      AppendDescendantTextNodes(Node, Value);
+      Values.Add(Value);
+    end;
+    Result := Values.ToArray;
+  finally
+    Values.Free;
+  end;
+end;
+
+// Возвращает фактический текст ячейки worksheet с учётом типа хранения XLSX.
+function GetWorksheetCellText(const ACellNode: IXMLNode;
+  const ASharedStrings: TArray<string>): string;
+var
+  CellType, CellReference, RawValue: string;
+  ValueNode, InlineNode: IXMLNode;
+  SharedStringIndex: Integer;
+begin
+  Result := '';
+  if ACellNode = nil then Exit;
+  CellType := VarToStr(ACellNode.Attributes['t']);
+  CellReference := VarToStr(ACellNode.Attributes['r']);
+  ValueNode := FindDirectChildNode(ACellNode, 'v');
+  if ValueNode <> nil then RawValue := ValueNode.Text else RawValue := '';
+  if SameText(CellType, 's') then
+  begin
+    if (ValueNode = nil) or not TryStrToInt(RawValue, SharedStringIndex) or
+       (SharedStringIndex < 0) or (SharedStringIndex >= Length(ASharedStrings)) then
+      raise EInvalidOpException.CreateFmt(
+        'Некорректный индекс shared string в ячейке %s: ' +
+        'Type="%s"; Index="%s"; SharedStringsCount=%d; Entry=xl/sharedStrings.xml.',
+        [CellReference, CellType, RawValue, Length(ASharedStrings)]);
+    Exit(ASharedStrings[SharedStringIndex]);
+  end;
+  if SameText(CellType, 'inlineStr') then
+  begin
+    InlineNode := FindDirectChildNode(ACellNode, 'is');
+    AppendDescendantTextNodes(InlineNode, Result);
+    Exit;
+  end;
+  if SameText(CellType, 'b') or SameText(CellType, 'e') or
+     SameText(CellType, 'd') then Exit;
+  if (CellType = '') or SameText(CellType, 'str') then Result := RawValue;
+end;
+
 // Строит соответствие технического имени заголовка и номера столбца листа.
 function BuildWorksheetHeaderIndex(const AWorksheetXml: string;
-  const AHeaderRow: Integer): TDictionary<string, Integer>;
-var Doc: IXMLDocument; Root, SheetData, RowNode, CellNode, ValueNode,
-  InlineNode, TextNode: IXMLNode; I, J, ColumnIndex: Integer;
-  CellReference, Header: string;
+  const AHeaderRow: Integer;
+  const ASharedStrings: TArray<string>): TDictionary<string, Integer>;
+var Doc: IXMLDocument; Root, SheetData, RowNode, CellNode: IXMLNode;
+  I, J, ColumnIndex: Integer;
+  CellReference, Header, NormalizedHeader: string;
 begin
   Result := TDictionary<string, Integer>.Create;
   try
@@ -1848,22 +1943,14 @@ begin
       CellReference := VarToStr(CellNode.Attributes['r']);
       ColumnIndex := ExcelColumnIndexFromCellReference(CellReference);
       if ColumnIndex = 0 then Continue;
-      Header := '';
-      InlineNode := FindDirectChildNode(CellNode, 'is');
-      if InlineNode <> nil then
-      begin
-        TextNode := FindDirectChildNode(InlineNode, 't');
-        if TextNode <> nil then Header := TextNode.Text;
-      end
-      else
-      begin
-        ValueNode := FindDirectChildNode(CellNode, 'v');
-        if ValueNode <> nil then Header := ValueNode.Text;
-      end;
-      if Header = '' then Continue;
-      if Result.ContainsKey(Header) then
-        raise EInvalidOpException.CreateFmt('Повторяющийся технический заголовок: %s', [Header]);
-      Result.Add(Header, ColumnIndex);
+      Header := GetWorksheetCellText(CellNode, ASharedStrings);
+      NormalizedHeader := LowerCase(Trim(Header));
+      if NormalizedHeader = '' then Continue;
+      if Result.ContainsKey(NormalizedHeader) then
+        raise EInvalidOpException.CreateFmt(
+          'Повторяющийся технический заголовок "%s" в строке %d',
+          [Header, AHeaderRow]);
+      Result.Add(NormalizedHeader, ColumnIndex);
     end;
   except
     Result.Free;
@@ -1876,7 +1963,7 @@ function BuildDefinedNameReference(const ASheetName, AFieldName: string;
   const AExcelRow: Integer; const AHeaderIndex: TDictionary<string, Integer>): string;
 var ColumnIndex: Integer;
 begin
-  if not AHeaderIndex.TryGetValue(AFieldName, ColumnIndex) then
+  if not AHeaderIndex.TryGetValue(LowerCase(Trim(AFieldName)), ColumnIndex) then
     raise EInvalidOpException.CreateFmt('Лист %s не содержит технический заголовок %s',
       [ASheetName, AFieldName]);
   Result := Format('''%s''!$%s$%d',
@@ -1886,12 +1973,16 @@ end;
 
 // Проверяет неизменность технических заголовков между шаблоном и сформированным листом.
 procedure ValidateTechnicalSheetColumnOrder(const ATemplateWorksheetXml,
-  AGeneratedWorksheetXml, ASheetName: string);
+  AGeneratedWorksheetXml, ASheetName: string;
+  const ATemplateSharedStrings: TArray<string>;
+  const AGeneratedSharedStrings: TArray<string>);
 var TemplateHeaders, GeneratedHeaders: TDictionary<string, Integer>;
   Pair: TPair<string, Integer>; GeneratedColumn: Integer;
 begin
-  TemplateHeaders := BuildWorksheetHeaderIndex(ATemplateWorksheetXml, 2);
-  GeneratedHeaders := BuildWorksheetHeaderIndex(AGeneratedWorksheetXml, 2);
+  TemplateHeaders := BuildWorksheetHeaderIndex(ATemplateWorksheetXml, 2,
+    ATemplateSharedStrings);
+  GeneratedHeaders := BuildWorksheetHeaderIndex(AGeneratedWorksheetXml, 2,
+    AGeneratedSharedStrings);
   try
     if TemplateHeaders.Count <> GeneratedHeaders.Count then
       raise EInvalidOpException.CreateFmt('Изменилось число колонок листа %s', [ASheetName]);
@@ -2153,6 +2244,7 @@ const
     'Метаданные отчёта');
 var Zip: TZipFile; WorkbookXml, RelsXml, TempOutput: string;
   Locations: TArray<TReportWorksheetLocation>; SheetXml: TArray<string>;
+  TemplateSharedStrings, GeneratedSharedStrings: TArray<string>;
   Rows: TJSONArray; Names: TDictionary<string, string>; I: Integer;
 begin
   if not FileExists(ASourceFileName) then
@@ -2184,10 +2276,17 @@ begin
     Zip := TZipFile.Create;
     try
       Zip.Open(ASourceFileName, zmRead);
+      if ZipEntryExists(Zip, 'xl/sharedStrings.xml') then
+        TemplateSharedStrings := ParseSharedStrings(
+          ReadZipEntryUtf8(Zip, 'xl/sharedStrings.xml'))
+      else
+        SetLength(TemplateSharedStrings, 0);
+      SetLength(GeneratedSharedStrings, 0);
       for I := 0 to High(SheetXml) do
         ValidateTechnicalSheetColumnOrder(
           ReadZipEntryUtf8(Zip, Locations[I].ArchivePath), SheetXml[I],
-          Locations[I].SheetName);
+          Locations[I].SheetName, TemplateSharedStrings,
+          GeneratedSharedStrings);
     finally
       Zip.Free;
     end;
@@ -2330,7 +2429,8 @@ end;
 
 // Проверяет, что каждый служебный definedName указывает на поле с соответствующим техническим заголовком.
 procedure ValidateReportDefinedNameBindings(const AWorkbookXml: string;
-  const ATechnicalSheets: TDictionary<string, string>);
+  const ATechnicalSheets: TDictionary<string, string>;
+  const ASharedStrings: TArray<string>);
 var Doc: IXMLDocument; NamesNode, Node: IXMLNode; Name, Reference, SheetName,
   FieldName: string; I, ColumnIndex, RowIndex, PointIndex, ActualColumn: Integer;
   HeaderIndex: TDictionary<string, Integer>; Seen: TDictionary<string, Byte>;
@@ -2341,7 +2441,8 @@ begin
   HeaderIndex := nil;
   try
     if ATechnicalSheets.ContainsKey('_DevicePoints') then
-      HeaderIndex := BuildWorksheetHeaderIndex(ATechnicalSheets['_DevicePoints'], 2);
+      HeaderIndex := BuildWorksheetHeaderIndex(
+        ATechnicalSheets['_DevicePoints'], 2, ASharedStrings);
     if NamesNode = nil then raise EInvalidOpException.Create('workbook не содержит definedNames');
     for I := 0 to NamesNode.ChildNodes.Count - 1 do
     begin
@@ -2364,9 +2465,21 @@ begin
       begin
         if not SameText(SheetName, '_DevicePoints') or (RowIndex <> PointIndex + 2) then
           raise EInvalidOpException.CreateFmt('Неверная строка definedName %s', [Name]);
-        if (HeaderIndex = nil) or not HeaderIndex.TryGetValue(FieldName, ActualColumn) or
-           (ActualColumn <> ColumnIndex) then
-          raise EInvalidOpException.CreateFmt('definedName %s указывает не на заголовок %s', [Name, FieldName]);
+        if (HeaderIndex = nil) or not HeaderIndex.TryGetValue(
+           LowerCase(Trim(FieldName)), ActualColumn) then
+          raise EInvalidOpException.CreateFmt(
+            'definedName %s: Reference="%s"; на листе %s ' +
+            'отсутствует технический заголовок %s; ' +
+            'столбец ссылки=%s.',
+            [Name, Reference, SheetName, FieldName,
+             ExcelColumnName(ColumnIndex)]);
+        if ActualColumn <> ColumnIndex then
+          raise EInvalidOpException.CreateFmt(
+            'definedName %s: Reference="%s"; лист=%s; поле=%s; ' +
+            'ссылка указывает на столбец %s, но заголовок ' +
+            'находится в столбце %s.',
+            [Name, Reference, SheetName, FieldName,
+             ExcelColumnName(ColumnIndex), ExcelColumnName(ActualColumn)]);
       end;
     end;
   finally HeaderIndex.Free; Seen.Free; end;
@@ -2380,6 +2493,9 @@ var Zip: TZipFile; WorkbookXml, RelsXml, Name, FieldName, SheetName: string;
   Headers: TDictionary<string, Integer>; Doc: IXMLDocument; NamesNode, Node: IXMLNode;
   Index: TDictionary<string, IXMLNode>;
   I, PointIndex, ColumnIndex, RowIndex, ExpectedColumnIndex: Integer;
+  SharedStrings: TArray<string>;
+  DevicePointColumns: TArray<TReportColumn>;
+  DevicePointColumn: TReportColumn;
 begin
   Sheets := TDictionary<string, string>.Create;
   Zip := TZipFile.Create;
@@ -2390,18 +2506,31 @@ begin
     Locations := ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
     for I := 0 to High(Locations) do
       Sheets.Add(Locations[I].SheetName, ReadZipEntryUtf8(Zip, Locations[I].ArchivePath));
+    if ZipEntryExists(Zip, 'xl/sharedStrings.xml') then
+      SharedStrings := ParseSharedStrings(
+        ReadZipEntryUtf8(Zip, 'xl/sharedStrings.xml'))
+    else
+      SetLength(SharedStrings, 0);
   finally Zip.Free; end;
-  Headers := BuildWorksheetHeaderIndex(Sheets['_DevicePoints'], 2);
+  Headers := BuildWorksheetHeaderIndex(Sheets['_DevicePoints'], 2,
+    SharedStrings);
+  DevicePointColumns := BuildDevicePointsColumns;
   try
     Doc := LoadXMLData(WorkbookXml); Doc.Active := True;
     NamesNode := EnsureDefinedNamesNode(Doc.DocumentElement);
     Index := BuildDefinedNameIndex(NamesNode);
     try
       for PointIndex := 1 to TReportTemplateService.MAX_DEVICE_POINTS do
-        for FieldName in Headers.Keys do
+        for DevicePointColumn in DevicePointColumns do
         begin
+          FieldName := DevicePointColumn.TechnicalName;
           if MatchText(FieldName, ['ObjectType', 'ObjectIndex', 'PointIndex',
             'SpillageIndex', 'CoefTableType', 'CoefItemIndex', '_SchemaOnly']) then Continue;
+          if not Headers.TryGetValue(LowerCase(Trim(FieldName)),
+             ExpectedColumnIndex) then
+            raise EInvalidOpException.CreateFmt(
+              'Лист _DevicePoints не содержит технический заголовок %s',
+              [FieldName]);
           Name := Format('DevicePoints_%.2d_%s', [PointIndex, FieldName]);
           if not Index.TryGetValue(Name, Node) then
           begin
@@ -2412,7 +2541,6 @@ begin
               PointIndex + 2, Headers);
             Continue;
           end;
-          ExpectedColumnIndex := Headers[FieldName];
           if TryParseDefinedNameReference(Node.Text, SheetName, ColumnIndex,
              RowIndex) and SameText(SheetName, '_DevicePoints') and
              (ColumnIndex = ExpectedColumnIndex) and
@@ -2422,7 +2550,7 @@ begin
         end;
       WorkbookXml := SerializeXmlDocumentUtf8(Doc);
     finally Index.Free; end;
-    ValidateReportDefinedNameBindings(WorkbookXml, Sheets);
+    ValidateReportDefinedNameBindings(WorkbookXml, Sheets, SharedStrings);
     CopyXlsxReplacingWorkbook(ASourceFileName, AOutputFileName, WorkbookXml);
   finally Headers.Free; Sheets.Free; end;
 end;

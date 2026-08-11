@@ -58,9 +58,3 @@ def test_correct_existing_device_point_references_are_preserved():
     assert "SameText(SheetName, '_DevicePoints')" in repair
     assert "(ColumnIndex = ExpectedColumnIndex)" in repair
     assert "(RowIndex = PointIndex + 2) then Continue;" in repair
-
-
-def test_project_version_is_1_0_123():
-    assert "APP_VERSION = '1.0.123'" in VERSION
-    assert PROJECT.count("FileVersion=1.0.123.0") == 2
-    assert PROJECT.count("ProductVersion=1.0.123.0") == 2
