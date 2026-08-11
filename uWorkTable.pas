@@ -1147,7 +1147,11 @@ type
     Вызывается только после освобождения FHydraulicStateLock. }
   procedure NotifyHydraulicStateChanged;
 
-
+  function EnableEtalonChannelsByNames(
+    const ANames: TArray<string>;
+    const AWeightsOnly: Boolean;
+    out AError: TErrorInfo
+  ): Boolean;
 
   public
   procedure CaptureEnvironmentSimulationBase;
@@ -1330,7 +1334,10 @@ type
     procedure RecalculateAllMeterValues;
     procedure UpdateAggregateMeterValues;
     function SelectEtalons(const AFlowRate: Double; out AError: TErrorInfo): Boolean;
+    procedure DisableAllEtalons;
     function SetEtalonsByNames(const AEtalonNames: TArray<string>;
+      out AError: TErrorInfo): Boolean;
+    function SetScalesByNames(const AScaleNames: TArray<string>;
       out AError: TErrorInfo): Boolean;
     function CalcEtalonFlowRateMax: Double;
     function CalcEtalonFlowRateMin: Double;
@@ -4129,95 +4136,191 @@ end;
 
 
 
-function TWorkTable.SetEtalonsByNames(const AEtalonNames: TArray<string>;
-  out AError: TErrorInfo): Boolean;
+procedure TWorkTable.DisableAllEtalons;
 var
   I: Integer;
   Channel: TChannel;
+  Changed: Boolean;
+begin
+  Changed := False;
+
+  if FEtalonChannels <> nil then
+    for I := 0 to FEtalonChannels.Count - 1 do
+    begin
+      Channel := FEtalonChannels[I];
+
+      if Channel = nil then
+        Continue;
+
+      if Channel.Enabled then
+      begin
+        Channel.Enabled := False;
+        Changed := True;
+      end;
+    end;
+
+  UpdateAggregateMeterValues;
+
+  if Changed then
+    FireEvent(ewtEtalonsChanged, 'Выключены все эталонные каналы');
+end;
+
+function TWorkTable.EnableEtalonChannelsByNames(
+  const ANames: TArray<string>; const AWeightsOnly: Boolean;
+  out AError: TErrorInfo): Boolean;
+var
+  I: Integer;
+  J: Integer;
+  Channel: TChannel;
   ChannelName: string;
+  RequestedName: string;
+  NameFound: Boolean;
   NeedEnabled: Boolean;
   Changed: Boolean;
-  MatchedCount: Integer;
+  SelectionTypeText: string;
 
-  function BuildWorkTableError(ACode: Integer; const AMsg: string): TErrorInfo;
+  function BuildWorkTableError(const ACode: Integer;
+    const AMsg: string): TErrorInfo;
   begin
+    Result := TErrorInfo.Empty(Integer(State));
     Result.Code := ACode;
     Result.Msg := AMsg;
     Result.Time := Now;
-    Result.Stage := 0;
+    Result.Stage := Integer(State);
+  end;
+
+  function IsRequiredChannelType(AChannel: TChannel): Boolean;
+  var
+    IsWeightChannel: Boolean;
+  begin
+    Result := False;
+    if (AChannel = nil) or (AChannel.FlowMeter = nil) then
+      Exit;
+
+    IsWeightChannel :=
+      AChannel.FlowMeter.MeterFlowCategory = mftWeightsType;
+    if AWeightsOnly then
+      Result := IsWeightChannel
+    else
+      Result := not IsWeightChannel;
   end;
 
   function NameInList(const AName: string): Boolean;
   var
-    J: Integer;
-    Name: string;
+    NameIndex: Integer;
+    NormalizedName: string;
   begin
     Result := False;
-    Name := Trim(AName);
-
-    if Name = '' then
+    NormalizedName := Trim(AName);
+    if NormalizedName = '' then
       Exit;
 
-    for J := Low(AEtalonNames) to High(AEtalonNames) do
-      if SameText(Name, Trim(AEtalonNames[J])) then
+    for NameIndex := Low(ANames) to High(ANames) do
+      if SameText(NormalizedName, Trim(ANames[NameIndex])) then
         Exit(True);
   end;
 
 begin
   Result := False;
   Changed := False;
-  MatchedCount := 0;
-  AError := TErrorInfo.Empty(0);
+  AError := TErrorInfo.Empty(Integer(State));
+
+  if AWeightsOnly then
+    SelectionTypeText := 'весовых каналов'
+  else
+    SelectionTypeText := 'эталонных приборов';
 
   if (FEtalonChannels = nil) or (FEtalonChannels.Count = 0) then
   begin
-    AError := BuildWorkTableError(1101, 'Список эталонных каналов не создан или пуст');
+    AError := BuildWorkTableError(1101,
+      'Список эталонных каналов не создан или пуст');
     Exit;
   end;
 
-  if Length(AEtalonNames) = 0 then
+  if Length(ANames) = 0 then
   begin
-    AError := BuildWorkTableError(1102, 'Список имён эталонов для выбора пуст');
+    AError := BuildWorkTableError(1102,
+      Format('Список имён %s для включения пуст', [SelectionTypeText]));
     Exit;
   end;
 
+  { Validate every requested name before changing any channel. }
+  for J := Low(ANames) to High(ANames) do
+  begin
+    RequestedName := Trim(ANames[J]);
+    if RequestedName = '' then
+    begin
+      AError := BuildWorkTableError(1103,
+        Format('Список имён %s содержит пустое имя', [SelectionTypeText]));
+      Exit;
+    end;
+
+    NameFound := False;
+    for I := 0 to FEtalonChannels.Count - 1 do
+    begin
+      Channel := FEtalonChannels[I];
+      if not IsRequiredChannelType(Channel) then
+        Continue;
+
+      ChannelName := Trim(Channel.FlowMeter.Name);
+      if SameText(ChannelName, RequestedName) then
+      begin
+        NameFound := True;
+        Break;
+      end;
+    end;
+
+    if not NameFound then
+    begin
+      if AWeightsOnly then
+        AError := BuildWorkTableError(1104,
+          Format('В рабочем столе не найден весовой канал "%s"',
+            [RequestedName]))
+      else
+        AError := BuildWorkTableError(1105,
+          Format('В рабочем столе не найден эталонный прибор "%s"',
+            [RequestedName]));
+      Exit;
+    end;
+  end;
+
+  { All names are valid; enable matching channels without disabling others. }
   for I := 0 to FEtalonChannels.Count - 1 do
   begin
     Channel := FEtalonChannels[I];
-
-    if Channel = nil then
+    if not IsRequiredChannelType(Channel) then
       Continue;
 
-    ChannelName := '';
-
-    if Channel.FlowMeter <> nil then
-      ChannelName := Channel.FlowMeter.Name;
-
+    ChannelName := Trim(Channel.FlowMeter.Name);
     NeedEnabled := NameInList(ChannelName);
-
-    if NeedEnabled then
-      Inc(MatchedCount);
-
-    if Channel.Enabled <> NeedEnabled then
+    if NeedEnabled and not Channel.Enabled then
     begin
-      Channel.Enabled := NeedEnabled;
+      Channel.Enabled := True;
       Changed := True;
     end;
   end;
 
   UpdateAggregateMeterValues;
 
-  if MatchedCount = 0 then
-  begin
-    AError := BuildWorkTableError(1103,
-      'В рабочем столе не найдены эталонные каналы по именам из гидросхемы');
-    Exit(False);
-  end;
-
   if Changed then
-    FireEvent(ewtEtalonsChanged, 'Изменен набор выбранных эталонных каналов');
+    if AWeightsOnly then
+      FireEvent(ewtEtalonsChanged, 'Включены весовые каналы по именам')
+    else
+      FireEvent(ewtEtalonsChanged, 'Включены эталонные приборы по именам');
 
   Result := True;
+end;
+
+function TWorkTable.SetEtalonsByNames(const AEtalonNames: TArray<string>;
+  out AError: TErrorInfo): Boolean;
+begin
+  Result := EnableEtalonChannelsByNames(AEtalonNames, False, AError);
+end;
+
+function TWorkTable.SetScalesByNames(const AScaleNames: TArray<string>;
+  out AError: TErrorInfo): Boolean;
+begin
+  Result := EnableEtalonChannelsByNames(AScaleNames, True, AError);
 end;
 
 { Rebuilds aggregate lists for table values from enabled etalon channels. }
@@ -8063,6 +8166,8 @@ function TWorkTable.BeginHydraulicLineApply(const AOperationID: Int64;
   const APointUUID: string; const APointIndex: Integer;
   out AConfiguration: RWorkTableHydraulicConfiguration;
   out ARange: RWorkTableHydraulicRange): Boolean;
+var
+  Error: TErrorInfo;
 begin
   Result := False;
   AConfiguration := Default(RWorkTableHydraulicConfiguration); AConfiguration.ChartIndex := -1;
@@ -8080,7 +8185,31 @@ begin
     AConfiguration := CopyHydraulicConfiguration(FHydraulicConfiguration); ARange := FHydraulicRange;
     FHydraulicLineError := TErrorInfo.Empty(Integer(FState)); FHydraulicLineState := hlsSettingUp; Result := True;
   finally TMonitor.Exit(FHydraulicStateLock); end;
-  if Result then NotifyHydraulicStateChanged;
+
+  if Result then
+  begin
+    { Both groups are stored in FEtalonChannels. Apply the saved selection
+      atomically: a failure in either group leaves every etalon disabled. }
+    DisableAllEtalons;
+
+    if (Length(AConfiguration.EtalonNames) > 0) and
+       not SetEtalonsByNames(AConfiguration.EtalonNames, Error) then
+    begin
+      DisableAllEtalons;
+      FailHydraulicLineApply(AOperationID, APointUUID, APointIndex, Error);
+      Exit(False);
+    end;
+
+    if (Length(AConfiguration.ScaleNames) > 0) and
+       not SetScalesByNames(AConfiguration.ScaleNames, Error) then
+    begin
+      DisableAllEtalons;
+      FailHydraulicLineApply(AOperationID, APointUUID, APointIndex, Error);
+      Exit(False);
+    end;
+
+    NotifyHydraulicStateChanged;
+  end;
 end;
 
 { Завершает актуальную установку переводом линии в настроенное состояние. }
