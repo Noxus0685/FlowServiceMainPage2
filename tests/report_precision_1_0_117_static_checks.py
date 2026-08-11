@@ -11,7 +11,7 @@ def implementation(start, end):
 
 
 def test_version_and_shared_precision_policy():
-    assert "APP_VERSION = '1.0.116'" in VERSION
+    assert "APP_VERSION = '1.0.117'" in VERSION
     rounding = implementation('function RoundReportValueByMeterPrecision',
                               'function ReportErrorDecimals')
     assert 'AMeterValue.GetStrNum(AValue)' in rounding
