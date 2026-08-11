@@ -228,8 +228,8 @@ object FrameProceed: TFrameProceed
           OnColumnMoved = GridDataPointsColumnMoved
           OnSelChanged = GridResultsSelChanged
           OnGetValue = GridResultsGetValue
-          Viewport.Width = 941.000000000000000000
-          Viewport.Height = 568.000000000000000000
+          Viewport.Width = 961.000000000000000000
+          Viewport.Height = 609.000000000000000000
           object StringColumnResultName: TStringColumn
             Header = #1048#1084#1103
             HeaderSettings.TextSettings.Trimming = Character
@@ -383,26 +383,26 @@ object FrameProceed: TFrameProceed
           Size.Width = 348.000000000000000000
           Size.Height = 609.000000000000000000
           Size.PlatformDefault = False
-          TabIndex = 0
+          TabIndex = 3
           TabOrder = 0
           TabPosition = PlatformDefault
           Sizes = (
             348s
-            583s
+            604s
             348s
-            583s
+            604s
             348s
-            583s
+            604s
             348s
-            583s)
+            604s)
           object TabItemSessionProperties: TTabItem
             CustomIcon = <
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = True
-            Size.Width = 71.000000000000000000
-            Size.Height = 26.000000000000000000
+            IsSelected = False
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -412,7 +412,7 @@ object FrameProceed: TFrameProceed
             object LayoutSessionProperties: TLayout
               Align = Client
               Size.Width = 348.000000000000000000
-              Size.Height = 583.000000000000000000
+              Size.Height = 604.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
               object LabelCoefs: TLabel
@@ -465,8 +465,8 @@ object FrameProceed: TFrameProceed
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 65.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -499,8 +499,8 @@ object FrameProceed: TFrameProceed
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 73.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -513,15 +513,67 @@ object FrameProceed: TFrameProceed
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = False
-            Size.Width = 61.000000000000000000
-            Size.Height = 26.000000000000000000
+            IsSelected = True
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
             Text = #1054#1090#1095#1077#1090#1099
             ExplicitSize.cx = 61.000000000000000000
             ExplicitSize.cy = 26.000000000000000000
+            object LayoutReportToolbar: TLayout
+              Align = Top
+              Padding.Left = 8.000000000000000000
+              Padding.Top = 8.000000000000000000
+              Padding.Right = 8.000000000000000000
+              Padding.Bottom = 8.000000000000000000
+              Size.Width = 348.000000000000000000
+              Size.Height = 48.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 0
+              object ButtonLoadReportTemplate: TButton
+                Align = Left
+                Position.X = 8.000000000000000000
+                Position.Y = 8.000000000000000000
+                Size.Width = 120.000000000000000000
+                Size.Height = 32.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+                Text = #1047#1072#1075#1088#1091#1079#1080#1090#1100
+                TextSettings.Trimming = None
+                OnClick = ButtonLoadReportTemplateClick
+              end
+              object ButtonExportReportTemplate: TButton
+                Align = Left
+                Margins.Left = 8.000000000000000000
+                Position.X = 136.000000000000000000
+                Position.Y = 8.000000000000000000
+                Size.Width = 120.000000000000000000
+                Size.Height = 32.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 1
+                Text = #1042#1099#1075#1088#1091#1079#1080#1090#1100
+                TextSettings.Trimming = None
+                OnClick = ButtonExportReportTemplateClick
+              end
+            end
+            object ListBoxReportTemplates: TListBox
+              Align = Client
+              Margins.Left = 8.000000000000000000
+              Margins.Right = 8.000000000000000000
+              Margins.Bottom = 8.000000000000000000
+              Size.Width = 332.000000000000000000
+              Size.Height = 548.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 1
+              DisableFocusEffect = True
+              DefaultItemStyles.ItemStyle = ''
+              DefaultItemStyles.GroupHeaderStyle = ''
+              DefaultItemStyles.GroupFooterStyle = ''
+              Viewport.Width = 328.000000000000000000
+              Viewport.Height = 523.000000000000000000
+            end
           end
         end
       end
@@ -543,7 +595,7 @@ object FrameProceed: TFrameProceed
         LineType = Right
         Margins.Top = 5.000000000000000000
         Margins.Bottom = 5.000000000000000000
-        Position.X = 715.000000000000000000
+        Position.X = 839.000000000000000000
         Position.Y = 5.000000000000000000
         Size.Width = 12.000000000000000000
         Size.Height = 22.000000000000000000
@@ -554,7 +606,6 @@ object FrameProceed: TFrameProceed
         Align = Left
         Padding.Left = 5.000000000000000000
         Padding.Right = 5.000000000000000000
-        Position.X = 210.000000000000000000
         Size.Width = 271.000000000000000000
         Size.Height = 32.000000000000000000
         Size.PlatformDefault = False
@@ -639,7 +690,7 @@ object FrameProceed: TFrameProceed
         Align = Left
         Enabled = False
         Hint = #1042#1099#1075#1088#1091#1079#1080#1090#1100' '#1074#1099#1073#1088#1072#1085#1085#1099#1077' '#1076#1072#1085#1085#1099#1077' '#1074' Excel'
-        Position.X = 564.000000000000000000
+        Position.X = 552.000000000000000000
         Size.Width = 47.000000000000000000
         Size.Height = 32.000000000000000000
         Size.PlatformDefault = False
@@ -654,18 +705,19 @@ object FrameProceed: TFrameProceed
         Action = ActionRemoveInvalidAndExcessMeasurements
         Align = Left
         ImageIndex = -1
-        Position.X = 517.000000000000000000
+        Position.X = 505.000000000000000000
         Size.Width = 47.000000000000000000
         Size.Height = 32.000000000000000000
         Size.PlatformDefault = False
         StyleLookup = 'bookmarkstoolbutton'
         TabOrder = 40
+        TextSettings.Trimming = None
         ParentShowHint = False
         ShowHint = True
       end
       object Layout19: TLayout
         Align = Left
-        Position.X = 611.000000000000000000
+        Position.X = 599.000000000000000000
         Size.Width = 240.000000000000000000
         Size.Height = 32.000000000000000000
         Size.PlatformDefault = False
@@ -673,7 +725,7 @@ object FrameProceed: TFrameProceed
       end
       object Layout20: TLayout
         Align = Left
-        Position.X = 491.000000000000000000
+        Position.X = 281.000000000000000000
         Size.Width = 224.000000000000000000
         Size.Height = 32.000000000000000000
         Size.PlatformDefault = False
@@ -702,7 +754,7 @@ object FrameProceed: TFrameProceed
         LineType = Right
         Margins.Top = 5.000000000000000000
         Margins.Bottom = 5.000000000000000000
-        Position.X = 481.000000000000000000
+        Position.X = 271.000000000000000000
         Position.Y = 5.000000000000000000
         Size.Width = 10.000000000000000000
         Size.Height = 22.000000000000000000
@@ -913,23 +965,29 @@ object FrameProceed: TFrameProceed
     object MenuItemChartSettings: TMenuItem
       Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080
       object MenuItemChartLineMode: TMenuItem
+        Locked = True
         Text = #1051#1080#1085#1080#1103' '#1089#1088#1077#1076#1085#1080#1093' '#1079#1085#1072#1095#1077#1085#1080#1081
         object MenuItemChartLinePchip: TMenuItem
+          Locked = True
           Text = 'PCHIP '#1087#1086' log(Q)'
           OnClick = ChartLineModeMenuClick
         end
         object MenuItemChartLineSegments: TMenuItem
+          Locked = True
           Text = #1055#1088#1103#1084#1099#1077' '#1086#1090#1088#1077#1079#1082#1080
           OnClick = ChartLineModeMenuClick
         end
       end
       object MenuItemChartScale: TMenuItem
+        Locked = True
         Text = #1064#1082#1072#1083#1072' '#1088#1072#1089#1093#1086#1076#1072
         object MenuItemChartScaleLog: TMenuItem
+          Locked = True
           Text = #1051#1086#1075#1072#1088#1080#1092#1084#1080#1095#1077#1089#1082#1072#1103
           OnClick = ChartScaleMenuClick
         end
         object MenuItemChartScaleLinear: TMenuItem
+          Locked = True
           Text = #1054#1073#1099#1095#1085#1072#1103
           OnClick = ChartScaleMenuClick
         end

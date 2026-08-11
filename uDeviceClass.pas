@@ -1,5 +1,7 @@
 ﻿unit uDeviceClass;
 
+{$RTTI EXPLICIT FIELDS([vcPublic]) PROPERTIES([vcPublic, vcPublished])}
+
 interface
 
 uses
@@ -691,12 +693,95 @@ type
 
   end;
 
+// Выбирает отображаемую погрешность из уже сформированной группировки Summary.
+function TrySelectDevicePointDisplaySpillage(
+  const ASpillages: array of TPointSpillage;
+  out ASelected: TPointSpillage): Boolean;
+// Возвращает погрешность поверочной точки по тому же правилу, которое используется в сводной таблице обработки.
+function TryGetDevicePointDisplayError(ADevice: TDevice;
+  ADevicePoint: TDevicePoint; ASession: TSessionSpillage;
+  out AError: Double): Boolean;
+
 implementation
 uses
   uDataManager,
   uAppServices,
   uRepositories,
   uMKSDebug;
+
+function IsDevicePointDisplayErrorCandidate(ASpillage: TPointSpillage): Boolean;
+begin
+  Result := (ASpillage <> nil) and (ASpillage.State <> osDeleted) and
+    ASpillage.Enabled and ASpillage.Valid and
+    (ASpillage.Validation = vsValid) and not IsNan(ASpillage.Error) and
+    not IsInfinite(ASpillage.Error) and (Abs(ASpillage.Error) < MaxDouble);
+end;
+
+function TrySelectDevicePointDisplaySpillage(
+  const ASpillages: array of TPointSpillage;
+  out ASelected: TPointSpillage): Boolean;
+var
+  Candidate: TPointSpillage;
+begin
+  ASelected := nil;
+  for Candidate in ASpillages do
+    if IsDevicePointDisplayErrorCandidate(Candidate) and
+       ((ASelected = nil) or
+        (Abs(Candidate.Error) < Abs(ASelected.Error)) or
+        (SameValue(Abs(Candidate.Error), Abs(ASelected.Error), 1E-9) and
+         (Candidate.ID >= ASelected.ID))) then
+      ASelected := Candidate;
+  Result := ASelected <> nil;
+end;
+
+function TryGetDevicePointDisplayError(ADevice: TDevice;
+  ADevicePoint: TDevicePoint; ASession: TSessionSpillage;
+  out AError: Double): Boolean;
+var
+  Candidate, Selected: TPointSpillage;
+  Candidates: TList<TPointSpillage>;
+  ExactPointIdentity: Boolean;
+begin
+  AError := 0;
+  Result := False;
+  if (ADevice = nil) or (ADevicePoint = nil) or (ASession = nil) or
+     (ASession.Spillages = nil) or (ASession.ID <= 0) or
+     ((Trim(ASession.DeviceUUID) <> '') and
+      not SameText(Trim(ASession.DeviceUUID), Trim(ADevice.UUID))) then Exit;
+  Candidates := TList<TPointSpillage>.Create;
+  try
+    for Candidate in ASession.Spillages do
+    begin
+      if (Candidate = nil) or (Candidate.SessionID <> ASession.ID) or
+         ((Trim(Candidate.DeviceUUID) <> '') and
+          not SameText(Trim(Candidate.DeviceUUID), Trim(ADevice.UUID))) then
+        Continue;
+      if (Trim(ADevicePoint.DeviceTypeUUID) <> '') and
+         (Trim(Candidate.DeviceTypeUUID) <> '') then
+      begin
+        if not SameText(Trim(Candidate.DeviceTypeUUID),
+          Trim(ADevicePoint.DeviceTypeUUID)) then
+          Continue;
+        ExactPointIdentity := True;
+      end
+      else if (Trim(ADevicePoint.Name) <> '') and
+              (Trim(Candidate.Name) <> '') then
+        ExactPointIdentity := SameText(Trim(Candidate.Name),
+          Trim(ADevicePoint.Name))
+      else
+        ExactPointIdentity := False;
+      if not ExactPointIdentity and
+         (ADevice.FindMatchedDevicePointForSpillage(Candidate) <> ADevicePoint) then
+        Continue;
+      Candidates.Add(Candidate);
+    end;
+    Result := TrySelectDevicePointDisplaySpillage(Candidates.ToArray, Selected);
+    if Result then
+      AError := Selected.Error;
+  finally
+    Candidates.Free;
+  end;
+end;
 
 function UnknownStateText(const ACode: Integer): string;
 begin
