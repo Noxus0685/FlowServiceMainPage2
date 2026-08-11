@@ -26,6 +26,7 @@ uses
   System.Types,
   System.UITypes,
   System.Variants,
+  uBaseProcedures,
   uClasses,
   uDeviceClass,
   uFlowMeter,
@@ -107,8 +108,15 @@ type
     function InitErrorPercent(AItem: TCalibrCoefItem): Double;
     function CalcErrorPercent(AItem: TCalibrCoefItem): Double;
     function TryGetSpillageValues(ASpillage: TPointSpillage; out AArg, AValue, AQ: Double): Boolean;
-    function BuildCoefFromPoint(const AArg, AValue, AQ: Double; AOrderNo: Integer): TCalibrCoefItem;
+    // Возвращает допустимый диапазон расхода поверочной точки для группировки проливок.
+    function TryGetSpillageFlowRange(ASpillage: TPointSpillage;
+      out AQFrom, AQTo: Double): Boolean;
+    // Создаёт усреднённую строку коэффициентов с готовыми границами диапазона расхода.
+    function BuildCoefFromPoint(const AArg, AValue, AQ, AQFrom, AQTo: Double;
+      AOrderNo: Integer): TCalibrCoefItem;
+    // Объединяет проливки по пересекающимся диапазонам расхода и усредняет данные группы.
     procedure BuildCurrentTableFromSpillages;
+    // Пересчитывает K и b по усреднённым строкам, не заменяя диапазоны Q1/Q2.
     procedure RecalculateCurrentTable;
     procedure SetCurrentSpillages(ASpillages: TObjectList<TPointSpillage>);
 
@@ -1336,35 +1344,182 @@ begin
     (not IsInfinite(AArg)) and (not IsInfinite(AValue)) and (not IsInfinite(AQ));
 end;
 
-procedure TFrameCalibrCoefs.BuildCurrentTableFromSpillages;
+function TFrameCalibrCoefs.TryGetSpillageFlowRange(
+  ASpillage: TPointSpillage; out AQFrom, AQTo: Double): Boolean;
 var
+  DevicePoint: TDevicePoint;
+  AccuracyText: string;
+  AccuracyPercent: Double;
+  Delta: Double;
+  TempQ: Double;
+begin
+  Result := False;
+  AQFrom := 0;
+  AQTo := 0;
+
+  if (ASpillage = nil) or (FFlowMeter = nil) or
+     (FFlowMeter.Device = nil) then
+    Exit;
+
+  DevicePoint := FFlowMeter.Device.FindMatchedDevicePointForSpillage(ASpillage);
+  if (DevicePoint = nil) or (DevicePoint.Q <= 0) then
+    Exit;
+
+  AccuracyText := NormalizeFlowAccuracyInput(DevicePoint.FlowAccuracy);
+  AccuracyPercent := 10.0;
+  if AccuracyText <> '' then
+  begin
+    if CharInSet(AccuracyText[1], ['+', '-']) then
+      AccuracyPercent := NormalizeFloatInput(Copy(AccuracyText, 2, MaxInt))
+    else
+      AccuracyPercent := NormalizeFloatInput(AccuracyText);
+  end;
+  AccuracyPercent := Abs(AccuracyPercent);
+  Delta := DevicePoint.Q * AccuracyPercent / 100.0;
+
+  if (AccuracyText <> '') and (AccuracyText[1] = '+') then
+  begin
+    AQFrom := DevicePoint.Q;
+    AQTo := DevicePoint.Q + Delta;
+  end
+  else if (AccuracyText <> '') and (AccuracyText[1] = '-') then
+  begin
+    AQFrom := DevicePoint.Q - Delta;
+    AQTo := DevicePoint.Q;
+  end
+  else
+  begin
+    AQFrom := DevicePoint.Q - Delta;
+    AQTo := DevicePoint.Q + Delta;
+  end;
+
+  if AQFrom > AQTo then
+  begin
+    TempQ := AQFrom;
+    AQFrom := AQTo;
+    AQTo := TempQ;
+  end;
+  Result := True;
+end;
+
+procedure TFrameCalibrCoefs.BuildCurrentTableFromSpillages;
+type
+  TCoefSourcePoint = record
+    Arg: Double;
+    Value: Double;
+    Q: Double;
+    QFrom: Double;
+    QTo: Double;
+  end;
+  TCoefPointGroup = record
+    SumArg: Double;
+    SumValue: Double;
+    SumQ: Double;
+    QFrom: Double;
+    QTo: Double;
+    Count: Integer;
+  end;
+var
+  SourcePoints: TList<TCoefSourcePoint>;
+  SourcePoint: TCoefSourcePoint;
+  CurrentGroup: TCoefPointGroup;
   Spillage: TPointSpillage;
-  ArgValue: Double;
-  RefValue: Double;
-  QValue: Double;
   Item: TCalibrCoefItem;
   OrderNo: Integer;
+
+  procedure StartGroup(const ASource: TCoefSourcePoint);
+  begin
+    CurrentGroup := Default(TCoefPointGroup);
+    CurrentGroup.SumArg := ASource.Arg;
+    CurrentGroup.SumValue := ASource.Value;
+    CurrentGroup.SumQ := ASource.Q;
+    CurrentGroup.QFrom := ASource.QFrom;
+    CurrentGroup.QTo := ASource.QTo;
+    CurrentGroup.Count := 1;
+  end;
+
+  procedure AddToGroup(const ASource: TCoefSourcePoint);
+  begin
+    CurrentGroup.SumArg := CurrentGroup.SumArg + ASource.Arg;
+    CurrentGroup.SumValue := CurrentGroup.SumValue + ASource.Value;
+    CurrentGroup.SumQ := CurrentGroup.SumQ + ASource.Q;
+    CurrentGroup.QFrom := Min(CurrentGroup.QFrom, ASource.QFrom);
+    CurrentGroup.QTo := Max(CurrentGroup.QTo, ASource.QTo);
+    Inc(CurrentGroup.Count);
+  end;
+
+  procedure StoreGroup;
+  begin
+    if CurrentGroup.Count <= 0 then
+      Exit;
+
+    Item := BuildCoefFromPoint(
+      CurrentGroup.SumArg / CurrentGroup.Count,
+      CurrentGroup.SumValue / CurrentGroup.Count,
+      CurrentGroup.SumQ / CurrentGroup.Count,
+      CurrentGroup.QFrom,
+      CurrentGroup.QTo,
+      OrderNo);
+    FCurrentTable.Items.Add(Item);
+    Inc(OrderNo);
+  end;
+
 begin
   if (FCurrentTable = nil) or (FCurrentTable.Items = nil) then
     Exit;
 
   FCurrentTable.Items.Clear;
-  OrderNo := 1;
-
   if FCurrentSpillages = nil then
     Exit;
 
-  for Spillage in FCurrentSpillages do
-  begin
-    if (Spillage = nil) or (not Spillage.Enabled) then
-      Continue;
+  SourcePoints := TList<TCoefSourcePoint>.Create;
+  try
+    for Spillage in FCurrentSpillages do
+    begin
+      if (Spillage = nil) or (not Spillage.Enabled) then
+        Continue;
 
-    if not TryGetSpillageValues(Spillage, ArgValue, RefValue, QValue) then
-      Continue;
+      if not TryGetSpillageValues(Spillage, SourcePoint.Arg,
+        SourcePoint.Value, SourcePoint.Q) then
+        Continue;
 
-    Item := BuildCoefFromPoint(ArgValue, RefValue, QValue, OrderNo);
-    FCurrentTable.Items.Add(Item);
-    Inc(OrderNo);
+      if not TryGetSpillageFlowRange(Spillage, SourcePoint.QFrom,
+        SourcePoint.QTo) then
+      begin
+        SourcePoint.QFrom := SourcePoint.Q;
+        SourcePoint.QTo := SourcePoint.Q;
+      end;
+      SourcePoints.Add(SourcePoint);
+    end;
+
+    SourcePoints.Sort(TComparer<TCoefSourcePoint>.Construct(
+      function(const Left, Right: TCoefSourcePoint): Integer
+      begin
+        Result := CompareValue(Left.QFrom, Right.QFrom);
+        if Result = EqualsValue then
+          Result := CompareValue(Left.QTo, Right.QTo);
+        if Result = EqualsValue then
+          Result := CompareValue(Left.Q, Right.Q);
+      end));
+
+    OrderNo := 1;
+    CurrentGroup := Default(TCoefPointGroup);
+    for SourcePoint in SourcePoints do
+    begin
+      if CurrentGroup.Count = 0 then
+        StartGroup(SourcePoint)
+      else if (SourcePoint.QFrom <= CurrentGroup.QTo + 1E-12) and
+              (SourcePoint.QTo >= CurrentGroup.QFrom - 1E-12) then
+        AddToGroup(SourcePoint)
+      else
+      begin
+        StoreGroup;
+        StartGroup(SourcePoint);
+      end;
+    end;
+    StoreGroup;
+  finally
+    SourcePoints.Free;
   end;
 end;
 
@@ -1397,8 +1552,6 @@ begin
 
       Item.K := 0;
       Item.b := 0;
-      Item.QFrom := 0;
-      Item.QTo := 0;
 
       if (not Item.Enable) or SameValue(Item.Arg, 0, 1E-12) then
         Continue;
@@ -1426,8 +1579,6 @@ begin
     if Seeds.Count = 1 then
     begin
       Item := Seeds[0].Item;
-      Item.QFrom := NegInfinity;
-      Item.QTo := Infinity;
       Item.K := 0;
       Item.b := Seeds[0].Ratio;
       SortCurrentTableByRange;
@@ -1439,12 +1590,6 @@ begin
     begin
       PrevSeed := Seeds[I];
       CurrSeed := Seeds[I + 1];
-
-      if I = 0 then
-        PrevSeed.Item.QFrom := NegInfinity
-      else
-        PrevSeed.Item.QFrom := PrevSeed.Q;
-      PrevSeed.Item.QTo := CurrSeed.Q;
 
       if SameValue(PrevSeed.Q, CurrSeed.Q, 1E-12) then
       begin
@@ -1460,8 +1605,6 @@ begin
     end;
 
     Item := Seeds[Seeds.Count - 1].Item;
-    Item.QFrom := Seeds[Seeds.Count - 1].Q;
-    Item.QTo := Infinity;
     Item.K := Seeds[Seeds.Count - 2].Item.K;
     Item.b := Seeds[Seeds.Count - 2].Item.b;
 
@@ -1472,9 +1615,9 @@ begin
   end;
 end;
 
-function TFrameCalibrCoefs.BuildCoefFromPoint(const AArg, AValue, AQ: Double;
+function TFrameCalibrCoefs.BuildCoefFromPoint(
+  const AArg, AValue, AQ, AQFrom, AQTo: Double;
   AOrderNo: Integer): TCalibrCoefItem;
-
 begin
   Result := TCalibrCoefItem.Create;
   Result.Name := Format('Точка %d', [AOrderNo]);
@@ -1483,8 +1626,8 @@ begin
   Result.Arg := AArg;
   Result.Value := AValue;
   Result.RangeArg := AQ;
-  Result.QFrom := 0;
-  Result.QTo := 0;
+  Result.QFrom := AQFrom;
+  Result.QTo := AQTo;
   Result.K := 0;
   Result.b := 0;
   Result.Enable := True;

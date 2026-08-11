@@ -35,6 +35,7 @@ uses
   uAppServices in 'uAppServices.pas',
   uAppVersion in 'uAppVersion.pas',
   uOpenXmlXlsx in 'uOpenXmlXlsx.pas',
+  uReportTemplates in 'uReportTemplates.pas',
   uResultsXlsxExporter in 'uResultsXlsxExporter.pas',
   uGridXlsxExporter in 'uGridXlsxExporter.pas',
   uGridLayoutManager in 'uGridLayoutManager.pas',
@@ -47,8 +48,8 @@ uses
   uControlRegister in 'uControlRegister.pas',
   uSyncSetup in 'uSyncSetup.pas',
   FmxHelper in 'FmxHelper.pas',
-  FMX.SimpleChart in '..\FMXFP\Components\FP\FMX.SimpleChart.pas',
-  frmGraphsWorkspace in 'frmGraphsWorkspace.pas' {Frame1: TFrame};
+  frmGraphsWorkspace in 'frmGraphsWorkspace.pas' {Frame1: TFrame},
+  FMX.SimpleChart in 'Components\FP\FMX.SimpleChart.pas';
 
 {$R *.res}
 
