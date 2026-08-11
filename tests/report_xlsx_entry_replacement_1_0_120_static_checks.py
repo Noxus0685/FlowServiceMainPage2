@@ -84,3 +84,16 @@ def test_zip_validation_routine_is_closed_before_next_function():
     validation = section('procedure ValidateZipEntries',
                          '// Проверяет наличие ZIP entry')
     assert validation.rstrip().endswith('end;')
+
+
+def test_entry_replacement_and_validation_are_top_level_routines():
+    replacement = section('procedure ReplaceTechnicalSheetEntries',
+                          'procedure ValidateTechnicalSheetOutput')
+    for declaration in ('Replaced: TArray<Boolean>',
+                        'SourceZip, OutputZip: TZipFile'):
+        assert declaration in replacement
+    assert replacement.rstrip().endswith('end;')
+    assert REPORT.count('procedure ValidateTechnicalSheetOutput') == 1
+    validation = section('procedure ValidateTechnicalSheetOutput',
+                         '// Атомарно сохраняет сформированный XLSX')
+    assert validation.rstrip().endswith('end;')
