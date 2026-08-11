@@ -44,6 +44,7 @@ uses
   uBaseProcedures,
   uClasses,
   uDataManager,
+  System.JSON,
   uDeviceClass,
   uFlowMeter,
   uRepositories,
@@ -474,6 +475,16 @@ type
     function IsChartDeviceVisible(ADevice: TDevice): Boolean;
     // Обновляет список XLSX-шаблонов, доступных на вкладке «Отчёты».
     procedure RefreshReportTemplates;
+        procedure BeginReportExportUi;
+    // Возвращает элементы отчётной вкладки в обычное состояние.
+    procedure EndReportExportUi;
+    // Обрабатывает успешное завершение фоновой выгрузки в UI-потоке.
+    procedure CompleteReportExport(const AOperationId: Int64;
+      const AOutputFileName: string; const ADurationMs: Int64);
+    // Обрабатывает ошибку фоновой выгрузки в UI-потоке.
+    procedure FailReportExport(const AOperationId: Int64;
+      const AErrorClass, AErrorMessage, AStage: string;
+      const ADurationMs: Int64);
   public
     { Public declarations }
     procedure Initialize;
