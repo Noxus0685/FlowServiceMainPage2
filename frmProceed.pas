@@ -33,12 +33,14 @@ uses
   System.Generics.Defaults,
   System.IniFiles,
   System.IOUtils,
+  System.Hash,
   System.Math,
   System.Rtti,
   System.SysUtils,
   System.Types,
   System.UITypes,
   System.Diagnostics,
+  System.DateUtils,
   System.Threading,
   System.Variants,
   uBaseProcedures,
@@ -481,7 +483,7 @@ type
     procedure EndReportExportUi;
     // Обрабатывает успешное завершение фоновой выгрузки в UI-потоке.
     procedure CompleteReportExport(const AOperationId: Int64;
-      const AOutputFileName: string; const ADurationMs: Int64);
+      const AResult: TReportExportResult; const ADurationMs: Int64);
     // Обрабатывает ошибку фоновой выгрузки в UI-потоке.
     procedure FailReportExport(const AOperationId: Int64;
       const AErrorClass, AErrorMessage, AStage: string;
@@ -5249,6 +5251,7 @@ var
   Dialog: TOpenDialog;
   ImportedFileName, ImportStage: string;
   Stopwatch: TStopwatch;
+  ImportResult: TReportExportResult;
 begin
   ImportStage := 'выбор файла';
   Dialog := TOpenDialog.Create(Self);
@@ -5264,17 +5267,35 @@ begin
       ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateImportStarted',
         'Запущена подготовка шаблона отчёта', Dialog.FileName);
       ImportedFileName := TReportTemplateService.PrepareTemplate(Dialog.FileName);
+      ImportResult := ValidateFinalReportFile(ImportedFileName);
       MarkReportTemplateAsRecentlyLoaded(ImportedFileName);
       RefreshReportTemplates;
       ListBoxReportTemplates.ItemIndex := ListBoxReportTemplates.Items.IndexOf(
         TPath.GetFileName(ImportedFileName));
       UpdateReportTemplateControls;
       ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateImport',
-        'Загружен шаблон отчёта', Format('File=%s; DurationMs=%d',
-          [TPath.GetFileName(ImportedFileName), Stopwatch.ElapsedMilliseconds]) +
-          '; CalcMode=auto; FullCalcOnLoad=True; ForceFullCalc=True; ' +
-          'CalcOnSave=True; CalcId=0; CalcChainRemoved=True; ' +
-          'Stage=EnableFullWorkbookRecalculation');
+        'Загружен шаблон отчёта', Format(
+          'Output=%s; FileSize=%d; FileHashSHA256=%s; LastWriteTimeUtc=%s; ' +
+          'CalcPrCount=%d; CalcMode=%s; FullCalcOnLoad=%s; ForceFullCalc=%s; ' +
+          'CalcOnSave=%s; CalcId=%s; CalcChainEntryExists=%s; ' +
+          'CalcChainRelationshipExists=%s; CalcChainOverrideExists=%s; ' +
+          'CalcChainRemoved=%s; DurationMs=%d; Stage=FinalOutputValidation',
+          [ImportResult.OutputFileName, ImportResult.FileSize,
+           ImportResult.FileHashSHA256,
+           DateToISO8601(ImportResult.LastWriteTimeUtc, True),
+           ImportResult.CalculationState.CalcPrCount,
+           ImportResult.CalculationState.CalcMode,
+           BoolToStr(ImportResult.CalculationState.FullCalcOnLoad, True),
+           BoolToStr(ImportResult.CalculationState.ForceFullCalc, True),
+           BoolToStr(ImportResult.CalculationState.CalcOnSave, True),
+           ImportResult.CalculationState.CalcId,
+           BoolToStr(ImportResult.CalculationState.CalcChainEntryExists, True),
+           BoolToStr(ImportResult.CalculationState.CalcChainRelationshipExists, True),
+           BoolToStr(ImportResult.CalculationState.CalcChainOverrideExists, True),
+           BoolToStr(not ImportResult.CalculationState.CalcChainEntryExists and
+             not ImportResult.CalculationState.CalcChainRelationshipExists and
+             not ImportResult.CalculationState.CalcChainOverrideExists, True),
+           Stopwatch.ElapsedMilliseconds]));
     except
       on E: Exception do
       begin
@@ -5371,17 +5392,33 @@ begin
 end;
 
 procedure TFrameProceed.CompleteReportExport(const AOperationId: Int64;
-  const AOutputFileName: string; const ADurationMs: Int64);
+  const AResult: TReportExportResult; const ADurationMs: Int64);
 begin
   if AOperationId <> FReportExportOperationId then Exit;
   EndReportExportUi;
   FReportExportTask := nil;
   ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateExport',
-    'Сформирован отчёт по шаблону', Format(
-      'Output=%s; DurationMs=%d; Thread=Worker; CalcMode=auto; ' +
-      'FullCalcOnLoad=True; ForceFullCalc=True; CalcOnSave=True; CalcId=0; ' +
-      'CalcChainRemoved=True; Stage=EnableFullWorkbookRecalculation',
-      [AOutputFileName, ADurationMs]));
+    'Сформирован и проверен отчёт по шаблону', Format(
+      'OperationId=%d; Output=%s; FileSize=%d; FileHashSHA256=%s; ' +
+      'LastWriteTimeUtc=%s; CalcPrCount=%d; CalcMode=%s; ' +
+      'FullCalcOnLoad=%s; ForceFullCalc=%s; CalcOnSave=%s; CalcId=%s; ' +
+      'CalcChainEntryExists=%s; CalcChainRelationshipExists=%s; ' +
+      'CalcChainOverrideExists=%s; CalcChainRemoved=%s; DurationMs=%d; Thread=Worker; ' +
+      'Stage=FinalOutputValidation',
+      [AOperationId, AResult.OutputFileName, AResult.FileSize,
+       AResult.FileHashSHA256, DateToISO8601(AResult.LastWriteTimeUtc, True),
+       AResult.CalculationState.CalcPrCount, AResult.CalculationState.CalcMode,
+       BoolToStr(AResult.CalculationState.FullCalcOnLoad, True),
+       BoolToStr(AResult.CalculationState.ForceFullCalc, True),
+       BoolToStr(AResult.CalculationState.CalcOnSave, True),
+       AResult.CalculationState.CalcId,
+       BoolToStr(AResult.CalculationState.CalcChainEntryExists, True),
+       BoolToStr(AResult.CalculationState.CalcChainRelationshipExists, True),
+       BoolToStr(AResult.CalculationState.CalcChainOverrideExists, True),
+       BoolToStr(not AResult.CalculationState.CalcChainEntryExists and
+         not AResult.CalculationState.CalcChainRelationshipExists and
+         not AResult.CalculationState.CalcChainOverrideExists, True),
+       ADurationMs]));
 end;
 
 procedure TFrameProceed.FailReportExport(const AOperationId: Int64;
@@ -5454,27 +5491,36 @@ begin
   BeginReportExportUi;
   ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateExportStarted',
     'Запущена фоновая выгрузка отчёта', Format(
-      'Template=%s; Output=%s; SnapshotMs=%d; SourceSize=%d',
-      [TemplateFileName, OutputFileName, SnapshotMs,
-       TFile.GetSize(TemplateFileName)]));
+      'OperationId=%d; Template=%s; TemplateSize=%d; TemplateHashSHA256=%s; ' +
+      'Output=%s; SnapshotMs=%d; Stage=ExportStarted',
+      [OperationId, TPath.GetFullPath(TemplateFileName), TFile.GetSize(TemplateFileName),
+       THashSHA2.GetHashStringFromFile(TemplateFileName),
+       TPath.GetFullPath(OutputFileName), SnapshotMs]));
   FReportExportTask := TTask.Run(
     procedure
     var
       WorkerStopwatch: TStopwatch;
       ErrorClass, ErrorMessage, ErrorStage: string;
       DurationMs: Int64;
+      ExportResult: TReportExportResult;
+      ConfirmedHash: string;
     begin
       WorkerStopwatch := TStopwatch.StartNew;
       FReportExportQueueThread := TThread.CurrentThread;
       try
         ErrorStage := 'ExportTemplateFromJson';
-        TReportTemplateService.ExportTemplateFromJson(TemplateFileName,
+        ExportResult := TReportTemplateService.ExportTemplateFromJson(TemplateFileName,
           OutputFileName, ReportJson);
+        if not SameText(ExportResult.OutputFileName, TPath.GetFullPath(OutputFileName)) then
+          raise EInvalidOpException.Create('Проверен не тот итоговый файл отчёта.');
+        ConfirmedHash := THashSHA2.GetHashStringFromFile(ExportResult.OutputFileName);
+        if not SameText(ConfirmedHash, ExportResult.FileHashSHA256) then
+          raise EInvalidOpException.Create('Итоговый XLSX был изменён после проверки.');
         DurationMs := WorkerStopwatch.ElapsedMilliseconds;
         TThread.Queue(FReportExportQueueThread,
           procedure
           begin
-            CompleteReportExport(OperationId, OutputFileName, DurationMs);
+            CompleteReportExport(OperationId, ExportResult, DurationMs);
           end);
       except
         on E: Exception do
