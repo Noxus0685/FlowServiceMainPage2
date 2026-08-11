@@ -1094,18 +1094,33 @@ begin
   end;
 end;
 
-// Возвращает устойчивый набор столбцов: сначала схема, затем новые фактические поля.
+// Формирует единственную неизменяемую схему колонок технического листа.
+function BuildTechnicalSheetColumns(const ASheetName: string;
+  ARows: TJSONArray): TArray<TReportColumn>;
+begin
+  if SameText(ASheetName, '_DevicePoints') then
+    Result := BuildDevicePointsColumns
+  else if SameText(ASheetName, '_Spillages') then
+    Result := JsonRowsToColumns(ARows, ['Spillage'], True)
+  else if SameText(ASheetName, '_CoefTables') then
+    Result := JsonRowsToColumns(ARows, ['CalibrCoefTable', 'CalibrCoefItem'], True)
+  else
+    raise EArgumentException.CreateFmt('Неизвестный технический лист: %s', [ASheetName]);
+end;
+
+// Возвращает устойчивый набор столбцов канонической схемы.
 function BuildSeparatedColumns(ARows: TJSONArray;
   const AObjectTypes: array of string): TList<string>;
-var SchemaColumns, ActualColumns, Columns: TArray<TReportColumn>;
+var Columns: TArray<TReportColumn>; SheetName: string;
   Column: TReportColumn;
 begin
   if (Length(AObjectTypes) = 1) and SameText(AObjectTypes[0], 'DevicePoint') then
-    SchemaColumns := BuildDevicePointsColumns
+    SheetName := '_DevicePoints'
+  else if (Length(AObjectTypes) = 1) and SameText(AObjectTypes[0], 'Spillage') then
+    SheetName := '_Spillages'
   else
-    SchemaColumns := JsonRowsToColumns(ARows, AObjectTypes, True);
-  ActualColumns := JsonRowsToColumns(ARows, AObjectTypes, False);
-  Columns := MergeReportColumns(SchemaColumns, ActualColumns);
+    SheetName := '_CoefTables';
+  Columns := BuildTechnicalSheetColumns(SheetName, ARows);
   Result := TList<string>.Create;
   for Column in Columns do AddUniqueColumn(Result, Column.TechnicalName);
 end;
@@ -1562,31 +1577,52 @@ begin
       'Не удалось создать контейнер definedNames через XML DOM');
 end;
 
-// Находит именованный диапазон по атрибуту name без учёта регистра.
-function FindDefinedNameNode(const ADefinedNamesNode: IXMLNode;
-  const AName: string): IXMLNode;
-var
-  I, FoundCount: Integer;
-  Child: IXMLNode;
-  NameValue: string;
+// Строит регистронезависимый индекс существующих definedName за один проход.
+function BuildDefinedNameIndex(const ADefinedNamesNode: IXMLNode):
+  TDictionary<string, IXMLNode>;
+var I: Integer; Child: IXMLNode; NameValue: string;
 begin
-  Result := nil;
-  FoundCount := 0;
+  Result := TDictionary<string, IXMLNode>.Create(TStringComparer.OrdinalIgnoreCase);
   if ADefinedNamesNode = nil then Exit;
   for I := 0 to ADefinedNamesNode.ChildNodes.Count - 1 do
   begin
     Child := ADefinedNamesNode.ChildNodes[I];
     if not SameText(Child.LocalName, 'definedName') then Continue;
     NameValue := VarToStr(Child.Attributes['name']);
-    if SameText(NameValue, AName) then
-    begin
-      Inc(FoundCount);
-      Result := Child;
-    end;
+    if Result.ContainsKey(NameValue) then
+      raise EInvalidOpException.CreateFmt(
+        'Найдено несколько definedName с именем %s', [NameValue]);
+    Result.Add(NameValue, Child);
   end;
-  if FoundCount > 1 then
-    raise EInvalidOpException.CreateFmt(
-      'Найдено несколько definedName с именем %s: %d', [AName, FoundCount]);
+end;
+
+// Разбирает абсолютную ссылку definedName и возвращает лист, столбец и строку.
+function TryParseDefinedNameReference(const AReference: string;
+  out ASheetName: string; out AColumnIndex, ARowIndex: Integer): Boolean;
+var P, I: Integer; ColumnName, RowName: string; Ch: Char;
+begin
+  Result := False; ASheetName := ''; AColumnIndex := 0; ARowIndex := 0;
+  if (Length(AReference) < 8) or (AReference[1] <> '''') then Exit;
+  I := 2;
+  while I <= Length(AReference) do
+  begin
+    if AReference[I] = '''' then
+    begin
+      if (I < Length(AReference)) and (AReference[I + 1] = '''') then
+      begin ASheetName := ASheetName + ''''; Inc(I, 2); Continue; end;
+      Break;
+    end;
+    ASheetName := ASheetName + AReference[I]; Inc(I);
+  end;
+  if (I > Length(AReference)) or (Copy(AReference, I, 3) <> '''!$') then Exit;
+  Inc(I, 3); P := I;
+  while (I <= Length(AReference)) and CharInSet(AReference[I], ['A'..'Z', 'a'..'z']) do Inc(I);
+  ColumnName := UpperCase(Copy(AReference, P, I - P));
+  if (ColumnName = '') or (I > Length(AReference)) or (AReference[I] <> '$') then Exit;
+  Inc(I); RowName := Copy(AReference, I, MaxInt);
+  if not TryStrToInt(RowName, ARowIndex) or (ARowIndex < 1) then Exit;
+  for Ch in ColumnName do AColumnIndex := AColumnIndex * 26 + Ord(Ch) - Ord('A') + 1;
+  Result := AColumnIndex > 0;
 end;
 
 // Проверяет наличие имени в наборе FlowService без учёта регистра.
@@ -1605,6 +1641,8 @@ end;
 procedure ValidateDefinedNameValues(const AName, AReference: string);
 var
   I: Integer;
+  SheetName: string;
+  ColumnIndex, RowIndex: Integer;
 begin
   if (AName = '') or (AName <> BuildReportDefinedName(AName)) or
      CharInSet(AName[1], ['0'..'9', '.']) then
@@ -1623,8 +1661,8 @@ begin
         not CharInSet(AReference[I], [#9, #10, #13])) then
       raise EArgumentException.CreateFmt(
         'Ссылка диапазона %s содержит недопустимый XML-символ', [AName]);
-  if not TRegEx.IsMatch(AReference,
-    '^''[^'']+''!\$[A-Z]+\$[1-9][0-9]*$') then
+  if not TryParseDefinedNameReference(AReference, SheetName, ColumnIndex,
+    RowIndex) then
     raise EArgumentException.CreateFmt(
       'Недопустимый формат ссылки диапазона %s: %s', [AName, AReference]);
 end;
@@ -1721,6 +1759,101 @@ begin
      (Bytes[2] = $BF) then
     Offset := 3;
   Result := TEncoding.UTF8.GetString(Bytes, Offset, Length(Bytes) - Offset);
+end;
+
+function ExcelColumnIndexFromCellReference(const AReference: string): Integer;
+var I: Integer; Ch: Char;
+begin
+  Result := 0;
+  for I := 1 to Length(AReference) do
+  begin
+    Ch := UpCase(AReference[I]);
+    if not CharInSet(Ch, ['A'..'Z']) then Break;
+    Result := Result * 26 + Ord(Ch) - Ord('A') + 1;
+  end;
+end;
+
+// Строит соответствие технического имени заголовка и номера столбца листа.
+function BuildWorksheetHeaderIndex(const AWorksheetXml: string;
+  const AHeaderRow: Integer): TDictionary<string, Integer>;
+var Doc: IXMLDocument; Root, SheetData, RowNode, CellNode, ValueNode,
+  InlineNode, TextNode: IXMLNode; I, J, ColumnIndex: Integer;
+  CellReference, Header: string;
+begin
+  Result := TDictionary<string, Integer>.Create(TStringComparer.OrdinalIgnoreCase);
+  try
+    Doc := LoadXMLData(AWorksheetXml); Doc.Active := True;
+    Root := Doc.DocumentElement;
+    SheetData := FindDirectChildNode(Root, 'sheetData');
+    if SheetData = nil then
+      raise EInvalidOpException.Create('В worksheet отсутствует sheetData');
+    RowNode := nil;
+    for I := 0 to SheetData.ChildNodes.Count - 1 do
+      if SameText(SheetData.ChildNodes[I].LocalName, 'row') and
+         (StrToIntDef(VarToStr(SheetData.ChildNodes[I].Attributes['r']), 0) = AHeaderRow) then
+      begin RowNode := SheetData.ChildNodes[I]; Break; end;
+    if RowNode = nil then
+      raise EInvalidOpException.CreateFmt('В worksheet отсутствует строка заголовков %d', [AHeaderRow]);
+    for J := 0 to RowNode.ChildNodes.Count - 1 do
+    begin
+      CellNode := RowNode.ChildNodes[J];
+      if not SameText(CellNode.LocalName, 'c') then Continue;
+      CellReference := VarToStr(CellNode.Attributes['r']);
+      ColumnIndex := ExcelColumnIndexFromCellReference(CellReference);
+      if ColumnIndex = 0 then Continue;
+      Header := '';
+      InlineNode := FindDirectChildNode(CellNode, 'is');
+      if InlineNode <> nil then
+      begin
+        TextNode := FindDirectChildNode(InlineNode, 't');
+        if TextNode <> nil then Header := TextNode.Text;
+      end
+      else
+      begin
+        ValueNode := FindDirectChildNode(CellNode, 'v');
+        if ValueNode <> nil then Header := ValueNode.Text;
+      end;
+      if Header = '' then Continue;
+      if Result.ContainsKey(Header) then
+        raise EInvalidOpException.CreateFmt('Повторяющийся технический заголовок: %s', [Header]);
+      Result.Add(Header, ColumnIndex);
+    end;
+  except
+    Result.Free;
+    raise;
+  end;
+end;
+
+// Возвращает ссылку definedName на ячейку поля по фактическому заголовку листа.
+function BuildDefinedNameReference(const ASheetName, AFieldName: string;
+  const AExcelRow: Integer; const AHeaderIndex: TDictionary<string, Integer>): string;
+var ColumnIndex: Integer;
+begin
+  if not AHeaderIndex.TryGetValue(AFieldName, ColumnIndex) then
+    raise EInvalidOpException.CreateFmt('Лист %s не содержит технический заголовок %s',
+      [ASheetName, AFieldName]);
+  Result := Format('''%s''!$%s$%d',
+    [StringReplace(ASheetName, '''', '''''', [rfReplaceAll]),
+     ExcelColumnName(ColumnIndex), AExcelRow]);
+end;
+
+// Проверяет неизменность технических заголовков между шаблоном и сформированным листом.
+procedure ValidateTechnicalSheetColumnOrder(const ATemplateWorksheetXml,
+  AGeneratedWorksheetXml, ASheetName: string);
+var TemplateHeaders, GeneratedHeaders: TDictionary<string, Integer>;
+  Pair: TPair<string, Integer>; GeneratedColumn: Integer;
+begin
+  TemplateHeaders := BuildWorksheetHeaderIndex(ATemplateWorksheetXml, 2);
+  GeneratedHeaders := BuildWorksheetHeaderIndex(AGeneratedWorksheetXml, 2);
+  try
+    if TemplateHeaders.Count <> GeneratedHeaders.Count then
+      raise EInvalidOpException.CreateFmt('Изменилось число колонок листа %s', [ASheetName]);
+    for Pair in TemplateHeaders do
+      if not GeneratedHeaders.TryGetValue(Pair.Key, GeneratedColumn) or
+         (GeneratedColumn <> Pair.Value) then
+        raise EInvalidOpException.CreateFmt(
+          'Изменился порядок колонок %s: %s', [ASheetName, Pair.Key]);
+  finally GeneratedHeaders.Free; TemplateHeaders.Free; end;
 end;
 
 // Добавляет, обновляет и удаляет только именованные диапазоны FlowService через XML DOM.
@@ -2001,6 +2134,16 @@ begin
     SheetXml[4] := BuildMetaWorksheetXml(ARoot, Names);
     for I := 0 to High(SheetXml) do
       ValidateSeparatedWorksheetXml(SheetXml[I], Locations[I].SheetName);
+    Zip := TZipFile.Create;
+    try
+      Zip.Open(ASourceFileName, zmRead);
+      for I := 0 to High(SheetXml) do
+        ValidateTechnicalSheetColumnOrder(
+          ReadZipEntryUtf8(Zip, Locations[I].ArchivePath), SheetXml[I],
+          Locations[I].SheetName);
+    finally
+      Zip.Free;
+    end;
   finally
     Names.Free;
   end;
@@ -2019,24 +2162,30 @@ function AddPreparedDefinedNames(const AWorkbookXml: string;
   const ADefinedNames: TDictionary<string, string>): string;
 var Doc: IXMLDocument; Root, NamesNode, NameNode: IXMLNode;
   Pair: TPair<string, string>;
+  NameIndex: TDictionary<string, IXMLNode>;
 begin
   Doc := LoadXMLData(AWorkbookXml); Doc.Active := True;
   Root := Doc.DocumentElement;
   if (Root = nil) or not SameText(Root.LocalName, 'workbook') then
     raise EInvalidOpException.Create('Некорректный xl/workbook.xml');
   NamesNode := EnsureDefinedNamesNode(Root);
-  for Pair in ADefinedNames do
-  begin
-    ValidateDefinedNameValues(Pair.Key, Pair.Value);
-    if FindDefinedNameNode(NamesNode, Pair.Key) <> nil then
-      raise EInvalidOpException.CreateFmt(
-        'В исходном шаблоне уже существует definedName %s', [Pair.Key]);
-    NameNode := NamesNode.AddChild('definedName', NamesNode.NamespaceURI);
-    NameNode.Attributes['name'] := Pair.Key;
-    NameNode.Text := Pair.Value;
+  NameIndex := BuildDefinedNameIndex(NamesNode);
+  try
+    for Pair in ADefinedNames do
+    begin
+      ValidateDefinedNameValues(Pair.Key, Pair.Value);
+      if NameIndex.ContainsKey(Pair.Key) then
+        raise EInvalidOpException.CreateFmt(
+          'В исходном шаблоне уже существует definedName %s', [Pair.Key]);
+      NameNode := NamesNode.AddChild('definedName', NamesNode.NamespaceURI);
+      NameNode.Attributes['name'] := Pair.Key;
+      NameNode.Text := Pair.Value;
+      NameIndex.Add(Pair.Key, NameNode);
+    end;
+    Result := SerializeXmlDocumentUtf8(Doc);
+  finally
+    NameIndex.Free;
   end;
-  ValidateDefinedNameDuplicates(NamesNode);
-  Result := SerializeXmlDocumentUtf8(Doc);
 end;
 
 procedure AddUtf8ZipEntry(AZip: TZipFile; const AName, AText: string);
@@ -2097,6 +2246,124 @@ begin
   finally
     OutputZip.Free; SourceZip.Free;
   end;
+end;
+
+procedure CopyXlsxReplacingWorkbook(const ASourceFileName, AOutputFileName,
+  AWorkbookXml: string);
+var SourceZip, OutputZip: TZipFile; Name: string; Stream: TStream;
+  Header: TZipHeader;
+begin
+  SourceZip := TZipFile.Create; OutputZip := TZipFile.Create;
+  try
+    SourceZip.Open(ASourceFileName, zmRead);
+    OutputZip.Open(AOutputFileName, zmWrite);
+    for Name in SourceZip.FileNames do
+      if SameText(NormalizeArchivePath(Name), 'xl/workbook.xml') then
+        AddUtf8ZipEntry(OutputZip, Name, AWorkbookXml)
+      else
+      begin
+        Stream := nil; SourceZip.Read(Name, Stream, Header);
+        try Stream.Position := 0; OutputZip.Add(Stream, Name); finally Stream.Free; end;
+      end;
+  finally
+    OutputZip.Free; SourceZip.Free;
+  end;
+end;
+
+function TryDevicePointDefinedNameParts(const AName: string;
+  out APointIndex: Integer; out AFieldName: string): Boolean;
+var Parts: TArray<string>;
+begin
+  Parts := AName.Split(['_']);
+  Result := (Length(Parts) = 3) and SameText(Parts[0], 'DevicePoints') and
+    TryStrToInt(Parts[1], APointIndex) and (APointIndex >= 1) and
+    (APointIndex <= TReportTemplateService.MAX_DEVICE_POINTS);
+  if Result then AFieldName := Parts[2] else AFieldName := '';
+end;
+
+// Проверяет, что каждый служебный definedName указывает на поле с соответствующим техническим заголовком.
+procedure ValidateReportDefinedNameBindings(const AWorkbookXml: string;
+  const ATechnicalSheets: TDictionary<string, string>);
+var Doc: IXMLDocument; NamesNode, Node: IXMLNode; Name, Reference, SheetName,
+  FieldName: string; I, ColumnIndex, RowIndex, PointIndex, ActualColumn: Integer;
+  HeaderIndex: TDictionary<string, Integer>; Seen: TDictionary<string, Byte>;
+begin
+  Doc := LoadXMLData(AWorkbookXml); Doc.Active := True;
+  NamesNode := FindDirectChildNode(Doc.DocumentElement, 'definedNames');
+  Seen := TDictionary<string, Byte>.Create(TStringComparer.OrdinalIgnoreCase);
+  HeaderIndex := nil;
+  try
+    if ATechnicalSheets.ContainsKey('_DevicePoints') then
+      HeaderIndex := BuildWorksheetHeaderIndex(ATechnicalSheets['_DevicePoints'], 2);
+    if NamesNode = nil then raise EInvalidOpException.Create('workbook не содержит definedNames');
+    for I := 0 to NamesNode.ChildNodes.Count - 1 do
+    begin
+      Node := NamesNode.ChildNodes[I];
+      if not SameText(Node.LocalName, 'definedName') then Continue;
+      Name := VarToStr(Node.Attributes['name']);
+      if not IsReportDefinedName(Name) then Continue;
+      if Seen.ContainsKey(Name) then
+        raise EInvalidOpException.CreateFmt('Повтор definedName %s', [Name]);
+      Seen.Add(Name, 0); Reference := Node.Text;
+      if not TryParseDefinedNameReference(Reference, SheetName, ColumnIndex, RowIndex) then
+        raise EInvalidOpException.CreateFmt('Некорректная ссылка definedName %s', [Name]);
+      if not ATechnicalSheets.ContainsKey(SheetName) then
+        raise EInvalidOpException.CreateFmt('definedName %s указывает на неизвестный лист %s', [Name, SheetName]);
+      if TryDevicePointDefinedNameParts(Name, PointIndex, FieldName) then
+      begin
+        if not SameText(SheetName, '_DevicePoints') or (RowIndex <> PointIndex + 2) then
+          raise EInvalidOpException.CreateFmt('Неверная строка definedName %s', [Name]);
+        if (HeaderIndex = nil) or not HeaderIndex.TryGetValue(FieldName, ActualColumn) or
+           (ActualColumn <> ColumnIndex) then
+          raise EInvalidOpException.CreateFmt('definedName %s указывает не на заголовок %s', [Name, FieldName]);
+      end;
+    end;
+  finally HeaderIndex.Free; Seen.Free; end;
+end;
+
+// Исправляет только служебные именованные диапазоны уже подготовленного шаблона.
+procedure RepairPreparedReportDefinedNames(const ASourceFileName,
+  AOutputFileName: string);
+var Zip: TZipFile; WorkbookXml, RelsXml, Name, FieldName: string;
+  Locations: TArray<TReportWorksheetLocation>; Sheets: TDictionary<string, string>;
+  Headers: TDictionary<string, Integer>; Doc: IXMLDocument; NamesNode, Node: IXMLNode;
+  Index: TDictionary<string, IXMLNode>; I, PointIndex: Integer;
+begin
+  Sheets := TDictionary<string, string>.Create(TStringComparer.OrdinalIgnoreCase);
+  Zip := TZipFile.Create;
+  try
+    Zip.Open(ASourceFileName, zmRead); ValidateZipEntries(Zip);
+    WorkbookXml := ReadZipEntryUtf8(Zip, 'xl/workbook.xml');
+    RelsXml := ReadZipEntryUtf8(Zip, 'xl/_rels/workbook.xml.rels');
+    Locations := ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
+    for I := 0 to High(Locations) do
+      Sheets.Add(Locations[I].SheetName, ReadZipEntryUtf8(Zip, Locations[I].ArchivePath));
+  finally Zip.Free; end;
+  Headers := BuildWorksheetHeaderIndex(Sheets['_DevicePoints'], 2);
+  try
+    Doc := LoadXMLData(WorkbookXml); Doc.Active := True;
+    NamesNode := EnsureDefinedNamesNode(Doc.DocumentElement);
+    Index := BuildDefinedNameIndex(NamesNode);
+    try
+      for PointIndex := 1 to TReportTemplateService.MAX_DEVICE_POINTS do
+        for FieldName in Headers.Keys do
+        begin
+          if MatchText(FieldName, ['ObjectType', 'ObjectIndex', 'PointIndex',
+            'SpillageIndex', 'CoefTableType', 'CoefItemIndex', '_SchemaOnly']) then Continue;
+          Name := Format('DevicePoints_%.2d_%s', [PointIndex, FieldName]);
+          if not Index.TryGetValue(Name, Node) then
+          begin
+            Node := NamesNode.AddChild('definedName', NamesNode.NamespaceURI);
+            Node.Attributes['name'] := Name; Index.Add(Name, Node);
+          end;
+          Node.Text := BuildDefinedNameReference('_DevicePoints', FieldName,
+            PointIndex + 2, Headers);
+        end;
+      WorkbookXml := SerializeXmlDocumentUtf8(Doc);
+    finally Index.Free; end;
+    ValidateReportDefinedNameBindings(WorkbookXml, Sheets);
+    CopyXlsxReplacingWorkbook(ASourceFileName, AOutputFileName, WorkbookXml);
+  finally Headers.Free; Sheets.Free; end;
 end;
 
 function MissingTechnicalSheetNames(const AWorkbookXml: string): TArray<string>;
@@ -2320,7 +2587,13 @@ begin
   if Length(Missing) = 0 then
   begin
     ResolveTechnicalSheetEntries(WorkbookXml, RelsXml);
-    TFile.Copy(ASourceFileName, Result, False);
+    TemporaryFileName := BuildTemporaryReportFileName(Result);
+    try
+      RepairPreparedReportDefinedNames(ASourceFileName, TemporaryFileName);
+      TFile.Move(TemporaryFileName, Result);
+    finally
+      if FileExists(TemporaryFileName) then TFile.Delete(TemporaryFileName);
+    end;
     Exit;
   end;
   EmptyJson := TJSONObject.Create;
