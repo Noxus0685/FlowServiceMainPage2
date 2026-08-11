@@ -1152,6 +1152,7 @@ type
     const AWeightsOnly: Boolean;
     out AError: TErrorInfo
   ): Boolean;
+    function ApplyHydraulicConfiguration(out AError: TErrorInfo): Boolean;
 
   public
   procedure CaptureEnvironmentSimulationBase;
@@ -8418,6 +8419,198 @@ begin
   finally
     TMonitor.Exit(FHydraulicStateLock);
   end;
+end;
+
+function TWorkTable.ApplyHydraulicConfiguration(
+  out AError: TErrorInfo
+): Boolean;
+var
+  HydraulicState: EHydraulicLineState;
+  HydraulicError: TErrorInfo;
+  OperationID: Int64;
+  PointUUID: string;
+  PointIndex: Integer;
+  TargetFlow: Double;
+  Configuration: RWorkTableHydraulicConfiguration;
+  HydraulicRange: RWorkTableHydraulicRange;
+
+  function BuildApplyError(
+    const ACode: Integer;
+    const AMessage: string
+  ): TErrorInfo;
+  begin
+    Result := TErrorInfo.Empty(Integer(State));
+    Result.Code := ACode;
+    Result.Msg := AMessage;
+    Result.Time := Now;
+    Result.Stage := Integer(State);
+  end;
+
+  procedure FailApply(
+    const AErrorInfo: TErrorInfo
+  );
+  begin
+    DisableAllEtalons;
+
+    FailHydraulicLineApply(
+      OperationID,
+      PointUUID,
+      PointIndex,
+      AErrorInfo
+    );
+  end;
+
+begin
+  Result := False;
+  AError := TErrorInfo.Empty(Integer(State));
+
+  { Получаем сохранённую конфигурацию и служебные данные операции. }
+  GetHydraulicStateSnapshot(
+    HydraulicState,
+    HydraulicError,
+    OperationID,
+    PointUUID,
+    PointIndex,
+    TargetFlow,
+    Configuration,
+    HydraulicRange
+  );
+
+  { Конфигурация уже применена. Повторно ничего не делаем. }
+  if HydraulicState = hlsConfigured then
+    Exit(True);
+
+  { Применять можно только результат успешно завершённого поиска. }
+  if HydraulicState <> hlsSelected then
+  begin
+    if (HydraulicState = hlsFailed) and
+       (HydraulicError.Code <> 0) then
+      AError := HydraulicError
+    else
+      AError := BuildApplyError(
+        1240,
+        Format(
+          'Гидравлическая конфигурация не готова к применению: State=%s',
+          [HydraulicLineStateToString(HydraulicState)]
+        )
+      );
+
+    Exit;
+  end;
+
+  { Атомарно переводим состояние hlsSelected -> hlsSettingUp
+    и повторно получаем актуальную копию конфигурации. }
+  if not BeginHydraulicLineApply(
+    OperationID,
+    PointUUID,
+    PointIndex,
+    Configuration,
+    HydraulicRange
+  ) then
+  begin
+    AError := BuildApplyError(
+      1241,
+      'Не удалось начать применение гидравлической конфигурации'
+    );
+    Exit;
+  end;
+
+  if Configuration.ChartIndex < 0 then
+  begin
+    AError := BuildApplyError(
+      1242,
+      'В гидравлической конфигурации не задана схема'
+    );
+
+    FailApply(AError);
+    Exit;
+  end;
+
+  if Configuration.RangeIndex < 0 then
+  begin
+    AError := BuildApplyError(
+      1243,
+      'В гидравлической конфигурации не задан диапазон'
+    );
+
+    FailApply(AError);
+    Exit;
+  end;
+
+  if not Configuration.Range.IsValid then
+  begin
+    AError := BuildApplyError(
+      1244,
+      'Снимок диапазона гидравлической конфигурации некорректен'
+    );
+
+    FailApply(AError);
+    Exit;
+  end;
+
+  { Выключаем все эталоны, оставшиеся от предыдущей конфигурации. }
+  DisableAllEtalons;
+
+  { Включаем обычные эталонные расходомеры. }
+  if Length(Configuration.EtalonNames) > 0 then
+    if not SetEtalonsByNames(
+      Configuration.EtalonNames,
+      AError
+    ) then
+    begin
+      FailApply(AError);
+      Exit;
+    end;
+
+  { Включаем весовые каналы. }
+  if Length(Configuration.ScaleNames) > 0 then
+    if not SetScalesByNames(
+      Configuration.ScaleNames,
+      AError
+    ) then
+    begin
+      FailApply(AError);
+      Exit;
+    end;
+
+  UpdateAggregateMeterValues;
+
+  if not CompleteHydraulicLineApply(
+    OperationID,
+    PointUUID,
+    PointIndex
+  ) then
+  begin
+    AError := BuildApplyError(
+      1245,
+      'Не удалось завершить применение гидравлической конфигурации'
+    );
+
+    DisableAllEtalons;
+    Exit;
+  end;
+
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(
+      pcAction,
+      psWorkTable,
+      'ApplyHydraulicConfiguration',
+      'Гидравлическая конфигурация применена к рабочему столу',
+      Format(
+        'OperationID=%d; ChartIndex=%d; ChartName=%s; ' +
+        'RangeIndex=%d; Etalons=%s; Scales=%s',
+        [
+          OperationID,
+          Configuration.ChartIndex,
+          Configuration.ChartName,
+          Configuration.RangeIndex,
+          string.Join(', ', Configuration.EtalonNames),
+          string.Join(', ', Configuration.ScaleNames)
+        ]
+      )
+    );
+
+  Result := True;
 end;
 
     {$ENDREGION 'TWorkTable'}
