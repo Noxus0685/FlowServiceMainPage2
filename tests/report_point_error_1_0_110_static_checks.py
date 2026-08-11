@@ -8,7 +8,7 @@ VERSION = (ROOT / "uAppVersion.pas").read_text(encoding="utf-8-sig")
 
 
 def test_version_and_shared_selection():
-    assert "APP_VERSION = '1.0.110'" in VERSION
+    assert "APP_VERSION = '1.0.111'" in VERSION
     assert "function TryGetDevicePointDisplayError" in DEVICE
     assert "function TrySelectDevicePointDisplaySpillage" in DEVICE
     merged = PROCEED.split("function TFrameProceed.FormatMergedSummarySeriesResults", 1)[1].split("procedure TFrameProceed.BuildSummaryColumnsWithoutMerge", 1)[0]
@@ -46,6 +46,7 @@ def test_point_error_json_column_and_names():
 
 
 def test_controlled_idempotent_defined_name_migration():
-    assert "NeedsPointErrorMigration := not AInitializeStructure" in REPORT
-    assert "not WorkbookXml.Contains('DevicePoints_01_PointError')" in REPORT
+    assert "GetPointErrorMigrationState(WorkbookXml" in REPORT
+    assert "pemsRequired: NeedsPointErrorMigration := True" in REPORT
+    assert "pemsPartial:" in REPORT and "pemsInvalid:" in REPORT
     assert "if AInitializeStructure or NeedsPointErrorMigration then\n      UpdateReportDefinedNames" in REPORT

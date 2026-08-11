@@ -6,7 +6,7 @@ VERSION = (ROOT / "uAppVersion.pas").read_text(encoding="utf-8-sig")
 
 
 def test_release_and_template_state_api():
-    assert "APP_VERSION = '1.0.110'" in VERSION
+    assert "APP_VERSION = '1.0.111'" in VERSION
     for name in ("IsPreparedReportTemplate", "GetMissingReportTemplateSheets",
                  "RepairLegacyReportWorkbookXml", "ImportPreparedReportTemplate"):
         assert name in SRC
@@ -16,7 +16,7 @@ def test_prepared_export_does_not_rebuild_package_metadata():
     assert "UpdatePreparedTemplateData(ATemplateFileName, AOutputFileName, Json)" in SRC
     assert "InjectDataSheet(ASourceFileName, AOutputFileName, ARoot, False)" in SRC
     assert "if AInitializeStructure or NeedsPointErrorMigration then\n      UpdateReportDefinedNames" in SRC
-    assert "if AInitializeStructure or NeedsPointErrorMigration then\n    begin\n      WriteUtf8File(WorkbookFile" in SRC
+    assert "if AInitializeStructure or NeedsPointErrorMigration or WorkbookRepaired then\n    begin\n      WriteUtf8File(WorkbookFile" in SRC
 
 
 def test_safe_legacy_patterns_are_scoped_and_validated():
