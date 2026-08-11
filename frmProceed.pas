@@ -33,12 +33,14 @@ uses
   System.Generics.Defaults,
   System.IniFiles,
   System.IOUtils,
+  System.Hash,
   System.Math,
   System.Rtti,
   System.SysUtils,
   System.Types,
   System.UITypes,
   System.Diagnostics,
+  System.DateUtils,
   System.Threading,
   System.Variants,
   uBaseProcedures,
@@ -52,7 +54,8 @@ uses
   uWorkTable,
   uMKSDebug,
   uMeasurementRun,
-  uGridLayoutManager;
+  uGridLayoutManager,
+  uReportTemplates;
 
 type
   // Направление сортировки таблицы обработки.
@@ -186,7 +189,6 @@ type
     LayoutReportToolbar: TLayout;
     ButtonLoadReportTemplate: TButton;
     ButtonExportReportTemplate: TButton;
-    ListBoxReportTemplates: TListBox;
     LayoutTop: TLayout;
     ToolBarDataPoints: TToolBar;
     Line4: TLine;
@@ -464,14 +466,14 @@ type
       const ADefaultIndex: Integer): TAlphaColor;
     // Возвращает сохранённую видимость прибора на графике.
     function IsChartDeviceVisible(ADevice: TDevice): Boolean;
-    // Обновляет список XLSX-шаблонов, доступных на вкладке «Отчёты».
-    procedure RefreshReportTemplates;
-        procedure BeginReportExportUi;
+    // Обновляет доступность действий вкладки отчётов по наличию загруженных шаблонов.
+    procedure UpdateReportTemplateControls;
+    procedure BeginReportExportUi;
     // Возвращает элементы отчётной вкладки в обычное состояние.
     procedure EndReportExportUi;
     // Обрабатывает успешное завершение фоновой выгрузки в UI-потоке.
     procedure CompleteReportExport(const AOperationId: Int64;
-      const AOutputFileName: string; const ADurationMs: Int64);
+      const AResult: TReportExportResult; const ADurationMs: Int64);
     // Обрабатывает ошибку фоновой выгрузки в UI-потоке.
     procedure FailReportExport(const AOperationId: Int64;
       const AErrorClass, AErrorMessage, AStage: string;
@@ -507,8 +509,7 @@ implementation
     uAppServices,
     uMeterValue,
     fuDeviceEdit,
-    uGridXlsxExporter,
-    uReportTemplates;
+    uGridXlsxExporter;
 {$R *.fmx}
 
 const
@@ -715,7 +716,7 @@ begin
   RefreshResultsTab;
   UpdateSessionErrorChart;
   UpdateActionHints;
-  RefreshReportTemplates;
+  UpdateReportTemplateControls;
 end;
 
 procedure TFrameProceed.SetGridReadOnly(AGrid: TGrid);
@@ -5167,24 +5168,13 @@ begin
   end;
 end;
 
-procedure TFrameProceed.RefreshReportTemplates;
-var
-  FileName: string;
+// Обновляет доступность загрузки и выгрузки без общего списка шаблонов.
+procedure TFrameProceed.UpdateReportTemplateControls;
 begin
-  if ListBoxReportTemplates = nil then
-    Exit;
-
-  ListBoxReportTemplates.Items.BeginUpdate;
-  try
-    ListBoxReportTemplates.Items.Clear;
-    for FileName in TDirectory.GetFiles(TReportTemplateService.TemplatesPath,
-      '*.xlsx', TSearchOption.soTopDirectoryOnly) do
-      ListBoxReportTemplates.Items.Add(TPath.GetFileName(FileName));
-    if ListBoxReportTemplates.Items.Count > 0 then
-      ListBoxReportTemplates.ItemIndex := 0;
-  finally
-    ListBoxReportTemplates.Items.EndUpdate;
-  end;
+  if ButtonLoadReportTemplate <> nil then
+    ButtonLoadReportTemplate.Enabled := not FReportExportInProgress;
+  if ButtonExportReportTemplate <> nil then
+    ButtonExportReportTemplate.Enabled := not FReportExportInProgress;
 end;
 
 procedure TFrameProceed.ButtonLoadReportTemplateClick(Sender: TObject);
@@ -5192,6 +5182,8 @@ var
   Dialog: TOpenDialog;
   ImportedFileName, ImportStage: string;
   Stopwatch: TStopwatch;
+  ImportResult: TReportExportResult;
+  PreparedTemplate: TPreparedReportTemplate;
 begin
   ImportStage := 'выбор файла';
   Dialog := TOpenDialog.Create(Self);
@@ -5206,13 +5198,33 @@ begin
       ImportStage := 'подготовка XLSX';
       ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateImportStarted',
         'Запущена подготовка шаблона отчёта', Dialog.FileName);
-      ImportedFileName := TReportTemplateService.PrepareTemplate(Dialog.FileName);
-      RefreshReportTemplates;
-      ListBoxReportTemplates.ItemIndex := ListBoxReportTemplates.Items.IndexOf(
-        TPath.GetFileName(ImportedFileName));
+      PreparedTemplate := TReportTemplateService.PrepareTemplate(Dialog.FileName);
+      ImportedFileName := PreparedTemplate.FileName;
+      ImportResult := PreparedTemplate.ValidationResult;
+      UpdateReportTemplateControls;
       ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateImport',
-        'Загружен шаблон отчёта', Format('File=%s; DurationMs=%d',
-          [TPath.GetFileName(ImportedFileName), Stopwatch.ElapsedMilliseconds]));
+        'Загружен шаблон отчёта', Format(
+          'Output=%s; FileSize=%d; FileHashSHA256=%s; LastWriteTimeUtc=%s; ' +
+          'CalcPrCount=%d; CalcMode=%s; FullCalcOnLoad=%s; ForceFullCalc=%s; ' +
+          'CalcOnSave=%s; CalcId=%s; CalcChainEntryExists=%s; ' +
+          'CalcChainRelationshipExists=%s; CalcChainOverrideExists=%s; ' +
+          'CalcChainRemoved=%s; DurationMs=%d; Stage=FinalOutputValidation',
+          [ImportResult.OutputFileName, ImportResult.FileSize,
+           ImportResult.FileHashSHA256,
+           DateToISO8601(ImportResult.LastWriteTimeUtc, True),
+           ImportResult.CalculationState.CalcPrCount,
+           ImportResult.CalculationState.CalcMode,
+           BoolToStr(ImportResult.CalculationState.FullCalcOnLoad, True),
+           BoolToStr(ImportResult.CalculationState.ForceFullCalc, True),
+           BoolToStr(ImportResult.CalculationState.CalcOnSave, True),
+           ImportResult.CalculationState.CalcId,
+           BoolToStr(ImportResult.CalculationState.CalcChainEntryExists, True),
+           BoolToStr(ImportResult.CalculationState.CalcChainRelationshipExists, True),
+           BoolToStr(ImportResult.CalculationState.CalcChainOverrideExists, True),
+           BoolToStr(not ImportResult.CalculationState.CalcChainEntryExists and
+             not ImportResult.CalculationState.CalcChainRelationshipExists and
+             not ImportResult.CalculationState.CalcChainOverrideExists, True),
+           Stopwatch.ElapsedMilliseconds]));
     except
       on E: Exception do
       begin
@@ -5237,7 +5249,6 @@ begin
     ButtonExportReportTemplate.Enabled := False;
   end;
   if ButtonLoadReportTemplate <> nil then ButtonLoadReportTemplate.Enabled := False;
-  if ListBoxReportTemplates <> nil then ListBoxReportTemplates.Enabled := False;
 end;
 
 procedure TFrameProceed.EndReportExportUi;
@@ -5246,22 +5257,38 @@ begin
   if ButtonExportReportTemplate <> nil then
   begin
     ButtonExportReportTemplate.Text := FReportExportButtonText;
-    ButtonExportReportTemplate.Enabled := True;
   end;
-  if ButtonLoadReportTemplate <> nil then ButtonLoadReportTemplate.Enabled := True;
-  if ListBoxReportTemplates <> nil then ListBoxReportTemplates.Enabled := True;
+  UpdateReportTemplateControls;
 end;
 
 procedure TFrameProceed.CompleteReportExport(const AOperationId: Int64;
-  const AOutputFileName: string; const ADurationMs: Int64);
+  const AResult: TReportExportResult; const ADurationMs: Int64);
 begin
   if AOperationId <> FReportExportOperationId then Exit;
   EndReportExportUi;
   FReportExportTask := nil;
   ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateExport',
-    'Сформирован отчёт по шаблону', Format(
-      'Output=%s; DurationMs=%d; Thread=Worker',
-      [AOutputFileName, ADurationMs]));
+    'Сформирован и проверен отчёт по шаблону', Format(
+      'OperationId=%d; Output=%s; FileSize=%d; FileHashSHA256=%s; ' +
+      'LastWriteTimeUtc=%s; CalcPrCount=%d; CalcMode=%s; ' +
+      'FullCalcOnLoad=%s; ForceFullCalc=%s; CalcOnSave=%s; CalcId=%s; ' +
+      'CalcChainEntryExists=%s; CalcChainRelationshipExists=%s; ' +
+      'CalcChainOverrideExists=%s; CalcChainRemoved=%s; DurationMs=%d; Thread=Worker; ' +
+      'Stage=FinalOutputValidation',
+      [AOperationId, AResult.OutputFileName, AResult.FileSize,
+       AResult.FileHashSHA256, DateToISO8601(AResult.LastWriteTimeUtc, True),
+       AResult.CalculationState.CalcPrCount, AResult.CalculationState.CalcMode,
+       BoolToStr(AResult.CalculationState.FullCalcOnLoad, True),
+       BoolToStr(AResult.CalculationState.ForceFullCalc, True),
+       BoolToStr(AResult.CalculationState.CalcOnSave, True),
+       AResult.CalculationState.CalcId,
+       BoolToStr(AResult.CalculationState.CalcChainEntryExists, True),
+       BoolToStr(AResult.CalculationState.CalcChainRelationshipExists, True),
+       BoolToStr(AResult.CalculationState.CalcChainOverrideExists, True),
+       BoolToStr(not AResult.CalculationState.CalcChainEntryExists and
+         not AResult.CalculationState.CalcChainRelationshipExists and
+         not AResult.CalculationState.CalcChainOverrideExists, True),
+       ADurationMs]));
 end;
 
 procedure TFrameProceed.FailReportExport(const AOperationId: Int64;
@@ -5286,15 +5313,11 @@ var
   Json: TJSONObject;
   MeterValueError: TMeterValue;
   Stopwatch: TStopwatch;
-  TemplateFileName, SuggestedName, OutputFileName, ReportJson: string;
+  TemplateFileName, SuggestedName, OutputFileName, ReportJson,
+    ReportingForm: string;
   OperationId, SnapshotMs: Int64;
 begin
   if FReportExportInProgress then Exit;
-  if (ListBoxReportTemplates = nil) or (ListBoxReportTemplates.ItemIndex < 0) then
-  begin
-    MessageDlg('Выберите шаблон отчёта', TMsgDlgType.mtInformation,
-      [TMsgDlgBtn.mbOK], 0); Exit;
-  end;
   Device := ResolveSelectedDevice;
   if Device = nil then
   begin
@@ -5305,8 +5328,30 @@ begin
   if (AppServices <> nil) and (AppServices.DataManager <> nil) then
     DeviceType := AppServices.DataManager.FindType(Device.DeviceTypeUUID,
       Device.DeviceTypeName, TypeRepo);
-  TemplateFileName := TPath.Combine(TReportTemplateService.TemplatesPath,
-    ListBoxReportTemplates.Items[ListBoxReportTemplates.ItemIndex]);
+  if DeviceType <> nil then
+    ReportingForm := DeviceType.ReportingForm
+  else
+    ReportingForm := '';
+  try
+    if DeviceType = nil then
+      raise EInvalidOpException.Create(
+        'Не найден тип выбранного прибора. Невозможно определить шаблон отчёта.');
+    TemplateFileName :=
+      TReportTemplateService.ResolveDeviceTypeTemplate(DeviceType);
+  except
+    on E: Exception do
+    begin
+      ProtocolManager.AddMessage(pcError, psForm, 'ReportTemplateResolveError',
+        'Не удалось определить шаблон отчёта', Format(
+          'DeviceUUID=%s; DeviceSerialNumber=%s; DeviceTypeUUID=%s; ' +
+          'DeviceTypeName=%s; ReportingForm=%s; ' +
+          'Stage=ResolveDeviceTypeTemplate; Message=%s',
+          [Device.UUID, Device.SerialNumber, Device.DeviceTypeUUID,
+           Device.DeviceTypeName, ReportingForm, E.Message]));
+      MessageDlg(E.Message, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
+      Exit;
+    end;
+  end;
   SuggestedName := TPath.GetFileNameWithoutExtension(TemplateFileName);
   if Trim(Device.SerialNumber) <> '' then SuggestedName := SuggestedName + '_' + Device.SerialNumber;
   Dialog := TSaveDialog.Create(Self);
@@ -5334,27 +5379,40 @@ begin
   BeginReportExportUi;
   ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateExportStarted',
     'Запущена фоновая выгрузка отчёта', Format(
-      'Template=%s; Output=%s; SnapshotMs=%d; SourceSize=%d',
-      [TemplateFileName, OutputFileName, SnapshotMs,
-       TFile.GetSize(TemplateFileName)]));
+      'OperationId=%d; DeviceUUID=%s; DeviceSerialNumber=%s; ' +
+      'DeviceTypeUUID=%s; DeviceTypeName=%s; ReportingForm=%s; ' +
+      'Template=%s; TemplateSize=%d; TemplateHashSHA256=%s; ' +
+      'Output=%s; SnapshotMs=%d; Stage=ExportStarted',
+      [OperationId, Device.UUID, Device.SerialNumber, Device.DeviceTypeUUID,
+       Device.DeviceTypeName, DeviceType.ReportingForm,
+       TPath.GetFullPath(TemplateFileName), TFile.GetSize(TemplateFileName),
+       THashSHA2.GetHashStringFromFile(TemplateFileName),
+       TPath.GetFullPath(OutputFileName), SnapshotMs]));
   FReportExportTask := TTask.Run(
     procedure
     var
       WorkerStopwatch: TStopwatch;
       ErrorClass, ErrorMessage, ErrorStage: string;
       DurationMs: Int64;
+      ExportResult: TReportExportResult;
+      ConfirmedHash: string;
     begin
       WorkerStopwatch := TStopwatch.StartNew;
       FReportExportQueueThread := TThread.CurrentThread;
       try
         ErrorStage := 'ExportTemplateFromJson';
-        TReportTemplateService.ExportTemplateFromJson(TemplateFileName,
+        ExportResult := TReportTemplateService.ExportTemplateFromJson(TemplateFileName,
           OutputFileName, ReportJson);
+        if not SameText(ExportResult.OutputFileName, TPath.GetFullPath(OutputFileName)) then
+          raise EInvalidOpException.Create('Проверен не тот итоговый файл отчёта.');
+        ConfirmedHash := THashSHA2.GetHashStringFromFile(ExportResult.OutputFileName);
+        if not SameText(ConfirmedHash, ExportResult.FileHashSHA256) then
+          raise EInvalidOpException.Create('Итоговый XLSX был изменён после проверки.');
         DurationMs := WorkerStopwatch.ElapsedMilliseconds;
         TThread.Queue(FReportExportQueueThread,
           procedure
           begin
-            CompleteReportExport(OperationId, OutputFileName, DurationMs);
+            CompleteReportExport(OperationId, ExportResult, DurationMs);
           end);
       except
         on E: Exception do

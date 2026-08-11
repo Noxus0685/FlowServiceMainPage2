@@ -558,22 +558,6 @@ object FrameProceed: TFrameProceed
                 OnClick = ButtonExportReportTemplateClick
               end
             end
-            object ListBoxReportTemplates: TListBox
-              Align = Client
-              Margins.Left = 8.000000000000000000
-              Margins.Right = 8.000000000000000000
-              Margins.Bottom = 8.000000000000000000
-              Size.Width = 332.000000000000000000
-              Size.Height = 548.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 1
-              DisableFocusEffect = True
-              DefaultItemStyles.ItemStyle = ''
-              DefaultItemStyles.GroupHeaderStyle = ''
-              DefaultItemStyles.GroupFooterStyle = ''
-              Viewport.Width = 328.000000000000000000
-              Viewport.Height = 523.000000000000000000
-            end
           end
         end
       end
