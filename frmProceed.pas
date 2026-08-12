@@ -3,6 +3,7 @@
 interface
 
 uses
+  FmxHelper,
   FMX.ActnList,
   FMX.Controls,
   FMX.Controls.Presentation,
@@ -4646,7 +4647,7 @@ begin
     GridResults.EndUpdate;
   end;
 
-  GridResults.RowCount := Length(FCurrentResultRows);
+  RefreshGridContent(GridResults, Length(FCurrentResultRows), 'results-data');
   ButtonExportExcel.Enabled := GridResults.RowCount > 0;
   if Length(FCurrentResultRows) = 0 then
     GridResults.Row := -1
@@ -4688,7 +4689,7 @@ begin
   SetLength(FCurrentSpillages, Count);
   SortProcessingDataByDate;
 
-  GridDataPoints.RowCount := Length(FCurrentSpillages);
+  RefreshGridContent(GridDataPoints, Length(FCurrentSpillages), 'data-points');
   GridResults.Visible := False;
   GridDataPoints.Visible := True;
   ButtonExportExcel.Enabled := GridDataPoints.RowCount > 0;
@@ -5623,11 +5624,11 @@ begin
     LabelSessionActive.Text := '';
 
   if GridResults <> nil then
-    GridResults.RowCount := 0;
+    RefreshGridContent(GridResults, 0, 'clear-results');
   if GridDataPoints <> nil then
-    GridDataPoints.RowCount := 0;
+    RefreshGridContent(GridDataPoints, 0, 'clear-data-points');
   if GridCoefs <> nil then
-    GridCoefs.RowCount := 0;
+    RefreshGridContent(GridCoefs, 0, 'clear-coefs');
   if Chart1 <> nil then
     Chart1.ClearAllSeries;
 

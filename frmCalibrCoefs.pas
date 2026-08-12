@@ -3,6 +3,7 @@
 interface
 
 uses
+  FmxHelper,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Dialogs,
@@ -542,9 +543,9 @@ end;
 procedure TFrameCalibrCoefs.UpdateGrid;
 begin
   if (FCurrentTable <> nil) and (FCurrentTable.Items <> nil) then
-    GridCoefs.RowCount := FCurrentTable.Items.Count
+    RefreshGridContent(GridCoefs, FCurrentTable.Items.Count, 'calibration-coefs')
   else
-    GridCoefs.RowCount := 0;
+    RefreshGridContent(GridCoefs, 0, 'calibration-coefs');
 end;
 
 function TFrameCalibrCoefs.InitErrorPercent(AItem: TCalibrCoefItem): Double;

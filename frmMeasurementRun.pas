@@ -3,6 +3,7 @@
 interface
 
 uses
+  FmxHelper,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Forms,
@@ -712,7 +713,7 @@ begin
   SelectedRow := GridMeasurmentRun.Row;
   UpdateStopCriteriaColumns;
 
-  GridMeasurmentRun.RowCount := Rows;
+  RefreshGridContent(GridMeasurmentRun, Rows, 'measurement-run');
 
   if Rows = 0 then
     GridMeasurmentRun.Row := -1

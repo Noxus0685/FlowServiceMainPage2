@@ -3,6 +3,7 @@
 interface
 
 uses
+  FmxHelper,
   FMX.ActnList,
   FMX.Controls,
   FMX.Controls.Presentation,
@@ -761,7 +762,7 @@ begin
   begin
     DebugLog('DBG 2012'#13#10'DeviceSelect.BuildTree before TreeViewDevices.Clear');
     TreeViewDevices.Clear;
-    GridDevices.RowCount := 0;
+    RefreshGridContent(GridDevices, 0, 'device-filter');
     DebugLog('DBG 2013'#13#10'DeviceSelect.BuildTree EXIT');
     Exit;
   end;
@@ -1721,9 +1722,9 @@ begin
         FCheckedDevices.Delete(I);
 
   if FDevFilteredDevices <> nil then
-    GridDevices.RowCount := FDevFilteredDevices.Count
+    RefreshGridContent(GridDevices, FDevFilteredDevices.Count, 'device-filter')
   else
-    GridDevices.RowCount := 0;
+    RefreshGridContent(GridDevices, 0, 'device-filter');
 
   if (GridDevices.Row < 0) or (GridDevices.Row >= GridDevices.RowCount) then
     GridDevices.Row := -1;

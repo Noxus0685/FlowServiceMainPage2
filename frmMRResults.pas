@@ -3,6 +3,7 @@
 interface
 
 uses
+  FmxHelper,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Dialogs,
@@ -823,7 +824,7 @@ end;
 
 procedure TFrameMRResults.RefreshRows;
 begin
-  GridMRResults.RowCount := FRows.Count;
+  RefreshGridContent(GridMRResults, FRows.Count, 'mr-results');
 end;
 
 function TFrameMRResults.GetRowChannel(const ARow: Integer): TChannel;

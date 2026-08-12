@@ -44,7 +44,7 @@ def test_columns_menu_uses_logical_items_not_fmx_style_children():
 
 
 def test_release_version():
-    assert "APP_VERSION = '1.0.134'" in VERSION
+    assert "APP_VERSION = '1.0.135'" in VERSION
 
 
 def test_results_point_columns_are_fixed_and_normalized_after_layout():

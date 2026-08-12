@@ -3,6 +3,7 @@
 interface
 
 uses
+  FmxHelper,
   FMX.ComboEdit,
   FMX.Controls,
   FMX.Controls.Presentation,
@@ -1743,9 +1744,9 @@ begin
   Table := GetSelectedCalibrCoefTable;
 
   if Table <> nil then
-    FGridCoefs.RowCount := Table.Items.Count
+    RefreshGridContent(FGridCoefs, Table.Items.Count, 'device-coefs')
   else
-    FGridCoefs.RowCount := 0;
+    RefreshGridContent(FGridCoefs, 0, 'device-coefs');
 end;
 
 function TFormDeviceEditor.GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;
@@ -4302,7 +4303,7 @@ begin
     if FDevice.Points[i].State <> osDeleted then
       Inc(VisibleCount);
 
-  GridPoints.RowCount := VisibleCount;
+  RefreshGridContent(GridPoints, VisibleCount, 'device-points');
 
   { корректировка текущей строки }
   if GridPoints.Row >= GridPoints.RowCount then

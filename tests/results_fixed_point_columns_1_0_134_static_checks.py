@@ -66,4 +66,4 @@ def test_dynamic_results_column_implementation_is_absent():
 
 
 def test_release_version():
-    assert "APP_VERSION = '1.0.134'" in VERSION
+    assert "APP_VERSION = '1.0.135'" in VERSION

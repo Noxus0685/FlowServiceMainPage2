@@ -3,6 +3,7 @@
 interface
 
 uses
+  FmxHelper,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Edit,
@@ -210,7 +211,7 @@ var
   I: Integer;
 begin
   ApplyFilter;
-  StringGridValuesList.RowCount := FFilteredValues.Count;
+  RefreshGridContent(StringGridValuesList, FFilteredValues.Count, 'meter-value-filter');
   StringGridValuesList.BeginUpdate;
   try
     StringGridValuesList.Tag := 1;

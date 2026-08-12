@@ -3,6 +3,7 @@
 interface
 
 uses
+  FmxHelper,
   FMX.ActnList,
   FMX.Controls,
   FMX.Controls.Presentation,
@@ -485,7 +486,7 @@ begin
   if ActiveRepo = nil then
   begin
     TreeViewTypes.Clear;
-    GridTypes.RowCount := 0;
+    RefreshGridContent(GridTypes, 0, 'type-filter');
     Exit;
   end;
 
@@ -1774,9 +1775,9 @@ begin
         FCheckedTypes.Delete(I);
 
   if FDevFilteredTypes <> nil then
-    GridTypes.RowCount := FDevFilteredTypes.Count
+    RefreshGridContent(GridTypes, FDevFilteredTypes.Count, 'type-filter')
   else
-    GridTypes.RowCount := 0;
+    RefreshGridContent(GridTypes, 0, 'type-filter');
 
   if (GridTypes.Row >= GridTypes.RowCount) then
     GridTypes.Row := -1;

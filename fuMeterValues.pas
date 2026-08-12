@@ -3,6 +3,7 @@
 interface
 
 uses
+  FmxHelper,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Dialogs,
@@ -309,7 +310,7 @@ procedure TFormMeterValues.UpdateStringGridDimensions;
 var
   I: Integer;
 begin
-  StringGridDimensions.RowCount := MeterValue.Dimensions.Count;
+  RefreshGridContent(StringGridDimensions, MeterValue.Dimensions.Count, 'dimensions');
   StringGridDimensions.BeginUpdate;
   try
     if MeterValue.Dimensions.Count > 0 then
@@ -345,11 +346,11 @@ begin
   FlowMeter := FindOwnerFlowMeter;
   ReferenceTable := FindTableByType(FlowMeter, cctReference);
   if (ReferenceTable <> nil) and (ReferenceTable.Items <> nil) then
-    StringGridCoefsData.RowCount := ReferenceTable.Items.Count
+    RefreshGridContent(StringGridCoefsData, ReferenceTable.Items.Count, 'coef-data')
   else if FlowMeter = nil then
-    StringGridCoefsData.RowCount := MeterValue.Coefs.Count
+    RefreshGridContent(StringGridCoefsData, MeterValue.Coefs.Count, 'coef-data')
   else
-    StringGridCoefsData.RowCount := 0;
+    RefreshGridContent(StringGridCoefsData, 0, 'coef-data');
 
   StringGridCoefsData.BeginUpdate;
   try
@@ -424,7 +425,7 @@ procedure TFormMeterValues.UpdateStringGridCoefs;
 var
   I: Integer;
 begin
-  StringGridCoefs.RowCount := MeterValue.Coefs.Count;
+  RefreshGridContent(StringGridCoefs, MeterValue.Coefs.Count, 'coefs');
   StringGridCoefs.BeginUpdate;
   try
     if MeterValue.Coefs.Count > 0 then
@@ -901,9 +902,9 @@ var
 begin
   Index := -1;
   if FFilteredValues <> nil then
-    StringGridValuesList.RowCount := FFilteredValues.Count
+    RefreshGridContent(StringGridValuesList, FFilteredValues.Count, 'values')
   else
-    StringGridValuesList.RowCount := 0;
+    RefreshGridContent(StringGridValuesList, 0, 'values');
 
   StringGridValuesList.BeginUpdate;
   try

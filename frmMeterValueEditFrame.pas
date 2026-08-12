@@ -3,6 +3,7 @@
 interface
 
 uses
+  FmxHelper,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Consts,
@@ -1323,7 +1324,7 @@ procedure TFrameMeterValueEdit.RefreshSamplesGrid(const AReload: Boolean);
 begin
   if AReload then
     RefreshDisplayedSamples;
-  GridSamples.RowCount := Length(FDisplayedSamples);
+  RefreshGridContent(GridSamples, Length(FDisplayedSamples), 'meter-samples');
 
   if GridSamples.Row >= Length(FDisplayedSamples) then
     GridSamples.Row := Length(FDisplayedSamples) - 1;
