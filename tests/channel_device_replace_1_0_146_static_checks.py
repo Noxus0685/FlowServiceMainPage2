@@ -30,7 +30,7 @@ def test_destinations_and_refresh_are_explicit():
     assert 'RefreshResultsTab' in body(PROCEED,'procedure TFrameProceed.ReplaceProcessingDevice','procedure TFrameProceed.RemoveProcessingDevice')
 
 def test_version():
-    assert "APP_VERSION = '1.0.147'" in (ROOT/'uAppVersion.pas').read_text()
+    assert "APP_VERSION = '1.0.148'" in (ROOT/'uAppVersion.pas').read_text()
     project=(ROOT/'ProjectFornTest.dproj').read_text()
-    assert project.count('FileVersion=1.0.147.0')==2
-    assert project.count('ProductVersion=1.0.147.0')==2
+    assert project.count('FileVersion=1.0.148.0')==2
+    assert project.count('ProductVersion=1.0.148.0')==2

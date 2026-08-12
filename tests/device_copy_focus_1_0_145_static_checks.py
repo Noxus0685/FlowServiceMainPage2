@@ -59,7 +59,7 @@ def test_channel_copy_uses_configuration_only_mode_before_persistence():
 
 
 def test_version_1_0_146():
-    assert "APP_VERSION = '1.0.147'" in (ROOT / "uAppVersion.pas").read_text(encoding="utf-8")
+    assert "APP_VERSION = '1.0.148'" in (ROOT / "uAppVersion.pas").read_text(encoding="utf-8")
     project = (ROOT / "ProjectFornTest.dproj").read_text(encoding="utf-8")
-    assert project.count("FileVersion=1.0.147.0") == 2
-    assert project.count("ProductVersion=1.0.147.0") == 2
+    assert project.count("FileVersion=1.0.148.0") == 2
+    assert project.count("ProductVersion=1.0.148.0") == 2

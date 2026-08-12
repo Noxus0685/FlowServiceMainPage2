@@ -58,6 +58,12 @@ uses
 
 const
   C_RESULTS_POINT_COLUMN_COUNT = 20;
+  // Критические пользовательские строки заданы Unicode-кодами и не зависят от кодировки исходного файла.
+  C_RESULT_VALID_TEXT = #1043#1086#1076#1077#1085;
+  C_RESULT_INVALID_TEXT = #1053#1077#32#1075#1086#1076#1077#1085;
+  C_NO_PROCESSING_DATA_TEXT =
+    #1053#1077#1090#32#1076#1072#1085#1085#1099#1093#32
+    #1086#1073#1088#1072#1073#1086#1090#1082#1080;
 
 type
   // Направление сортировки таблицы обработки.
@@ -605,6 +611,18 @@ procedure TFrameProceed.Initialize;
 var
   UnitName: string;
 begin
+{$IFDEF DEBUG}
+  Assert(BuildResultTextByStatus(5) = C_RESULT_VALID_TEXT);
+  Assert(BuildResultTextByStatus(3) = C_RESULT_INVALID_TEXT);
+  Assert(Length(C_RESULT_VALID_TEXT) = 5);
+  Assert(Length(C_RESULT_INVALID_TEXT) = 8);
+  Assert(Length(C_NO_PROCESSING_DATA_TEXT) = 21);
+  Assert((Ord(C_RESULT_VALID_TEXT[1]) = 1043) and
+    (Ord(C_RESULT_VALID_TEXT[2]) = 1086) and
+    (Ord(C_RESULT_VALID_TEXT[3]) = 1076) and
+    (Ord(C_RESULT_VALID_TEXT[4]) = 1077) and
+    (Ord(C_RESULT_VALID_TEXT[5]) = 1085));
+{$ENDIF}
   FWorkTableManager := WorkTableManager;
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
   InitializeResultsGrid;
@@ -3179,8 +3197,8 @@ function TFrameProceed.BuildResultTextByStatus(const AStatus: Integer): string;
 begin
   case AStatus of
     1, 2: Result := #$2014;
-    3, 4: Result := 'Не годен';
-    5: Result := 'Годен';
+    3, 4: Result := C_RESULT_INVALID_TEXT;
+    5: Result := C_RESULT_VALID_TEXT;
   else
     Result := '-';
   end;
@@ -3223,9 +3241,9 @@ begin
     Exit;
   case ASpillage.Validation of
     vsValid:
-      Result := 'Годен';
+      Result := C_RESULT_VALID_TEXT;
     vsInvalid:
-      Result := 'Не годен';
+      Result := C_RESULT_INVALID_TEXT;
   else
     Result := #$2014;
   end;
@@ -4500,7 +4518,7 @@ begin
         begin
           Row.ResultStatus := 2;
           Row.ResultText := #$2014;
-          Row.ResultComment := 'Нет данных обработки';
+          Row.ResultComment := C_NO_PROCESSING_DATA_TEXT;
         end;
 
         LogMKS('DBG SP 9102', 'SummaryResults RESULT',

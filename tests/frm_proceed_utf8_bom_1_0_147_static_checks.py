@@ -28,9 +28,9 @@ def test_frm_proceed_is_utf8_with_bom_and_preserves_russian_literals():
     data = (ROOT / "frmProceed.pas").read_bytes()
     assert data.startswith(BOM)
     source = data.decode("utf-8-sig")
-    assert "Result := 'Годен';" in source
-    assert "Result := 'Не годен';" in source
-    assert "Row.ResultComment := 'Нет данных обработки';" in source
+    assert "C_RESULT_VALID_TEXT = #1043#1086#1076#1077#1085;" in source
+    assert "C_RESULT_INVALID_TEXT = #1053#1077#32#1075#1086#1076#1077#1085;" in source
+    assert "Row.ResultComment := C_NO_PROCESSING_DATA_TEXT;" in source
     for damaged in MOJIBAKE:
         assert damaged not in source
 
@@ -46,6 +46,6 @@ def test_changed_pascal_sources_are_valid_utf8_and_bom_marked_when_needed():
 def test_version_1_0_147():
     version = (ROOT / "uAppVersion.pas").read_text(encoding="utf-8-sig")
     project = (ROOT / "ProjectFornTest.dproj").read_text(encoding="utf-8-sig")
-    assert "APP_VERSION = '1.0.147'" in version
-    assert project.count("FileVersion=1.0.147.0") == 2
-    assert project.count("ProductVersion=1.0.147.0") == 2
+    assert "APP_VERSION = '1.0.148'" in version
+    assert project.count("FileVersion=1.0.148.0") == 2
+    assert project.count("ProductVersion=1.0.148.0") == 2
