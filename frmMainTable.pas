@@ -1,4 +1,4 @@
-﻿unit frmMainTable;
+unit frmMainTable;
 
 interface
 
@@ -838,7 +838,7 @@ type
 
     procedure OpenTypeSelect(ARow: Integer; const AIsEtalon: Boolean = False);
     procedure OpenChannelDeviceEditor(AChannel: TChannel);
-    procedure SelectDeviceForChannel(AChannel: TChannel);
+    procedure SelectDeviceForChannel(AChannel: TChannel; const AAddToProcessing: Boolean = True);
     procedure InitTables;
     procedure ApplyFlowMeterSelection(const ARow: Integer);
     function FindTypeIndex(const ATypeName: string): Integer;
@@ -1057,7 +1057,13 @@ type
     FDeviceClipboard: TChannelClipboardData;
     FEtalonClipboard: TChannelClipboardData;
     procedure SaveChannelToClipboard(AChannel: TChannel; var AClipboard: TChannelClipboardData);
-    procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData);
+    procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData;
+      const AAddToProcessing: Boolean);
+    // Atomically clones, synchronizes and replaces the processing reference.
+    procedure ReplaceChannelDeviceFromCopy(ASource, ADest: TChannel;
+      const AAddToProcessing: Boolean);
+    function IsDeviceUsedByAnotherChannel(AChannel: TChannel; const ADeviceUUID: string): Boolean;
+    procedure ValidateChannelDeviceUUIDs(AChannel: TChannel);
     procedure PersistDeviceAsync(ADevice: TDevice);
     procedure UpdateUIConditions;
     function   GetMeasurementRun: TMeasurementRun;
@@ -4465,12 +4471,14 @@ var
   WorkTable: TWorkTable;
   Ch: TChannel;
   Row: Integer;
+  IsEtalon: Boolean;
 begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
-  if FLastPopupGrid = GridEtalons then
+  IsEtalon := FLastPopupGrid = GridEtalons;
+  if IsEtalon then
   begin
     Row := GridEtalons.Row;
     if (Row < 0) or (Row >= WorkTable.EtalonChannels.Count) then
@@ -4491,7 +4499,7 @@ begin
     Exit;
 
   FLastPopupGrid := nil;
-  SelectDeviceForChannel(Ch);
+  SelectDeviceForChannel(Ch, not IsEtalon);
 end;
 
 
@@ -4553,10 +4561,11 @@ begin
   UpdateUIScale;
 end;
 
-procedure TFrameMainTable.SelectDeviceForChannel(AChannel: TChannel);
+procedure TFrameMainTable.SelectDeviceForChannel(AChannel: TChannel;
+  const AAddToProcessing: Boolean);
 var
   Frm: TFormDeviceSelect;
-  SelDevice: TDevice;
+  SelDevice, OldDevice: TDevice;
   LinkedChannel: TChannel;
   I: Integer;
   SelectedUUID: string;
@@ -4567,6 +4576,9 @@ begin
     Exit;
 
   OldDeviceUUID := Trim(AChannel.DeviceUUID);
+  OldDevice := nil;
+  if AChannel.FlowMeter <> nil then
+    OldDevice := AChannel.FlowMeter.Device;
 
   if DataManager <> nil then
     DataManager.PendingSelectedDeviceUUID := AChannel.DeviceUUID;
@@ -4617,8 +4629,11 @@ begin
       AChannel.FlowMeter.UpdateByDevice;
       AChannel.InitWorkRangesFromFlowMeter;
 
-      if FFrameProceed <> nil then
-        FFrameProceed.AddProcessingDevice(AChannel.FlowMeter.Device);
+      ValidateChannelDeviceUUIDs(AChannel);
+      if (FFrameProceed <> nil) and AAddToProcessing then
+        FFrameProceed.ReplaceProcessingDevice(OldDevice, AChannel.FlowMeter.Device,
+          (OldDevice <> nil) and
+          not IsDeviceUsedByAnotherChannel(AChannel, OldDeviceUUID));
 
       if (FActiveWorkTable <> nil) and (SelectedUUID <> '') then
         for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
@@ -4846,16 +4861,91 @@ begin
   end;
 end;
 
+procedure TFrameMainTable.ValidateChannelDeviceUUIDs(AChannel: TChannel);
+var
+  DeviceUUID: string;
+begin
+  // Reports any divergence between channel, meter and attached device identities.
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) then
+    Exit;
+  DeviceUUID := '';
+  if AChannel.FlowMeter.Device <> nil then
+    DeviceUUID := AChannel.FlowMeter.Device.UUID;
+  if (DeviceUUID = '') or not SameText(Trim(AChannel.DeviceUUID), Trim(DeviceUUID)) or
+     not SameText(Trim(AChannel.FlowMeter.DeviceUUID), Trim(DeviceUUID)) then
+    ProtocolManager.AddMessage(pcError, psForm, 'ChannelDeviceUUIDIntegrity',
+      'Нарушена целостность UUID прибора канала',
+      Format('ChannelUUID=%s; Channel.DeviceUUID=%s; FlowMeter.DeviceUUID=%s; Device.UUID=%s',
+        [AChannel.UUID, AChannel.DeviceUUID, AChannel.FlowMeter.DeviceUUID, DeviceUUID]));
+end;
+
+function TFrameMainTable.IsDeviceUsedByAnotherChannel(AChannel: TChannel;
+  const ADeviceUUID: string): Boolean;
+var
+  Ch: TChannel;
+begin
+  Result := False;
+  if (FActiveWorkTable = nil) or (Trim(ADeviceUUID) = '') then
+    Exit;
+  for Ch in FActiveWorkTable.DeviceChannels do
+    if (Ch <> nil) and (Ch <> AChannel) and
+       SameText(Trim(Ch.DeviceUUID), Trim(ADeviceUUID)) then
+      Exit(True);
+end;
+
+// Saves the old reference, creates a history-free device, synchronizes UUIDs,
+// and replaces processing state without exposing an inconsistent intermediate state.
+procedure TFrameMainTable.ReplaceChannelDeviceFromCopy(ASource, ADest: TChannel;
+  const AAddToProcessing: Boolean);
+var
+  OldDevice, NewDevice: TDevice;
+  OldDeviceUUID, NewDeviceUUID, SourceDeviceUUID: string;
+  RemoveOld, AddedNew: Boolean;
+begin
+  if (ASource = nil) or (ADest = nil) then
+    Exit;
+  OldDevice := nil;
+  OldDeviceUUID := Trim(ADest.DeviceUUID);
+  if ADest.FlowMeter <> nil then
+    OldDevice := ADest.FlowMeter.Device;
+  SourceDeviceUUID := '';
+  if (ASource.FlowMeter <> nil) and (ASource.FlowMeter.Device <> nil) then
+    SourceDeviceUUID := ASource.FlowMeter.Device.UUID;
+
+  ADest.AssignFlowMeterFrom(ASource, FActiveWorkTable, True);
+  NewDevice := ADest.FlowMeter.Device;
+  NewDeviceUUID := '';
+  if NewDevice <> nil then
+    NewDeviceUUID := NewDevice.UUID;
+  ValidateChannelDeviceUUIDs(ADest);
+
+  RemoveOld := AAddToProcessing and (OldDevice <> nil) and
+    not IsDeviceUsedByAnotherChannel(ADest, OldDeviceUUID);
+  AddedNew := AAddToProcessing and (NewDevice <> nil) and (NewDeviceUUID <> '') and
+    SameText(Trim(ADest.DeviceUUID), Trim(NewDeviceUUID)) and
+    SameText(Trim(ADest.FlowMeter.DeviceUUID), Trim(NewDeviceUUID));
+  if (FFrameProceed <> nil) and AddedNew then
+    FFrameProceed.ReplaceProcessingDevice(OldDevice, NewDevice, RemoveOld);
+  MarkChannelDeviceModified(ADest);
+  if NewDevice <> nil then
+    PersistDeviceAsync(NewDevice);
+  if FFrameMRResults <> nil then
+    FFrameMRResults.ReloadAndUpdate;
+
+  ProtocolManager.AddMessage(pcAction, psForm, 'ReplaceChannelDeviceFromCopy',
+    'Прибор канала заменён согласованной копией',
+    Format('ChannelUUID=%s; OldDeviceUUID=%s; NewDeviceUUID=%s; SourceDeviceUUID=%s; Channel.DeviceUUID=%s; FlowMeter.DeviceUUID=%s; Device.UUID=%s; OldDeviceRemovedFromProcessing=%s; NewDeviceAddedToProcessing=%s; IsEtalonChannel=%s',
+      [ADest.UUID, OldDeviceUUID, NewDeviceUUID, SourceDeviceUUID, ADest.DeviceUUID,
+       ADest.FlowMeter.DeviceUUID, NewDeviceUUID, BoolToStr(RemoveOld, True),
+       BoolToStr(AddedNew, True), BoolToStr(not AAddToProcessing, True)]));
+end;
+
 procedure TFrameMainTable.LoadChannelFromClipboard(AChannel: TChannel;
-  const AClipboard: TChannelClipboardData);
+  const AClipboard: TChannelClipboardData; const AAddToProcessing: Boolean);
 begin
   if (AChannel = nil) or not AClipboard.HasData or (AClipboard.Snapshot = nil) then
     Exit;
-
-  CloneSelectedChannelDevice(AClipboard.Snapshot, AChannel);
-  if FFrameProceed <> nil then
-    FFrameProceed.AddProcessingDevice(AChannel.FlowMeter.Device);
-  MarkChannelDeviceModified(AChannel);
+  ReplaceChannelDeviceFromCopy(AClipboard.Snapshot, AChannel, AAddToProcessing);
 end;
 
 function TFrameMainTable.GetSelectedChannel(AChannels: TObjectList<TChannel>;
@@ -5248,7 +5338,7 @@ begin
   if FActiveWorkTable = nil then
     Exit;
   Ch := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
-  LoadChannelFromClipboard(Ch, FDeviceClipboard);
+  LoadChannelFromClipboard(Ch, FDeviceClipboard, True);
   UpdateGrids;
 end;
 
@@ -5292,10 +5382,8 @@ begin
 
 
 
-      CloneSelectedChannelDevice(Src, Ch);
-      if (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-        PersistDeviceAsync(Ch.FlowMeter.Device) //Сохранение прибора
-      else
+      ReplaceChannelDeviceFromCopy(Src, Ch, True);
+      if (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
         AttachType(Ch, SourceType, FoundRepo, True);
 
   //  If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
@@ -5485,7 +5573,7 @@ begin
   if FActiveWorkTable = nil then
     Exit;
   Ch := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
-  LoadChannelFromClipboard(Ch, FEtalonClipboard);
+  LoadChannelFromClipboard(Ch, FEtalonClipboard, False);
   UpdateGrids;
 end;
 
@@ -5511,7 +5599,7 @@ begin
     Exit;
   for Ch in FActiveWorkTable.EtalonChannels do
     if Ch <> Src then
-      CloneSelectedChannelDevice(Src, Ch);
+      ReplaceChannelDeviceFromCopy(Src, Ch, False);
   UpdateGrids;
 end;
 
@@ -5522,7 +5610,7 @@ begin
   if FActiveWorkTable = nil then
     Exit;
   Ch := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
-  SelectDeviceForChannel(Ch);
+  SelectDeviceForChannel(Ch, False);
 end;
 
 procedure TFrameMainTable.ActionEtalonsSetFlowSourceExecute(Sender: TObject);
