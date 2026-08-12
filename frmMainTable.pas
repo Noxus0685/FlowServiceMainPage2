@@ -4848,13 +4848,37 @@ end;
 
 procedure TFrameMainTable.LoadChannelFromClipboard(AChannel: TChannel;
   const AClipboard: TChannelClipboardData);
+var
+  OldDevice, NewDevice: TDevice;
+  OldFlowMeter: TFlowMeter;
+  OldDeviceUUID, NewDeviceUUID: string;
 begin
   if (AChannel = nil) or not AClipboard.HasData or (AClipboard.Snapshot = nil) then
     Exit;
 
+  OldFlowMeter := AChannel.FlowMeter;
+  OldDevice := nil;
+  OldDeviceUUID := AChannel.DeviceUUID;
+  if OldFlowMeter <> nil then
+    OldDevice := OldFlowMeter.Device;
+
   CloneSelectedChannelDevice(AClipboard.Snapshot, AChannel);
-  if FFrameProceed <> nil then
-    FFrameProceed.AddProcessingDevice(AChannel.FlowMeter.Device);
+  NewDevice := nil;
+  NewDeviceUUID := '';
+  if AChannel.FlowMeter <> nil then
+  begin
+    NewDevice := AChannel.FlowMeter.Device;
+    NewDeviceUUID := AChannel.FlowMeter.DeviceUUID;
+  end;
+  if (FFrameProceed <> nil) and (FActiveWorkTable <> nil) and
+     (FActiveWorkTable.DeviceChannels.IndexOf(AChannel) >= 0) and
+     not SameText(Trim(OldDeviceUUID), Trim(NewDeviceUUID)) then
+  begin
+    if OldDevice <> nil then
+      FFrameProceed.RemoveProcessingDevice(OldDevice);
+    if NewDevice <> nil then
+      FFrameProceed.AddProcessingDevice(NewDevice);
+  end;
   MarkChannelDeviceModified(AChannel);
 end;
 

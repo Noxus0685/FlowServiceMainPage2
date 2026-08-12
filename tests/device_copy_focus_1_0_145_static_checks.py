@@ -58,8 +58,8 @@ def test_channel_copy_uses_configuration_only_mode_before_persistence():
     assert "ASource.FSpillages" in legacy
 
 
-def test_version_1_0_145():
-    assert "APP_VERSION = '1.0.145'" in (ROOT / "uAppVersion.pas").read_text(encoding="utf-8")
+def test_preserved_copy_behavior_at_current_version():
+    assert "APP_VERSION = '1.0.150'" in (ROOT / "uAppVersion.pas").read_text(encoding="utf-8")
     project = (ROOT / "ProjectFornTest.dproj").read_text(encoding="utf-8")
-    assert project.count("FileVersion=1.0.145.0") == 2
-    assert project.count("ProductVersion=1.0.145.0") == 2
+    assert project.count("FileVersion=1.0.150.0") == 2
+    assert project.count("ProductVersion=1.0.150.0") == 2
