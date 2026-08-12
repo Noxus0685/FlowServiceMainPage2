@@ -1,3 +1,4 @@
+{$CODEPAGE 1251}
 unit FmxHelper;
 
 interface
