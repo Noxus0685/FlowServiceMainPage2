@@ -27,7 +27,7 @@ def test_root_fmx_helper_path_encoding_and_first_line(capsys):
     raw = ROOT_HELPER_PATH.read_bytes()
     assert raw.splitlines()[0] == b"unit FmxHelper;"
     assert b"CODEPAGE" not in raw.upper()
-    assert raw.decode("cp1251") == HELPER
+    assert raw.decode("utf-8") == HELPER
 
 
 def test_picchar_is_the_original_64_char_table():
@@ -92,9 +92,15 @@ def test_existing_measurement_notification_is_retained_once():
 def test_simulation_completes_both_hydraulic_actions_through_public_api():
     handler = method(MAIN, "procedure TFrameMainTable.HandleWorkTableAction", "procedure TFrameMainTable.HandleWorkTableEvent")
     assert "awtFindHydraulicConfiguration:" in handler
+    assert "IsHydraulicSimulationMode(AWorkTable)" in handler
     assert "CompleteSimulatedHydraulicConfiguration(AWorkTable)" in handler
     assert "awtSetupHydraulicLine:" in handler
     assert "CompleteSimulatedHydraulicLineSetup(AWorkTable)" in handler
+    assert "AWorkTable.ApplyHydraulicConfiguration(Error)" in handler
+    predicate = method(MAIN, "function TFrameMainTable.IsHydraulicSimulationMode", "procedure TFrameMainTable.CompleteSimulatedHydraulicConfiguration")
+    assert "AWorkTable.IsSimulationMode" in predicate
+    assert "WorkTableManager.IsSimulationMode" in predicate
+    assert "AWorkTable.SimulationActive" not in predicate
     find_completion = method(MAIN, "procedure TFrameMainTable.CompleteSimulatedHydraulicConfiguration", "procedure TFrameMainTable.CompleteSimulatedHydraulicLineSetup")
     setup_completion = method(MAIN, "procedure TFrameMainTable.CompleteSimulatedHydraulicLineSetup", "procedure TFrameMainTable.ClearChannelSimulationValues")
     assert "CompleteHydraulicConfigurationSearch" in find_completion
@@ -105,10 +111,10 @@ def test_simulation_completes_both_hydraulic_actions_through_public_api():
     assert ".SetStage" not in find_completion + setup_completion
 
 
-def test_project_version_is_1_0_142():
-    assert "APP_VERSION = '1.0.142'" in VERSION
-    assert "FileVersion=1.0.142.0" in PROJECT
-    assert "ProductVersion=1.0.142.0" in PROJECT
+def test_project_version_is_1_0_143():
+    assert "APP_VERSION = '1.0.143'" in VERSION
+    assert "FileVersion=1.0.143.0" in PROJECT
+    assert "ProductVersion=1.0.143.0" in PROJECT
 
 
 def test_shortstring_trim_is_explicit_before_overload_resolution():

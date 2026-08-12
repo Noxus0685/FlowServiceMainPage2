@@ -851,6 +851,8 @@ type
     procedure ClearChannelSimulationValues(AChannel: TChannel);
     procedure DisableOtherChannelGroups(AChannels: TObjectList<TChannel>; const AActiveIndex: Integer);
     procedure ApplyEnabledChannelSimulationValues(AWorkTable: TWorkTable; const AEtalonChannels: Boolean);
+    // Определяет явный режим симуляции для гидравлических действий стола.
+    function IsHydraulicSimulationMode(AWorkTable: TWorkTable): Boolean;
     procedure CompleteSimulatedHydraulicConfiguration(AWorkTable: TWorkTable);
     procedure CompleteSimulatedHydraulicLineSetup(AWorkTable: TWorkTable);
     // Сбрасывает устаревшую ссылку FActiveWorkTable после удаления рабочего стола.
@@ -1959,7 +1961,7 @@ begin
          end;
     awtFindHydraulicConfiguration:
          begin
-         if AWorkTable.IsSimulationMode then
+         if IsHydraulicSimulationMode(AWorkTable) then
            CompleteSimulatedHydraulicConfiguration(AWorkTable);
          if Assigned(ProtocolManager) then
           ProtocolManager.AddMessage(
@@ -1972,7 +1974,7 @@ begin
          end;
     awtSetupHydraulicLine:
       begin
-        if AWorkTable.IsSimulationMode then
+        if IsHydraulicSimulationMode(AWorkTable) then
         begin
           CompleteSimulatedHydraulicLineSetup(AWorkTable);
           Exit;
@@ -10051,6 +10053,13 @@ begin
   Result := GRID_ETALON_GROUP_COLORS[Abs(AGroup) mod Length(GRID_ETALON_GROUP_COLORS)];
 end;
 
+function TFrameMainTable.IsHydraulicSimulationMode(AWorkTable: TWorkTable): Boolean;
+begin
+  Result := (AWorkTable <> nil) and
+    (AWorkTable.IsSimulationMode or
+     ((WorkTableManager <> nil) and WorkTableManager.IsSimulationMode));
+end;
+
 procedure TFrameMainTable.CompleteSimulatedHydraulicConfiguration(AWorkTable: TWorkTable);
 var
   State: EHydraulicLineState;
@@ -10064,7 +10073,7 @@ var
   Channel: TChannel;
 begin
   { Simulation creates a valid virtual selection through the public completion API. }
-  if (AWorkTable = nil) or not AWorkTable.IsSimulationMode then
+  if not IsHydraulicSimulationMode(AWorkTable) then
     Exit;
   AWorkTable.GetHydraulicStateSnapshot(State, Error, OperationID, PointUUID,
     PointIndex, TargetFlow, Configuration, HydraulicRange);
@@ -10124,7 +10133,7 @@ var
   HydraulicRange: RWorkTableHydraulicRange;
 begin
   { Simulation applies the saved virtual selection without equipment commands. }
-  if (AWorkTable = nil) or not AWorkTable.IsSimulationMode then
+  if not IsHydraulicSimulationMode(AWorkTable) then
     Exit;
   AWorkTable.GetHydraulicStateSnapshot(State, Error, OperationID, PointUUID,
     PointIndex, TargetFlow, Configuration, HydraulicRange);
