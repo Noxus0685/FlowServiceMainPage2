@@ -5765,7 +5765,6 @@ begin
   FHydraulicOperationID := 0;
 end;
 
-
 procedure TMeasurementRun.ProcessSelectEtalon;
 const
   HYDRAULIC_SEARCH_TIMEOUT_MS = 30000;
@@ -5781,8 +5780,10 @@ begin
     ContinueAfterPointError(
       mptsSetupError,
       meEtalonAbsent,
-      BuildError(1100,
-        'Потерян контекст выбора гидравлической конфигурации')
+      BuildError(
+        1100,
+        'Потерян контекст выбора гидравлической конфигурации'
+      )
     );
     Exit;
   end;
@@ -5799,6 +5800,21 @@ begin
 
   if Completed then
   begin
+    { Применяем найденную и сохранённую в TWorkTable
+      гидравлическую конфигурацию. }
+    if not FWorkTable.ApplyHydraulicConfiguration(Error) then
+    begin
+      ContinueAfterPointError(
+        mptsSetupError,
+        meEtalonAbsent,
+        Error
+      );
+      Exit;
+    end;
+
+    if IsStopRequested then
+      Exit;
+
     FireEvent(meEtalonSelected);
     SetStage(msSetupPoint);
     Exit;
@@ -5814,8 +5830,10 @@ begin
     ContinueAfterPointError(
       mptsSetupError,
       meEtalonAbsent,
-      BuildError(1101,
-        'Превышено время поиска гидравлической конфигурации')
+      BuildError(
+        1101,
+        'Превышено время поиска гидравлической конфигурации'
+      )
     );
   end;
 end;

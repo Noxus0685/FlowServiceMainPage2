@@ -1152,7 +1152,7 @@ type
     const AWeightsOnly: Boolean;
     out AError: TErrorInfo
   ): Boolean;
-    function ApplyHydraulicConfiguration(out AError: TErrorInfo): Boolean;
+
 
   public
   procedure CaptureEnvironmentSimulationBase;
@@ -1360,6 +1360,47 @@ type
     procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
     function GetSimulationActive: Boolean;
 
+
+  property IsSimulationMode: Boolean read FIsSimulationMode write FIsSimulationMode;
+  property SimulationActive: Boolean read GetSimulationActive;
+
+    { Текущее состояние поиска и установки гидравлической линии. }
+  property HydraulicLineState: EHydraulicLineState
+    read FHydraulicLineState write FHydraulicLineState;
+
+  { Последняя ошибка поиска или установки гидравлической линии. }
+  property HydraulicLineError: TErrorInfo
+    read FHydraulicLineError write FHydraulicLineError;
+
+  { Идентификатор текущей асинхронной операции.
+    Используется для отклонения устаревших результатов. }
+  property HydraulicOperationID: Int64
+    read FHydraulicOperationID write FHydraulicOperationID;
+
+  { UUID точки, для которой выполняется текущая операция. }
+  property HydraulicPointUUID: string
+    read FHydraulicPointUUID write FHydraulicPointUUID;
+
+  { Индекс точки, для которой выполняется текущая операция. }
+  property HydraulicPointIndex: Integer
+    read FHydraulicPointIndex write FHydraulicPointIndex;
+
+  { Целевой расход текущей точки в базовых единицах программы. }
+  property HydraulicTargetFlow: Double
+    read FHydraulicTargetFlow write FHydraulicTargetFlow;
+
+  { Результат выбора гидравлической схемы, строки, эталонов,
+    насосов и регулирующих устройств. }
+  property HydraulicConfiguration: RWorkTableHydraulicConfiguration
+    read FHydraulicConfiguration write FHydraulicConfiguration;
+
+  { Объект синхронизации доступа к состоянию гидравлической линии.
+
+    Свойство доступно только для чтения: внешний код не должен
+    заменять объект блокировки после создания TWorkTable. }
+  property HydraulicStateLock: TObject
+    read FHydraulicStateLock;
+
   public
 
   procedure DoProcStart(AProcName: string);
@@ -1442,47 +1483,10 @@ type
   { Формирует подробное диагностическое описание текущего состояния. }
   function GetHydraulicDiagnosticText: string;
 
-  property IsSimulationMode: Boolean read FIsSimulationMode write FIsSimulationMode;
-  property SimulationActive: Boolean read GetSimulationActive;
-
-    { Текущее состояние поиска и установки гидравлической линии. }
-  property HydraulicLineState: EHydraulicLineState
-    read FHydraulicLineState write FHydraulicLineState;
-
-  { Последняя ошибка поиска или установки гидравлической линии. }
-  property HydraulicLineError: TErrorInfo
-    read FHydraulicLineError write FHydraulicLineError;
-
-  { Идентификатор текущей асинхронной операции.
-    Используется для отклонения устаревших результатов. }
-  property HydraulicOperationID: Int64
-    read FHydraulicOperationID write FHydraulicOperationID;
-
-  { UUID точки, для которой выполняется текущая операция. }
-  property HydraulicPointUUID: string
-    read FHydraulicPointUUID write FHydraulicPointUUID;
-
-  { Индекс точки, для которой выполняется текущая операция. }
-  property HydraulicPointIndex: Integer
-    read FHydraulicPointIndex write FHydraulicPointIndex;
-
-  { Целевой расход текущей точки в базовых единицах программы. }
-  property HydraulicTargetFlow: Double
-    read FHydraulicTargetFlow write FHydraulicTargetFlow;
-
-  { Результат выбора гидравлической схемы, строки, эталонов,
-    насосов и регулирующих устройств. }
-  property HydraulicConfiguration: RWorkTableHydraulicConfiguration
-    read FHydraulicConfiguration write FHydraulicConfiguration;
-
-  { Объект синхронизации доступа к состоянию гидравлической линии.
-
-    Свойство доступно только для чтения: внешний код не должен
-    заменять объект блокировки после создания TWorkTable. }
-  property HydraulicStateLock: TObject
-    read FHydraulicStateLock;
-
+    function ApplyHydraulicConfiguration(out AError: TErrorInfo): Boolean;
   end;
+
+
 
   IWorkTableObserverHost = interface
     ['{8E305AD6-49F7-4D3C-AD3E-1DBDF5692656}']
