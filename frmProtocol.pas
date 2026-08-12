@@ -21,6 +21,7 @@ uses
   System.SysUtils,
   System.UITypes,
   uProtocols,
+  uProjectSettings,
   uAppVersion,
   uWorkTable;
 
@@ -63,10 +64,10 @@ type
     procedure LoadProtocolSettings;
     procedure SaveProtocolSettings;
     function ProtocolSettingsFileName: string;
-    procedure LoadCheckBoxSetting(AIni: TIniFile; ACheckBox: TCheckBox);
-    procedure SaveCheckBoxSetting(AIni: TIniFile; ACheckBox: TCheckBox);
-    procedure LoadComboBoxSetting(AIni: TIniFile; AComboBox: TComboBox);
-    procedure SaveComboBoxSetting(AIni: TIniFile; AComboBox: TComboBox);
+    procedure LoadCheckBoxSetting(AIni: TCustomIniFile; ACheckBox: TCheckBox);
+    procedure SaveCheckBoxSetting(AIni: TCustomIniFile; ACheckBox: TCheckBox);
+    procedure LoadComboBoxSetting(AIni: TCustomIniFile; AComboBox: TComboBox);
+    procedure SaveComboBoxSetting(AIni: TCustomIniFile; AComboBox: TComboBox);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -145,13 +146,10 @@ begin
   if (WorkTableManager <> nil) and (Trim(WorkTableManager.IniFileName) <> '') then
     Exit(WorkTableManager.IniFileName);
 
-  Result := TPath.Combine(
-    TPath.Combine(IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))), 'Settings'),
-    'TableSettings.ini'
-  );
+  Result := GetProjectSettingsFileName;
 end;
 
-procedure TFrameProtocol.LoadCheckBoxSetting(AIni: TIniFile; ACheckBox: TCheckBox);
+procedure TFrameProtocol.LoadCheckBoxSetting(AIni: TCustomIniFile; ACheckBox: TCheckBox);
 begin
   if (AIni = nil) or (ACheckBox = nil) or (ACheckBox.Name = '') then
     Exit;
@@ -159,7 +157,7 @@ begin
   ACheckBox.IsChecked := AIni.ReadBool('Protocol', ACheckBox.Name, True);
 end;
 
-procedure TFrameProtocol.SaveCheckBoxSetting(AIni: TIniFile; ACheckBox: TCheckBox);
+procedure TFrameProtocol.SaveCheckBoxSetting(AIni: TCustomIniFile; ACheckBox: TCheckBox);
 begin
   if (AIni = nil) or (ACheckBox = nil) or (ACheckBox.Name = '') then
     Exit;
@@ -167,7 +165,7 @@ begin
   AIni.WriteBool('Protocol', ACheckBox.Name, ACheckBox.IsChecked);
 end;
 
-procedure TFrameProtocol.LoadComboBoxSetting(AIni: TIniFile; AComboBox: TComboBox);
+procedure TFrameProtocol.LoadComboBoxSetting(AIni: TCustomIniFile; AComboBox: TComboBox);
 var
   Value: string;
   Index: Integer;
@@ -186,7 +184,7 @@ begin
     AComboBox.ItemIndex := 0;
 end;
 
-procedure TFrameProtocol.SaveComboBoxSetting(AIni: TIniFile; AComboBox: TComboBox);
+procedure TFrameProtocol.SaveComboBoxSetting(AIni: TCustomIniFile; AComboBox: TComboBox);
 begin
   if (AIni = nil) or (AComboBox = nil) or (AComboBox.Name = '') or
      (AComboBox.ItemIndex < 0) then
@@ -197,7 +195,7 @@ end;
 
 procedure TFrameProtocol.LoadProtocolSettings;
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   I: Integer;
   FileName: string;
 begin
@@ -205,9 +203,8 @@ begin
   if Trim(FileName) = '' then
     Exit;
 
-  ForceDirectories(ExtractFilePath(FileName));
   FLoadingSettings := True;
-  Ini := TIniFile.Create(FileName);
+  Ini := TProjectSettingsIni.Create(FileName, STORAGE_TABLE_SETTINGS);
   try
     LoadCheckBoxSetting(Ini, CheckBoxEvent);
     LoadCheckBoxSetting(Ini, CheckBoxState);
@@ -234,7 +231,7 @@ end;
 
 procedure TFrameProtocol.SaveProtocolSettings;
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   I: Integer;
   FileName: string;
 begin
@@ -242,8 +239,7 @@ begin
   if Trim(FileName) = '' then
     Exit;
 
-  ForceDirectories(ExtractFilePath(FileName));
-  Ini := TIniFile.Create(FileName);
+  Ini := TProjectSettingsIni.Create(FileName, STORAGE_TABLE_SETTINGS);
   try
     SaveCheckBoxSetting(Ini, CheckBoxEvent);
     SaveCheckBoxSetting(Ini, CheckBoxState);

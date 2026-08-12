@@ -3010,7 +3010,7 @@ begin
     FModified := FTestDataModified;
     LoadSettingsToControls;
     if FMeterValue.IsToSave then
-      TMeterValue.SaveToFile(0);
+      TMeterValue.SaveToStorage;
     if ARefreshChartOnly then
       UpdateStabilityChart
     else if ARecalculate then
@@ -3132,7 +3132,7 @@ begin
   if Sender = CheckBoxIsToSave then
   begin
     FMeterValue.SetToSave(CheckBoxIsToSave.IsChecked);
-    TMeterValue.SaveToFile(0);
+    TMeterValue.SaveToStorage;
     Exit;
   end;
 
@@ -3173,7 +3173,7 @@ begin
       FLoading := False;
     end;
     AnalyzeIfNeeded;
-    TMeterValue.SaveToFile(0);
+    TMeterValue.SaveToStorage;
   end;
 end;
 
@@ -3417,7 +3417,7 @@ begin
   FMeterValue.ShowTrailingZeros := CheckBoxShowTrailingZeros.IsChecked;
   FMeterValue.CoefK := SafeFloat(EditCoefK.Text);
   FMeterValue.CoefP := SafeFloat(EditCoefP.Text);
-  TMeterValue.SaveToFile(0);
+  TMeterValue.SaveToStorage;
 end;
 
 end.

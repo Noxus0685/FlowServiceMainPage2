@@ -19,6 +19,7 @@ uses
   uBaseProcedures,
   uClasses,
   uDeviceClass,
+  uProjectSettings,
   uRepositories,
   uTable_DATA;
 
@@ -167,7 +168,7 @@ begin
   inherited Create;
 
   {--------------------------------------------------}
-  { Имя ini-файла }
+  { Имя SQLite-файла настроек }
   {--------------------------------------------------}
   FIniFileName := AIniFileName;
 
@@ -545,7 +546,11 @@ var
   BaseDir: string;
   TargetDir: string;
 begin
-  BaseDir := IncludeTrailingPathDelimiter(ExtractFilePath(FIniFileName));
+  // Файлы репозиториев остаются в прежних Settings\Types и Settings\Devices;
+  // в setting.fpp переносится только их конфигурация.
+  BaseDir := IncludeTrailingPathDelimiter(
+    TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings')
+  );
 
   case AKind of
     rkType:
@@ -582,14 +587,14 @@ end;
 
 procedure TManagerTTableDM.Save;
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   Repo: TBaseRepository;
   Section: string;
 begin
   if FIniFileName = '' then
     Exit;
 
-  Ini := TIniFile.Create(FIniFileName);
+  Ini := TProjectSettingsIni.Create(FIniFileName, STORAGE_DB_SETTINGS);
   try
     {==================================================}
     { 1. СОХРАНЕНИЕ РЕПОЗИТОРИЕВ }
@@ -616,7 +621,7 @@ begin
     end;
 
     {==================================================}
-    { 2. ПЕРЕЗАПИСЬ INI-ФАЙЛА }
+    { 2. ПЕРЕЗАПИСЬ ХРАНИЛИЩА РЕПОЗИТОРИЕВ }
     {==================================================}
 
     Ini.EraseSection('Repositories');
@@ -682,7 +687,7 @@ procedure TManagerTTableDM.BuildRepositories(
   AKind: TRepositoryKind
 );
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   Names: TStringList;
   I: Integer;
 
@@ -701,13 +706,7 @@ var
 
   ActiveKey: string;
 begin
-  {--------------------------------------------------}
-  { Гарантируем наличие ini-файла }
-  {--------------------------------------------------}
-  if not FileExists(FIniFileName) then
-    TIniFile.Create(FIniFileName).Free;
-
-  Ini   := TIniFile.Create(FIniFileName);
+  Ini   := TProjectSettingsIni.Create(FIniFileName, STORAGE_DB_SETTINGS);
   Names := TStringList.Create;
   try
     {--------------------------------------------------}
@@ -958,7 +957,7 @@ procedure TManagerTTableDM.AddRepository(
   const ADbFile: string
 );
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   DM: TTableDM;
   Repo: TBaseRepository;
   RepoName: string;
@@ -986,7 +985,7 @@ begin
   {--------------------------------------------------}
   { 1. Сохраняем настройки в ini }
   {--------------------------------------------------}
-  Ini := TIniFile.Create(FIniFileName);
+  Ini := TProjectSettingsIni.Create(FIniFileName, STORAGE_DB_SETTINGS);
   try
     Ini.WriteString('Repositories', RepoName, DbFile);
     Ini.WriteString('Repository.' + RepoName, 'Kind', KindStr);
@@ -1047,7 +1046,7 @@ end;
 
 procedure TManagerTTableDM.RemoveRepository(const AName: string);
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   Obj: TObject;
   Repo: TBaseRepository;
   DM: TTableDM;
@@ -1115,9 +1114,9 @@ begin
     FActiveDeviceRepo := FDeviceRepositories[0];
 
   {--------------------------------------------------}
-  { 5. Обновляем INI }
+  { 5. Обновляем хранилище }
   {--------------------------------------------------}
-  Ini := TIniFile.Create(FIniFileName);
+  Ini := TProjectSettingsIni.Create(FIniFileName, STORAGE_DB_SETTINGS);
   try
     Ini.DeleteKey('Repositories', AName);
     Ini.EraseSection('Repository.' + AName);
@@ -1216,7 +1215,7 @@ end;
 procedure TManagerTTableDM.SetActiveTypeRepository(const AName: string);
 var
   Repo: TObject;
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
 begin
   // --------------------------------------------------
   // Проверка наличия
@@ -1239,9 +1238,9 @@ begin
   FActiveTypeRepo := TTypeRepository(Repo);
 
   // --------------------------------------------------
-  // Сохраняем в ini
+  // Сохраняем в проектное хранилище
   // --------------------------------------------------
-  Ini := TIniFile.Create(FIniFileName);
+  Ini := TProjectSettingsIni.Create(FIniFileName, STORAGE_DB_SETTINGS);
   try
     Ini.WriteString('Active', 'TypeRepository', AName);
     Ini.UpdateFile;
