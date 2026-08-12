@@ -3,6 +3,7 @@
 interface
 
 uses
+  FmxHelper,
   FMX.ComboEdit,
   FMX.Controls,
   FMX.Controls.Presentation,
@@ -41,12 +42,8 @@ uses
   uClasses,
   uDataManager,
   uDeviceClass,
-  uGridLayoutManager,
   uRepositories,
   uProtocols,
-  uGridStabilityController,
-  uGridStabilityRegistry;
-
 type
   TFormDeviceEditor = class(TForm)
     layLeft: TLayout;
@@ -362,8 +359,6 @@ type
      FClipboardPoint: TDevicePoint;
      FPointSortColumn: Integer;
      FPointSortAscending: Boolean;
-     FGridPointsStability: TGridStabilityController;
-     FGridPointsLayoutState: TGridLayoutState;
 
      function ResolveDeviceType(out ARepo: TTypeRepository): TDeviceType;
      procedure ApplyMassMode;
@@ -406,7 +401,6 @@ type
      procedure SortPoints;
      procedure CreateGridPointsHeaderMenu;
      { Registers DeviceEdit point columns for persistent manual width control. }
-     procedure RegisterGridPointsWidthControl;
 
      procedure InitCoefsTab;
      procedure UpdateCoefTablesCombo;
@@ -428,7 +422,6 @@ type
      procedure  UpdateComboEditDN;
 
   protected
-    procedure DoShow; override;
   public
     { Public declarations }
      procedure LoadDevice(ADevice: TDevice);
@@ -1207,7 +1200,6 @@ end;
 procedure TFormDeviceEditor.FormClose(Sender: TObject;
   var Action: TCloseAction);
 begin
-      FreeAndNil(FGridPointsLayoutState);
       FreeAndNil(FDevice);      // уничтожаем клон
       FreeAndNil(FLoadedDeviceSnapshot);
       FreeAndNil(FClipboardPoint);
@@ -1617,8 +1609,6 @@ begin
   NewCol('StringColumnCoefQTo', 'QTo', 90);
   NewCol('StringColumnCoefK', 'K', 90);
   NewCol('StringColumnCoefB', 'b', 90);
-  RegisterStableGrid(Self, FGridCoefs, Name);
-
   FTabControlMain.ActiveTab := FTabItemDevice;
   FCoefsTabInitialized := True;
 end;
@@ -1754,9 +1744,10 @@ begin
   Table := GetSelectedCalibrCoefTable;
 
   if Table <> nil then
-    TGridLayoutManager.SetRowCount(FGridCoefs, Table.Items.Count)
+    RefreshGridRowCount(FGridCoefs, Table.Items.Count, 'device-coefs')
   else
-    TGridLayoutManager.SetRowCount(FGridCoefs, 0);
+    RefreshGridRowCount(FGridCoefs, 0, 'device-coefs');
+    RefreshGridValues(FGridCoefs, 'device-coefs');
 end;
 
 function TFormDeviceEditor.GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;
@@ -2084,24 +2075,11 @@ begin
   FPopupMenuGridPointsHeader.Popup(P.X, P.Y);
 end;
 
-procedure TFormDeviceEditor.RegisterGridPointsWidthControl;
-begin
-  if FGridPointsLayoutState = nil then
-    FGridPointsLayoutState := TGridLayoutState.Create;
-  FGridPointsLayoutState.ConfigureWidthControl(GridPoints,
-    ClassName + '.' + GridPoints.Name);
-  FGridPointsLayoutState.RegisterExistingColumns;
-end;
-
 procedure TFormDeviceEditor.LoadDevice(ADevice: TDevice);
 var
   FoundType: TDeviceType;
   FoundRepo: TTypeRepository;
 begin
-  if FGridPointsStability = nil then
-    FGridPointsStability := RegisterStableGrid(Self, GridPoints, Name, False);
-  FGridPointsStability.Snapshot('after-fmx-load');
-  RegisterGridPointsWidthControl;
   InitCoefsTab;
   OnKeyDown := FormKeyDown;
   GridPoints.OnKeyDown := GridPointsKeyDown;
@@ -4311,19 +4289,10 @@ begin
   ceCategory.Hint := TextValue;
 end;
 
-procedure TFormDeviceEditor.DoShow;
-begin
-  inherited;
-  if FGridPointsStability <> nil then
-    FGridPointsStability.Snapshot('after-show');
-end;
-
 procedure TFormDeviceEditor.UpdatePointsGrid;
 var
   i, VisibleCount: Integer;
 begin
-  if FGridPointsStability <> nil then
-    FGridPointsStability.Snapshot('before-UpdatePointsGrid');
   if FDevice = nil then
     Exit;
 
@@ -4335,7 +4304,8 @@ begin
     if FDevice.Points[i].State <> osDeleted then
       Inc(VisibleCount);
 
-  TGridLayoutManager.SetRowCount(GridPoints, VisibleCount);
+  RefreshGridRowCount(GridPoints, VisibleCount, 'device-points');
+  RefreshGridValues(GridPoints, 'device-points');
 
   { корректировка текущей строки }
   if GridPoints.Row >= GridPoints.RowCount then
@@ -4344,18 +4314,6 @@ begin
   if GridPoints.RowCount = 0 then
     GridPoints.Row := -1;
 
-  if FGridPointsStability <> nil then
-    FGridPointsStability.Snapshot('after-EndUpdate');
-  if FGridPointsStability <> nil then
-  begin
-    FGridPointsStability.Snapshot('after-UpdatePointsGrid');
-    TThread.Queue(nil,
-      procedure
-      begin
-        if FGridPointsStability <> nil then
-          FGridPointsStability.Snapshot('after-deferred-layout');
-      end);
-  end;
 end;
 
 procedure TFormDeviceEditor.SortPoints;

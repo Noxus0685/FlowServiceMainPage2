@@ -9,6 +9,7 @@ uses  System.SysUtils,
       System.Zip,
       FMX.Forms,
       FMX.Controls,
+      FMX.Grid,
       FMX.Types,
       System.Hash,
       System.Classes,
@@ -77,13 +78,13 @@ type
   pDWORD=^DWORD;
 {$ENDIF}
 
-  // Вспомогательный тип - точка в калибровочной таблице расходомера.
+  // Г‚Г±ГЇГ®Г¬Г®ГЈГ ГІГҐГ«ГјГ­Г»Г© ГІГЁГЇ - ГІГ®Г·ГЄГ  Гў ГЄГ Г«ГЁГЎГ°Г®ГўГ®Г·Г­Г®Г© ГІГ ГЎГ«ГЁГ¶ГҐ Г°Г Г±ГµГ®Г¤Г®Г¬ГҐГ°Г .
   TCalibrationPoint = record
 
-    // Расход в м3/ч, выдаваемый расходомером с учетом веса импульса.
+    // ГђГ Г±ГµГ®Г¤ Гў Г¬3/Г·, ГўГ»Г¤Г ГўГ ГҐГ¬Г»Г© Г°Г Г±ГµГ®Г¤Г®Г¬ГҐГ°Г®Г¬ Г± ГіГ·ГҐГІГ®Г¬ ГўГҐГ±Г  ГЁГ¬ГЇГіГ«ГјГ±Г .
     WaterDischarge: Double;
 
-    // Поправочный коэффициент для данной частоты.
+    // ГЏГ®ГЇГ°Г ГўГ®Г·Г­Г»Г© ГЄГ®ГЅГґГґГЁГ¶ГЁГҐГ­ГІ Г¤Г«Гї Г¤Г Г­Г­Г®Г© Г·Г Г±ГІГ®ГІГ».
     Coefficient: Double;
 
   end;
@@ -152,13 +153,19 @@ function AppLogName:String;
 function RenameFileWithLastWriteTime(const AFileName: string;out ANewName: string; const ADateTimeFormat: string = 'yyyymmdd"_"hhnnss'): Boolean;
 function RenameFileWithCreationTime(const AFileName: string; out ANewName: string; const ADateTimeFormat: string = 'yyyymmdd"_"hhnnss'): Boolean;
 procedure PackLogs(_LogsDir:String; _LogsExt:String='.log'; _LogsZipName:String='');
-// 1. Получить MD5 самой программы (исполняемого файла)
+// Changes only the number of grid rows when the requested count differs.
+procedure RefreshGridRowCount(AGrid: TCustomGrid; const ARowCount: Integer;
+  const AReason: string = 'row-count');
+// Repaints existing cells so FMX requests their current OnGetValue values.
+procedure RefreshGridValues(AGrid: TCustomGrid;
+  const AReason: string = 'data-update');
+// 1. ГЏГ®Г«ГіГ·ГЁГІГј MD5 Г±Г Г¬Г®Г© ГЇГ°Г®ГЈГ°Г Г¬Г¬Г» (ГЁГ±ГЇГ®Г«Г­ГїГҐГ¬Г®ГЈГ® ГґГ Г©Г«Г )
 function GetMyMD5: string;
-// 2. Получить MD5 любого файла на диске
+// 2. ГЏГ®Г«ГіГ·ГЁГІГј MD5 Г«ГѕГЎГ®ГЈГ® ГґГ Г©Г«Г  Г­Г  Г¤ГЁГ±ГЄГҐ
 function GetFileMD5(const AFileName: string): string;
-// 3. Получить MD5 строки (например, пароля)
+// 3. ГЏГ®Г«ГіГ·ГЁГІГј MD5 Г±ГІГ°Г®ГЄГЁ (Г­Г ГЇГ°ГЁГ¬ГҐГ°, ГЇГ Г°Г®Г«Гї)
 function GetStringMD5(const AString: string): string;
-// 4. Получить MD5 данных из потока (TStream)
+// 4. ГЏГ®Г«ГіГ·ГЁГІГј MD5 Г¤Г Г­Г­Г»Гµ ГЁГ§ ГЇГ®ГІГ®ГЄГ  (TStream)
 function GetStreamMD5(AStream: TStream): string;
 
 
@@ -210,16 +217,49 @@ uses
   System.DateUtils,
   System.SyncObjs;
 
+procedure RefreshGridRowCount(AGrid: TCustomGrid; const ARowCount: Integer;
+  const AReason: string);
+var
+  OldRowCount: Integer;
+begin
+  { Changes row structure once and leaves all grid and column properties intact. }
+  if not Assigned(AGrid) then
+    Exit;
+  OldRowCount := AGrid.RowCount;
+  if OldRowCount = ARowCount then
+    Exit;
+  AGrid.BeginUpdate;
+  try
+    AGrid.RowCount := ARowCount;
+  finally
+    AGrid.EndUpdate;
+  end;
+  AGrid.Repaint;
+  OutputDebugMessage(Format('GridStructuralRefresh Grid="%s" Reason="%s" Rows=%d->%d OldSignature="" NewSignature="" IndexChanged=0 VisibleChanged=0 ContentChanged=False',
+    [AGrid.Name, AReason, OldRowCount, ARowCount]));
+end;
+
+procedure RefreshGridValues(AGrid: TCustomGrid; const AReason: string);
+begin
+  { RAD Studio 12 has no public value-only model notification; Repaint is the
+    narrow public path that redraws existing cells and invokes OnGetValue. }
+  if not Assigned(AGrid) then
+    Exit;
+  AGrid.Repaint;
+  OutputDebugMessage(Format('GridValuesRefresh Grid="%s" Reason="%s" ContentChanged=False',
+    [AGrid.Name, AReason]));
+end;
+
 var
   LogCriticalSection: TCriticalSection;
 
 const
-  PICCHAR:array[$C0..$FF] of cHAR=( 'А','Б','В','Г','Д','Е','Ж','З','И',
-  'Й','К',  'Л','М','Н','О','П','Р','С','Т','У','Ф',
-  'Х','Ц','Ч','Ш','Щ','Ъ','Ы','Ь','Э','Ю','Я',
-  'а','б','в','г','д','е','ж','з','и','й','к','л','м',
-  'н','о','п','р','с','т','у','ф','х','ц','ч','ш','щ',
-  'ъ','ы','ь','э','ю','я'
+  PICCHAR:array[$C0..$FF] of cHAR=( 'ГЂ','ГЃ','Г‚','Гѓ','Г„','Г…','Г†','Г‡','Г€',
+  'Г‰','ГЉ',  'Г‹','ГЊ','ГЌ','ГЋ','ГЏ','Гђ','Г‘','Г’','Г“','Г”',
+  'Г•','Г–','Г—','Г','Г™','Гљ','Г›','Гњ','Гќ','Гћ','Гџ',
+  'Г ','ГЎ','Гў','ГЈ','Г¤','ГҐ','Г¦','Г§','ГЁ','Г©','ГЄ','Г«','Г¬',
+  'Г­','Г®','ГЇ','Г°','Г±','ГІ','Гі','Гґ','Гµ','Г¶','Г·','Гё','Г№',
+  'Гє','Г»','Гј','ГЅ','Гѕ','Гї'
   );
 
 CRCtable:  ARRAY[0..255] OF LongWord =
@@ -325,7 +365,7 @@ crctab: array[0..255] OF word = (
 {$IFDEF LINUX}
 procedure  OutputDebugString(Msg:PChar);
 begin
-  //Пока игнорируем
+  //ГЏГ®ГЄГ  ГЁГЈГ­Г®Г°ГЁГ°ГіГҐГ¬
 end;
 {$ENDIF}
 
@@ -446,21 +486,21 @@ const tables: array[0..255] of WORD=(
             $4400, $84C1, $8581, $4540, $8701, $47C0, $4680, $8641,
             $8201, $42C0, $4380, $8341, $4100, $81C1, $8081, $4040);
 
-  WinR: Array[0..66] of Char = ('а', 'б', 'в', 'г', 'д', 'е', 'ё', 'ж', 'з', 'и',
-    'й', 'к', 'л', 'м', 'н', 'о', 'п', 'р', 'с', 'т',
-    'у', 'ф', 'х', 'ц', 'ч', 'ш', 'щ', 'ъ', 'ы', 'ь',
-    'э', 'ю', 'я', 'А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё',                                                                /// с этой проблемой не знал как
-    'Ж', 'З', 'И', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П',                                                               //как разобраться с кодировкой были
-    'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ',                                                           // проблемы и с помощью этого решил
-    'Ъ', 'Ы', 'Ь', 'Э', 'Ю', 'Я', '№');
-  KoiR: Array[0..66] of Char = ('Б', 'В', 'Ч', 'З', 'Д', 'Е', 'Ј', 'Ц', 'Ъ', 'Й',
-    'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'Т', 'У', 'Ф',
-    'Х', 'Ж', 'И', 'Г' ,'Ю', 'Ы', 'Э', 'Я', 'Щ', 'Ш',
-    'Ь', 'А', 'С', 'б', 'в', 'ч', 'з', 'д', 'е', 'і',
-    'ц', 'ъ', 'й', 'к', 'л', 'м', 'н', 'о', 'п', 'р',
-    'т', 'у', 'ф', 'х', 'ж', 'и', 'г', 'ю', 'ы', 'э',
-    'я', 'щ', 'ш', 'ь', 'а', 'с', '?');
-//Из Cyrillic Windows-1251 в Cyrillic (KOI8-R)
+  WinR: Array[0..66] of Char = ('Г ', 'ГЎ', 'Гў', 'ГЈ', 'Г¤', 'ГҐ', 'Вё', 'Г¦', 'Г§', 'ГЁ',
+    'Г©', 'ГЄ', 'Г«', 'Г¬', 'Г­', 'Г®', 'ГЇ', 'Г°', 'Г±', 'ГІ',
+    'Гі', 'Гґ', 'Гµ', 'Г¶', 'Г·', 'Гё', 'Г№', 'Гє', 'Г»', 'Гј',
+    'ГЅ', 'Гѕ', 'Гї', 'ГЂ', 'ГЃ', 'Г‚', 'Гѓ', 'Г„', 'Г…', 'ВЁ',                                                                /// Г± ГЅГІГ®Г© ГЇГ°Г®ГЎГ«ГҐГ¬Г®Г© Г­ГҐ Г§Г­Г Г« ГЄГ ГЄ
+    'Г†', 'Г‡', 'Г€', 'Г‰', 'ГЉ', 'Г‹', 'ГЊ', 'ГЌ', 'ГЋ', 'ГЏ',                                                               //ГЄГ ГЄ Г°Г Г§Г®ГЎГ°Г ГІГјГ±Гї Г± ГЄГ®Г¤ГЁГ°Г®ГўГЄГ®Г© ГЎГ»Г«ГЁ
+    'Гђ', 'Г‘', 'Г’', 'Г“', 'Г”', 'Г•', 'Г–', 'Г—', 'Г', 'Г™',                                                           // ГЇГ°Г®ГЎГ«ГҐГ¬Г» ГЁ Г± ГЇГ®Г¬Г®Г№ГјГѕ ГЅГІГ®ГЈГ® Г°ГҐГёГЁГ«
+    'Гљ', 'Г›', 'Гњ', 'Гќ', 'Гћ', 'Гџ', 'В№');
+  KoiR: Array[0..66] of Char = ('ГЃ', 'Г‚', 'Г—', 'Г‡', 'Г„', 'Г…', 'ВЈ', 'Г–', 'Гљ', 'Г‰',
+    'ГЉ', 'Г‹', 'ГЊ', 'ГЌ', 'ГЋ', 'ГЏ', 'Гђ', 'Г’', 'Г“', 'Г”',
+    'Г•', 'Г†', 'Г€', 'Гѓ' ,'Гћ', 'Г›', 'Гќ', 'Гџ', 'Г™', 'Г',
+    'Гњ', 'ГЂ', 'Г‘', 'ГЎ', 'Гў', 'Г·', 'Г§', 'Г¤', 'ГҐ', 'Ві',
+    'Г¶', 'Гє', 'Г©', 'ГЄ', 'Г«', 'Г¬', 'Г­', 'Г®', 'ГЇ', 'Г°',
+    'ГІ', 'Гі', 'Гґ', 'Гµ', 'Г¦', 'ГЁ', 'ГЈ', 'Гѕ', 'Г»', 'ГЅ',
+    'Гї', 'Г№', 'Гё', 'Гј', 'Г ', 'Г±', '?');
+//Г€Г§ Cyrillic Windows-1251 Гў Cyrillic (KOI8-R)
 function WinRToKoiR (aStr: String): String;
 var
   i, j, Index: Integer;
@@ -521,7 +561,7 @@ begin
   i:=0;j:=0;
   while (i<len) do
   begin
-    inc(i);//первый старший полубайт
+    inc(i);//ГЇГҐГ°ГўГ»Г© Г±ГІГ Г°ГёГЁГ© ГЇГ®Г«ГіГЎГ Г©ГІ
     b:=0;
     if aStr[i] in ['0'..'9','A'..'F'] then
     begin
@@ -531,7 +571,7 @@ begin
         b:=((ord(aStr[i])-ord('A'))+10) shl 4;
     end;
     if i<len then begin
-      inc(i);//второй младший полубайт
+      inc(i);//ГўГІГ®Г°Г®Г© Г¬Г«Г Г¤ГёГЁГ© ГЇГ®Г«ГіГЎГ Г©ГІ
       if aStr[i] in ['0'..'9','A'..'F'] then
       begin
         if (aStr[i] in ['0'..'9']) then
@@ -736,7 +776,7 @@ begin
 end;
 
 
-//Выбирает из сттроки цифры, разрешается ввод Hex
+//Г‚Г»ГЎГЁГ°Г ГҐГІ ГЁГ§ Г±ГІГІГ°Г®ГЄГЁ Г¶ГЁГґГ°Г», Г°Г Г§Г°ГҐГёГ ГҐГІГ±Гї ГўГўГ®Г¤ Hex
 function S2IDef(const val:String;default_value:integer):integer;
 var i:integer;
     s,res:string;
@@ -744,7 +784,7 @@ var i:integer;
 begin
      hex:=False;
      s:=UpperCase(Val);res:='';
-     //выбираем только цифры
+     //ГўГ»ГЎГЁГ°Г ГҐГ¬ ГІГ®Г«ГјГЄГ® Г¶ГЁГґГ°Г»
      for i:=1 to Length(s) do
      begin
        if s[i] in ['X','$'] then hex:=True;
@@ -758,13 +798,13 @@ begin
             res:=res+s[i];
      end;
      if hex then res:='$'+res;
-     //Сохраняем значение в Tag
+     //Г‘Г®ГµГ°Г Г­ГїГҐГ¬ Г§Г­Г Г·ГҐГ­ГЁГҐ Гў Tag
      if res<>'' then
        result:=StrToIntDef(res,default_value);
 end;
 
 
-//пузырьковая сортировка
+//ГЇГіГ§Г»Г°ГјГЄГ®ГўГ Гї Г±Г®Г°ГІГЁГ°Г®ГўГЄГ 
 procedure SortCalibrationPointArray(var _array:array of TCalibrationPoint);
 var i,j:Integer;
     tmp:TCalibrationPoint;
@@ -775,7 +815,7 @@ begin
       begin
          if _array[j].WaterDischarge>_array[j+1].WaterDischarge then
          begin
-          //обмен элементов
+          //Г®ГЎГ¬ГҐГ­ ГЅГ«ГҐГ¬ГҐГ­ГІГ®Гў
           tmp:=_array[j];
           _array[j]:=_array[j+1];
           _array[j+1]:=tmp;
@@ -939,7 +979,7 @@ function FontToStr(font: TFont): string;
   end;
 begin
 
-  {кодируем все атрибуты TFont в строку}
+  {ГЄГ®Г¤ГЁГ°ГіГҐГ¬ ГўГ±ГҐ Г ГІГ°ГЁГЎГіГІГ» TFont Гў Г±ГІГ°Г®ГЄГі}
   Result := '';
   Result := Result + font.Family + '|';
   Result := Result + FloatToStr(font.Size) + '|';
@@ -985,7 +1025,7 @@ begin
       font.Style := font.Style + [TFontStyle.fsStrikeout];
   end
   else begin
-    //для старого варианта
+    //Г¤Г«Гї Г±ГІГ Г°Г®ГЈГ® ГўГ Г°ГЁГ Г­ГІГ 
     font.Size := Size;
   end;
 end;
@@ -1029,13 +1069,13 @@ end;
 
 function CalculateAngle(CurrentValue, MinValue, MaxValue: Double; MaxAngle:Double=270): Double;
 begin
-  // Проверяем, что текущее значение находится в пределах от минимального до максимального значения
+  // ГЏГ°Г®ГўГҐГ°ГїГҐГ¬, Г·ГІГ® ГІГҐГЄГіГ№ГҐГҐ Г§Г­Г Г·ГҐГ­ГЁГҐ Г­Г ГµГ®Г¤ГЁГІГ±Гї Гў ГЇГ°ГҐГ¤ГҐГ«Г Гµ Г®ГІ Г¬ГЁГ­ГЁГ¬Г Г«ГјГ­Г®ГЈГ® Г¤Г® Г¬Г ГЄГ±ГЁГ¬Г Г«ГјГ­Г®ГЈГ® Г§Г­Г Г·ГҐГ­ГЁГї
   if CurrentValue < MinValue then
     CurrentValue := MinValue
   else if CurrentValue > MaxValue then
     CurrentValue := MaxValue;
 
-  // Рассчитываем угол поворота
+  // ГђГ Г±Г±Г·ГЁГІГ»ГўГ ГҐГ¬ ГіГЈГ®Г« ГЇГ®ГўГ®Г°Г®ГІГ 
   Result := (CurrentValue - MinValue) / (MaxValue - MinValue) * MaxAngle;
 end;
 
@@ -1045,13 +1085,13 @@ begin
 end;
 
 (*
-вы можете использовать $ 00BBGGRR
+ГўГ» Г¬Г®Г¦ГҐГІГҐ ГЁГ±ГЇГ®Г«ГјГ§Г®ГўГ ГІГј $ 00BBGGRR
 
-BB = Синий
-GG = Зеленый
-RR = Красный
+BB = Г‘ГЁГ­ГЁГ©
+GG = Г‡ГҐГ«ГҐГ­Г»Г©
+RR = ГЉГ°Г Г±Г­Г»Г©
 
-Все эти значения могут быть от 0 до 255 ($ 00 и $ FF)
+Г‚Г±ГҐ ГЅГІГЁ Г§Г­Г Г·ГҐГ­ГЁГї Г¬Г®ГЈГіГІ ГЎГ»ГІГј Г®ГІ 0 Г¤Г® 255 ($ 00 ГЁ $ FF)
 *)
 function ColorToAlphaColor(aColor:TColor):TAlphaColor;
 var rgbcolor:LongWord;
@@ -1145,7 +1185,7 @@ end;
 procedure OutputDebugMessage(const Msg: string);
 begin
 {$IFDEF LINUX}
-  WriteLn(Msg); // Или используйте другой метод по вашему выбору
+  WriteLn(Msg); // Г€Г«ГЁ ГЁГ±ГЇГ®Г«ГјГ§ГіГ©ГІГҐ Г¤Г°ГіГЈГ®Г© Г¬ГҐГІГ®Г¤ ГЇГ® ГўГ ГёГҐГ¬Гі ГўГ»ГЎГ®Г°Гі
 {$ELSE}
   OutputDebugString(PChar(Msg));
 {$ENDIF}
@@ -1236,13 +1276,13 @@ var
   AdminSID: PSID;
   IsAdmin: BOOL;
 begin
-  // Открыть текущий токен процесса
+  // ГЋГІГЄГ°Г»ГІГј ГІГҐГЄГіГ№ГЁГ© ГІГ®ГЄГҐГ­ ГЇГ°Г®Г¶ГҐГ±Г±Г 
   if OpenProcessToken(GetCurrentProcess, TOKEN_QUERY, hToken) then
   try
-    // Создать SID для группы администраторов
+    // Г‘Г®Г§Г¤Г ГІГј SID Г¤Г«Гї ГЈГ°ГіГЇГЇГ» Г Г¤Г¬ГЁГ­ГЁГ±ГІГ°Г ГІГ®Г°Г®Гў
     if AllocateAndInitializeSid(SECURITY_NT_AUTHORITY, 2, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, AdminSID) then
     try
-      // Проверить, является ли текущий пользователь членом группы администраторов
+      // ГЏГ°Г®ГўГҐГ°ГЁГІГј, ГїГўГ«ГїГҐГІГ±Гї Г«ГЁ ГІГҐГЄГіГ№ГЁГ© ГЇГ®Г«ГјГ§Г®ГўГ ГІГҐГ«Гј Г·Г«ГҐГ­Г®Г¬ ГЈГ°ГіГЇГЇГ» Г Г¤Г¬ГЁГ­ГЁГ±ГІГ°Г ГІГ®Г°Г®Гў
 {$IFDEF MSWINDOWS}
       if CheckTokenMembership(hToken, AdminSID, @IsAdmin) then
         Result := IsAdmin;
@@ -1405,7 +1445,7 @@ end;
 
 (*
 Screen.ActiveForm.Handle,
-        'Произошла ошибка при работе с устройством.', cTestModeCOM,
+        'ГЏГ°Г®ГЁГ§Г®ГёГ«Г  Г®ГёГЁГЎГЄГ  ГЇГ°ГЁ Г°Г ГЎГ®ГІГҐ Г± ГіГ±ГІГ°Г®Г©Г±ГІГўГ®Г¬.', cTestModeCOM,
         MB_OK or MB_ICONERROR
 *)
 procedure _MessageBox(AHandle:longint;AMessage:string;ADopMessage:string;AICON:Integer);
@@ -1458,7 +1498,7 @@ begin
       if (AMask and mask)=mask then
          result:=result+IntToStr(i)+',';
     end;
-    //затираем запятую
+    //Г§Г ГІГЁГ°Г ГҐГ¬ Г§Г ГЇГїГІГіГѕ
     if result<>'' then result[length(result)]:=' ';
 
 
@@ -1477,24 +1517,24 @@ end;
 //begin
 //  Result := False;
 //
-//  // Разбиваем строку на части, разделённые запятыми
+//  // ГђГ Г§ГЎГЁГўГ ГҐГ¬ Г±ГІГ°Г®ГЄГі Г­Г  Г·Г Г±ГІГЁ, Г°Г Г§Г¤ГҐГ«ВёГ­Г­Г»ГҐ Г§Г ГЇГїГІГ»Г¬ГЁ
 //  Ranges := SplitString(RangeStr, ',');
 //
 //  for i := 0 to High(Ranges) do
 //  begin
 //    Range := Trim(Ranges[i]);
 //
-//    // Проверяем, содержит ли часть диапазон
+//    // ГЏГ°Г®ГўГҐГ°ГїГҐГ¬, Г±Г®Г¤ГҐГ°Г¦ГЁГІ Г«ГЁ Г·Г Г±ГІГј Г¤ГЁГ ГЇГ Г§Г®Г­
 //    if Pos('..', Range) > 0 then
 //    begin
-//      // Разбиваем диапазон на начальное и конечное значения
+//      // ГђГ Г§ГЎГЁГўГ ГҐГ¬ Г¤ГЁГ ГЇГ Г§Г®Г­ Г­Г  Г­Г Г·Г Г«ГјГ­Г®ГҐ ГЁ ГЄГ®Г­ГҐГ·Г­Г®ГҐ Г§Г­Г Г·ГҐГ­ГЁГї
 //      Parts := SplitString(Range, '..');
 //      if Length(Parts) = 2 then
 //      begin
 //        StartRange := StrToIntDef(Trim(Parts[0]), 0);
 //        EndRange := StrToIntDef(Trim(Parts[1]), 0);
 //
-//        // Проверяем, входит ли значение в диапазон
+//        // ГЏГ°Г®ГўГҐГ°ГїГҐГ¬, ГўГµГ®Г¤ГЁГІ Г«ГЁ Г§Г­Г Г·ГҐГ­ГЁГҐ Гў Г¤ГЁГ ГЇГ Г§Г®Г­
 //        if (Value >= StartRange) and (Value <= EndRange) then
 //        begin
 //          Result := True;
@@ -1504,7 +1544,7 @@ end;
 //    end
 //    else
 //    begin
-//      // Проверяем отдельное значение
+//      // ГЏГ°Г®ГўГҐГ°ГїГҐГ¬ Г®ГІГ¤ГҐГ«ГјГ­Г®ГҐ Г§Г­Г Г·ГҐГ­ГЁГҐ
 //      if Value = StrToIntDef(Range, -1) then
 //      begin
 //        Result := True;
@@ -1525,24 +1565,24 @@ var
 begin
   Result := False;
 
-  // Разбиваем строку на части, разделённые запятыми
+  // ГђГ Г§ГЎГЁГўГ ГҐГ¬ Г±ГІГ°Г®ГЄГі Г­Г  Г·Г Г±ГІГЁ, Г°Г Г§Г¤ГҐГ«ВёГ­Г­Г»ГҐ Г§Г ГЇГїГІГ»Г¬ГЁ
   Ranges := SplitString(RangeStr, ',');
 
   for i := 0 to High(Ranges) do
   begin
     Range := Trim(Ranges[i]);
 
-    // Проверяем, содержит ли часть диапазон
+    // ГЏГ°Г®ГўГҐГ°ГїГҐГ¬, Г±Г®Г¤ГҐГ°Г¦ГЁГІ Г«ГЁ Г·Г Г±ГІГј Г¤ГЁГ ГЇГ Г§Г®Г­
     if Pos('..', Range) > 0 then
     begin
-      // Разбиваем диапазон на начальное и конечное значения
+      // ГђГ Г§ГЎГЁГўГ ГҐГ¬ Г¤ГЁГ ГЇГ Г§Г®Г­ Г­Г  Г­Г Г·Г Г«ГјГ­Г®ГҐ ГЁ ГЄГ®Г­ГҐГ·Г­Г®ГҐ Г§Г­Г Г·ГҐГ­ГЁГї
       Parts := SplitString(Range, '..');
       if Length(Parts) = 3 then
       begin
         StartRange := StrToIntDef(Trim(Parts[0]), 0);
         EndRange := StrToIntDef(Trim(Parts[2]), 0);
 
-        // Проверяем, входит ли значение в диапазон
+        // ГЏГ°Г®ГўГҐГ°ГїГҐГ¬, ГўГµГ®Г¤ГЁГІ Г«ГЁ Г§Г­Г Г·ГҐГ­ГЁГҐ Гў Г¤ГЁГ ГЇГ Г§Г®Г­
         if (Value >= StartRange) and (Value <= EndRange) then
         begin
           Result := True;
@@ -1552,7 +1592,7 @@ begin
     end
     else
     begin
-      // Проверяем отдельное значение
+      // ГЏГ°Г®ГўГҐГ°ГїГҐГ¬ Г®ГІГ¤ГҐГ«ГјГ­Г®ГҐ Г§Г­Г Г·ГҐГ­ГЁГҐ
       if Value = StrToIntDef(Range, -1) then
       begin
         Result := True;
@@ -1575,24 +1615,24 @@ begin
   Elements := TList<Integer>.Create;
 
   try
-    // Разбиваем строку на части, разделённые запятыми
+    // ГђГ Г§ГЎГЁГўГ ГҐГ¬ Г±ГІГ°Г®ГЄГі Г­Г  Г·Г Г±ГІГЁ, Г°Г Г§Г¤ГҐГ«ВёГ­Г­Г»ГҐ Г§Г ГЇГїГІГ»Г¬ГЁ
     Ranges := SplitString(RangeStr, ',');
 
     for i := 0 to High(Ranges) do
     begin
       Range := Trim(Ranges[i]);
 
-      // Проверяем, содержит ли часть диапазон
+      // ГЏГ°Г®ГўГҐГ°ГїГҐГ¬, Г±Г®Г¤ГҐГ°Г¦ГЁГІ Г«ГЁ Г·Г Г±ГІГј Г¤ГЁГ ГЇГ Г§Г®Г­
       if Pos('..', Range) > 0 then
       begin
-        // Разбиваем диапазон на начальное и конечное значения
+        // ГђГ Г§ГЎГЁГўГ ГҐГ¬ Г¤ГЁГ ГЇГ Г§Г®Г­ Г­Г  Г­Г Г·Г Г«ГјГ­Г®ГҐ ГЁ ГЄГ®Г­ГҐГ·Г­Г®ГҐ Г§Г­Г Г·ГҐГ­ГЁГї
         Parts := SplitString(Range, '..');
         if Length(Parts) = 3 then
         begin
           StartRange := StrToIntDef(Trim(Parts[0]), 0);
           EndRange := StrToIntDef(Trim(Parts[2]), 0);
 
-          // Добавляем все элементы диапазона в список
+          // Г„Г®ГЎГ ГўГ«ГїГҐГ¬ ГўГ±ГҐ ГЅГ«ГҐГ¬ГҐГ­ГІГ» Г¤ГЁГ ГЇГ Г§Г®Г­Г  Гў Г±ГЇГЁГ±Г®ГЄ
           for j := StartRange to EndRange do
           begin
             Elements.Add(j);
@@ -1601,12 +1641,12 @@ begin
       end
       else
       begin
-        // Добавляем отдельное значение в список
+        // Г„Г®ГЎГ ГўГ«ГїГҐГ¬ Г®ГІГ¤ГҐГ«ГјГ­Г®ГҐ Г§Г­Г Г·ГҐГ­ГЁГҐ Гў Г±ГЇГЁГ±Г®ГЄ
         Elements.Add(StrToIntDef(Range, 0));
       end;
     end;
 
-    // Проверяем, существует ли элемент с заданным индексом
+    // ГЏГ°Г®ГўГҐГ°ГїГҐГ¬, Г±ГіГ№ГҐГ±ГІГўГіГҐГІ Г«ГЁ ГЅГ«ГҐГ¬ГҐГ­ГІ Г± Г§Г Г¤Г Г­Г­Г»Г¬ ГЁГ­Г¤ГҐГЄГ±Г®Г¬
     if (Index >= 0) and (Index < Elements.Count) then
     begin
       Result := Elements[Index];
@@ -1618,15 +1658,15 @@ end;
 
 function TwosComplementToDecimal(hexValue: Word): Integer;
 begin
-  // Проверка знакового бита
+  // ГЏГ°Г®ГўГҐГ°ГЄГ  Г§Г­Г ГЄГ®ГўГ®ГЈГ® ГЎГЁГІГ 
   if (hexValue and $8000) <> 0 then
   begin
-    // Если число отрицательное, инвертируем все биты и прибавляем 1
+    // Г…Г±Г«ГЁ Г·ГЁГ±Г«Г® Г®ГІГ°ГЁГ¶Г ГІГҐГ«ГјГ­Г®ГҐ, ГЁГ­ГўГҐГ°ГІГЁГ°ГіГҐГ¬ ГўГ±ГҐ ГЎГЁГІГ» ГЁ ГЇГ°ГЁГЎГ ГўГ«ГїГҐГ¬ 1
     Result := -((not hexValue) + 1);
   end
   else
   begin
-    // Если число положительное, просто возвращаем его
+    // Г…Г±Г«ГЁ Г·ГЁГ±Г«Г® ГЇГ®Г«Г®Г¦ГЁГІГҐГ«ГјГ­Г®ГҐ, ГЇГ°Г®Г±ГІГ® ГўГ®Г§ГўГ°Г Г№Г ГҐГ¬ ГҐГЈГ®
     Result := hexValue;
   end;
 end;
@@ -1684,28 +1724,28 @@ begin
   end;
 end;
 
-// Вспомогательная функция для преобразования Word в два байта
+// Г‚Г±ГЇГ®Г¬Г®ГЈГ ГІГҐГ«ГјГ­Г Гї ГґГіГ­ГЄГ¶ГЁГї Г¤Г«Гї ГЇГ°ГҐГ®ГЎГ°Г Г§Г®ГўГ Г­ГЁГї Word Гў Г¤ГўГ  ГЎГ Г©ГІГ 
 function WordToBytes(Value: Word): ShortString;
 begin
 //  Result := AnsiChar(DecToHex(Value div 100))+AnsiChar(DecToHex(Value mod 100));
   Result := AnsiChar(Hi(Value)) + AnsiChar(Lo(Value));
 end;
 
-(* Пример использования
+(* ГЏГ°ГЁГ¬ГҐГ° ГЁГ±ГЇГ®Г«ГјГ§Г®ГўГ Г­ГЁГї
 var
   ResponseStr, Param: string;
 begin
   ResponseStr := '>-0000+015.81+015.87'#$D;
 
-  // Получить первый параметр
+  // ГЏГ®Г«ГіГ·ГЁГІГј ГЇГҐГ°ГўГ»Г© ГЇГ Г°Г Г¬ГҐГІГ°
   Param := ExtractParameter(ResponseStr, 1);
   // Param = '-0000'
 
-  // Получить второй параметр
+  // ГЏГ®Г«ГіГ·ГЁГІГј ГўГІГ®Г°Г®Г© ГЇГ Г°Г Г¬ГҐГІГ°
   Param := ExtractParameter(ResponseStr, 2);
   // Param = '+015.81'
 
-  // Получить третий параметр
+  // ГЏГ®Г«ГіГ·ГЁГІГј ГІГ°ГҐГІГЁГ© ГЇГ Г°Г Г¬ГҐГІГ°
   Param := ExtractParameter(ResponseStr, 3);
   // Param = '+015.87'
 end;
@@ -1719,22 +1759,22 @@ begin
   CurrentPos := 1;
   ParamCount := 0;
 
-  // Проверка валидности номера параметра
+  // ГЏГ°Г®ГўГҐГ°ГЄГ  ГўГ Г«ГЁГ¤Г­Г®Г±ГІГЁ Г­Г®Г¬ГҐГ°Г  ГЇГ Г°Г Г¬ГҐГІГ°Г 
   if (ParamNumber < 1) then
     Exit;
 
   for I := 1 to Length(ResponseString) do
   begin
-    // Ищем либо '+', либо '-'
+    // Г€Г№ГҐГ¬ Г«ГЁГЎГ® '+', Г«ГЁГЎГ® '-'
     if (ResponseString[I] = '+') or (ResponseString[I] = '-') then
     begin
       Inc(ParamCount);
       CurrentSign := ResponseString[I];
 
-      // Если нашли нужный параметр
+      // Г…Г±Г«ГЁ Г­Г ГёГ«ГЁ Г­ГіГ¦Г­Г»Г© ГЇГ Г°Г Г¬ГҐГІГ°
       if ParamCount = ParamNumber then
       begin
-        // Ищем конец параметра (следующий знак или конец строки)
+        // Г€Г№ГҐГ¬ ГЄГ®Г­ГҐГ¶ ГЇГ Г°Г Г¬ГҐГІГ°Г  (Г±Г«ГҐГ¤ГіГѕГ№ГЁГ© Г§Г­Г ГЄ ГЁГ«ГЁ ГЄГ®Г­ГҐГ¶ Г±ГІГ°Г®ГЄГЁ)
         CurrentPos := I + 1;
         while (CurrentPos <= Length(ResponseString)) and
               ((ResponseString[CurrentPos]  in ['0'..'9','.',','])) and
@@ -1744,7 +1784,7 @@ begin
           Inc(CurrentPos);
         end;
 
-        // Извлекаем параметр СО ЗНАКОМ
+        // Г€Г§ГўГ«ГҐГЄГ ГҐГ¬ ГЇГ Г°Г Г¬ГҐГІГ° Г‘ГЋ Г‡ГЌГЂГЉГЋГЊ
         Result := Copy(ResponseString, I, CurrentPos - I);
         Exit;
       end;
@@ -1763,12 +1803,12 @@ begin
 
   StringList := TStringList.Create;
   try
-    // Устанавливаем разделитель
+    // Г“Г±ГІГ Г­Г ГўГ«ГЁГўГ ГҐГ¬ Г°Г Г§Г¤ГҐГ«ГЁГІГҐГ«Гј
     StringList.Delimiter := StrDivider;
-    StringList.StrictDelimiter := True; // Игнорировать кавычки
+    StringList.StrictDelimiter := True; // Г€ГЈГ­Г®Г°ГЁГ°Г®ГўГ ГІГј ГЄГ ГўГ»Г·ГЄГЁ
     StringList.DelimitedText := S;
 
-    // Проверяем, существует ли параметр с таким номером
+    // ГЏГ°Г®ГўГҐГ°ГїГҐГ¬, Г±ГіГ№ГҐГ±ГІГўГіГҐГІ Г«ГЁ ГЇГ Г°Г Г¬ГҐГІГ° Г± ГІГ ГЄГЁГ¬ Г­Г®Г¬ГҐГ°Г®Г¬
     if ParamNum <= StringList.Count then
       Result := StringList[ParamNum - 1];
   finally
@@ -1797,7 +1837,7 @@ end;
 //var
 //  LogPath, LogDir, LogText, AppName: string;
 //begin
-//  // Получаем имя приложения
+//  // ГЏГ®Г«ГіГ·Г ГҐГ¬ ГЁГ¬Гї ГЇГ°ГЁГ«Г®Г¦ГҐГ­ГЁГї
 //  {$IFDEF FMX}
 //  AppName := Application.Title;
 //  {$ELSE}
@@ -1809,7 +1849,7 @@ end;
 //
 //  AppName := StringReplace(AppName, ' ', '_', [rfReplaceAll]);
 //
-//  // Формируем путь
+//  // Г”Г®Г°Г¬ГЁГ°ГіГҐГ¬ ГЇГіГІГј
 //  {$IFDEF LINUX}
 //  LogDir := GetEnvironmentVariable('XDG_DATA_HOME');
 //  if LogDir = '' then
@@ -1830,11 +1870,11 @@ end;
 //
 //    TFile.AppendAllText(LogPath, LogText, TEncoding.UTF8);
 //  except
-//    // Fallback в текущую директорию
+//    // Fallback Гў ГІГҐГЄГіГ№ГіГѕ Г¤ГЁГ°ГҐГЄГІГ®Г°ГЁГѕ
 //    try
 //      TFile.AppendAllText('app_log.txt', LogText, TEncoding.UTF8);
 //    except
-//      // Игнорируем
+//      // Г€ГЈГ­Г®Г°ГЁГ°ГіГҐГ¬
 //    end;
 //  end;
 //end;
@@ -1846,18 +1886,18 @@ procedure WriteLog(const Msg: string;LocalPath:String='');
 var
   LogPath, LogDir, LogText, AppName: string;
 begin
-  if RecursionGuard > 0 then Exit; // Игнорируем повторный вызов
+  if RecursionGuard > 0 then Exit; // Г€ГЈГ­Г®Г°ГЁГ°ГіГҐГ¬ ГЇГ®ГўГІГ®Г°Г­Г»Г© ГўГ»Г§Г®Гў
   Inc(RecursionGuard);
   LogCriticalSection.Enter;
   try
-    // Получаем имя приложения
+    // ГЏГ®Г«ГіГ·Г ГҐГ¬ ГЁГ¬Гї ГЇГ°ГЁГ«Г®Г¦ГҐГ­ГЁГї
     AppName := AppLogName;
 
 
     {$IFDEF MSWINDOWS}
     if LocalPath='' then
     begin
-      LogDir := GetEnvironmentVariable('LOCALAPPDATA'); // или другой подходящий путь
+      LogDir := GetEnvironmentVariable('LOCALAPPDATA'); // ГЁГ«ГЁ Г¤Г°ГіГЈГ®Г© ГЇГ®Г¤ГµГ®Г¤ГїГ№ГЁГ© ГЇГіГІГј
       if LogDir='' then
         LogDir := 'C:\Temp';
     end
@@ -1867,7 +1907,7 @@ begin
     LogPath := TPath.Combine(LogDir,AppName);
     {$ENDIF}
 
-    // Формируем путь
+    // Г”Г®Г°Г¬ГЁГ°ГіГҐГ¬ ГЇГіГІГј
     {$IFDEF LINUX}
     if LocalPath='' then
     begin
@@ -1889,11 +1929,11 @@ begin
 
       TFile.AppendAllText(LogPath, LogText, TEncoding.UTF8);
     except
-      // Fallback в текущую директорию
+      // Fallback Гў ГІГҐГЄГіГ№ГіГѕ Г¤ГЁГ°ГҐГЄГІГ®Г°ГЁГѕ
       try
         TFile.AppendAllText('app_log.txt', LogText, TEncoding.UTF8);
       except
-        // Игнорируем
+        // Г€ГЈГ­Г®Г°ГЁГ°ГіГҐГ¬
       end;
     end;
   finally
@@ -1948,32 +1988,32 @@ begin
     result := StringReplace(ChangeFileExt(ExtractFileName(ParamStr(0)), '.log'), ' ', '_', [rfReplaceAll]);
 end;
 
-// 1. Получить MD5 самой программы (исполняемого файла)
+// 1. ГЏГ®Г«ГіГ·ГЁГІГј MD5 Г±Г Г¬Г®Г© ГЇГ°Г®ГЈГ°Г Г¬Г¬Г» (ГЁГ±ГЇГ®Г«Г­ГїГҐГ¬Г®ГЈГ® ГґГ Г©Г«Г )
 function GetMyMD5: string;
 begin
   Result := THashMD5.GetHashStringFromFile(ParamStr(0));
 end;
 
-// 2. Получить MD5 любого файла на диске
+// 2. ГЏГ®Г«ГіГ·ГЁГІГј MD5 Г«ГѕГЎГ®ГЈГ® ГґГ Г©Г«Г  Г­Г  Г¤ГЁГ±ГЄГҐ
 function GetFileMD5(const AFileName: string): string;
 begin
   Result := THashMD5.GetHashStringFromFile(AFileName);
 end;
 
-// 3. Получить MD5 строки (например, пароля)
+// 3. ГЏГ®Г«ГіГ·ГЁГІГј MD5 Г±ГІГ°Г®ГЄГЁ (Г­Г ГЇГ°ГЁГ¬ГҐГ°, ГЇГ Г°Г®Г«Гї)
 function GetStringMD5(const AString: string): string;
 begin
   Result := THashMD5.GetHashString(AString);
 end;
 
-// 4. Получить MD5 данных из потока (TStream)
+// 4. ГЏГ®Г«ГіГ·ГЁГІГј MD5 Г¤Г Г­Г­Г»Гµ ГЁГ§ ГЇГ®ГІГ®ГЄГ  (TStream)
 function GetStreamMD5(AStream: TStream): string;
 begin
   Result := THashMD5.GetHashString(AStream);
 end;
 
 
-// Основная функция: переименовывает файл, добавляя дату/время его создания
+// ГЋГ±Г­Г®ГўГ­Г Гї ГґГіГ­ГЄГ¶ГЁГї: ГЇГҐГ°ГҐГЁГ¬ГҐГ­Г®ГўГ»ГўГ ГҐГІ ГґГ Г©Г«, Г¤Г®ГЎГ ГўГ«ГїГї Г¤Г ГІГі/ГўГ°ГҐГ¬Гї ГҐГЈГ® Г±Г®Г§Г¤Г Г­ГЁГї
 function RenameFileWithCreationTime(const AFileName: string;
   out ANewName: string; const ADateTimeFormat: string = 'yyyymmdd"_"hhnnss'): Boolean;
 var
@@ -1988,18 +2028,18 @@ begin
     Exit;
 
   try
-    // Получаем время создания файла (можно заменить на TFile.GetLastWriteTime)
+    // ГЏГ®Г«ГіГ·Г ГҐГ¬ ГўГ°ГҐГ¬Гї Г±Г®Г§Г¤Г Г­ГЁГї ГґГ Г©Г«Г  (Г¬Г®Г¦Г­Г® Г§Г Г¬ГҐГ­ГЁГІГј Г­Г  TFile.GetLastWriteTime)
     FileDate := TFile.GetCreationTime(AFileName);
 
-    // Разбираем путь
+    // ГђГ Г§ГЎГЁГ°Г ГҐГ¬ ГЇГіГІГј
     Dir := ExtractFilePath(AFileName);
     Name := ChangeFileExt(ExtractFileName(AFileName), '');
     Ext := ExtractFileExt(AFileName);
 
-    // Формируем новое имя: старое_имя_дата_время.расширение
+    // Г”Г®Г°Г¬ГЁГ°ГіГҐГ¬ Г­Г®ГўГ®ГҐ ГЁГ¬Гї: Г±ГІГ Г°Г®ГҐ_ГЁГ¬Гї_Г¤Г ГІГ _ГўГ°ГҐГ¬Гї.Г°Г Г±ГёГЁГ°ГҐГ­ГЁГҐ
     NewName := Dir + Name + '_' + FormatDateTime(ADateTimeFormat, FileDate) + Ext;
 
-    // Если новое имя совпадает со старым, переименование не нужно
+    // Г…Г±Г«ГЁ Г­Г®ГўГ®ГҐ ГЁГ¬Гї Г±Г®ГўГЇГ Г¤Г ГҐГІ Г±Г® Г±ГІГ Г°Г»Г¬, ГЇГҐГ°ГҐГЁГ¬ГҐГ­Г®ГўГ Г­ГЁГҐ Г­ГҐ Г­ГіГ¦Г­Г®
     if SameText(NewName, AFileName) then
     begin
       ANewName := AFileName;
@@ -2007,15 +2047,15 @@ begin
       Exit;
     end;
 
-    // Проверяем, не существует ли уже файл с таким именем
+    // ГЏГ°Г®ГўГҐГ°ГїГҐГ¬, Г­ГҐ Г±ГіГ№ГҐГ±ГІГўГіГҐГІ Г«ГЁ ГіГ¦ГҐ ГґГ Г©Г« Г± ГІГ ГЄГЁГ¬ ГЁГ¬ГҐГ­ГҐГ¬
     if TFile.Exists(NewName) then
     begin
-      // Можно добавить суффикс или выйти с ошибкой
-      // В данном случае просто возвращаем False
+      // ГЊГ®Г¦Г­Г® Г¤Г®ГЎГ ГўГЁГІГј Г±ГіГґГґГЁГЄГ± ГЁГ«ГЁ ГўГ»Г©ГІГЁ Г± Г®ГёГЁГЎГЄГ®Г©
+      // Г‚ Г¤Г Г­Г­Г®Г¬ Г±Г«ГіГ·Г ГҐ ГЇГ°Г®Г±ГІГ® ГўГ®Г§ГўГ°Г Г№Г ГҐГ¬ False
       Exit;
     end;
 
-    // Переименовываем (SysUtils.RenameFile возвращает Boolean)
+    // ГЏГҐГ°ГҐГЁГ¬ГҐГ­Г®ГўГ»ГўГ ГҐГ¬ (SysUtils.RenameFile ГўГ®Г§ГўГ°Г Г№Г ГҐГІ Boolean)
     Result := System.SysUtils.RenameFile(AFileName, NewName);
     if Result then
       ANewName := NewName;
@@ -2023,14 +2063,14 @@ begin
   except
     on E: Exception do
     begin
-      // Логирование ошибки (по желанию)
-      // OutputDebugString(PChar('Ошибка переименования: ' + E.Message));
+      // Г‹Г®ГЈГЁГ°Г®ГўГ Г­ГЁГҐ Г®ГёГЁГЎГЄГЁ (ГЇГ® Г¦ГҐГ«Г Г­ГЁГѕ)
+      // OutputDebugString(PChar('ГЋГёГЁГЎГЄГ  ГЇГҐГ°ГҐГЁГ¬ГҐГ­Г®ГўГ Г­ГЁГї: ' + E.Message));
       Result := False;
     end;
   end;
 end;
 
-// Перегрузка для использования времени последнего изменения
+// ГЏГҐГ°ГҐГЈГ°ГіГ§ГЄГ  Г¤Г«Гї ГЁГ±ГЇГ®Г«ГјГ§Г®ГўГ Г­ГЁГї ГўГ°ГҐГ¬ГҐГ­ГЁ ГЇГ®Г±Г«ГҐГ¤Г­ГҐГЈГ® ГЁГ§Г¬ГҐГ­ГҐГ­ГЁГї
 function RenameFileWithLastWriteTime(const AFileName: string;
   out ANewName: string; const ADateTimeFormat: string = 'yyyymmdd"_"hhnnss'): Boolean;
 var
@@ -2090,9 +2130,9 @@ begin
       ZipFile.Open(zName, zmReadWrite)
     else
       ZipFile.Open(zName, zmWrite);
-    // ищем все файлы в директории
+    // ГЁГ№ГҐГ¬ ГўГ±ГҐ ГґГ Г©Г«Г» Гў Г¤ГЁГ°ГҐГЄГІГ®Г°ГЁГЁ
     ArchiveFiles := TDirectory.GetFiles(searchPath);
-    // добавляем все найденные файлы в архив
+    // Г¤Г®ГЎГ ГўГ«ГїГҐГ¬ ГўГ±ГҐ Г­Г Г©Г¤ГҐГ­Г­Г»ГҐ ГґГ Г©Г«Г» Гў Г Г°ГµГЁГў
     for AFile in ArchiveFiles do
     begin
       if pos('.log', AFile) > 0 then
@@ -2101,10 +2141,10 @@ begin
         deletefile(PWideChar(AFile));
       end;
     end;
-    // закрываем файл
+    // Г§Г ГЄГ°Г»ГўГ ГҐГ¬ ГґГ Г©Г«
     ZipFile.Close;
   finally
-    // уничтожаем TZipFile
+    // ГіГ­ГЁГ·ГІГ®Г¦Г ГҐГ¬ TZipFile
     FreeAndNil(ZipFile);
   end;
 end;

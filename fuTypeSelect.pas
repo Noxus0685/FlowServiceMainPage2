@@ -3,7 +3,7 @@
 interface
 
 uses
-  uGridStabilityRegistry,
+  FmxHelper,
   FMX.ActnList,
   FMX.Controls,
   FMX.Controls.Presentation,
@@ -48,7 +48,6 @@ uses
   uBaseProcedures,
   uClasses,
   uDataManager,
-  uGridLayoutManager,
   uRepositories,
   uProtocols;
 type
@@ -487,7 +486,8 @@ begin
   if ActiveRepo = nil then
   begin
     TreeViewTypes.Clear;
-    TGridLayoutManager.SetRowCount(GridTypes, 0);
+    RefreshGridRowCount(GridTypes, 0, 'type-filter');
+    RefreshGridValues(GridTypes, 'type-filter');
     Exit;
   end;
 
@@ -1315,8 +1315,6 @@ end;
 
 procedure TFormTypeSelect.FormCreate(Sender: TObject);
 begin
-  RegisterStableGrid(Self, GridTypes, Name);
-
    FSortColumn := -1;
    FSortAscending := True;
    FSkipTypeDeleteConfirm := False;
@@ -1778,9 +1776,10 @@ begin
         FCheckedTypes.Delete(I);
 
   if FDevFilteredTypes <> nil then
-    TGridLayoutManager.SetRowCount(GridTypes, FDevFilteredTypes.Count)
+    RefreshGridRowCount(GridTypes, FDevFilteredTypes.Count, 'type-filter')
   else
-    TGridLayoutManager.SetRowCount(GridTypes, 0);
+    RefreshGridRowCount(GridTypes, 0, 'type-filter');
+    RefreshGridValues(GridTypes, 'type-filter');
 
   if (GridTypes.Row >= GridTypes.RowCount) then
     GridTypes.Row := -1;
