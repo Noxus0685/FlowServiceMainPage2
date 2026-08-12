@@ -78,13 +78,13 @@ type
   pDWORD=^DWORD;
 {$ENDIF}
 
-  // Âñïîìîãàòåëüíûé òèï - òî÷êà â êàëèáðîâî÷íîé òàáëèöå ðàñõîäîìåðà.
+  //   -     .
   TCalibrationPoint = record
 
-    // Ðàñõîä â ì3/÷, âûäàâàåìûé ðàñõîäîìåðîì ñ ó÷åòîì âåñà èìïóëüñà.
+    //   3/,      .
     WaterDischarge: Double;
 
-    // Ïîïðàâî÷íûé êîýôôèöèåíò äëÿ äàííîé ÷àñòîòû.
+    //     .
     Coefficient: Double;
 
   end;
@@ -156,16 +156,18 @@ procedure PackLogs(_LogsDir:String; _LogsExt:String='.log'; _LogsZipName:String=
 // Changes only the number of grid rows when the requested count differs.
 procedure RefreshGridRowCount(AGrid: TCustomGrid; const ARowCount: Integer;
   const AReason: string = 'row-count');
-// Repaints existing cells so FMX requests their current OnGetValue values.
+// Invalidates one FMX value cache entry without changing grid structure.
+procedure RefreshGridCell(AGrid: TCustomGrid; const ACol, ARow: Integer);
+// Invalidates all existing FMX value cache entries so OnGetValue runs again.
 procedure RefreshGridValues(AGrid: TCustomGrid;
   const AReason: string = 'data-update');
-// 1. Ïîëó÷èòü MD5 ñàìîé ïðîãðàììû (èñïîëíÿåìîãî ôàéëà)
+// 1.  MD5   ( )
 function GetMyMD5: string;
-// 2. Ïîëó÷èòü MD5 ëþáîãî ôàéëà íà äèñêå
+// 2.  MD5    
 function GetFileMD5(const AFileName: string): string;
-// 3. Ïîëó÷èòü MD5 ñòðîêè (íàïðèìåð, ïàðîëÿ)
+// 3.  MD5  (, )
 function GetStringMD5(const AString: string): string;
-// 4. Ïîëó÷èòü MD5 äàííûõ èç ïîòîêà (TStream)
+// 4.  MD5    (TStream)
 function GetStreamMD5(AStream: TStream): string;
 
 
@@ -213,7 +215,6 @@ function GetSecondsBetweenDates(const ADate1, ADate2: TDateTime): Int64;
 
 
 implementation
-
 uses
   System.DateUtils,
   System.SyncObjs;
@@ -223,7 +224,6 @@ procedure RefreshGridRowCount(AGrid: TCustomGrid; const ARowCount: Integer;
 var
   OldRowCount: Integer;
 begin
-  { Changes row structure once and leaves all grid and column properties intact. }
   if not Assigned(AGrid) then
     Exit;
   OldRowCount := AGrid.RowCount;
@@ -236,31 +236,49 @@ begin
     AGrid.EndUpdate;
   end;
   AGrid.Repaint;
-  OutputDebugMessage(Format('GridStructuralRefresh Grid="%s" Reason="%s" Rows=%d->%d OldSignature="" NewSignature="" IndexChanged=0 VisibleChanged=0 ContentChanged=False',
+  OutputDebugMessage(Format('GridStructuralRefresh Grid="%s" Reason="%s" Rows=%d->%d ContentChanged=False StructuralRefresh=True',
     [AGrid.Name, AReason, OldRowCount, ARowCount]));
 end;
 
-procedure RefreshGridValues(AGrid: TCustomGrid; const AReason: string);
+procedure RefreshGridCell(AGrid: TCustomGrid; const ACol, ARow: Integer);
 begin
-  { RAD Studio 12 has no public value-only model notification; Repaint is the
-    narrow public path that redraws existing cells and invokes OnGetValue. }
-  if not Assigned(AGrid) then
+  { DataChanged clears only this FMX cell value cache and requests OnGetValue. }
+  if not Assigned(AGrid) or not Assigned(AGrid.Model) or
+     not (AGrid.Model is TGridModel) or
+     (ACol < 0) or (ACol >= AGrid.ColumnCount) or
+     (ARow < 0) or (ARow >= AGrid.RowCount) then
     Exit;
-  AGrid.Repaint;
-  OutputDebugMessage(Format('GridValuesRefresh Grid="%s" Reason="%s" ContentChanged=False',
-    [AGrid.Name, AReason]));
+  TGridModel(AGrid.Model).DataChanged(ACol, ARow);
+end;
+
+procedure RefreshGridValues(AGrid: TCustomGrid; const AReason: string);
+var
+  ACol, ARow, ChangedCount: Integer;
+begin
+  if not Assigned(AGrid) or not Assigned(AGrid.Model) or
+     not (AGrid.Model is TGridModel) then
+    Exit;
+  ChangedCount := 0;
+  for ARow := 0 to AGrid.RowCount - 1 do
+    for ACol := 0 to AGrid.ColumnCount - 1 do
+    begin
+      RefreshGridCell(AGrid, ACol, ARow);
+      Inc(ChangedCount);
+    end;
+  OutputDebugMessage(Format('GridValuesRefresh Grid="%s" Reason="%s" RowCount=%d ColumnCount=%d DataChanged=%d ContentChanged=False StructuralRefresh=False',
+    [AGrid.Name, AReason, AGrid.RowCount, AGrid.ColumnCount, ChangedCount]));
 end;
 
 var
   LogCriticalSection: TCriticalSection;
 
 const
-  PICCHAR:array[$C0..$FF] of cHAR=( 'À','Á','Â','Ã','Ä','Å','Æ','Ç','È',
-  'É','Ê',  'Ë','Ì','Í','Î','Ï','Ð','Ñ','Ò','Ó','Ô',
-  'Õ','Ö','×','Ø','Ù','Ú','Û','Ü','Ý','Þ','ß',
-  'à','á','â','ã','ä','å','æ','ç','è','é','ê','ë','ì',
-  'í','î','ï','ð','ñ','ò','ó','ô','õ','ö','÷','ø','ù',
-  'ú','û','ü','ý','þ','ÿ'
+  PICCHAR:array[$C0..$FF] of string=( '','','','','','','','','',
+  '','',  '','','','','','','','','','',
+  '','','','','','','','','','','',
+  '','','','','','','','','','','','','',
+  '','','','','','','','','','','','','',
+  '','','','','',''
   );
 
 CRCtable:  ARRAY[0..255] OF LongWord =
@@ -366,7 +384,7 @@ crctab: array[0..255] OF word = (
 {$IFDEF LINUX}
 procedure  OutputDebugString(Msg:PChar);
 begin
-  //Ïîêà èãíîðèðóåì
+  // 
 end;
 {$ENDIF}
 
@@ -487,21 +505,21 @@ const tables: array[0..255] of WORD=(
             $4400, $84C1, $8581, $4540, $8701, $47C0, $4680, $8641,
             $8201, $42C0, $4380, $8341, $4100, $81C1, $8081, $4040);
 
-  WinR: Array[0..66] of Char = ('à', 'á', 'â', 'ã', 'ä', 'å', '¸', 'æ', 'ç', 'è',
-    'é', 'ê', 'ë', 'ì', 'í', 'î', 'ï', 'ð', 'ñ', 'ò',
-    'ó', 'ô', 'õ', 'ö', '÷', 'ø', 'ù', 'ú', 'û', 'ü',
-    'ý', 'þ', 'ÿ', 'À', 'Á', 'Â', 'Ã', 'Ä', 'Å', '¨',                                                                /// ñ ýòîé ïðîáëåìîé íå çíàë êàê
-    'Æ', 'Ç', 'È', 'É', 'Ê', 'Ë', 'Ì', 'Í', 'Î', 'Ï',                                                               //êàê ðàçîáðàòüñÿ ñ êîäèðîâêîé áûëè
-    'Ð', 'Ñ', 'Ò', 'Ó', 'Ô', 'Õ', 'Ö', '×', 'Ø', 'Ù',                                                           // ïðîáëåìû è ñ ïîìîùüþ ýòîãî ðåøèë
-    'Ú', 'Û', 'Ü', 'Ý', 'Þ', 'ß', '¹');
-  KoiR: Array[0..66] of Char = ('Á', 'Â', '×', 'Ç', 'Ä', 'Å', '£', 'Ö', 'Ú', 'É',
-    'Ê', 'Ë', 'Ì', 'Í', 'Î', 'Ï', 'Ð', 'Ò', 'Ó', 'Ô',
-    'Õ', 'Æ', 'È', 'Ã' ,'Þ', 'Û', 'Ý', 'ß', 'Ù', 'Ø',
-    'Ü', 'À', 'Ñ', 'á', 'â', '÷', 'ç', 'ä', 'å', '³',
-    'ö', 'ú', 'é', 'ê', 'ë', 'ì', 'í', 'î', 'ï', 'ð',
-    'ò', 'ó', 'ô', 'õ', 'æ', 'è', 'ã', 'þ', 'û', 'ý',
-    'ÿ', 'ù', 'ø', 'ü', 'à', 'ñ', '?');
-//Èç Cyrillic Windows-1251 â Cyrillic (KOI8-R)
+  WinR: Array[0..66] of string = ('', '', '', '', '', '', '', '', '', '',
+    '', '', '', '', '', '', '', '', '', '',
+    '', '', '', '', '', '', '', '', '', '',
+    '', '', '', '', '', '', '', '', '', '',                                                                ///      
+    '', '', '', '', '', '', '', '', '', '',                                                               //    
+    '', '', '', '', '', '', '', '', '', '',                                                           //      
+    '', '', '', '', '', '', '');
+  KoiR: Array[0..66] of string = ('', '', '', '', '', '', '', '', '', '',
+    '', '', '', '', '', '', '', '', '', '',
+    '', '', '', '' ,'', '', '', '', '', '',
+    '', '', '', '', '', '', '', '', '', '',
+    '', '', '', '', '', '', '', '', '', '',
+    '', '', '', '', '', '', '', '', '', '',
+    '', '', '', '', '', '', '?');
+// Cyrillic Windows-1251  Cyrillic (KOI8-R)
 function WinRToKoiR (aStr: String): String;
 var
   i, j, Index: Integer;
@@ -562,7 +580,7 @@ begin
   i:=0;j:=0;
   while (i<len) do
   begin
-    inc(i);//ïåðâûé ñòàðøèé ïîëóáàéò
+    inc(i);//  
     b:=0;
     if aStr[i] in ['0'..'9','A'..'F'] then
     begin
@@ -572,7 +590,7 @@ begin
         b:=((ord(aStr[i])-ord('A'))+10) shl 4;
     end;
     if i<len then begin
-      inc(i);//âòîðîé ìëàäøèé ïîëóáàéò
+      inc(i);//  
       if aStr[i] in ['0'..'9','A'..'F'] then
       begin
         if (aStr[i] in ['0'..'9']) then
@@ -777,7 +795,7 @@ begin
 end;
 
 
-//Âûáèðàåò èç ñòòðîêè öèôðû, ðàçðåøàåòñÿ ââîä Hex
+//   ,   Hex
 function S2IDef(const val:String;default_value:integer):integer;
 var i:integer;
     s,res:string;
@@ -785,7 +803,7 @@ var i:integer;
 begin
      hex:=False;
      s:=UpperCase(Val);res:='';
-     //âûáèðàåì òîëüêî öèôðû
+     //  
      for i:=1 to Length(s) do
      begin
        if s[i] in ['X','$'] then hex:=True;
@@ -799,13 +817,13 @@ begin
             res:=res+s[i];
      end;
      if hex then res:='$'+res;
-     //Ñîõðàíÿåì çíà÷åíèå â Tag
+     //   Tag
      if res<>'' then
        result:=StrToIntDef(res,default_value);
 end;
 
 
-//ïóçûðüêîâàÿ ñîðòèðîâêà
+// 
 procedure SortCalibrationPointArray(var _array:array of TCalibrationPoint);
 var i,j:Integer;
     tmp:TCalibrationPoint;
@@ -816,7 +834,7 @@ begin
       begin
          if _array[j].WaterDischarge>_array[j+1].WaterDischarge then
          begin
-          //îáìåí ýëåìåíòîâ
+          // 
           tmp:=_array[j];
           _array[j]:=_array[j+1];
           _array[j+1]:=tmp;
@@ -980,7 +998,7 @@ function FontToStr(font: TFont): string;
   end;
 begin
 
-  {êîäèðóåì âñå àòðèáóòû TFont â ñòðîêó}
+  {   TFont  }
   Result := '';
   Result := Result + font.Family + '|';
   Result := Result + FloatToStr(font.Size) + '|';
@@ -1026,7 +1044,7 @@ begin
       font.Style := font.Style + [TFontStyle.fsStrikeout];
   end
   else begin
-    //äëÿ ñòàðîãî âàðèàíòà
+    //  
     font.Size := Size;
   end;
 end;
@@ -1070,13 +1088,13 @@ end;
 
 function CalculateAngle(CurrentValue, MinValue, MaxValue: Double; MaxAngle:Double=270): Double;
 begin
-  // Ïðîâåðÿåì, ÷òî òåêóùåå çíà÷åíèå íàõîäèòñÿ â ïðåäåëàõ îò ìèíèìàëüíîãî äî ìàêñèìàëüíîãî çíà÷åíèÿ
+  // ,           
   if CurrentValue < MinValue then
     CurrentValue := MinValue
   else if CurrentValue > MaxValue then
     CurrentValue := MaxValue;
 
-  // Ðàññ÷èòûâàåì óãîë ïîâîðîòà
+  //   
   Result := (CurrentValue - MinValue) / (MaxValue - MinValue) * MaxAngle;
 end;
 
@@ -1086,13 +1104,13 @@ begin
 end;
 
 (*
-âû ìîæåòå èñïîëüçîâàòü $ 00BBGGRR
+   $ 00BBGGRR
 
-BB = Ñèíèé
-GG = Çåëåíûé
-RR = Êðàñíûé
+BB = 
+GG = 
+RR = 
 
-Âñå ýòè çíà÷åíèÿ ìîãóò áûòü îò 0 äî 255 ($ 00 è $ FF)
+      0  255 ($ 00  $ FF)
 *)
 function ColorToAlphaColor(aColor:TColor):TAlphaColor;
 var rgbcolor:LongWord;
@@ -1186,7 +1204,7 @@ end;
 procedure OutputDebugMessage(const Msg: string);
 begin
 {$IFDEF LINUX}
-  WriteLn(Msg); // Èëè èñïîëüçóéòå äðóãîé ìåòîä ïî âàøåìó âûáîðó
+  WriteLn(Msg); //       
 {$ELSE}
   OutputDebugString(PChar(Msg));
 {$ENDIF}
@@ -1277,13 +1295,13 @@ var
   AdminSID: PSID;
   IsAdmin: BOOL;
 begin
-  // Îòêðûòü òåêóùèé òîêåí ïðîöåññà
+  //    
   if OpenProcessToken(GetCurrentProcess, TOKEN_QUERY, hToken) then
   try
-    // Ñîçäàòü SID äëÿ ãðóïïû àäìèíèñòðàòîðîâ
+    //  SID   
     if AllocateAndInitializeSid(SECURITY_NT_AUTHORITY, 2, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, AdminSID) then
     try
-      // Ïðîâåðèòü, ÿâëÿåòñÿ ëè òåêóùèé ïîëüçîâàòåëü ÷ëåíîì ãðóïïû àäìèíèñòðàòîðîâ
+      // ,       
 {$IFDEF MSWINDOWS}
       if CheckTokenMembership(hToken, AdminSID, @IsAdmin) then
         Result := IsAdmin;
@@ -1446,7 +1464,7 @@ end;
 
 (*
 Screen.ActiveForm.Handle,
-        'Ïðîèçîøëà îøèáêà ïðè ðàáîòå ñ óñòðîéñòâîì.', cTestModeCOM,
+        '     .', cTestModeCOM,
         MB_OK or MB_ICONERROR
 *)
 procedure _MessageBox(AHandle:longint;AMessage:string;ADopMessage:string;AICON:Integer);
@@ -1499,7 +1517,7 @@ begin
       if (AMask and mask)=mask then
          result:=result+IntToStr(i)+',';
     end;
-    //çàòèðàåì çàïÿòóþ
+    // 
     if result<>'' then result[length(result)]:=' ';
 
 
@@ -1518,24 +1536,24 @@ end;
 //begin
 //  Result := False;
 //
-//  // Ðàçáèâàåì ñòðîêó íà ÷àñòè, ðàçäåë¸ííûå çàïÿòûìè
+//  //    ,  
 //  Ranges := SplitString(RangeStr, ',');
 //
 //  for i := 0 to High(Ranges) do
 //  begin
 //    Range := Trim(Ranges[i]);
 //
-//    // Ïðîâåðÿåì, ñîäåðæèò ëè ÷àñòü äèàïàçîí
+//    // ,    
 //    if Pos('..', Range) > 0 then
 //    begin
-//      // Ðàçáèâàåì äèàïàçîí íà íà÷àëüíîå è êîíå÷íîå çíà÷åíèÿ
+//      //       
 //      Parts := SplitString(Range, '..');
 //      if Length(Parts) = 2 then
 //      begin
 //        StartRange := StrToIntDef(Trim(Parts[0]), 0);
 //        EndRange := StrToIntDef(Trim(Parts[1]), 0);
 //
-//        // Ïðîâåðÿåì, âõîäèò ëè çíà÷åíèå â äèàïàçîí
+//        // ,     
 //        if (Value >= StartRange) and (Value <= EndRange) then
 //        begin
 //          Result := True;
@@ -1545,7 +1563,7 @@ end;
 //    end
 //    else
 //    begin
-//      // Ïðîâåðÿåì îòäåëüíîå çíà÷åíèå
+//      //   
 //      if Value = StrToIntDef(Range, -1) then
 //      begin
 //        Result := True;
@@ -1566,24 +1584,24 @@ var
 begin
   Result := False;
 
-  // Ðàçáèâàåì ñòðîêó íà ÷àñòè, ðàçäåë¸ííûå çàïÿòûìè
+  //    ,  
   Ranges := SplitString(RangeStr, ',');
 
   for i := 0 to High(Ranges) do
   begin
     Range := Trim(Ranges[i]);
 
-    // Ïðîâåðÿåì, ñîäåðæèò ëè ÷àñòü äèàïàçîí
+    // ,    
     if Pos('..', Range) > 0 then
     begin
-      // Ðàçáèâàåì äèàïàçîí íà íà÷àëüíîå è êîíå÷íîå çíà÷åíèÿ
+      //       
       Parts := SplitString(Range, '..');
       if Length(Parts) = 3 then
       begin
         StartRange := StrToIntDef(Trim(Parts[0]), 0);
         EndRange := StrToIntDef(Trim(Parts[2]), 0);
 
-        // Ïðîâåðÿåì, âõîäèò ëè çíà÷åíèå â äèàïàçîí
+        // ,     
         if (Value >= StartRange) and (Value <= EndRange) then
         begin
           Result := True;
@@ -1593,7 +1611,7 @@ begin
     end
     else
     begin
-      // Ïðîâåðÿåì îòäåëüíîå çíà÷åíèå
+      //   
       if Value = StrToIntDef(Range, -1) then
       begin
         Result := True;
@@ -1616,24 +1634,24 @@ begin
   Elements := TList<Integer>.Create;
 
   try
-    // Ðàçáèâàåì ñòðîêó íà ÷àñòè, ðàçäåë¸ííûå çàïÿòûìè
+    //    ,  
     Ranges := SplitString(RangeStr, ',');
 
     for i := 0 to High(Ranges) do
     begin
       Range := Trim(Ranges[i]);
 
-      // Ïðîâåðÿåì, ñîäåðæèò ëè ÷àñòü äèàïàçîí
+      // ,    
       if Pos('..', Range) > 0 then
       begin
-        // Ðàçáèâàåì äèàïàçîí íà íà÷àëüíîå è êîíå÷íîå çíà÷åíèÿ
+        //       
         Parts := SplitString(Range, '..');
         if Length(Parts) = 3 then
         begin
           StartRange := StrToIntDef(Trim(Parts[0]), 0);
           EndRange := StrToIntDef(Trim(Parts[2]), 0);
 
-          // Äîáàâëÿåì âñå ýëåìåíòû äèàïàçîíà â ñïèñîê
+          //      
           for j := StartRange to EndRange do
           begin
             Elements.Add(j);
@@ -1642,12 +1660,12 @@ begin
       end
       else
       begin
-        // Äîáàâëÿåì îòäåëüíîå çíà÷åíèå â ñïèñîê
+        //     
         Elements.Add(StrToIntDef(Range, 0));
       end;
     end;
 
-    // Ïðîâåðÿåì, ñóùåñòâóåò ëè ýëåìåíò ñ çàäàííûì èíäåêñîì
+    // ,      
     if (Index >= 0) and (Index < Elements.Count) then
     begin
       Result := Elements[Index];
@@ -1659,15 +1677,15 @@ end;
 
 function TwosComplementToDecimal(hexValue: Word): Integer;
 begin
-  // Ïðîâåðêà çíàêîâîãî áèòà
+  //   
   if (hexValue and $8000) <> 0 then
   begin
-    // Åñëè ÷èñëî îòðèöàòåëüíîå, èíâåðòèðóåì âñå áèòû è ïðèáàâëÿåì 1
+    //   ,      1
     Result := -((not hexValue) + 1);
   end
   else
   begin
-    // Åñëè ÷èñëî ïîëîæèòåëüíîå, ïðîñòî âîçâðàùàåì åãî
+    //   ,   
     Result := hexValue;
   end;
 end;
@@ -1725,28 +1743,28 @@ begin
   end;
 end;
 
-// Âñïîìîãàòåëüíàÿ ôóíêöèÿ äëÿ ïðåîáðàçîâàíèÿ Word â äâà áàéòà
+//     Word   
 function WordToBytes(Value: Word): ShortString;
 begin
 //  Result := AnsiChar(DecToHex(Value div 100))+AnsiChar(DecToHex(Value mod 100));
   Result := AnsiChar(Hi(Value)) + AnsiChar(Lo(Value));
 end;
 
-(* Ïðèìåð èñïîëüçîâàíèÿ
+(*  
 var
   ResponseStr, Param: string;
 begin
   ResponseStr := '>-0000+015.81+015.87'#$D;
 
-  // Ïîëó÷èòü ïåðâûé ïàðàìåòð
+  //   
   Param := ExtractParameter(ResponseStr, 1);
   // Param = '-0000'
 
-  // Ïîëó÷èòü âòîðîé ïàðàìåòð
+  //   
   Param := ExtractParameter(ResponseStr, 2);
   // Param = '+015.81'
 
-  // Ïîëó÷èòü òðåòèé ïàðàìåòð
+  //   
   Param := ExtractParameter(ResponseStr, 3);
   // Param = '+015.87'
 end;
@@ -1760,22 +1778,22 @@ begin
   CurrentPos := 1;
   ParamCount := 0;
 
-  // Ïðîâåðêà âàëèäíîñòè íîìåðà ïàðàìåòðà
+  //    
   if (ParamNumber < 1) then
     Exit;
 
   for I := 1 to Length(ResponseString) do
   begin
-    // Èùåì ëèáî '+', ëèáî '-'
+    //   '+',  '-'
     if (ResponseString[I] = '+') or (ResponseString[I] = '-') then
     begin
       Inc(ParamCount);
       CurrentSign := ResponseString[I];
 
-      // Åñëè íàøëè íóæíûé ïàðàìåòð
+      //    
       if ParamCount = ParamNumber then
       begin
-        // Èùåì êîíåö ïàðàìåòðà (ñëåäóþùèé çíàê èëè êîíåö ñòðîêè)
+        //    (    )
         CurrentPos := I + 1;
         while (CurrentPos <= Length(ResponseString)) and
               ((ResponseString[CurrentPos]  in ['0'..'9','.',','])) and
@@ -1785,7 +1803,7 @@ begin
           Inc(CurrentPos);
         end;
 
-        // Èçâëåêàåì ïàðàìåòð ÑÎ ÇÍÀÊÎÌ
+        //    
         Result := Copy(ResponseString, I, CurrentPos - I);
         Exit;
       end;
@@ -1804,12 +1822,12 @@ begin
 
   StringList := TStringList.Create;
   try
-    // Óñòàíàâëèâàåì ðàçäåëèòåëü
+    //  
     StringList.Delimiter := StrDivider;
-    StringList.StrictDelimiter := True; // Èãíîðèðîâàòü êàâû÷êè
+    StringList.StrictDelimiter := True; //  
     StringList.DelimitedText := S;
 
-    // Ïðîâåðÿåì, ñóùåñòâóåò ëè ïàðàìåòð ñ òàêèì íîìåðîì
+    // ,      
     if ParamNum <= StringList.Count then
       Result := StringList[ParamNum - 1];
   finally
@@ -1838,7 +1856,7 @@ end;
 //var
 //  LogPath, LogDir, LogText, AppName: string;
 //begin
-//  // Ïîëó÷àåì èìÿ ïðèëîæåíèÿ
+//  //   
 //  {$IFDEF FMX}
 //  AppName := Application.Title;
 //  {$ELSE}
@@ -1850,7 +1868,7 @@ end;
 //
 //  AppName := StringReplace(AppName, ' ', '_', [rfReplaceAll]);
 //
-//  // Ôîðìèðóåì ïóòü
+//  //  
 //  {$IFDEF LINUX}
 //  LogDir := GetEnvironmentVariable('XDG_DATA_HOME');
 //  if LogDir = '' then
@@ -1871,11 +1889,11 @@ end;
 //
 //    TFile.AppendAllText(LogPath, LogText, TEncoding.UTF8);
 //  except
-//    // Fallback â òåêóùóþ äèðåêòîðèþ
+//    // Fallback   
 //    try
 //      TFile.AppendAllText('app_log.txt', LogText, TEncoding.UTF8);
 //    except
-//      // Èãíîðèðóåì
+//      // 
 //    end;
 //  end;
 //end;
@@ -1887,18 +1905,18 @@ procedure WriteLog(const Msg: string;LocalPath:String='');
 var
   LogPath, LogDir, LogText, AppName: string;
 begin
-  if RecursionGuard > 0 then Exit; // Èãíîðèðóåì ïîâòîðíûé âûçîâ
+  if RecursionGuard > 0 then Exit; //   
   Inc(RecursionGuard);
   LogCriticalSection.Enter;
   try
-    // Ïîëó÷àåì èìÿ ïðèëîæåíèÿ
+    //   
     AppName := AppLogName;
 
 
     {$IFDEF MSWINDOWS}
     if LocalPath='' then
     begin
-      LogDir := GetEnvironmentVariable('LOCALAPPDATA'); // èëè äðóãîé ïîäõîäÿùèé ïóòü
+      LogDir := GetEnvironmentVariable('LOCALAPPDATA'); //    
       if LogDir='' then
         LogDir := 'C:\Temp';
     end
@@ -1908,7 +1926,7 @@ begin
     LogPath := TPath.Combine(LogDir,AppName);
     {$ENDIF}
 
-    // Ôîðìèðóåì ïóòü
+    //  
     {$IFDEF LINUX}
     if LocalPath='' then
     begin
@@ -1930,11 +1948,11 @@ begin
 
       TFile.AppendAllText(LogPath, LogText, TEncoding.UTF8);
     except
-      // Fallback â òåêóùóþ äèðåêòîðèþ
+      // Fallback   
       try
         TFile.AppendAllText('app_log.txt', LogText, TEncoding.UTF8);
       except
-        // Èãíîðèðóåì
+        // 
       end;
     end;
   finally
@@ -1989,32 +2007,32 @@ begin
     result := StringReplace(ChangeFileExt(ExtractFileName(ParamStr(0)), '.log'), ' ', '_', [rfReplaceAll]);
 end;
 
-// 1. Ïîëó÷èòü MD5 ñàìîé ïðîãðàììû (èñïîëíÿåìîãî ôàéëà)
+// 1.  MD5   ( )
 function GetMyMD5: string;
 begin
   Result := THashMD5.GetHashStringFromFile(ParamStr(0));
 end;
 
-// 2. Ïîëó÷èòü MD5 ëþáîãî ôàéëà íà äèñêå
+// 2.  MD5    
 function GetFileMD5(const AFileName: string): string;
 begin
   Result := THashMD5.GetHashStringFromFile(AFileName);
 end;
 
-// 3. Ïîëó÷èòü MD5 ñòðîêè (íàïðèìåð, ïàðîëÿ)
+// 3.  MD5  (, )
 function GetStringMD5(const AString: string): string;
 begin
   Result := THashMD5.GetHashString(AString);
 end;
 
-// 4. Ïîëó÷èòü MD5 äàííûõ èç ïîòîêà (TStream)
+// 4.  MD5    (TStream)
 function GetStreamMD5(AStream: TStream): string;
 begin
   Result := THashMD5.GetHashString(AStream);
 end;
 
 
-// Îñíîâíàÿ ôóíêöèÿ: ïåðåèìåíîâûâàåò ôàéë, äîáàâëÿÿ äàòó/âðåìÿ åãî ñîçäàíèÿ
+//  :  ,  /  
 function RenameFileWithCreationTime(const AFileName: string;
   out ANewName: string; const ADateTimeFormat: string = 'yyyymmdd"_"hhnnss'): Boolean;
 var
@@ -2029,18 +2047,18 @@ begin
     Exit;
 
   try
-    // Ïîëó÷àåì âðåìÿ ñîçäàíèÿ ôàéëà (ìîæíî çàìåíèòü íà TFile.GetLastWriteTime)
+    //     (   TFile.GetLastWriteTime)
     FileDate := TFile.GetCreationTime(AFileName);
 
-    // Ðàçáèðàåì ïóòü
+    //  
     Dir := ExtractFilePath(AFileName);
     Name := ChangeFileExt(ExtractFileName(AFileName), '');
     Ext := ExtractFileExt(AFileName);
 
-    // Ôîðìèðóåì íîâîå èìÿ: ñòàðîå_èìÿ_äàòà_âðåìÿ.ðàñøèðåíèå
+    //   : ___.
     NewName := Dir + Name + '_' + FormatDateTime(ADateTimeFormat, FileDate) + Ext;
 
-    // Åñëè íîâîå èìÿ ñîâïàäàåò ñî ñòàðûì, ïåðåèìåíîâàíèå íå íóæíî
+    //      ,   
     if SameText(NewName, AFileName) then
     begin
       ANewName := AFileName;
@@ -2048,15 +2066,15 @@ begin
       Exit;
     end;
 
-    // Ïðîâåðÿåì, íå ñóùåñòâóåò ëè óæå ôàéë ñ òàêèì èìåíåì
+    // ,        
     if TFile.Exists(NewName) then
     begin
-      // Ìîæíî äîáàâèòü ñóôôèêñ èëè âûéòè ñ îøèáêîé
-      // Â äàííîì ñëó÷àå ïðîñòî âîçâðàùàåì False
+      //       
+      //      False
       Exit;
     end;
 
-    // Ïåðåèìåíîâûâàåì (SysUtils.RenameFile âîçâðàùàåò Boolean)
+    //  (SysUtils.RenameFile  Boolean)
     Result := System.SysUtils.RenameFile(AFileName, NewName);
     if Result then
       ANewName := NewName;
@@ -2064,14 +2082,14 @@ begin
   except
     on E: Exception do
     begin
-      // Ëîãèðîâàíèå îøèáêè (ïî æåëàíèþ)
-      // OutputDebugString(PChar('Îøèáêà ïåðåèìåíîâàíèÿ: ' + E.Message));
+      //   ( )
+      // OutputDebugString(PChar(' : ' + E.Message));
       Result := False;
     end;
   end;
 end;
 
-// Ïåðåãðóçêà äëÿ èñïîëüçîâàíèÿ âðåìåíè ïîñëåäíåãî èçìåíåíèÿ
+//      
 function RenameFileWithLastWriteTime(const AFileName: string;
   out ANewName: string; const ADateTimeFormat: string = 'yyyymmdd"_"hhnnss'): Boolean;
 var
@@ -2131,9 +2149,9 @@ begin
       ZipFile.Open(zName, zmReadWrite)
     else
       ZipFile.Open(zName, zmWrite);
-    // èùåì âñå ôàéëû â äèðåêòîðèè
+    //     
     ArchiveFiles := TDirectory.GetFiles(searchPath);
-    // äîáàâëÿåì âñå íàéäåííûå ôàéëû â àðõèâ
+    //      
     for AFile in ArchiveFiles do
     begin
       if pos('.log', AFile) > 0 then
@@ -2142,10 +2160,10 @@ begin
         deletefile(PWideChar(AFile));
       end;
     end;
-    // çàêðûâàåì ôàéë
+    //  
     ZipFile.Close;
   finally
-    // óíè÷òîæàåì TZipFile
+    //  TZipFile
     FreeAndNil(ZipFile);
   end;
 end;
