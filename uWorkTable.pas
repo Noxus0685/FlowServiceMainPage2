@@ -2312,8 +2312,7 @@ begin
   SrcDevice := ASource.FFlowMeter.Device;
   if ACloneDeviceToRepo and (SrcDevice <> nil) and (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
   begin
-    NewDevice := DataManager.ActiveDeviceRepo.CreateDevice(SrcDevice);
-    NewDevice.UUID := TGUID.NewGuid.ToString;
+    NewDevice := DataManager.ActiveDeviceRepo.CreateDeviceForChannelCopy(SrcDevice);
     NewDevice.SerialNumber := SrcDevice.SerialNumber;
     FFlowMeter.Device := NewDevice;
   end

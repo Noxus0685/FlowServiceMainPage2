@@ -639,6 +639,7 @@ type
     destructor Destroy;
 
     procedure Assign(ASource: TDevice; FullAssign: Boolean);
+    procedure AssignWithoutMeasurementHistory(ASource: TDevice);
     function Clone: TDevice;
     function GetSearchText: string; override;
     procedure RecalcPoints;
@@ -1910,6 +1911,15 @@ begin
       end;
       FPoints.Add(NewP);
     end;
+end;
+
+procedure TDevice.AssignWithoutMeasurementHistory(ASource: TDevice);
+begin
+  { Copy device configuration only. Sessions and spillages are created later,
+    when a measurement is actually started. }
+  Assign(ASource, False);
+  FSessions.Clear;
+  FSpillages.Clear;
 end;
 
 procedure TCalibrCoefItem.Assign(ASource: TCalibrCoefItem);
