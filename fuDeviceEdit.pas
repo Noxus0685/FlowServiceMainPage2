@@ -43,7 +43,8 @@ uses
   uDataManager,
   uDeviceClass,
   uRepositories,
-  uProtocols,
+  uProtocols;
+
 type
   TFormDeviceEditor = class(TForm)
     layLeft: TLayout;
