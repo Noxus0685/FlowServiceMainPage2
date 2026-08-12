@@ -11,7 +11,8 @@ uses
   System.SyncObjs,
   System.Diagnostics,
   System.SysUtils,
-    uProtocols,
+  uProjectSettings,
+  uProtocols,
   uBaseProcedures;
 
   const
@@ -358,11 +359,12 @@ type
     procedure SetCalcValue;
 
     function GetNewUUID: string;
-    class function GetMeterValuesFileName(IsBackUp: Integer): string; static;
-    class procedure SaveToFile(IsBackUp: Integer); static;
-    class procedure LoadFromFile; static;
-    // Удаляет указанные значения/владельцев из памяти и физически перезаписывает MeterValues.ini.
-    class procedure DeleteFromFile(const AHashes: TStrings;
+    // Сохраняет значения в логическое хранилище MeterValues файла setting.fpp.
+    class procedure SaveToStorage; static;
+    // Загружает значения из логического хранилища MeterValues файла setting.fpp.
+    class procedure LoadFromStorage; static;
+    // Удаляет указанные значения/владельцев и перезаписывает хранилище MeterValues.
+    class procedure DeleteFromStorage(const AHashes: TStrings;
       const AOwnerNames: TStrings = nil); static;
 
     procedure SetCoef(ACoef: TCoef); overload;
@@ -716,7 +718,7 @@ class function TMeterValue.FindStabilitySectionByPersistentKey(AMeterValue: TMet
   out ALookupMode, ALookupKey, AMatchedSection, AMatchedHash, AMatchedHashOwner,
   AMatchedValueKind: string): Boolean;
 var
-  Ini: TMemIniFile;
+  Ini: TProjectSettingsIni;
   Count: Integer;
   I: Integer;
   MatchIndex: Integer;
@@ -761,7 +763,7 @@ begin
   if AMeterValue = nil then
     Exit;
 
-  Ini := TMemIniFile.Create(GetMeterValuesFileName(0));
+  Ini := OpenProjectSettings(STORAGE_METER_VALUES);
   try
     Count := Ini.ReadInteger('MeterValues', 'ValuesCount', 0);
     if Trim(AMeterValue.Hash) <> '' then
@@ -821,7 +823,7 @@ class function TMeterValue.LoadStabilitySettingsByPersistentKey(AMeterValue: TMe
   out ALookupMode, ALookupKey, AMatchedSection, AMatchedHash, AMatchedHashOwner,
   AMatchedValueKind: string): Boolean;
 var
-  Ini: TMemIniFile;
+  Ini: TCustomIniFile;
   Count: Integer;
   I: Integer;
   LegacyCount: Integer;
@@ -937,7 +939,7 @@ begin
   if AMeterValue = nil then
     Exit;
 
-  Ini := TMemIniFile.Create(GetMeterValuesFileName(0));
+  Ini := OpenProjectSettings(STORAGE_METER_VALUES);
   try
     Count := Ini.ReadInteger('MeterValues', 'ValuesCount', 0);
 
@@ -3824,19 +3826,10 @@ begin
   Result := TGUID.NewGuid.ToString;
 end;
 
-{ Serializes all meter values to persistent INI storage (optionally backup). }
-class function TMeterValue.GetMeterValuesFileName(IsBackUp: Integer): string;
-begin
-  if IsBackUp = 0 then
-    Result := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'MeterValues.ini')
-  else
-    Result := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), Format('MeterValuesBackUp%d.ini', [IsBackUp]));
-end;
-
-class procedure TMeterValue.SaveToFile(IsBackUp: Integer);
+{ Сохраняет все значения в логическое хранилище MeterValues файла setting.fpp. }
+class procedure TMeterValue.SaveToStorage;
 var
-  Ini: TMemIniFile;
-  FileName: string;
+  Ini: TProjectSettingsIni;
   I, J: Integer;
   MV: TMeterValue;
   Section: string;
@@ -3887,13 +3880,11 @@ begin
     Keys.Free;
   end;
 
-  FileName := GetMeterValuesFileName(IsBackUp);
-
-  ForceDirectories(ExtractFilePath(FileName));
-
-  Ini := TMemIniFile.Create(FileName);
+  Ini := OpenProjectSettings(STORAGE_METER_VALUES);
   try
-    Ini.Clear;
+    Ini.BeginUpdate;
+    try
+      Ini.Clear;
     Ini.WriteString('MeterValues', 'VER', '1.1');
     Ini.WriteFloat('MeterValues', 'InitDensity', FInitDensity);
     Ini.WriteInteger('MeterValues', 'ValuesCount', FMeterValuesSaves.Count);
@@ -3996,18 +3987,22 @@ begin
       end;
     end;
 
-    Ini.UpdateFile;
+      Ini.UpdateFile;
+      Ini.EndUpdate;
+    except
+      Ini.CancelUpdate;
+      raise;
+    end;
   finally
     Ini.Free;
   end;
 end;
 
-class procedure TMeterValue.DeleteFromFile(const AHashes: TStrings;
+class procedure TMeterValue.DeleteFromStorage(const AHashes: TStrings;
   const AOwnerNames: TStrings);
 var
   I: Integer;
   MV: TMeterValue;
-  FileName: string;
 
   function InList(AList: TStrings; const AValue: string): Boolean;
   begin
@@ -4021,99 +4016,11 @@ var
       InList(AOwnerNames, AHashOwner);
   end;
 
-  procedure CopySection(ASourceIni, ADestIni: TMemIniFile;
-    const ASourceSection, ADestSection: string);
-  var
-    Values: TStringList;
-    J: Integer;
-  begin
-    Values := TStringList.Create;
-    try
-      ASourceIni.ReadSectionValues(ASourceSection, Values);
-      for J := 0 to Values.Count - 1 do
-        ADestIni.WriteString(ADestSection, Values.Names[J], Values.ValueFromIndex[J]);
-    finally
-      Values.Free;
-    end;
-  end;
-
-  procedure PurgeMeterValuesIni;
-  var
-    SourceIni: TMemIniFile;
-    DestIni: TMemIniFile;
-    Count: Integer;
-    ReadIndex: Integer;
-    WriteIndex: Integer;
-    DimIndex: Integer;
-    CoefIndex: Integer;
-    DimensionsCount: Integer;
-    CoefsCount: Integer;
-    SourceSection: string;
-    DestSection: string;
-    Hash: string;
-    NameOwner: string;
-    HashOwner: string;
-  begin
-    if not FileExists(FileName) then
-      Exit;
-
-    SourceIni := TMemIniFile.Create(FileName);
-    DestIni := TMemIniFile.Create(FileName);
-    try
-      DestIni.Clear;
-      DestIni.WriteString('MeterValues', 'VER',
-        SourceIni.ReadString('MeterValues', 'VER', '1.0'));
-      DestIni.WriteString('MeterValues', 'InitDensity',
-        SourceIni.ReadString('MeterValues', 'InitDensity', FloatToStr(FInitDensity)));
-
-      Count := SourceIni.ReadInteger('MeterValues', 'ValuesCount', 0);
-      WriteIndex := 0;
-
-      for ReadIndex := 0 to Count - 1 do
-      begin
-        SourceSection := 'MeterValue.' + IntToStr(ReadIndex);
-        Hash := SourceIni.ReadString(SourceSection, 'Hash', '');
-        NameOwner := SourceIni.ReadString(SourceSection, 'NameOwner', '');
-        HashOwner := SourceIni.ReadString(SourceSection, 'HashOwner', '');
-
-        if IsDeletedEntry(Hash, NameOwner, HashOwner) then
-          Continue;
-
-        DestSection := 'MeterValue.' + IntToStr(WriteIndex);
-        CopySection(SourceIni, DestIni, SourceSection, DestSection);
-
-        DimensionsCount := SourceIni.ReadInteger(SourceSection, 'DimensionsCount', 0);
-        for DimIndex := 0 to DimensionsCount - 1 do
-          CopySection(SourceIni, DestIni,
-            SourceSection + '.Dimension.' + IntToStr(DimIndex),
-            DestSection + '.Dimension.' + IntToStr(DimIndex));
-
-        CoefsCount := SourceIni.ReadInteger(SourceSection, 'CoefsCount', 0);
-        for CoefIndex := 0 to CoefsCount - 1 do
-          CopySection(SourceIni, DestIni,
-            SourceSection + '.Coef.' + IntToStr(CoefIndex),
-            DestSection + '.Coef.' + IntToStr(CoefIndex));
-
-        Inc(WriteIndex);
-      end;
-
-      // Физически пересобираем файл без удаляемых секций и без дыр в нумерации.
-      DestIni.WriteInteger('MeterValues', 'ValuesCount', WriteIndex);
-      DestIni.UpdateFile;
-    finally
-      DestIni.Free;
-      SourceIni.Free;
-    end;
-  end;
-
 begin
   if ((AHashes = nil) or (AHashes.Count = 0)) and
      ((AOwnerNames = nil) or (AOwnerNames.Count = 0)) then
     Exit;
 
-  // Удаляем значения не только по Hash, но и по владельцу рабочего стола.
-  // Это закрывает старые записи MeterValues.ini, которые уже не привязаны к полям TWorkTable,
-  // но всё ещё имеют NameOwner вроде "Рабочий стол 1".
   if FMeterValues <> nil then
     for I := FMeterValues.Count - 1 downto 0 do
     begin
@@ -4125,20 +4032,13 @@ begin
       end;
     end;
 
-  // Сначала сохраняем актуальное состояние памяти, затем отдельно чистим сам файл:
-  // в нём могут быть старые секции, которых уже нет в FMeterValues.
-  SaveToFile(0);
-  FileName := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'),
-    'MeterValues.ini');
-  PurgeMeterValuesIni;
+  SaveToStorage;
 end;
 
-{ Loads meter values from persistent INI storage and restores relations. }
-{ TODO -oAndrey -cError : В список попадают явно лишние значения, которые там остаются и не удаляются. Загрузка из-за этого происходит медленно }
-class procedure TMeterValue.LoadFromFile;
+{ Загружает значения из логического хранилища MeterValues файла setting.fpp. }
+class procedure TMeterValue.LoadFromStorage;
 var
-  Ini: TIniFile;
-  FileName: string;
+  Ini: TCustomIniFile;
   Count, I, J: Integer;
   Section: string;
   MV: TMeterValue;
@@ -4180,14 +4080,7 @@ var
   end;
 
 begin
-  FileName := GetMeterValuesFileName(0);
-  if not FileExists(FileName) then
-  begin
-    SaveToFile(0);
-    Exit;
-  end;
-
-  Ini := TIniFile.Create(FileName);
+  Ini := OpenProjectSettings(STORAGE_METER_VALUES);
   try
     FInitDensity := S2F(Ini.ReadString('MeterValues', 'InitDensity', FloatToStr(FInitDensity)));
     Count := Ini.ReadInteger('MeterValues', 'ValuesCount', 0);

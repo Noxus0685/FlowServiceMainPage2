@@ -71,6 +71,7 @@ uses
   uMeterValue,
   uObservable,
   uParameter,
+  uProjectSettings,
   uProtocols,
   uRepositories,
   uGraphsViewConfig,
@@ -3749,23 +3750,21 @@ end;
 procedure TFrameMainTable.PersistChannelEnabled(AWorkTable: TWorkTable; AChannel: TChannel;
   const AKind: string; const AOldEnabled, ANewEnabled: Boolean);
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   StoragePath: string;
   SectionName: string;
 begin
   if (AWorkTable = nil) or (AChannel = nil) then
     Exit;
 
-  StoragePath := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
-    'Settings' + PathDelim + 'TableSettings.ini';
-  ForceDirectories(ExtractFilePath(StoragePath));
+  StoragePath := GetProjectSettingsFileName;
 
   if SameText(AKind, 'Etalon') then
     SectionName := Format('WorkTables/%s/EtalonChannels/%s', [AWorkTable.UUID, AChannel.UUID])
   else
     SectionName := Format('WorkTables/%s/DeviceChannels/%s', [AWorkTable.UUID, AChannel.UUID]);
 
-  Ini := TIniFile.Create(StoragePath);
+  Ini := TProjectSettingsIni.Create(StoragePath, STORAGE_TABLE_SETTINGS);
   try
     Ini.WriteBool(SectionName, 'Enabled', ANewEnabled);
     Ini.UpdateFile;
