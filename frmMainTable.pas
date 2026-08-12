@@ -3,7 +3,6 @@
 interface
 
 uses
-  uGridStabilityRegistry,
   FMX.ActnList,
   FMX.Colors,
   FMX.ComboEdit,
@@ -67,7 +66,6 @@ uses
   uDataManager,
   uDeviceClass,
   uFlowMeter,
-  uGridLayoutManager,
   uMeasurementRun,
   uMeterValue,
   uObservable,
@@ -2458,8 +2456,6 @@ var
   LayoutOrder: string;
 
 begin
-  RegisterStableGrid(Self, GridDevices, Name);
-  RegisterStableGrid(Self, GridEtalons, Name);
   EnsureFlowGraphDictionaries;
   if ButtonClearFlowGraphs <> nil then
     ButtonClearFlowGraphs.OnClick := ButtonClearFlowGraphsClick;
@@ -2490,7 +2486,7 @@ begin
   FFrameChannelProperties := nil;
   FFrameWorkTableProperties := nil;
 
-  TGridLayoutManager.SetRowCount(GridDevices, 2);
+  GridDevices.RowCount := 2;
 
   // Заполняем список через имя колонки
   PopupColumnDeviceSignal1.Items.Clear;
@@ -4122,8 +4118,7 @@ begin
 
     if Assigned(GridEtalonsN) then
     begin
-      TGridLayoutManager.SetRowCount(GridEtalonsN,
-        WorkTable.EtalonChannels.Count);
+      GridEtalonsN.RowCount := WorkTable.EtalonChannels.Count;
     end;
 
     GridDevicesN := FindComponent('GridDevices' + IntToStr(I)) as TGrid;
@@ -4132,8 +4127,7 @@ begin
 
     if Assigned(GridDevicesN) then
     begin
-      TGridLayoutManager.SetRowCount(GridDevicesN,
-        WorkTable.DeviceChannels.Count);
+      GridDevicesN.RowCount := WorkTable.DeviceChannels.Count;
     end;
 
     if WorkTable = FActiveWorkTable then
@@ -8228,8 +8222,6 @@ begin
   AddStringColumn(GridAutoTestNumbers, 'StringColumnVirtualResponse', 'Virtual response', 130);
   AddStringColumn(GridAutoTestNumbers, 'StringColumnProgress', 'Progress', 90);
   AddStringColumn(GridAutoTestNumbers, 'StringColumnReason', 'Причина', 300);
-  RegisterStableGrid(Self, GridAutoTestNumbers, Name);
-
   GridAutoTestResults := TGrid.Create(Self);
   GridAutoTestResults.Name := 'GridAutoTestResults';
   GridAutoTestResults.Parent := Layout;
@@ -8247,8 +8239,6 @@ begin
   AddStringColumn(GridAutoTestResults, 'StringColumnWorkTableState', 'WorkTable.State', 130);
   AddStringColumn(GridAutoTestResults, 'StringColumnReason', 'Причина', 240);
   AddStringColumn(GridAutoTestResults, 'StringColumnLogFile', 'Файл лога', 220);
-  RegisterStableGrid(Self, GridAutoTestResults, Name);
-
   InitializeAutoTestScenarioList;
   ButtonStopAutoTestScenario.Enabled := False;
   FAutoTestRealCommandsBlocked := False;
@@ -8830,10 +8820,8 @@ begin
     SetLength(FAutoTestResultRows, Length(FAutoTestResultRows) + 1);
     FAutoTestResultRows[High(FAutoTestResultRows)] := ResultRow;
 
-    TGridLayoutManager.SetRowCount(GridAutoTestNumbers,
-      Length(FAutoTestStepRows));
-    TGridLayoutManager.SetRowCount(GridAutoTestResults,
-      Length(FAutoTestResultRows));
+    GridAutoTestNumbers.RowCount := Length(FAutoTestStepRows);
+    GridAutoTestResults.RowCount := Length(FAutoTestResultRows);
     if FAutoTestStatusLabel <> nil then
       FAutoTestStatusLabel.Text := FinalReason;
     RefreshAutoMeasurementTestContext;
@@ -9259,7 +9247,7 @@ begin
     end;
   end;
 
-  TGridLayoutManager.SetRowCount(GridDevices, Rows);
+  GridDevices.RowCount := Rows;
 
   UpdateFlowMeterPropertiesFrame(Row);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -9391,7 +9379,7 @@ begin
     end;
 
 
-  TGridLayoutManager.SetRowCount(GridDevices, Rows);
+  GridDevices.RowCount := Rows;
 
   UpdateFlowMeterPropertiesFrame(Row);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -9925,7 +9913,7 @@ begin
     end;
   end;
 
-  TGridLayoutManager.SetRowCount(GridEtalons, Rows);
+  GridEtalons.RowCount := Rows;
 
   UpdateFlowMeterPropertiesFrame(Row, True);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -9978,7 +9966,7 @@ begin
     end;
 
 
-  TGridLayoutManager.SetRowCount(GridEtalons, Rows);
+  GridEtalons.RowCount := Rows;
 
   UpdateFlowMeterPropertiesFrame(Row, True);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -10238,7 +10226,7 @@ end;
     Rows: Integer;
  begin
    Rows:= GridDevices.RowCount;
-   TGridLayoutManager.SetRowCount(GridDevices, Rows, True);
+   GridDevices.RowCount := Rows;
  end;
 
 procedure ReloadGridByGrowingRowCount(AGrid: TGrid; ANewRowCount: Integer);
@@ -10249,7 +10237,7 @@ begin
 
   Sel := AGrid.Selected;
 
-  TGridLayoutManager.SetRowCount(AGrid, ANewRowCount, True);
+  AGrid.RowCount := ANewRowCount;
 
   // вернуть выделение (если осталось валидным)
   if (Sel >= 0) and (Sel < AGrid.RowCount) then
@@ -10268,7 +10256,7 @@ begin
 
   Sel := AGrid.Selected;
 
-  TGridLayoutManager.SetRowCount(AGrid, ANewRowCount);
+  AGrid.RowCount := ANewRowCount;
 
   if (Sel >= 0) and (Sel < AGrid.RowCount) then
     AGrid.Selected := Sel;

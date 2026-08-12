@@ -3,7 +3,6 @@
 interface
 
 uses
-  uGridStabilityRegistry,
   FMX.ComboEdit,
   FMX.ActnList,
   FMX.Controls,
@@ -49,7 +48,6 @@ uses
   uClasses,
   uDataManager,
   uDeviceClass,
-  uGridLayoutManager,
   uRepositories,
   uProtocols,
   uReportTemplates;
@@ -767,8 +765,6 @@ end;
 
  begin
    inherited Create(AOwner);
-   RegisterStableGrid(Self, GridPoints, Name);
-   RegisterStableGrid(Self, GridDiameters, Name);
    FDiameterQ2 := TDictionary<Integer, Double>.Create;
    FDiameterQ4 := TDictionary<Integer, Double>.Create;
    TabItemCoefs.Visible := False;
@@ -1103,8 +1099,6 @@ begin
   NewCol('StringColumnCoefQTo', 'QTo', 90);
   NewCol('StringColumnCoefK', 'K', 90);
   NewCol('StringColumnCoefB', 'b', 90);
-  RegisterStableGrid(Self, FGridCoefs, Name);
-
   UpdateCoefsGrid;
 end;
 
@@ -1496,7 +1490,7 @@ begin
       Inc(VisibleCount);
     end;
 
-  TGridLayoutManager.SetRowCount(GridDiameters, VisibleCount);
+  GridDiameters.RowCount := VisibleCount;
   if VisibleCount <= 0 then
     GridDiameters.Row := -1
   else if PrevRow < 0 then
@@ -1583,7 +1577,7 @@ begin
     if (P <> nil) and (P.State <> osDeleted) then
       Inc(VisibleCount);
 
-  TGridLayoutManager.SetRowCount(GridPoints, VisibleCount);
+  GridPoints.RowCount := VisibleCount;
 end;
 
 procedure TFormTypeEditor.UpdateCoefsGrid;
@@ -1591,8 +1585,7 @@ begin
   if FGridCoefs = nil then
     Exit;
 
-  TGridLayoutManager.SetRowCount(FGridCoefs,
-    FCalibrCoefItemsLocal.Count);
+  FGridCoefs.RowCount := FCalibrCoefItemsLocal.Count;
 end;
 
 function TFormTypeEditor.GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;
