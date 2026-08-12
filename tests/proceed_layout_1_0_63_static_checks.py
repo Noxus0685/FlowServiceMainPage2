@@ -7,23 +7,20 @@ VERSION = (ROOT / "uAppVersion.pas").read_text(encoding="utf-8-sig")
 
 
 def body(name: str) -> str:
-    start = PROCEED.index(f"procedure TFrameProceed.{name}")
-    end = PROCEED.find("\nprocedure TFrameProceed.", start + 1)
-    return PROCEED[start:] if end < 0 else PROCEED[start:end]
+    markers = (f"procedure TFrameProceed.{name}", f"function TFrameProceed.{name}")
+    start = next(PROCEED.index(marker) for marker in markers if marker in PROCEED)
+    ends = [pos for marker in ("\nprocedure TFrameProceed.", "\nfunction TFrameProceed.")
+            if (pos := PROCEED.find(marker, start + 1)) >= 0]
+    return PROCEED[start:min(ends)] if ends else PROCEED[start:]
 
 
-def test_display_position_is_captured_from_fmx_column_index():
+def test_display_position_and_visibility_are_captured_without_width():
     capture = body("CaptureGridColumnsLayout")
     assert "Column := AGrid.Columns[I]" in capture
     assert "Position := Column.Index" in capture
     assert "Position := I" not in capture
-    assert "Width := Column.Width" in capture
+    assert "Width := Column.Width" not in capture
     assert "Visible := Column.Visible" in capture
-    assert "'GridLayoutSaveOrderBegin'" in capture
-    assert "'GridLayoutSaved'" in capture
-    for field in ("GridName", "ColumnName", "ColumnsIndex", "VisualIndex",
-                  "Position", "Width", "Visible"):
-        assert field in capture
 
 
 def test_saved_order_is_applied_by_stable_column_name():
@@ -31,10 +28,8 @@ def test_saved_order_is_applied_by_stable_column_name():
     assert "SortedColumns[J].Position > Temp.Position" in apply
     assert "SameText(AGrid.Columns[J].Name, SortedColumns[I].Name)" in apply
     assert "Column.Index := TargetIndex" in apply
-    assert "FApplyingGridColumnsLayout := True" in apply
-    assert "FApplyingGridColumnsLayout := False" in apply
-    assert "'GridLayoutLoaded'" in apply
-    assert "SavedPosition=%d; AppliedPosition=%d" in apply
+    assert "GetResultsPointColumnIndex(Column) >= 0" in apply
+    assert "Column = StringColumnResultComment" in apply
 
 
 def test_columns_menu_uses_logical_items_not_fmx_style_children():
@@ -49,32 +44,28 @@ def test_columns_menu_uses_logical_items_not_fmx_style_children():
 
 
 def test_release_version():
-    assert "APP_VERSION = '1.0.65'" in VERSION
+    assert "APP_VERSION = '1.0.135'" in VERSION
 
 
-def test_results_point_columns_are_normalized_after_layout():
+def test_results_point_columns_are_fixed_and_normalized_after_layout():
     update = body("UpdateResultsPointColumns")
     normalize = body("NormalizeResultsPointColumnsVisibility")
     results = body("UpdateGridResults")
-    assert "PointColumnCount := Length(FResultPointColumns)" in update
-    assert "StaticPointColumnCount := Min(PointColumnCount, 4)" in update
-    assert "DynamicPointColumnCount := Max(PointColumnCount - 4, 0)" in update
-    assert "StringColumnPointNum4, 3" in update
-    assert "ProcessingDynamicPoint" in update
-    assert "NormalizeResultsPointColumnsVisibility" in update
-    assert "SetStaticPointColumnVisibility(StringColumnPointNum4, 3)" in normalize
-    assert "HiddenStaticColumns" in normalize
-    assert "ProcessingResultColumnsNormalized" in normalize
-    assert "ApplyGridColumnsLayout(GridResults" in results
+    assert "C_RESULTS_POINT_COLUMN_COUNT" in update
+    assert "FResultsPointColumns[I].Header" in update
+    assert "FResultsPointColumns[I].Visible := True" in update
+    assert "FResultsPointColumns[I].Visible := False" in update
+    assert "ProcessingResultPointColumnLimitExceeded" in update
+    assert "FResultsPointColumns[I].Visible" in normalize
     assert "NormalizeResultsPointColumnsVisibility" in results
 
 
-def test_results_grid_dynamic_point_access_uses_column_tags():
+def test_results_grid_fixed_point_access_uses_component_index():
     get_value = body("GridResultsGetValue")
     draw = body("GridResultsDrawColumnCell")
     assert "not GridResults.Columns[ACol].Visible" in get_value
-    assert "SameText(GridResults.Columns[ACol].TagString, 'ProcessingDynamicPoint')" in get_value
-    assert "PointIdx := GridResults.Columns[ACol].Tag" in get_value
+    assert "PointIndex := GetResultsPointColumnIndex" in get_value
+    assert "PointIndex < Length(FResultPointColumns)" in get_value
+    assert "PointIndex < Length(Row.PointValues)" in get_value
     assert "not Column.Visible" in draw
-    assert "SameText(Column.TagString, 'ProcessingDynamicPoint')" in draw
-    assert "PointIdx := Column.Tag" in draw
+    assert "PointIdx := GetResultsPointColumnIndex(Column)" in draw

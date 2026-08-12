@@ -3,7 +3,7 @@
 interface
 
 uses
-  uGridStabilityRegistry,
+  FmxHelper,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Dialogs,
@@ -30,7 +30,6 @@ uses
   uMeasurementRun,
   uObservable,
   uResultsXlsxExporter,
-  uGridLayoutManager,
   uWorkTable;
 
 type
@@ -73,8 +72,6 @@ type
     procedure ButtonCreateSessionClick(Sender: TObject);
     procedure ButtonExportExcelClick(Sender: TObject);
     procedure GridMRResultsSelChanged(Sender: TObject);
-    procedure GridMRResultsMouseUp(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Single);
   private
     FActiveWorkTable: TWorkTable;
     FPointColumns: TObjectList<TStringColumn>;
@@ -82,7 +79,7 @@ type
     FRows: TList<TChannel>;
     FProceed: TObject;
     FRefreshing: Boolean;
-    FGridLayoutState: TGridLayoutState;
+    FColumnStructureSignature: string;
 
     function GetMeasurementRun: TMeasurementRun;
     procedure SetActiveWorkTable(const Value: TWorkTable);
@@ -90,8 +87,6 @@ type
     procedure DetachMeasurementRun;
 
     procedure BuildColumns;
-    function CreateGridColumn(AOwner: TComponent;
-      ADefinition: TGridColumnDefinition): TColumn;
     function GetDisplayPointKey(AGroup: TDisplayPointGroup): string;
     function HasCurrentMeasurementPoints: Boolean;
     procedure BuildRows;
@@ -203,19 +198,13 @@ end;
 constructor TFrameMRResults.Create(AOwner: TComponent);
 begin
   inherited;
-  RegisterStableGrid(Self, GridMRResults, Name, False);
   FPointColumns := TObjectList<TStringColumn>.Create(False);
   FDisplayPoints := TObjectList<TDisplayPointGroup>.Create(True);
   FRows := TList<TChannel>.Create;
-  FGridLayoutState := TGridLayoutState.Create;
-  FGridLayoutState.ConfigureWidthControl(GridMRResults,
-    ClassName + '.' + GridMRResults.Name);
-
   GridMRResults.OnGetValue := GridMRResultsGetValue;
   GridMRResults.OnDrawColumnCell := GridMRResultsDrawColumnCell;
   GridMRResults.OnSetValue := nil;
   GridMRResults.OnSelChanged := GridMRResultsSelChanged;
-  GridMRResults.OnMouseUp := GridMRResultsMouseUp;
   SetGridReadOnly(GridMRResults);
 end;
 
@@ -225,7 +214,6 @@ begin
   FreeAndNil(FRows);
   FreeAndNil(FDisplayPoints);
   FreeAndNil(FPointColumns);
-  FreeAndNil(FGridLayoutState);
   inherited;
 end;
 
@@ -595,15 +583,6 @@ begin
   ButtonCreateSession.Enabled := ButtonClearSession.Enabled;
 end;
 
-{ Persists width only after the tracked manual resize has completed. }
-procedure TFrameMRResults.GridMRResultsMouseUp(Sender: TObject;
-  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
-begin
-  if (Button = TMouseButton.mbLeft) and (not FRefreshing) and
-     (FGridLayoutState <> nil) then
-    FGridLayoutState.FinishPendingManualResize;
-end;
-
 procedure TFrameMRResults.BuildRows;
 var
   Ch: TChannel;
@@ -620,12 +599,12 @@ end;
 procedure TFrameMRResults.BuildColumns;
 var
   I: Integer;
+  Col: TStringColumn;
   Group: TDisplayPointGroup;
   RequiredDisplayPoints, PreviousDisplayPoints: TObjectList<TDisplayPointGroup>;
-  Definitions: TGridColumnDefinitions;
+  RequiredSignature: string;
 begin
-  { Build the desired model away from the live grid.  This is intentionally
-    done before touching Parent/Index or freeing a column. }
+  { Builds point columns only when the actual point composition changes. }
   RequiredDisplayPoints := TObjectList<TDisplayPointGroup>.Create(True);
   PreviousDisplayPoints := FDisplayPoints;
   FDisplayPoints := RequiredDisplayPoints;
@@ -635,45 +614,48 @@ begin
         if (MeasurementRun.Points[I] <> nil) and MeasurementRun.Points[I].Enabled then
           AddScenarioDisplayPoint(MeasurementRun.Points[I]);
     MakeDisplayHeadersUnique;
+    RequiredSignature := '';
+    for Group in RequiredDisplayPoints do
+      RequiredSignature := RequiredSignature + '|' + GetDisplayPointKey(Group);
   finally
     FDisplayPoints := PreviousDisplayPoints;
   end;
 
-  Definitions := TGridColumnDefinitions.Create(True);
-  try
-    Definitions.Add(TGridColumnDefinition.Create('fixed:name',
-      StringColumnName.Header, TStringColumn, StringColumnName.Width, True,
-      StringColumnName.Visible, StringColumnName));
-    for Group in RequiredDisplayPoints do
-      Definitions.Add(TGridColumnDefinition.Create(GetDisplayPointKey(Group),
-        Group.Header, TStringColumn, C_DYNAMIC_COLUMN_WIDTH, True, True));
-    Definitions.Add(TGridColumnDefinition.Create('fixed:result',
-      StringColumnResult.Header, TStringColumn, StringColumnResult.Width, True,
-      StringColumnResult.Visible, StringColumnResult));
+  if RequiredSignature = FColumnStructureSignature then
+  begin
+    RequiredDisplayPoints.Free;
+    Exit;
+  end;
 
-    if TGridLayoutManager.Apply(GridMRResults, FGridLayoutState, Definitions,
-      CreateGridColumn, 'table=' + IntToHex(NativeInt(Pointer(FActiveWorkTable)),
-        SizeOf(Pointer) * 2)) then
+  GridMRResults.BeginUpdate;
+  try
+    FPointColumns.Clear;
+    while GridMRResults.ColumnCount > 2 do
+      if GridMRResults.Columns[1] <> StringColumnResult then
+        GridMRResults.Columns[1].Free
+      else
+        Break;
+    StringColumnName.Index := 0;
+    for Group in RequiredDisplayPoints do
     begin
-      FPointColumns.Clear;
-      for I := 1 to GridMRResults.ColumnCount - 2 do
-        FPointColumns.Add(TStringColumn(GridMRResults.Columns[I]));
-      FDisplayPoints.Free;
-      FDisplayPoints := RequiredDisplayPoints;
-      RequiredDisplayPoints := nil;
-      SetGridReadOnly(GridMRResults);
+      Col := TStringColumn.Create(GridMRResults);
+      Col.Parent := GridMRResults;
+      Col.HeaderSettings.TextSettings.WordWrap := False;
+      Col.Stored := False;
+      Col.Header := Group.Header;
+      Col.Index := GridMRResults.ColumnCount - 1;
+      FPointColumns.Add(Col);
     end;
+    StringColumnResult.Index := GridMRResults.ColumnCount - 1;
+    FDisplayPoints.Free;
+    FDisplayPoints := RequiredDisplayPoints;
+    RequiredDisplayPoints := nil;
+    FColumnStructureSignature := RequiredSignature;
+    SetGridReadOnly(GridMRResults);
   finally
-    Definitions.Free;
+    GridMRResults.EndUpdate;
     RequiredDisplayPoints.Free;
   end;
-end;
-
-function TFrameMRResults.CreateGridColumn(AOwner: TComponent;
-  ADefinition: TGridColumnDefinition): TColumn;
-begin
-  Result := TStringColumn.Create(AOwner);
-  Result.HeaderSettings.TextSettings.WordWrap := False;
 end;
 
 function TFrameMRResults.GetDisplayPointKey(AGroup: TDisplayPointGroup): string;
@@ -842,7 +824,7 @@ end;
 
 procedure TFrameMRResults.RefreshRows;
 begin
-  TGridLayoutManager.SetRowCount(GridMRResults, FRows.Count);
+  RefreshGridContent(GridMRResults, FRows.Count, 'mr-results');
 end;
 
 function TFrameMRResults.GetRowChannel(const ARow: Integer): TChannel;

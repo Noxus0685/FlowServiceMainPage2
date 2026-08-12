@@ -3,6 +3,7 @@
 interface
 
 uses
+  FmxHelper,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Dialogs,
@@ -30,8 +31,6 @@ uses
   uClasses,
   uDeviceClass,
   uFlowMeter,
-  uGridLayoutManager,
-  uGridStabilityRegistry,
   uMeterValue;
 
 type
@@ -154,8 +153,6 @@ begin
   FFilteredTables := TObjectList<TCalibrCoefTable>.Create(False);
   FCurrentSpillages := TObjectList<TPointSpillage>.Create(False);
   FCurrentType := cctReference;
-  RegisterStableGrid(Self, GridCoefs, Name);
-
   GridCoefs.OnGetValue := GridCoefsGetValue;
   GridCoefs.OnSetValue := GridCoefsSetValue;
   GridCoefs.OnKeyDown := GridCoefsKeyDown;
@@ -546,9 +543,9 @@ end;
 procedure TFrameCalibrCoefs.UpdateGrid;
 begin
   if (FCurrentTable <> nil) and (FCurrentTable.Items <> nil) then
-    TGridLayoutManager.SetRowCount(GridCoefs, FCurrentTable.Items.Count, True)
+    RefreshGridContent(GridCoefs, FCurrentTable.Items.Count, 'calibration-coefs')
   else
-    TGridLayoutManager.SetRowCount(GridCoefs, 0, True);
+    RefreshGridContent(GridCoefs, 0, 'calibration-coefs');
 end;
 
 function TFrameCalibrCoefs.InitErrorPercent(AItem: TCalibrCoefItem): Double;
