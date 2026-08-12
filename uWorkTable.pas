@@ -2372,22 +2372,34 @@ begin
     end;
     if BindingValid then
       BindingLogCategory := pcProc;
-    ProtocolManager.AddMessage(BindingLogCategory, psWorkTable,
-      'CopiedDeviceErrorBinding',
-      'Восстановлена связь погрешности скопированного прибора',
-      Format('ChannelName=%s; OldDeviceUUID=%s; NewDeviceUUID=%s; ' +
-        'FlowMeterUUID=%s; DeviceUUID=%s; TableFlowAssigned=%s; ' +
-        'ValueErrorAssigned=%s; ValueQuantityAssigned=%s; ' +
-        'ValueBaseMultiplierAssigned=%s; ValueEtalonAssigned=%s; ' +
-        'ValueBaseMultiplierHash=%s; ValueEtalonHash=%s; BindingValid=%s',
-        [Name, OldDeviceUUID, NewDeviceUUID, FFlowMeter.UUID,
-         FFlowMeter.DeviceUUID, BoolToStr(AWorkTable.TableFlow <> nil, True),
-         BoolToStr(FFlowMeter.ValueError <> nil, True),
-         BoolToStr(FFlowMeter.ValueQuantity <> nil, True),
-         BoolToStr(ValueBaseMultiplierAssigned, True),
-         BoolToStr(ValueEtalonAssigned, True),
-         ValueBaseMultiplierHash, ValueEtalonHash,
-         BoolToStr(BindingValid, True)]));
+ProtocolManager.AddMessage(
+  BindingLogCategory,
+  psWorkTable,
+  'CopiedDeviceErrorBinding',
+  'Восстановлена связь погрешности скопированного прибора',
+  Format(
+    'ChannelName=%s; OldDeviceUUID=%s; NewDeviceUUID=%s; ' +
+    'FlowMeterUUID=%s; DeviceUUID=%s; TableFlowAssigned=%s; ' +
+    'ValueErrorAssigned=%s; ValueQuantityAssigned=%s; ' +
+    'ValueBaseMultiplierAssigned=%s; ValueEtalonAssigned=%s; ' +
+    'ValueBaseMultiplierHash=%s; ValueEtalonHash=%s; BindingValid=%s',
+    [
+      Name,
+      OldDeviceUUID,
+      NewDeviceUUID,
+      FFlowMeter.UUID,
+      FFlowMeter.DeviceUUID,
+      BoolToStr(AWorkTable.TableFlow <> nil, 'True', 'False'),
+      BoolToStr(FFlowMeter.ValueError <> nil, 'True', 'False'),
+      BoolToStr(FFlowMeter.ValueQuantity <> nil, 'True', 'False'),
+      BoolToStr(ValueBaseMultiplierAssigned, 'True', 'False'),
+      BoolToStr(ValueEtalonAssigned, 'True', 'False'),
+      ValueBaseMultiplierHash,
+      ValueEtalonHash,
+      BoolToStr(BindingValid, 'True', 'False')
+    ]
+  )
+);
   end;
 end;
 
