@@ -10,6 +10,7 @@ assert ROOT_HELPER_PATH.parent == ROOT
 MAIN = (ROOT / "frmMainTable.pas").read_text(encoding="utf-8")
 MEASUREMENT_FRAME = (ROOT / "frmMeasurementRun.pas").read_text(encoding="utf-8")
 RUN = (ROOT / "uMeasurementRun.pas").read_text(encoding="utf-8")
+SIMULATION_FORM = (ROOT / "fuTable_Main.pas").read_text(encoding="utf-8")
 HELPER = ROOT_HELPER_PATH.read_text(encoding="utf-8")
 VERSION = (ROOT / "uAppVersion.pas").read_text(encoding="utf-8")
 PROJECT = (ROOT / "ProjectFornTest.dproj").read_text(encoding="utf-8")
@@ -111,10 +112,20 @@ def test_simulation_completes_both_hydraulic_actions_through_public_api():
     assert ".SetStage" not in find_completion + setup_completion
 
 
-def test_project_version_is_1_0_143():
-    assert "APP_VERSION = '1.0.143'" in VERSION
-    assert "FileVersion=1.0.143.0" in PROJECT
-    assert "ProductVersion=1.0.143.0" in PROJECT
+def test_simulation_entry_point_enables_manager_mode_before_frame_initialization():
+    form_create = method(SIMULATION_FORM, "procedure TTableMainForm.FormCreate", "procedure TTableMainForm.tcMainChange")
+    manager_assignment = form_create.index("FWorkTableManager := AppServices.WorkTableManager;")
+    simulation_assignment = form_create.index("FWorkTableManager.IsSimulationMode := True;")
+    frame_initialization = form_create.index("FFrameMainTable.Initialize;")
+    assert manager_assignment < simulation_assignment < frame_initialization
+    assert form_create.count("FWorkTableManager.IsSimulationMode := True;") == 1
+    assert "FWorkTableManager.IsSimulationMode := True;" not in MAIN
+
+
+def test_project_version_is_1_0_144():
+    assert "APP_VERSION = '1.0.144'" in VERSION
+    assert "FileVersion=1.0.144.0" in PROJECT
+    assert "ProductVersion=1.0.144.0" in PROJECT
 
 
 def test_shortstring_trim_is_explicit_before_overload_resolution():
