@@ -528,6 +528,7 @@ begin
     pcMKS: Result := 'MKS';
     pcInfo: Result := 'INFO';
     pcProc: Result := 'PROC';
+    pcWorkLog: Result := 'WORKLOG';
     pcHandler: Result := 'HANDLER';
     pcWarning: Result := 'Warning!';
     pcError: Result := 'Error!';
@@ -543,6 +544,7 @@ begin
     psParameters: Result := 'PAR';
     psWorkTable: Result := 'WT';
     psMeasurement: Result := 'MR';
+    psEngine: Result := 'ENG';
   else
     Result := '';
   end;
