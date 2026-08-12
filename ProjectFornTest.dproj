@@ -297,7 +297,6 @@
         <DCCReference Include="uReportTemplates.pas"/>
         <DCCReference Include="uResultsXlsxExporter.pas"/>
         <DCCReference Include="uGridXlsxExporter.pas"/>
-        <DCCReference Include="uGridLayoutManager.pas"/>
         <DCCReference Include="uTable_Data.pas">
             <Form>TableDM</Form>
             <FormType>dfm</FormType>
