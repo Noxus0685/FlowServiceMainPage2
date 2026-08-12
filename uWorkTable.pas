@@ -199,7 +199,7 @@ type
       - регулирующие устройства;
       - остальные элементы гидравлической линии.
 
-      TMeasurementRun должен оставаться на стадии msSelectEtalon и ожидать
+      TMeasurementRun должен оставаться на стадии msHydraulicLineConfiguration и ожидать
       завершения поиска.
 
       При успешном завершении состояние изменяется на hlsSelected.
@@ -217,8 +217,8 @@ type
 
       Физическая установка арматуры и запуск оборудования ещё не выполнялись.
 
-      Из этого состояния ProcessSetupPoint должен один раз запустить
-      асинхронную установку линии и перевести состояние в hlsSettingUp. }
+      Из этого состояния MeasurementRun переходит на
+      msSetupHydraulicLine, где установка запускается один раз. }
     hlsSelected,
 
     { Выполняется асинхронная физическая установка гидравлической линии.
@@ -230,8 +230,8 @@ type
       - установить начальные параметры регулирования;
       - передать механизму регулирования требуемый расход.
 
-      TMeasurementRun должен находиться на стадии msWaitPointSetup и ожидать
-      завершения установки, не вызывая IsPointSetupReady.
+      TMeasurementRun находится на msSetupHydraulicLine и только
+      контролирует завершение уже запущенной операции.
 
       При успешном завершении состояние изменяется на hlsConfigured.
       При ошибке состояние изменяется на hlsFailed. }
@@ -245,8 +245,8 @@ type
       Это состояние не означает, что расход, температура и давление уже
       стабилизировались.
 
-      Только после получения hlsConfigured метод ProcessWaitPointSetup может
-      вызывать IsPointSetupReady и ожидать стабилизации параметров точки. }
+      MeasurementRun может перейти на msSetupPoint; готовность
+      параметров точки затем проверяется отдельно. }
     hlsConfigured,
 
     { Поиск конфигурации или установка гидравлической линии завершились
@@ -1430,6 +1430,9 @@ type
   procedure StopMonitor;
   procedure SaveMeasurementResults;
 
+  { Публикует единственную команду физической установки выбранной линии. }
+  function SetupHydraulicLine(out AError: TErrorInfo): Boolean;
+
   { Запускает поиск гидравлической конфигурации для точки.
     Возвращает OperationID или 0 при ошибочных аргументах. }
   function BeginHydraulicConfigurationSearch(const APointUUID: string;
@@ -1483,7 +1486,7 @@ type
   { Формирует подробное диагностическое описание текущего состояния. }
   function GetHydraulicDiagnosticText: string;
 
-    function ApplyHydraulicConfiguration(out AError: TErrorInfo): Boolean;
+  function ApplyHydraulicConfiguration(out AError: TErrorInfo): Boolean;
   end;
 
 
@@ -6161,6 +6164,35 @@ procedure TWorkTable.ExecuteAction(AAction: EActionWorkTable; const ASourceName:
   const ADescription: string);
 begin
   NotifySyncOwned(notifyAction, CreateActionNotification(AAction, ASourceName, ADescription));
+end;
+
+function TWorkTable.SetupHydraulicLine(out AError: TErrorInfo): Boolean;
+var
+  HydraulicState: EHydraulicLineState;
+  OperationID: Int64;
+  PointUUID: string;
+  PointIndex: Integer;
+  TargetFlow: Double;
+  Configuration: RWorkTableHydraulicConfiguration;
+  Range: RWorkTableHydraulicRange;
+begin
+  GetHydraulicStateSnapshot(HydraulicState, AError, OperationID, PointUUID,
+    PointIndex, TargetFlow, Configuration, Range);
+  Result := HydraulicState = hlsSelected;
+  if not Result then
+  begin
+    AError := TErrorInfo.Empty(Integer(FState));
+    AError.Code := 1246;
+    AError.Msg := Format(
+      'Гидравлическая конфигурация не готова к установке: State=%s',
+      [HydraulicLineStateToString(HydraulicState)]);
+    AError.Time := Now;
+    Exit;
+  end;
+
+  FireAction(awtSetupHydraulicLine, 'SetupHydraulicLine', Format(
+    'OperationID=%d; PointUUID=%s; PointIndex=%d; TargetFlow=%.6f',
+    [OperationID, PointUUID, PointIndex, TargetFlow]));
 end;
 
 procedure TWorkTable.ResetSpillageRuntimeValues;

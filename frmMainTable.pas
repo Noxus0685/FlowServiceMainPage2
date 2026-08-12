@@ -1895,7 +1895,9 @@ begin
 end;
 
 procedure TFrameMainTable.HandleWorkTableAction(const AWorkTable: TWorkTable; AData: TObject);
-var Action:  EActionWorkTable;
+var
+  Action: EActionWorkTable;
+  Error: TErrorInfo;
 
 
 function TryToGetAction:  EActionWorkTable;
@@ -1962,6 +1964,18 @@ begin
             AWorkTable.Name
           );
          end;
+    awtSetupHydraulicLine:
+      begin
+        if Assigned(ProtocolManager) then
+          ProtocolManager.AddMessage(pcProc, psForm,
+            'SetupHydraulicLine', 'Гидравлическая линия устанавливается',
+            AWorkTable.Name);
+        if not AWorkTable.ApplyHydraulicConfiguration(Error) and
+           Assigned(ProtocolManager) then
+          ProtocolManager.AddMessage(pcError, psForm,
+            'SetupHydraulicLine', 'Ошибка установки гидравлической линии',
+            Error.Msg);
+      end;
     awtSelectEtalons:
       begin
         // Доменное действие уже выполнено в TWorkTable.SelectEtalons.
@@ -8596,7 +8610,7 @@ begin
             PointReady := (Point <> nil) and (Run.CurrentPointIndex >= 0) and
               (Run.Points <> nil) and (Run.CurrentPointIndex < Run.Points.Count) and
               (Run.Points[Run.CurrentPointIndex] = Point) and
-              (Run.Stage in [msSelectPoint, msSelectEtalon, msSetupPoint, msWaitPointSetup, msWaitStable, msWaitMeasureStart, msMeasure, msWaitMeasureStop, msResultsRead, msSave]);
+              (Run.Stage in [msSelectPoint, msHydraulicLineConfiguration, msSetupHydraulicLine, msSetupPoint, msWaitPointSetup, msWaitStable, msWaitMeasureStart, msMeasure, msWaitMeasureStop, msResultsRead, msSave]);
             if not PointReady then
             begin
               Inc(PointWaitSteps);
@@ -8895,7 +8909,8 @@ begin
         StartMeasurement;
 
     msSelectPoint,
-    msSelectEtalon,
+    msHydraulicLineConfiguration,
+    msSetupHydraulicLine,
     msSetupPoint,
     msWaitStable,
     msWaitMeasureStart,
