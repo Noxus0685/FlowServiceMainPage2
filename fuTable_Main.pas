@@ -610,6 +610,8 @@ begin
   if not AppServices.Initialized then
     AppServices.Initialize;
   FWorkTableManager := AppServices.WorkTableManager;
+  // Эта форма является точкой входа симулятора и явно включает его режим.
+  FWorkTableManager.IsSimulationMode := True;
 
   if FSubscribedWorkTables = nil then
     FSubscribedWorkTables := TList<TWorkTable>.Create;
