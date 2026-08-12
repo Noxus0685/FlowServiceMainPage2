@@ -1,4 +1,4 @@
-unit uWorkTable;
+﻿unit uWorkTable;
 
 interface
 
@@ -2254,8 +2254,7 @@ begin
 
   FFlowMeter.UUID := TGUID.NewGuid.ToString;
   FFlowMeter.Name := ASource.FFlowMeter.Name;
-  // DeviceUUID is assigned from the newly created instance below.
-  FFlowMeter.DeviceUUID := '';
+  FFlowMeter.DeviceUUID := ASource.FFlowMeter.DeviceUUID;
   FFlowMeter.DeviceTypeName := ASource.FFlowMeter.DeviceTypeName;
   FFlowMeter.DeviceTypeUUID := ASource.FFlowMeter.DeviceTypeUUID;
   FFlowMeter.RepoTypeName := ASource.FFlowMeter.RepoTypeName;
@@ -2316,16 +2315,6 @@ begin
     NewDevice := DataManager.ActiveDeviceRepo.CreateDeviceForChannelCopy(SrcDevice);
     NewDevice.SerialNumber := SrcDevice.SerialNumber;
     FFlowMeter.Device := NewDevice;
-    // Keep instance, type and repository identities synchronized independently.
-    FFlowMeter.DeviceUUID := NewDevice.UUID;
-    FFlowMeter.DeviceTypeName := NewDevice.DeviceTypeName;
-    FFlowMeter.DeviceTypeUUID := NewDevice.DeviceTypeUUID;
-    FFlowMeter.SerialNumber := NewDevice.SerialNumber;
-    FFlowMeter.OutputType := NewDevice.OutputType;
-    FFlowMeter.RepoTypeName := NewDevice.RepoTypeName;
-    FFlowMeter.RepoTypeUUID := NewDevice.RepoTypeUUID;
-    FFlowMeter.RepoDeviceName := NewDevice.RepoDeviceName;
-    FFlowMeter.RepoDeviceUUID := NewDevice.RepoDeviceUUID;
   end
   else if SrcDevice <> nil then
   begin
