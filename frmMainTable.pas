@@ -1670,16 +1670,16 @@ begin
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested',
     'Запрошена команда интерфейса измерения',
     Format('Command=Start; AutoMode=%s; RunAssigned=True; Stage=%d; IsPaused=%s; CurrentPointIndex=%d; CurrentPointUUID=%s; WorkTableState=%d; ButtonEnabled=%s',
-      [BoolToStr((SwitchAuto <> nil) and SwitchAuto.IsChecked, True), Ord(Run.Stage),
-       BoolToStr(Run.IsPaused, True), Run.CurrentPointIndex, UUID,
-       Ord(FActiveWorkTable.State), BoolToStr(TestButton.Enabled, True)]));
+      [BoolToStr((SwitchAuto <> nil) and SwitchAuto.IsChecked, 'True', 'False'), Ord(Run.Stage),
+       BoolToStr(Run.IsPaused, 'True', 'False'), Run.CurrentPointIndex, UUID,
+       Ord(FActiveWorkTable.State), BoolToStr(TestButton.Enabled, 'True', 'False')]));
   FActiveWorkTable.MeasurementMode := Run.Mode;
   FActiveWorkTable.StartMeasurementRun;
   if FFrameMeasurementRun <> nil then FFrameMeasurementRun.UpdateUI;
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent',
     'Команда интерфейса передана',
     Format('Command=Start; RunObjectPointer=%p; StageBefore=%d; IsPausedBefore=%s; CurrentPointIndexBefore=%d',
-      [Pointer(Run), StageBefore, BoolToStr(PausedBefore, True), IndexBefore]));
+      [Pointer(Run), StageBefore, BoolToStr(PausedBefore, 'True', 'False'), IndexBefore]));
 end;
 
 procedure TFrameMainTable.StopMeasurement;
@@ -1691,14 +1691,14 @@ begin
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandRequested',
     'Запрошена команда интерфейса измерения',
     Format('Command=Stop; AutoMode=%s; RunAssigned=%s; Stage=%d; IsPaused=%s; CurrentPointIndex=%d; CurrentPointUUID=; WorkTableState=%d; ButtonEnabled=%s',
-      [BoolToStr((SwitchAuto <> nil) and SwitchAuto.IsChecked, True), BoolToStr(Run <> nil, True),
-       StageValue, BoolToStr(Paused, True), PointIndex, Ord(FActiveWorkTable.State), BoolToStr(TestButton.Enabled, True)]));
+      [BoolToStr((SwitchAuto <> nil) and SwitchAuto.IsChecked, 'True', 'False'), BoolToStr(Run <> nil, 'True', 'False'),
+       StageValue, BoolToStr(Paused, 'True', 'False'), PointIndex, Ord(FActiveWorkTable.State), BoolToStr(TestButton.Enabled, 'True', 'False')]));
   FActiveWorkTable.StopMeasurementRun;
   if FFrameMeasurementRun <> nil then FFrameMeasurementRun.UpdateUI;
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiCommandSent',
     'Команда интерфейса передана',
     Format('Command=Stop; RunObjectPointer=%p; StageBefore=%d; IsPausedBefore=%s; CurrentPointIndexBefore=%d',
-      [Pointer(Run), StageValue, BoolToStr(Paused, True), PointIndex]));
+      [Pointer(Run), StageValue, BoolToStr(Paused, 'True', 'False'), PointIndex]));
 end;
 
  procedure TFrameMainTable.SwitchAutoSwitch(Sender: TObject);
@@ -1819,7 +1819,7 @@ begin
     Format('Mode=%s; PointsCount=%d; ManualPointAssigned=%s',
       [TMeasurementRun.MeasurementRunModeToString(Run.Mode), Run.Points.Count,
        BoolToStr((Run.Mode = mrmManual) and
-         (FActiveWorkTable.CurrentPoint <> nil), True)]));
+         (FActiveWorkTable.CurrentPoint <> nil), 'True', 'False')]));
 end;
 
 procedure TFrameMainTable.UpdateForm;
@@ -3770,8 +3770,8 @@ begin
     ProtocolManager.AddMessage(pcAction, psForm, 'ChannelEnabledChanged',
       'Изменён флаг включения канала рабочего стола',
       Format('WorkTableUUID=%s; ChannelKind=%s; ChannelUUID=%s; OldEnabled=%s; NewEnabled=%s; StoragePath=%s; SaveResult=Success',
-        [AWorkTable.UUID, AKind, AChannel.UUID, BoolToStr(AOldEnabled, True),
-         BoolToStr(ANewEnabled, True), StoragePath]));
+        [AWorkTable.UUID, AKind, AChannel.UUID, BoolToStr(AOldEnabled, 'True', 'False'),
+         BoolToStr(ANewEnabled, 'True', 'False'), StoragePath]));
   finally
     Ini.Free;
   end;
@@ -5990,8 +5990,8 @@ procedure TFrameMainTable.RefreshFlowGraphChannels(const AReason: string);
       if Assigned(ProtocolManager) then
         ProtocolManager.AddMessage(pcInfo, psForm, 'GraphSeriesState', Caption,
           Format('ChannelUUID=%s; Enabled=%s; Available=%s; UserVisible=%s; EffectiveVisible=%s',
-          [C.UUID, BoolToStr(C.Enabled, True), BoolToStr(S.ChannelAvailable, True),
-           BoolToStr(S.UserVisible, True), BoolToStr(S.EffectiveVisible, True)]));
+          [C.UUID, BoolToStr(C.Enabled, 'True', 'False'), BoolToStr(S.ChannelAvailable, 'True', 'False'),
+           BoolToStr(S.UserVisible, 'True', 'False'), BoolToStr(S.EffectiveVisible, 'True', 'False')]));
     end;
   end;
 var
@@ -6087,7 +6087,7 @@ procedure TFrameMainTable.AddFlowGraphSamples(const ATimeStampMs: Int64);
     if Assigned(ProtocolManager) then
       ProtocolManager.AddMessage(pcMKS, psForm, 'FlowGraphAddSample',
         Format('PointIndex=%d; PointKey=%s; SeriesKind=%s; SeriesKey=%s; RawValueLS=%g; Accepted=%s; RejectReason=%s; TimeStampMs=%d; SegmentStartMs=%d; SamplesBefore=%d; SamplesAfter=%d',
-          [FCurrentGraphPointIndex, FCurrentGraphPointKey, AKind, AKey, ARawValue, BoolToStr(AAccepted, True), AReason,
+          [FCurrentGraphPointIndex, FCurrentGraphPointKey, AKind, AKey, ARawValue, BoolToStr(AAccepted, 'True', 'False'), AReason,
            ATimeStampMs, FCurrentGraphPointStartMs, ASamplesBefore, ASamplesAfter]), '');
   end;
 
@@ -6492,9 +6492,9 @@ begin
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcMKS, psForm, 'FlowGraphTick',
       Format('TimeMs=%d; RunActive=%s; LastRunActive=%s; NewRunStarted=%s; Stage=%d; WorkTableState=%d; CurrentPointAssigned=%s; CurrentPointIndex=%d; CurrentPointKey=%s; StoredPointKey=%s; SegmentStartMs=%d; ChannelsReady=%s; SamplingActive=%s',
-        [CurrentTimeMs, BoolToStr(RunActive, True), BoolToStr(FLastGraphRunActive, True), BoolToStr(NewRunStarted, True),
-         StageOrdinal, WorkTableStateOrdinal, BoolToStr(Point <> nil, True), PointIndex, PointKey, FCurrentGraphPointKey, FCurrentGraphPointStartMs,
-         BoolToStr(FGraphChannelsReady, True), BoolToStr(FGraphSamplingActive, True)]), '');
+        [CurrentTimeMs, BoolToStr(RunActive, 'True', 'False'), BoolToStr(FLastGraphRunActive, 'True', 'False'), BoolToStr(NewRunStarted, 'True', 'False'),
+         StageOrdinal, WorkTableStateOrdinal, BoolToStr(Point <> nil, 'True', 'False'), PointIndex, PointKey, FCurrentGraphPointKey, FCurrentGraphPointStartMs,
+         BoolToStr(FGraphChannelsReady, 'True', 'False'), BoolToStr(FGraphSamplingActive, 'True', 'False')]), '');
 
   if (not FGraphChannelsReady) and (FActiveWorkTable <> nil) then
     RefreshFlowGraphChannels('ChannelsNotReady');
@@ -8096,7 +8096,7 @@ begin
       'Обновлено фактическое действие центральной кнопки',
       Format('Action=%s; WorkTableState=%d; RunAssigned=%s; RunStage=%d; IsPaused=%s; CurrentPointIndex=%d; Reason=%s',
         [NewAction, WorkTableStateValue,
-         BoolToStr(Run <> nil, True), StageValue, BoolToStr(Paused, True),
+         BoolToStr(Run <> nil, 'True', 'False'), StageValue, BoolToStr(Paused, 'True', 'False'),
          PointIndex, AReason]));
     if (PreviousAction = 'Stop') and (NewAction = 'Start') then
       ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementRunUiStateChanged',
@@ -8313,7 +8313,7 @@ begin
     FAutoTestInfoLabel.Text := Format('Стол: %s (%s)'#13#10'Режим: %d; Состояние: %s; Stage: %s'#13#10'Включено приборных каналов: %d; Точек сессии: %d; Включено эталонов: %d; Реальные команды заблокированы: %s',
       [FActiveWorkTable.Name, FActiveWorkTable.UUID, Ord(MeasurementRun.Mode),
        TWorkTable.WorkTableStateToString(FActiveWorkTable.State), RunText,
-       DeviceEnabled, PointCount, EtalonEnabled, BoolToStr(FAutoTestRealCommandsBlocked, True)]);
+       DeviceEnabled, PointCount, EtalonEnabled, BoolToStr(FAutoTestRealCommandsBlocked, 'True', 'False')]);
   end
   else
     FAutoTestInfoLabel.Text := 'Текущий стол не выбран';
@@ -9017,7 +9017,7 @@ begin
       'Передан запрос штатной остановки измерения',
       Format('WorkTableState=%d; RunStage=%d; CurrentPointIndex=%d; SetupInProgress=%s',
         [Ord(FActiveWorkTable.State), StageValue, PointIndex,
-         BoolToStr((Run <> nil) and (Run.Stage in [msSetupPoint, msWaitPointSetup]), True)]));
+         BoolToStr((Run <> nil) and (Run.Stage in [msSetupPoint, msWaitPointSetup]), 'True', 'False')]));
     StopMeasurement;
   end
   else
@@ -10202,9 +10202,9 @@ begin
       Format('WorkTableUUID=%s; SelectedChannelUUID=%s; SelectedChannelName=%s; SelectedGroup=%d; SelectedOldEnabled=%s; SelectedNewEnabled=%s; AffectedChannelUUID=%s; AffectedChannelName=%s; AffectedGroup=%d; AffectedOldEnabled=%s; AffectedNewEnabled=%s; Reason=ExclusiveGroupSelection',
         [WorkTableUUID,
          SelectedChannel.UUID, SelectedChannel.Name, ActiveGroup,
-         BoolToStr(SelectedChannel.Enabled, True), BoolToStr(True, True),
+         BoolToStr(SelectedChannel.Enabled, 'True', 'False'), BoolToStr(True, 'True', 'False'),
          OtherChannel.UUID, OtherChannel.Name, OtherChannel.Group,
-         BoolToStr(OldEnabled, True), BoolToStr(OtherChannel.Enabled, True)]));
+         BoolToStr(OldEnabled, 'True', 'False'), BoolToStr(OtherChannel.Enabled, 'True', 'False')]));
   end;
 end;
 

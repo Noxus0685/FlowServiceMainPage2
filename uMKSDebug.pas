@@ -32,12 +32,12 @@ begin
       APoint.EtalonUUID,
       APoint.Num,
       APoint.SessionID,
-      BoolToStr(APoint.Valid, True),
+      BoolToStr(APoint.Valid, 'True', 'False'),
       Ord(APoint.Status),
       Ord(APoint.State),
       APoint.Error,
       APoint.SpillTime,
-      BoolToStr(APoint.Enabled, True)
+      BoolToStr(APoint.Enabled, 'True', 'False')
     ]
   );
 end;

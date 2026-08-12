@@ -622,12 +622,12 @@ begin
       ProtocolManager.AddMessage(pcProc, psForm, 'GraphDynamicLayoutCalculated',
         'Рассчитана динамическая сетка графиков', Format(
         'GraphCount=%d; AvailableWidth=%g; AvailableHeight=%g; AutoGrid=%s; PreferredColumnCount=%d; CalculatedColumns=%d; CalculatedRows=%d; GraphWidth=%g; GraphHeight=%g',
-        [FGraphSlots.Count, AvailableWidth, AvailableHeight, BoolToStr(FConfig.AutoGrid, True),
+        [FGraphSlots.Count, AvailableWidth, AvailableHeight, BoolToStr(FConfig.AutoGrid, 'True', 'False'),
          FConfig.PreferredColumnCount, Columns, Rows, GraphWidth, GraphHeight]));
       ProtocolManager.AddMessage(pcProc, psForm, 'GraphDynamicLayoutApplied',
         'Применена динамическая сетка графиков', Format(
         'GraphCount=%d; Columns=%d; Rows=%d; ContentHeight=%g; ScrollRequired=%s',
-        [FGraphSlots.Count, Columns, Rows, ContentHeight, BoolToStr(ScrollRequired, True)]));
+        [FGraphSlots.Count, Columns, Rows, ContentHeight, BoolToStr(ScrollRequired, 'True', 'False')]));
     end;
     FLastLayoutColumns := Columns; FLastLayoutRows := Rows;
     FLastLayoutGraphCount := FGraphSlots.Count;
@@ -1232,7 +1232,7 @@ begin
       ProtocolManager.AddMessage(pcProc, psForm, 'GraphColumnModeChanged',
         'Изменён режим колонок графиков', Format(
         'AutoGrid=%s; PreferredColumnCount=%d',
-        [BoolToStr(FConfig.AutoGrid, True), FConfig.PreferredColumnCount]));
+        [BoolToStr(FConfig.AutoGrid, 'True', 'False'), FConfig.PreferredColumnCount]));
     Exit;
   end;
   if not (Sender is TGraphDurationMenuItem) then Exit;
@@ -1258,7 +1258,7 @@ begin
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphLegendChanged',
       'Изменено отображение легенды', Format('GraphIndex=%d; ShowLegend=%s',
-      [FContextGraphIndex, BoolToStr(Value, True)]));
+      [FContextGraphIndex, BoolToStr(Value, 'True', 'False')]));
 end;
 
 procedure TFrameGraphsWorkspace.ToleranceVisibilityClick(Sender: TObject);
@@ -1287,8 +1287,8 @@ begin
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphToleranceVisibilityChanged',
       'Изменена видимость линий допуска', Format(
       'GraphIndex=%d; ShowTargetLine=%s; ShowToleranceLines=%s',
-      [FContextGraphIndex, BoolToStr(Panel.ShowTargetLine, True),
-       BoolToStr(Panel.ShowToleranceLines, True)]));
+      [FContextGraphIndex, BoolToStr(Panel.ShowTargetLine, 'True', 'False'),
+       BoolToStr(Panel.ShowToleranceLines, 'True', 'False')]));
 end;
 
 procedure TFrameGraphsWorkspace.AddGraphClick(Sender: TObject);
@@ -1921,9 +1921,9 @@ begin
         'Выполнена попытка резервного обновления серии', Format(
         'GraphIndex=%d; ChannelUUID=%s; MeterValueKey=%s; DoFallback=%s; SamplingActive=%s; TransitionStage=%s; WaitingForFirstSample=%s; BufferAddedCount=%d; CurrentValue=%g; NowMs=%d; SegmentStartMs=%d; RuntimeResetTimeMs=%d',
         [AGraphIndex, ASeriesConfig.ChannelUUID, ASeriesConfig.MeterValueKey,
-         BoolToStr(ADoFallback, True), BoolToStr(ASamplingActive, True),
-         BoolToStr(IsPointTransitionStage, True),
-         BoolToStr(Runtime.WaitingForFirstSample, True), BufferedAddedCount,
+         BoolToStr(ADoFallback, 'True', 'False'), BoolToStr(ASamplingActive, 'True', 'False'),
+         BoolToStr(IsPointTransitionStage, 'True', 'False'),
+         BoolToStr(Runtime.WaitingForFirstSample, 'True', 'False'), BufferedAddedCount,
          BaseY, ANowMs, FSharedSegmentStartMs, FRuntimeResetTimeMs]));
     if IsNan(BaseY) or IsInfinite(BaseY) or (Abs(BaseY) >= MaxDouble) then
       FallbackSkipReason := 'InvalidCurrentValue'
@@ -2673,7 +2673,7 @@ begin
     Format('GraphIndex=%d; SeriesChannelUUID=%s; ResolvedChannelUUID=%s; ToleranceChannelUUID=%s; IdentityMatch=%s',
       [AGraphIndex, ASeriesConfig.ChannelUUID, ResolvedChannel.UUID,
        AInfo.ChannelUUID, BoolToStr(SameText(NormalizeUUID(AInfo.ChannelUUID),
-       NormalizeUUID(ASeriesConfig.ChannelUUID)), True)]));
+       NormalizeUUID(ASeriesConfig.ChannelUUID)), 'True', 'False')]));
   if not SameText(NormalizeUUID(AInfo.ChannelUUID),
     NormalizeUUID(ASeriesConfig.ChannelUUID)) then
   begin AReason := 'ToleranceResultChannelMismatch'; Exit(False) end;
@@ -2814,7 +2814,7 @@ begin
     end;
     LogToleranceEvent('GraphTolerancePointPending', Reason, Format(
       'RunActive=%s; Stage=%d; RunPointUUID=%s; RunPointIndex=%d; RunPointQ=%g; SegmentStartMs=%d; Reason=%s',
-      [BoolToStr(RunActive, True), RunStage, RunPointUUID, RunPointIndex,
+      [BoolToStr(RunActive, 'True', 'False'), RunStage, RunPointUUID, RunPointIndex,
        RunPointQ, FSharedSegmentStartMs, Reason]));
     Exit;
   end;
@@ -2889,13 +2889,13 @@ begin
         Info.ErrorPercent, Info.DisplayTarget, Info.DisplayLower, Info.DisplayUpper]));
   LogToleranceEvent('GraphSeriesToleranceVisualState', CurrentPointKey, Format(
     'GraphIndex=%d; SeriesChannelUUID=%s; RuntimeChannelUUID=%s; MainSeriesVisible=%s; ShowTargetLine=%s; ShowToleranceLines=%s; TargetSeriesAssigned=%s; LowerSeriesAssigned=%s; UpperSeriesAssigned=%s; TargetPointsCount=%d; LowerPointsCount=%d; UpperPointsCount=%d; TargetVisible=%s; LowerVisible=%s; UpperVisible=%s',
-    [AGraphIndex, Info.ChannelUUID, ARuntime.ChannelUUID, BoolToStr(MainSeriesVisible, True),
-     BoolToStr(Panel.ShowTargetLine, True), BoolToStr(Panel.ShowToleranceLines, True),
-     BoolToStr(Visual.TargetSeries <> nil, True), BoolToStr(Visual.LowerSeries <> nil, True),
-     BoolToStr(Visual.UpperSeries <> nil, True), Visual.TargetSeries.Points.Count,
+    [AGraphIndex, Info.ChannelUUID, ARuntime.ChannelUUID, BoolToStr(MainSeriesVisible, 'True', 'False'),
+     BoolToStr(Panel.ShowTargetLine, 'True', 'False'), BoolToStr(Panel.ShowToleranceLines, 'True', 'False'),
+     BoolToStr(Visual.TargetSeries <> nil, 'True', 'False'), BoolToStr(Visual.LowerSeries <> nil, 'True', 'False'),
+     BoolToStr(Visual.UpperSeries <> nil, 'True', 'False'), Visual.TargetSeries.Points.Count,
      Visual.LowerSeries.Points.Count, Visual.UpperSeries.Points.Count,
-     BoolToStr(Visual.TargetSeries.Visible, True), BoolToStr(Visual.LowerSeries.Visible, True),
-     BoolToStr(Visual.UpperSeries.Visible, True)]));
+     BoolToStr(Visual.TargetSeries.Visible, 'True', 'False'), BoolToStr(Visual.LowerSeries.Visible, 'True', 'False'),
+     BoolToStr(Visual.UpperSeries.Visible, 'True', 'False')]));
 end;
 
 function TFrameGraphsWorkspace.GetActiveEtalonChannel: TChannel;
@@ -3009,7 +3009,7 @@ begin
        Candidate.FlowRate, CandidateSource,
        IfThen(SameText(CandidateSource, 'Q'), 'l/s', 'm3/h'), CandidateFlow,
        ARunTargetQ, CandidateFlow - ARunTargetQ, ToleranceQ, Candidate.Error,
-       BoolToStr(SameValue(CandidateFlow, ARunTargetQ, ToleranceQ), True)]));
+       BoolToStr(SameValue(CandidateFlow, ARunTargetQ, ToleranceQ), 'True', 'False')]));
     LogToleranceEvent('GraphEtalonFlowNormalization', Candidate.UUID,
       Format('ChannelUUID=; PointUUID=%s; SourceField=%s; SourceUnit=%s; RawValue=%g; ConversionFactor=%g; NormalizedValue=%g; BaseUnit=l/s',
       [Candidate.UUID, CandidateSource,
@@ -3174,8 +3174,8 @@ begin
   LogToleranceEvent('GraphToleranceVisualUpdated', Format('%d', [AGraphIndex]),
     Format('GraphIndex=%d; TargetPointsCount=%d; LowerPointsCount=%d; UpperPointsCount=%d; TargetVisible=%s; LowerVisible=%s; UpperVisible=%s; AxisMinX=%g; AxisMaxX=%g',
       [AGraphIndex, Slot.TargetSeries.Points.Count, Slot.LowerSeries.Points.Count,
-       Slot.UpperSeries.Points.Count, BoolToStr(Slot.TargetSeries.Visible, True),
-       BoolToStr(Slot.LowerSeries.Visible, True), BoolToStr(Slot.UpperSeries.Visible, True),
+       Slot.UpperSeries.Points.Count, BoolToStr(Slot.TargetSeries.Visible, 'True', 'False'),
+       BoolToStr(Slot.LowerSeries.Visible, 'True', 'False'), BoolToStr(Slot.UpperSeries.Visible, 'True', 'False'),
        FSharedAxisMinX, FSharedAxisMaxX]));
 end;
 
@@ -3371,8 +3371,8 @@ begin
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphWorkspaceUpdateBegin',
       'Начато обновление визуальных серий рабочей области', Format(
       'GraphCount=%d; RunActive=%s; SamplingActive=%s; SegmentStartMs=%d; RuntimeResetTimeMs=%d; CurrentPointKey=%s',
-      [FConfig.GraphCount, BoolToStr(RunActive, True),
-       BoolToStr(SamplingActive, True), FSharedSegmentStartMs,
+      [FConfig.GraphCount, BoolToStr(RunActive, 'True', 'False'),
+       BoolToStr(SamplingActive, 'True', 'False'), FSharedSegmentStartMs,
        FRuntimeResetTimeMs, PointKey]));
   StoredPointKey := FLastPointKey;
   NewRunStarted := RunActive and not FLastRunActive;
@@ -3391,18 +3391,18 @@ begin
     SelectedReason := 'None';
   end;
   Decision := Format('%s|%s|%s|%s|%s|%s|%s',
-    [BoolToStr(RunActive, True), BoolToStr(FLastRunActive, True),
-     BoolToStr(NewRunStarted, True), PointKey, StoredPointKey,
-     BoolToStr(PointChanged, True), SelectedReason]);
+    [BoolToStr(RunActive, 'True', 'False'), BoolToStr(FLastRunActive, 'True', 'False'),
+     BoolToStr(NewRunStarted, 'True', 'False'), PointKey, StoredPointKey,
+     BoolToStr(PointChanged, 'True', 'False'), SelectedReason]);
   if (Decision <> FLastSegmentDecision) and Assigned(ProtocolManager) then
   begin
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphSegmentDecision',
       'Принято решение о временном сегменте графиков', Format(
       'RunActive=%s; LastRunActive=%s; NewRunStarted=%s; CurrentPointKey=%s; StoredPointKey=%s; PointChanged=%s; SelectedReason=%s; SegmentStartRequired=%s',
-      [BoolToStr(RunActive, True), BoolToStr(FLastRunActive, True),
-       BoolToStr(NewRunStarted, True), PointKey, StoredPointKey,
-       BoolToStr(PointChanged, True), SelectedReason,
-       BoolToStr(SegmentStartRequired, True)]));
+      [BoolToStr(RunActive, 'True', 'False'), BoolToStr(FLastRunActive, 'True', 'False'),
+       BoolToStr(NewRunStarted, 'True', 'False'), PointKey, StoredPointKey,
+       BoolToStr(PointChanged, 'True', 'False'), SelectedReason,
+       BoolToStr(SegmentStartRequired, 'True', 'False')]));
     FLastSegmentDecision := Decision;
   end;
   PointStateStored := (PointKey <> '') and
@@ -3459,10 +3459,10 @@ begin
           'Начато обновление пользовательской серии', Format(
           'GraphIndex=%d; ChannelUUID=%s; OwnerKind=%d; MeterValueKey=%s; VisualSeriesAssigned=%s; Visible=%s; LastSampleTimeMs=%d; LastSampleIndex=%d; WaitingForFirstSample=%s',
           [GraphIndex, Config.ChannelUUID, Ord(Config.OwnerKind),
-           Config.MeterValueKey, BoolToStr(VisualSeries <> nil, True),
-           BoolToStr(Config.Visible, True),
+           Config.MeterValueKey, BoolToStr(VisualSeries <> nil, 'True', 'False'),
+           BoolToStr(Config.Visible, 'True', 'False'),
            RuntimeLastSampleTimeMs, RuntimeLastSampleIndex,
-           BoolToStr(RuntimeWaitingForFirstSample, True)]));
+           BoolToStr(RuntimeWaitingForFirstSample, 'True', 'False')]));
       if VisualSeries = nil then
       begin
         Inc(SeriesFailed);

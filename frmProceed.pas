@@ -873,7 +873,7 @@ begin
 
   Result := Result + Format(
     '; Selected.Text=%s; Selected.Count=%d; Expanded=%s',
-    [Item.Text, Item.Count, BoolToStr(Item.IsExpanded, True)]
+    [Item.Text, Item.Count, BoolToStr(Item.IsExpanded, 'True', 'False')]
   );
 end;
 
@@ -922,7 +922,7 @@ begin
     Result := Result + sLineBreak + Format(
       '  Name=%s; UUID=%s; State=%s; Manual=%s; Sessions=%d; Spillages=%d',
       [Device.Name, Device.UUID, StateText(Device.State),
-       BoolToStr(IsManualProcessingDevice(Device), True),
+       BoolToStr(IsManualProcessingDevice(Device), 'True', 'False'),
        Device.Sessions.Count, Device.Spillages.Count]);
   end;
 end;
@@ -1539,7 +1539,7 @@ begin
         'Сохранена раскладка столбца',
         Format('GridName=%s; ColumnName=%s; ColumnsIndex=%d; VisualIndex=%d; Position=%d; Visible=%s',
           [AGrid.Name, Column.Name, I, Column.Index, AColumns[I].Position,
-           BoolToStr(Column.Visible, True)]));
+           BoolToStr(Column.Visible, 'True', 'False')]));
   end;
 end;
 
@@ -3361,7 +3361,7 @@ begin
     'Выбор результата Summary с фильтрацией служебных значений',
     Format('GroupName=%s; DeviceUUID=%s; CandidateSpillageID=%d; CandidateError=%s; IsValid=%s; SkipReason=%s; SelectedSpillageID=%d; SelectedError=%s; SelectionReason=%s',
       [AGroupName, CandidateDeviceUUID, CandidateID, CandidateError,
-       BoolToStr(AIsValid, True), ASkipReason, SelectedID, SelectedError,
+       BoolToStr(AIsValid, 'True', 'False'), ASkipReason, SelectedID, SelectedError,
        ASelectionReason]));
 end;
 
@@ -4043,7 +4043,7 @@ begin
               Format('Point1Q=%.6f; Point2Q=%.6f; Point1Range=[%.6f..%.6f]; Point2Range=[%.6f..%.6f]; Intersection=%.6f; ControlDelta=%.6f; Result=%s',
                 [Cols[I].TargetFlow, Spillage.QavgEtalon, Cols[I].CommonMinQ,
                  Cols[I].CommonMaxQ, PointMinQ, PointMaxQ, IntersectionQ,
-                 ControlDeltaQ, BoolToStr((J = I) and SameValue(IntersectionQ, BestIntersectionQ, 1E-9), True)]));
+                 ControlDeltaQ, BoolToStr((J = I) and SameValue(IntersectionQ, BestIntersectionQ, 1E-9), 'True', 'False')]));
           end;
         if J >= 0 then
         begin
@@ -4116,9 +4116,9 @@ begin
     ProtocolManager.AddMessage(pcProc, psForm, 'ProcessingSummaryColumnsBuilt',
       'Построены колонки Summary обработки',
       Format('MergeEnabled=%s; Source=Spillages; DevicesCount=%d; SourceSpillagesCount=%d; SelectedSpillagesCount=%d; MergedGroupsCount=%d; ColumnsCount=%d; ColumnHeaders=%s; FallbackMeasurementRunUsed=False; MeasurementRunPointsEmpty=%s; SummaryColumnsSource=BestPhysicalPointSpillages',
-        [BoolToStr(True, True), DevicesCount, SourceSpillagesCount,
+        [BoolToStr(True, 'True', 'False'), DevicesCount, SourceSpillagesCount,
          SpillagesCount, Cols.Count, Cols.Count, Headers,
-         BoolToStr(RunPointsEmpty, True)]));
+         BoolToStr(RunPointsEmpty, 'True', 'False')]));
   finally
     for I := 0 to PhysicalPointGroupKeys.Count - 1 do
       if PhysicalPointGroups.TryGetValue(PhysicalPointGroupKeys[I],
@@ -4175,7 +4175,7 @@ begin
       LowerCase(Trim(FResultPointColumns[I].SourcePointUUID)) + '|' +
       LowerCase(Trim(FResultPointColumns[I].EtalonUUID)) + '|' +
       FloatToStr(FResultPointColumns[I].TargetFlow) + '|' +
-      BoolToStr(FResultPointColumns[I].IsMerged, True) + '|' +
+      BoolToStr(FResultPointColumns[I].IsMerged, 'True', 'False') + '|' +
       FResultPointColumns[I].Header;
     NewSignature := NewSignature + IntToStr(Length(Key)) + ':' + Key + ';';
   end;
@@ -4495,7 +4495,7 @@ begin
         LogMKS('DBG SP 9102', 'SummaryResults RESULT',
           Format('RowDeviceUUID=%s; RowSerial=%s; RequiredPointsCount=%d; FoundPointsCount=%d; InvalidCount=%d; HasAnyData=%s; ResultText=%s',
             [Row.DeviceUUID, Row.Serial, RequiredPointsCount, FoundPointsCount,
-             InvalidCount, BoolToStr(HasAnyData, True), Row.ResultText]));
+             InvalidCount, BoolToStr(HasAnyData, 'True', 'False'), Row.ResultText]));
 
         Rows.Add(Row);
       end;
@@ -5106,16 +5106,16 @@ begin
            DateToISO8601(ImportResult.LastWriteTimeUtc, True),
            ImportResult.CalculationState.CalcPrCount,
            ImportResult.CalculationState.CalcMode,
-           BoolToStr(ImportResult.CalculationState.FullCalcOnLoad, True),
-           BoolToStr(ImportResult.CalculationState.ForceFullCalc, True),
-           BoolToStr(ImportResult.CalculationState.CalcOnSave, True),
+           BoolToStr(ImportResult.CalculationState.FullCalcOnLoad, 'True', 'False'),
+           BoolToStr(ImportResult.CalculationState.ForceFullCalc, 'True', 'False'),
+           BoolToStr(ImportResult.CalculationState.CalcOnSave, 'True', 'False'),
            ImportResult.CalculationState.CalcId,
-           BoolToStr(ImportResult.CalculationState.CalcChainEntryExists, True),
-           BoolToStr(ImportResult.CalculationState.CalcChainRelationshipExists, True),
-           BoolToStr(ImportResult.CalculationState.CalcChainOverrideExists, True),
+           BoolToStr(ImportResult.CalculationState.CalcChainEntryExists, 'True', 'False'),
+           BoolToStr(ImportResult.CalculationState.CalcChainRelationshipExists, 'True', 'False'),
+           BoolToStr(ImportResult.CalculationState.CalcChainOverrideExists, 'True', 'False'),
            BoolToStr(not ImportResult.CalculationState.CalcChainEntryExists and
              not ImportResult.CalculationState.CalcChainRelationshipExists and
-             not ImportResult.CalculationState.CalcChainOverrideExists, True),
+             not ImportResult.CalculationState.CalcChainOverrideExists, 'True', 'False'),
            Stopwatch.ElapsedMilliseconds]));
     except
       on E: Exception do
@@ -5170,16 +5170,16 @@ begin
       [AOperationId, AResult.OutputFileName, AResult.FileSize,
        AResult.FileHashSHA256, DateToISO8601(AResult.LastWriteTimeUtc, True),
        AResult.CalculationState.CalcPrCount, AResult.CalculationState.CalcMode,
-       BoolToStr(AResult.CalculationState.FullCalcOnLoad, True),
-       BoolToStr(AResult.CalculationState.ForceFullCalc, True),
-       BoolToStr(AResult.CalculationState.CalcOnSave, True),
+       BoolToStr(AResult.CalculationState.FullCalcOnLoad, 'True', 'False'),
+       BoolToStr(AResult.CalculationState.ForceFullCalc, 'True', 'False'),
+       BoolToStr(AResult.CalculationState.CalcOnSave, 'True', 'False'),
        AResult.CalculationState.CalcId,
-       BoolToStr(AResult.CalculationState.CalcChainEntryExists, True),
-       BoolToStr(AResult.CalculationState.CalcChainRelationshipExists, True),
-       BoolToStr(AResult.CalculationState.CalcChainOverrideExists, True),
+       BoolToStr(AResult.CalculationState.CalcChainEntryExists, 'True', 'False'),
+       BoolToStr(AResult.CalculationState.CalcChainRelationshipExists, 'True', 'False'),
+       BoolToStr(AResult.CalculationState.CalcChainOverrideExists, 'True', 'False'),
        BoolToStr(not AResult.CalculationState.CalcChainEntryExists and
          not AResult.CalculationState.CalcChainRelationshipExists and
-         not AResult.CalculationState.CalcChainOverrideExists, True),
+         not AResult.CalculationState.CalcChainOverrideExists, 'True', 'False'),
        ADurationMs]));
 end;
 
@@ -6260,7 +6260,7 @@ var
       Exit;
 
     DbgProceedTree(1605, 'FindItemByPoint checks children of: ' + AItem.Text +
-      '; Expanded=' + BoolToStr(AItem.IsExpanded, True) +
+      '; Expanded=' + BoolToStr(AItem.IsExpanded, 'True', 'False') +
       '; Count=' + AItem.Count.ToString);
     for ChildIndex := 0 to AItem.Count - 1 do
     begin
@@ -6290,7 +6290,7 @@ begin
     begin
       DbgProceedTree(1603, 'TreeViewDevicesMouseDown selects item: ' + Item.Text +
         '; Count=' + Item.Count.ToString +
-        '; Expanded=' + BoolToStr(Item.IsExpanded, True) + #13#10 +
+        '; Expanded=' + BoolToStr(Item.IsExpanded, 'True', 'False') + #13#10 +
         GetProcessingDevicesDebugText);
       TreeViewDevices.Selected := Item;
       Exit;

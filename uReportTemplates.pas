@@ -538,7 +538,7 @@ begin
   if AValue is TJSONString then
     Exit(TJSONString(AValue).Value);
   if AValue is TJSONBool then
-    Exit(BoolToStr(TJSONBool(AValue).AsBoolean, True));
+    Exit(BoolToStr(TJSONBool(AValue).AsBoolean, 'True', 'False'));
   Result := AValue.Value;
 end;
 
@@ -1953,7 +1953,7 @@ begin
             Name,
             Count + 1,
             LocalSheetId,
-            BoolToStr(IsReportDefinedName(Name), True)
+            BoolToStr(IsReportDefinedName(Name), 'True', 'False')
           ]
         );
       end;
@@ -2916,12 +2916,12 @@ begin
         'Stage=ValidatePreparedTemplate; %s',
         [TPath.GetFullPath(ASourceFileName), TFile.GetSize(ASourceFileName),
          THashSHA2.GetHashStringFromFile(ASourceFileName), TemplateState.CalcPrCount,
-         TemplateState.CalcMode, BoolToStr(TemplateState.FullCalcOnLoad, True),
-         BoolToStr(TemplateState.ForceFullCalc, True),
-         BoolToStr(TemplateState.CalcOnSave, True), TemplateState.CalcId,
-         BoolToStr(TemplateState.CalcChainEntryExists, True),
-         BoolToStr(TemplateState.CalcChainRelationshipExists, True),
-         BoolToStr(TemplateState.CalcChainOverrideExists, True), E.Message]);
+         TemplateState.CalcMode, BoolToStr(TemplateState.FullCalcOnLoad, 'True', 'False'),
+         BoolToStr(TemplateState.ForceFullCalc, 'True', 'False'),
+         BoolToStr(TemplateState.CalcOnSave, 'True', 'False'), TemplateState.CalcId,
+         BoolToStr(TemplateState.CalcChainEntryExists, 'True', 'False'),
+         BoolToStr(TemplateState.CalcChainRelationshipExists, 'True', 'False'),
+         BoolToStr(TemplateState.CalcChainOverrideExists, 'True', 'False'), E.Message]);
   end;
   Zip := TZipFile.Create;
   try

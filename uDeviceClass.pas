@@ -2170,7 +2170,7 @@ begin
       Add(Sess.OperatorName);
       Add(FloatToStr(Sess.K));
       Add(FloatToStr(Sess.P));
-      Add(BoolToStr(Sess.Active, True));
+      Add(BoolToStr(Sess.Active, 'True', 'False'));
       Add(Sess.DeviceCoefsName);
       Add(Sess.DeviceCoefsUUID);
       Add(Sess.CalibrCoefsName);
@@ -2198,7 +2198,7 @@ begin
       Add(IntToStr(SpillageValidationToLegacyCode(S.Validation, S.ValidationReason)));
       Add(S.ValidationMessage);
       Add(FloatToStr(S.Error));
-      Add(BoolToStr(S.Valid, True));
+      Add(BoolToStr(S.Valid, 'True', 'False'));
       Add(FloatToStr(S.QStd));
       Add(FloatToStr(S.QCV));
       Add(FloatToStr(S.VolumeBefore));

@@ -387,7 +387,7 @@ begin
   begin
     RestoreDeviceFlowRateText(WorkTable);
     LogDeviceFlowRateApply(Format('InputText=%s InputIsEmpty=False ParseSuccess=False HasSeparateDeviceFlow=%s DeviceFlowBaseLps=%.6f FallbackToEtalon=False PreviousTargetPreserved=True ImmediateApply=False CurrentValuesPreserved=True TargetChanged=False',
-      [InputText, BoolToStr(WorkTable.HasDeviceSimulationFlowRate, True),
+      [InputText, BoolToStr(WorkTable.HasDeviceSimulationFlowRate, 'True', 'False'),
        WorkTable.DeviceSimulationFlowRate]));
     Exit;
   end;

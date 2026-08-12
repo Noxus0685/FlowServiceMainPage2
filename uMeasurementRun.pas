@@ -815,7 +815,7 @@ begin
       [FLastPreviousSampleSize, S.SampleSize, FLastSampleCountInBuffer,
        FLastEstimatedSampleIntervalMs, 1000.0 / FLastEstimatedSampleIntervalMs,
        FLastRequiredSampleSize, S.MinWindowDurationSec, S.MaxSampleAgeSec,
-       BoolToStr(FLastBufferExpanded, True)])
+       BoolToStr(FLastBufferExpanded, 'True', 'False')])
   else
     BufferText := '';
   ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitPointSetup',
@@ -823,8 +823,8 @@ begin
     Format('PointSetupValueConfigured: Name=%s; Target=%.6f; MaxVariation=%.9f; MaxStdDeviation=%.9f; MaxTrendRate=%.9f; MinSampleCount=%d; MaxOutlierRatio=%.9f; CheckCurrentRange=%s; CheckMeanRange=%s%s%s',
       [AName, S.TargetValue, S.MaxVariation, S.MaxStdDeviation, S.MaxTrendRate,
        S.MinSampleCount, S.MaxOutlierFraction,
-       BoolToStr(S.RequireCurrentValueInRange, True),
-       BoolToStr(S.RequireMeanValueInRange, True), RangeText, BufferText]));
+       BoolToStr(S.RequireCurrentValueInRange, 'True', 'False'),
+       BoolToStr(S.RequireMeanValueInRange, 'True', 'False'), RangeText, BufferText]));
 end;
 
 function TMeasurementRun.BuildPointSetupSignalLog(const AName, ASource,
@@ -846,10 +846,10 @@ begin
      AInfo.ActualWindowDurationSec, S.MinWindowDurationSec, AInfo.Variation,
      S.MaxVariation, AInfo.StdDeviation, S.MaxStdDeviation, AInfo.TrendRate,
      S.MaxTrendRate, AInfo.OutlierFraction, S.MaxOutlierFraction,
-     BoolToStr(AInfo.IsSignalStable, True),
-     BoolToStr(AInfo.IsCurrentValueInRange, True),
-     BoolToStr(AInfo.IsMeanValueInRange, True),
-     BoolToStr(AInfo.IsSuitableForMeasurement, True), Ord(AInfo.Status),
+     BoolToStr(AInfo.IsSignalStable, 'True', 'False'),
+     BoolToStr(AInfo.IsCurrentValueInRange, 'True', 'False'),
+     BoolToStr(AInfo.IsMeanValueInRange, 'True', 'False'),
+     BoolToStr(AInfo.IsSuitableForMeasurement, 'True', 'False'), Ord(AInfo.Status),
      AInfo.StatusText, ACurrentMs - FSetupStartedMs]);
 end;
 
@@ -1980,12 +1980,12 @@ begin
         // одновременно в ErrorDeviceCount), поскольку в ожидание он не попал.
         if ChannelEnabled then Inc(FStabilitySkippedDeviceCount);
         LogText := Format('DeviceStabilitySetup: ChannelIndex=%d; ChannelName=%s; ChannelUUID=%s; ChannelEnabled=%s; DeviceAssigned=%s; DeviceName=%s; DeviceUUID=%s; DevicePointFound=%s; DevicePointIndex=%d; DevicePointID=%d; DevicePointUUID=%s; DevicePointName=%s; MeasurementPointName=%s; TargetFlowLS=%.6f; DevicePointQ=%.6f; StabilizationMode=%s; RequiredSec=%.3f; AutoStabilizationEnabled=%s; TimeoutSec=%.3f; AddedToWaitList=False; Result=%s; Reason=%s',
-          [I, ChannelName, ChannelUUID, BoolToStr(ChannelEnabled, True),
-           BoolToStr(DeviceAssigned, True), DeviceName, DeviceUUID,
-           BoolToStr(PointFound, True), DevicePointIndex, DevicePointID,
+          [I, ChannelName, ChannelUUID, BoolToStr(ChannelEnabled, 'True', 'False'),
+           BoolToStr(DeviceAssigned, 'True', 'False'), DeviceName, DeviceUUID,
+           BoolToStr(PointFound, 'True', 'False'), DevicePointIndex, DevicePointID,
            DevicePointUUID, DevicePointName, MeasurementPointName,
            MeasurementTargetQ, DevicePointQ,
-           ModeText, RequiredSec, BoolToStr(ModeText = 'Automatic', True), TimeoutSec,
+           ModeText, RequiredSec, BoolToStr(ModeText = 'Automatic', 'True', 'False'), TimeoutSec,
            ResultText, Reason]);
         if ResultText = 'Error' then
           ProtocolManager.AddMessage(pcError, psMeasurement, 'EnterWaitStable',
@@ -2022,7 +2022,7 @@ begin
          Settings.MaxVariation, Settings.MaxStdDeviation, Settings.MaxTrendRate,
          FDeviceStability[N].RequiredTimeSec, FDeviceStability[N].TimeoutSec,
          FWaitStableStartedMs,
-         BoolToStr(FDeviceStability[N].TimeoutSec > 0, True)]);
+         BoolToStr(FDeviceStability[N].TimeoutSec > 0, 'True', 'False')]);
       AddDiagnosticEvent(LogText);
       ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitStable',
         'Настроено ожидание стабилизации поверяемого прибора', LogText);
@@ -2033,7 +2033,7 @@ begin
            Channel.FlowMeter.Device.Points.IndexOf(DevicePoint), DevicePoint.ID,
            DevicePointUUID, DevicePointName, MeasurementPointName,
            MeasurementTargetQ, DevicePoint.Q, ModeText, RequiredSec,
-           BoolToStr(ModeText = 'Automatic', True), TimeoutSec]));
+           BoolToStr(ModeText = 'Automatic', 'True', 'False'), TimeoutSec]));
     end;
 
   ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterWaitStable',
@@ -2044,13 +2044,13 @@ begin
        FStabilityPointResolvedCount, Length(FDeviceStability),
        FStabilitySkippedDeviceCount, FStabilityErrorDeviceCount,
        FixedTimeCount, AutoCount,
-       BoolToStr((FStabilityEnabledDeviceCount = Length(FDeviceStability)), True),
+       BoolToStr((FStabilityEnabledDeviceCount = Length(FDeviceStability)), 'True', 'False'),
        IfThen((FStabilityEnabledDeviceCount > 0) and (Length(FDeviceStability) = 0),
          'NoEnabledDeviceAddedToWaitList', IfThen(FStabilityErrorDeviceCount > 0,
          'DeviceConfigurationErrors', 'SetupCompleted'))]));
 
   LoadRequiredStabilization(GetCurrentPoint);
-  AddDiagnosticEvent(Format('RequiredStabilizationSec=%.3f; RequireAutoStabilization=%s; RequiredStabilizationSource=TDevicePoint runtime', [FRequiredDeviceStabilizationSec, BoolToStr(FRequireAutoStabilization, True)]));
+  AddDiagnosticEvent(Format('RequiredStabilizationSec=%.3f; RequireAutoStabilization=%s; RequiredStabilizationSource=TDevicePoint runtime', [FRequiredDeviceStabilizationSec, BoolToStr(FRequireAutoStabilization, 'True', 'False')]));
 
   if IsStopRequested then
     Exit;
@@ -2301,8 +2301,8 @@ begin
   AddDiagnosticEvent(Format('FinalizeMeasurementRun: PreviousStage=%s; FinalStage=%s; PreviousWorkTableState=%s; FinalWorkTableState=%s; RunCompleted=%s; RunResult=%s; DoneReason=%s; StopRequested=%s; CurrentPointIndexBefore=%d; CurrentPointIndexAfter=%d; NextStageAfterSaveBefore=%s; NextStageAfterSaveAfter=%s; DisplayedStatusText=%s',
     [MeasurementStateToString(PreviousStage), MeasurementStateToString(FCurrentStage),
      TWorkTable.WorkTableStateToString(PreviousWorkTableState), FinalWorkTableStateText,
-     BoolToStr(FRunCompleted, True), GetEnumName(TypeInfo(TMeasurementRunResult), Ord(FRunResult)),
-     GetEnumName(TypeInfo(TMeasurementRunDoneReason), Ord(FDoneReason)), BoolToStr(FStopRequested, True),
+     BoolToStr(FRunCompleted, 'True', 'False'), GetEnumName(TypeInfo(TMeasurementRunResult), Ord(FRunResult)),
+     GetEnumName(TypeInfo(TMeasurementRunDoneReason), Ord(FDoneReason)), BoolToStr(FStopRequested, 'True', 'False'),
      CurrentPointIndexBefore, FCurrentPointIndex, MeasurementStateToString(NextStageAfterSaveBefore),
      MeasurementStateToString(FNextStageAfterSave), DisplayedStatusText]));
 
@@ -2488,10 +2488,10 @@ begin
 
   LogText := Format('PointSetupDecision: PointIndex=%d; PointName=%s; WaitMs=%d; TimeoutMs=%d; FreshDataReady=True; TableFlowAvailable=%s; TableFlowReady=%s; TemperatureReady=%s; PressureReady=%s; ConditionsReady=%s; Result=%s; Reason=%s',
     [FCurrentPointIndex, GetCurrentPoint.Name, CurrentMs - FSetupStartedMs,
-     CalcStableTimeoutSec * 1000, BoolToStr(TableFlowAvailable, True),
-     BoolToStr(TableFlowReady, True), BoolToStr(TemperatureReady, True),
-     BoolToStr(PressureReady, True), BoolToStr(ConditionsReady, True),
-     BoolToStr(Result, True), Reason]);
+     CalcStableTimeoutSec * 1000, BoolToStr(TableFlowAvailable, 'True', 'False'),
+     BoolToStr(TableFlowReady, 'True', 'False'), BoolToStr(TemperatureReady, 'True', 'False'),
+     BoolToStr(PressureReady, 'True', 'False'), BoolToStr(ConditionsReady, 'True', 'False'),
+     BoolToStr(Result, 'True', 'False'), Reason]);
   PublishProtocol := (FLastPointSetupReadyProtocolMs < 0) or
     (CurrentMs - FLastPointSetupReadyProtocolMs >= 2000);
   if PublishProtocol then
@@ -2555,8 +2555,8 @@ begin
 
   DiagnosticSecond := Trunc((TMeterValue.GetMonotonicTimeMs - FWaitStartedTick) / 1000);
   DiagnosticText := Format('IsStable=%s; EtalonStable=%s; ConditionsStable=%s; DevicesStable=%s; ReadyToMeasure=%s; Reason=%s',
-    [BoolToStr(Result, True), BoolToStr(EtalonStable, True), BoolToStr(ConditionsStable, True),
-     BoolToStr(DevicesStable, True), BoolToStr(Result, True), StableInfo.StatusText]);
+    [BoolToStr(Result, 'True', 'False'), BoolToStr(EtalonStable, 'True', 'False'), BoolToStr(ConditionsStable, 'True', 'False'),
+     BoolToStr(DevicesStable, 'True', 'False'), BoolToStr(Result, 'True', 'False'), StableInfo.StatusText]);
   if (DiagnosticText <> FLastDiagnosticIsStableText) or
      (DiagnosticSecond <> FLastDiagnosticIsStableSecond) then
   begin
@@ -2569,7 +2569,7 @@ end;
 function TMeasurementRun.IsEtalonStable(out StableInfo: RStableInfo): Boolean;
 begin
   Result := CheckFlowStable(StableInfo);
-  AddDiagnosticEvent('EtalonStable=' + BoolToStr(Result, True) + '; Reason=' + StableInfo.StatusText);
+  AddDiagnosticEvent('EtalonStable=' + BoolToStr(Result, 'True', 'False') + '; Reason=' + StableInfo.StatusText);
 end;
 
 function TMeasurementRun.IsConditionsStable(out StableInfo: RStableInfo): Boolean;
@@ -2593,8 +2593,8 @@ begin
     LogText := Format('PointSetupCondition: Name=FluidTemp; Enabled=True; Current=%.6f; Mean=%.6f; Target=%.6f; LowerLimit=%.6f; UpperLimit=%.6f; IsSignalStable=%s; IsCurrentInRange=%s; IsMeanInRange=%s; IsSuitableForMeasurement=%s; Reason=%s',
       [ParamInfo.CurrentValue, ParamInfo.MeanValue, ParamInfo.TargetValue,
        ParamInfo.LowerLimit, ParamInfo.UpperLimit,
-       BoolToStr(ParamInfo.IsSignalStable, True), BoolToStr(ParamInfo.IsCurrentInRange, True),
-       BoolToStr(ParamInfo.IsMeanInRange, True), BoolToStr(TemperatureStable, True), ParamInfo.StatusText]);
+       BoolToStr(ParamInfo.IsSignalStable, 'True', 'False'), BoolToStr(ParamInfo.IsCurrentInRange, 'True', 'False'),
+       BoolToStr(ParamInfo.IsMeanInRange, 'True', 'False'), BoolToStr(TemperatureStable, 'True', 'False'), ParamInfo.StatusText]);
     AddDiagnosticEvent(LogText);
     if PublishProtocol then ProtocolManager.AddMessage(pcProc, psMeasurement,
       'IsConditionsStable', 'Диагностика температуры', LogText);
@@ -2623,8 +2623,8 @@ begin
     LogText := Format('PointSetupCondition: Name=FluidPress; Enabled=True; Current=%.6f; Mean=%.6f; Target=%.6f; LowerLimit=%.6f; UpperLimit=%.6f; IsSignalStable=%s; IsCurrentInRange=%s; IsMeanInRange=%s; IsSuitableForMeasurement=%s; Reason=%s',
       [ParamInfo.CurrentValue, ParamInfo.MeanValue, ParamInfo.TargetValue,
        ParamInfo.LowerLimit, ParamInfo.UpperLimit,
-       BoolToStr(ParamInfo.IsSignalStable, True), BoolToStr(ParamInfo.IsCurrentInRange, True),
-       BoolToStr(ParamInfo.IsMeanInRange, True), BoolToStr(PressureStable, True), ParamInfo.StatusText]);
+       BoolToStr(ParamInfo.IsSignalStable, 'True', 'False'), BoolToStr(ParamInfo.IsCurrentInRange, 'True', 'False'),
+       BoolToStr(ParamInfo.IsMeanInRange, 'True', 'False'), BoolToStr(PressureStable, 'True', 'False'), ParamInfo.StatusText]);
     AddDiagnosticEvent(LogText);
     if PublishProtocol then ProtocolManager.AddMessage(pcProc, psMeasurement,
       'IsConditionsStable', 'Диагностика давления', LogText);
@@ -2655,7 +2655,7 @@ begin
     StableInfo.Status := sOk;
     StableInfo.StatusText := 'ConditionsStable=True';
   end;
-  AddDiagnosticEvent('ConditionsStable=' + BoolToStr(Result, True));
+  AddDiagnosticEvent('ConditionsStable=' + BoolToStr(Result, 'True', 'False'));
 end;
 
 function TMeasurementRun.IsDevicesStable(out StableInfo: RStableInfo): Boolean;
@@ -2987,19 +2987,19 @@ begin
 
     LogText := Format('DeviceChannelReadiness: ChannelIndex=%d; ChannelUUID=%s; ChannelName=%s; DeviceUUID=%s; DevicePointUUID=%s; DevicePointName=%s; MeasurementMode=%s; MeasurementPointQLS=%.6f; ParticipantFound=%s; ParticipantSourcePointUUID=%s; ParticipantSourceTargetQLS=%.6f; DeviceTargetValue=%.6f; TargetDifferenceToPhysicalPointLS=%.9f; MergeToleranceLS=%.9f; ParticipatesInCurrentPoint=%s; DevicePointErrorPercent=%.6f; StabilityLower=%.6f; StabilityUpper=%.6f; UsedSampleCount=%d; RequiredSampleCount=%d; ElapsedWindowSec=%.3f; RequiredWindowDurationSec=%.3f; HasEnoughSamples=%s; HasFullWindow=%s; IsDataActual=%s; OutOfRangeSampleCount=%d; FirstOutOfRangeValue=%.6f; FirstOutOfRangeTimeMs=%d; Variation=%.9f; MaxVariation=%.9f; IsVariationStable=%s; StdDeviation=%.9f; MaxStdDeviation=%.9f; IsDeviationStable=%s; TrendRate=%.9f; MaxTrendRate=%.9f; IsTrendStable=%s; StableReady=%s; Ready=%s; Reason=%s; TargetSource=%s; DevicePointMatchSource=%s; ActualLS=%.6f; ActualM3H=%.6f',
       [I, Channel.UUID, Channel.Name, DeviceUUID, DevicePointUUID, MatchedPointName,
-       ModeText, CurrentPointQ, BoolToStr(ParticipantFound, True), Participant.SourcePointUUID,
+       ModeText, CurrentPointQ, BoolToStr(ParticipantFound, 'True', 'False'), Participant.SourcePointUUID,
        Participant.SelectedSourceTargetQLS, TargetValue, TargetDifferenceToPhysicalPoint, MergeToleranceLS,
-       BoolToStr(ParticipantFound and (Reason <> 'ParticipantTargetDoesNotMatchPhysicalPoint'), True),
+       BoolToStr(ParticipantFound and (Reason <> 'ParticipantTargetDoesNotMatchPhysicalPoint'), 'True', 'False'),
        ErrorPercent, SignalInfo.StabilityLowerLimit, SignalInfo.StabilityUpperLimit,
        SignalInfo.UsedSampleCount, SignalInfo.RequiredSampleCount, SignalInfo.ElapsedWindowSec,
-       SignalInfo.RequiredWindowDurationSec, BoolToStr(SignalInfo.HasEnoughSamples, True),
-       BoolToStr(SignalInfo.HasFullWindow, True), BoolToStr(SignalInfo.IsDataActual, True),
+       SignalInfo.RequiredWindowDurationSec, BoolToStr(SignalInfo.HasEnoughSamples, 'True', 'False'),
+       BoolToStr(SignalInfo.HasFullWindow, 'True', 'False'), BoolToStr(SignalInfo.IsDataActual, 'True', 'False'),
        SignalInfo.OutOfRangeSampleCount, SignalInfo.FirstOutOfRangeSampleValue,
        SignalInfo.FirstOutOfRangeSampleTimeMs,
-       SignalInfo.Variation, Settings.MaxVariation, BoolToStr(SignalInfo.IsVariationStable, True),
-       SignalInfo.StdDeviation, Settings.MaxStdDeviation, BoolToStr(SignalInfo.IsDeviationStable, True),
-       SignalInfo.TrendRate, Settings.MaxTrendRate, BoolToStr(SignalInfo.IsTrendStable, True),
-       BoolToStr(StableReady, True), BoolToStr(Ready, True), Reason, TargetSource,
+       SignalInfo.Variation, Settings.MaxVariation, BoolToStr(SignalInfo.IsVariationStable, 'True', 'False'),
+       SignalInfo.StdDeviation, Settings.MaxStdDeviation, BoolToStr(SignalInfo.IsDeviationStable, 'True', 'False'),
+       SignalInfo.TrendRate, Settings.MaxTrendRate, BoolToStr(SignalInfo.IsTrendStable, 'True', 'False'),
+       BoolToStr(StableReady, 'True', 'False'), BoolToStr(Ready, 'True', 'False'), Reason, TargetSource,
        PointMatchSource, ActualValue, M3H(ActualValue)]);
     PublishDeviceLog(LogText);
 
@@ -3145,19 +3145,19 @@ begin
         if (not ChannelStable) and (FirstChannelFailureReason = '') then
           FirstChannelFailureReason := ChannelReason;
         AddDiagnosticEvent(Format('EtalonChannelReady=%s; ChannelUUID=%s; ChannelName=%s; TargetValue=%.6f; PointErrorPercent=%.6f; StabilityLower=%.6f; StabilityUpper=%.6f; FlowAccuracy=%s; FlowReachedLower=%.6f; FlowReachedUpper=%.6f; UsedSampleCount=%d; RequiredSampleCount=%d; ElapsedWindowSec=%.3f; RequiredWindowDurationSec=%.3f; HasEnoughSamples=%s; HasFullWindow=%s; IsDataActual=%s; OutOfRangeSampleCount=%d; MinSampleValue=%.6f; MaxSampleValue=%.6f; Variation=%.9f; MaxVariation=%.9f; IsVariationStable=%s; StdDeviation=%.9f; MaxStdDeviation=%.9f; IsDeviationStable=%s; TrendRate=%.9f; MaxTrendRate=%.9f; IsTrendStable=%s; StableReady=%s; FlowReached=%s; Ready=%s; Reason=%s',
-          [BoolToStr(ChannelStable, True), Channel.UUID, Channel.Name, TargetValue, PointErrorPercent,
+          [BoolToStr(ChannelStable, 'True', 'False'), Channel.UUID, Channel.Name, TargetValue, PointErrorPercent,
            SignalInfo.StabilityLowerLimit, SignalInfo.StabilityUpperLimit, Point.FlowAccuracy,
            StableInfo.LowerLimit, StableInfo.UpperLimit, SignalInfo.UsedSampleCount,
            SignalInfo.RequiredSampleCount, SignalInfo.ElapsedWindowSec, SignalInfo.RequiredWindowDurationSec,
-           BoolToStr(SignalInfo.HasEnoughSamples, True), BoolToStr(SignalInfo.HasFullWindow, True),
-           BoolToStr(SignalInfo.IsDataActual, True), SignalInfo.OutOfRangeSampleCount,
+           BoolToStr(SignalInfo.HasEnoughSamples, 'True', 'False'), BoolToStr(SignalInfo.HasFullWindow, 'True', 'False'),
+           BoolToStr(SignalInfo.IsDataActual, 'True', 'False'), SignalInfo.OutOfRangeSampleCount,
            SignalInfo.MinValue, SignalInfo.MaxValue,
-           SignalInfo.Variation, Settings.MaxVariation, BoolToStr(SignalInfo.IsVariationStable, True),
-           SignalInfo.StdDeviation, Settings.MaxStdDeviation, BoolToStr(SignalInfo.IsDeviationStable, True),
-           SignalInfo.TrendRate, Settings.MaxTrendRate, BoolToStr(SignalInfo.IsTrendStable, True),
-           BoolToStr(ChannelStable, True),
-           BoolToStr((ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit), True),
-           BoolToStr(ChannelStable and ((ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit)), True),
+           SignalInfo.Variation, Settings.MaxVariation, BoolToStr(SignalInfo.IsVariationStable, 'True', 'False'),
+           SignalInfo.StdDeviation, Settings.MaxStdDeviation, BoolToStr(SignalInfo.IsDeviationStable, 'True', 'False'),
+           SignalInfo.TrendRate, Settings.MaxTrendRate, BoolToStr(SignalInfo.IsTrendStable, 'True', 'False'),
+           BoolToStr(ChannelStable, 'True', 'False'),
+           BoolToStr((ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit), 'True', 'False'),
+           BoolToStr(ChannelStable and ((ActualValue >= StableInfo.LowerLimit) and (ActualValue <= StableInfo.UpperLimit)), 'True', 'False'),
            ChannelReason]));
       end;
 
@@ -3206,7 +3206,7 @@ begin
   Result := StableInfo.IsReadyForMeasurement;
   if Result then StableInfo.Status := sOk else StableInfo.Status := sRun_NN;
   StableInfo.StatusText := Format('EtalonFlowStable=%s; GroupFlowReached=%s; AllSelectedEtalonChannelsStable=%s; ToleranceSource=%s; Target=%.6f; Actual=%.6f; Lower=%.6f; Upper=%.6f; FailureReason=%s',
-    [BoolToStr(Result, True), BoolToStr(GroupFlowReached, True), BoolToStr(AllChannelsStable, True),
+    [BoolToStr(Result, 'True', 'False'), BoolToStr(GroupFlowReached, 'True', 'False'), BoolToStr(AllChannelsStable, 'True', 'False'),
      ToleranceSource, TargetValue, ActualValue, StableInfo.LowerLimit, StableInfo.UpperLimit,
      FirstChannelFailureReason]);
 end;
@@ -4849,8 +4849,8 @@ begin
     'MeasurementPointNavigationRequested', 'Запрошен переход между точками',
     Format('Direction=%s; CurrentStage=%s; CurrentPointIndex=%d; CurrentPointUUID=%s; TargetIndex=%d; TargetUUID=%s; PhysicalMeasureStarted=%s; StopRequested=%s; ForceNextPointBefore=%d',
       [ADirection, MeasurementStateToString(FCurrentStage), FCurrentPointIndex,
-       CurrentUUID, ATargetIndex, TargetUUID, BoolToStr(PhysicalStarted, True),
-       BoolToStr(FStopRequested, True), FForceNextPoint]));
+       CurrentUUID, ATargetIndex, TargetUUID, BoolToStr(PhysicalStarted, 'True', 'False'),
+       BoolToStr(FStopRequested, 'True', 'False'), FForceNextPoint]));
 
   RejectionReason := '';
   if FCurrentStage in [msNone, msDone] then
@@ -5056,7 +5056,7 @@ var
             if DetailChannel = nil then
               Continue;
             Details.AppendFormat('; Etalon[%d].Enabled=%s; Group=%d; QminWork=%.6f; QmaxWork=%.6f',
-              [J, BoolToStr(DetailChannel.Enabled, True), DetailChannel.Group, DetailChannel.QMinWork, DetailChannel.QMaxWork]);
+              [J, BoolToStr(DetailChannel.Enabled, 'True', 'False'), DetailChannel.Group, DetailChannel.QMinWork, DetailChannel.QMaxWork]);
             if (DetailChannel.FlowMeter <> nil) and (DetailChannel.FlowMeter.Device <> nil) then
               Details.AppendFormat('; Etalon[%d].Name=%s; DeviceQmin=%.6f; DeviceQmax=%.6f',
                 [J, DetailChannel.FlowMeter.Device.Name, DetailChannel.FlowMeter.Device.Qmin, DetailChannel.FlowMeter.Device.Qmax]);
@@ -5272,7 +5272,7 @@ begin
   AddDiagnosticEvent(Format(
     'SetupPoint command: PointIndex=%d; MeasurementPointUUID=%s; PointName=%s; TargetFlowLS=%.6f; SelectedEtalonUUID=%s; WorkTableState=%s; Attempt=%d; CommandSent=%s; %s',
     [FSetupPointIndex, FSetupPointUUID, APoint.Name, FSetupTargetFlowLS, GetSelectedEtalonUUID,
-     TWorkTable.WorkTableStateToString(FWorkTable.State), FAttempt, BoolToStr(FPointSetupCommandSent, True), BuildPointSetupIdentityLog]));
+     TWorkTable.WorkTableStateToString(FWorkTable.State), FAttempt, BoolToStr(FPointSetupCommandSent, 'True', 'False'), BuildPointSetupIdentityLog]));
 
     ProtocolManager.AddMessage(
     pcProc,
@@ -5290,7 +5290,7 @@ begin
        GetSelectedEtalonUUID,
        TWorkTable.WorkTableStateToString(FWorkTable.State),
        FAttempt,
-       BoolToStr(FPointSetupCommandSent, True),
+       BoolToStr(FPointSetupCommandSent, 'True', 'False'),
        BuildPointSetupIdentityLog])
   );
 
@@ -5751,8 +5751,8 @@ begin
               [
                 Configuration.ChartIndex,
                 Configuration.RangeIndex,
-                BoolToStr(Configuration.Range.IsValid, True),
-                BoolToStr(Range.IsValid, True)
+                BoolToStr(Configuration.Range.IsValid, 'True', 'False'),
+                BoolToStr(Range.IsValid, 'True', 'False')
               ]
             )
           );
@@ -6077,13 +6077,13 @@ begin
         'Тайм-аут запуска мониторинга', Format('PointSetupTimeout: PointIndex=%d; PointName=%s; ElapsedMs=%d; TimeoutMs=%d; FreshDataReady=False; TableFlowAvailable=%s; TableFlowReady=False; ConditionsReady=False; Reason=Мониторинг не запущен (%s); Action=ContinueAfterPointError',
         [FCurrentPointIndex, Point.Name, CurrentMs - FSetupStartedMs,
          SETUP_TIMEOUT_S * 1000,
-         BoolToStr((FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.Value <> nil), True),
+         BoolToStr((FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.Value <> nil), 'True', 'False'),
          TWorkTable.WorkTableStateToString(FWorkTable.State)]));
       ContinueAfterPointError(mptsSetupError, mePointNotSet, BuildError(1211,
         'Мониторинг не запустился после установки точки'));
       ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitPointSetup',
         'Тайм-аут обработан', Format('PointSetupTimeoutHandled: PointStatus=%d; MeasurementError=%s; NextStage=%s; ContinueMeasurement=%s',
-        [Ord(mptsSetupError), 'Мониторинг не запустился', MeasurementStateToString(FCurrentStage), BoolToStr(FCurrentStage <> msDone, True)]));
+        [Ord(mptsSetupError), 'Мониторинг не запустился', MeasurementStateToString(FCurrentStage), BoolToStr(FCurrentStage <> msDone, 'True', 'False')]));
     end
     else
       if (FLastWaitPointSetupLogState <> FWorkTable.State) or (CurrentMs - FLastWaitPointSetupLogMs >= 1000) then
@@ -6123,7 +6123,7 @@ begin
           [FCurrentPointIndex, Point.Name, CurrentMs - FSetupStartedMs,
            SETUP_TIMEOUT_S * 1000,
            BoolToStr((FWorkTable.FlowRate <> nil) and
-             (FWorkTable.FlowRate.Value <> nil), True)]));
+             (FWorkTable.FlowRate.Value <> nil), 'True', 'False')]));
       ContinueAfterPointError(mptsStabilityError, meStableTimeout,
         BuildError(1213, 'Нет свежих данных расхода стола'));
     end;
@@ -6153,15 +6153,15 @@ begin
         'Тайм-аут стабилизации установки', Format('PointSetupTimeout: PointIndex=%d; PointName=%s; ElapsedMs=%d; TimeoutMs=%d; FreshDataReady=True; TableFlowAvailable=%s; TableFlowReady=%s; ConditionsReady=%s; Reason=%s; Action=ContinueAfterPointError',
         [FCurrentPointIndex, Point.Name, CurrentMs - FSetupStartedMs,
          SETUP_TIMEOUT_S * 1000,
-         BoolToStr((FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.Value <> nil), True),
+         BoolToStr((FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.Value <> nil), 'True', 'False'),
          BoolToStr((FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.Value <> nil) and
-           FWorkTable.FlowRate.Value.LastStabilityInfo.IsSuitableForMeasurement, True),
-         BoolToStr(FLastTemperatureReady and FLastPressureReady, True), SetupInfo.StatusText]));
+           FWorkTable.FlowRate.Value.LastStabilityInfo.IsSuitableForMeasurement, 'True', 'False'),
+         BoolToStr(FLastTemperatureReady and FLastPressureReady, 'True', 'False'), SetupInfo.StatusText]));
       ContinueAfterPointError(mptsStabilityError, meStableTimeout, BuildError(1213,
         'Установка не достигла стабильности или диапазона: ' + SetupInfo.StatusText));
       ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitPointSetup',
         'Тайм-аут обработан', Format('PointSetupTimeoutHandled: PointStatus=%d; MeasurementError=%s; NextStage=%s; ContinueMeasurement=%s',
-        [Ord(mptsStabilityError), SetupInfo.StatusText, MeasurementStateToString(FCurrentStage), BoolToStr(FCurrentStage <> msDone, True)]));
+        [Ord(mptsStabilityError), SetupInfo.StatusText, MeasurementStateToString(FCurrentStage), BoolToStr(FCurrentStage <> msDone, 'True', 'False')]));
     end;
     Exit;
   end;
@@ -6226,7 +6226,7 @@ begin
           [FDeviceStability[I].Channel.Name, FDeviceStability[I].DevicePoint.Name,
            FDeviceStability[I].RequiredTimeSec, ElapsedMs / 1000,
            Max(0.0, FDeviceStability[I].RequiredTimeSec - ElapsedMs / 1000),
-           BoolToStr(FDeviceStability[I].Result = dsrFixedTimeCompleted, True)]);
+           BoolToStr(FDeviceStability[I].Result = dsrFixedTimeCompleted, 'True', 'False')]);
         ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitStable',
           'Ход ожидания фиксированного времени', LogText);
       end;
@@ -6258,13 +6258,13 @@ begin
         [FDeviceStability[I].Channel.Name, FDeviceStability[I].DevicePoint.Name,
          ElapsedMs / 1000,
          FDeviceStability[I].TimeoutSec, SignalInfo.UsedSampleCount,
-         SignalInfo.ActualWindowDurationSec, BoolToStr(SignalInfo.IsSignalStable, True),
+         SignalInfo.ActualWindowDurationSec, BoolToStr(SignalInfo.IsSignalStable, 'True', 'False'),
          SignalInfo.Variation,
          FDeviceStability[I].Value.StabilitySettings.MaxVariation,
          SignalInfo.StdDeviation, FDeviceStability[I].Value.StabilitySettings.MaxStdDeviation,
          SignalInfo.TrendRate, FDeviceStability[I].Value.StabilitySettings.MaxTrendRate,
          SignalInfo.OutlierFraction, FDeviceStability[I].Value.StabilitySettings.MaxOutlierFraction,
-         BoolToStr(FDeviceStability[I].Result <> dsrWaiting, True), SignalInfo.StatusText]);
+         BoolToStr(FDeviceStability[I].Result <> dsrWaiting, 'True', 'False'), SignalInfo.StatusText]);
       AddDiagnosticEvent(LogText);
       if PublishProgress then
         ProtocolManager.AddMessage(pcProc, psMeasurement, 'ProcessWaitStable',
@@ -6281,7 +6281,7 @@ begin
          IfThen(IsAuto, 'Automatic', 'FixedTime'),
          FDeviceStability[I].RequiredTimeSec, ElapsedMs / 1000,
          FDeviceStability[I].TimeoutSec,
-         BoolToStr(FDeviceStability[I].Result = dsrAutoStable, True),
+         BoolToStr(FDeviceStability[I].Result = dsrAutoStable, 'True', 'False'),
          IfThen(FDeviceStability[I].Result = dsrFixedTimeCompleted, 'FixedTimeCompleted',
            IfThen(FDeviceStability[I].Result = dsrAutoStable, 'SignalStable', 'AutoStabilityTimeout')),
          FDeviceStability[I].DiagnosticText]);
@@ -6317,7 +6317,7 @@ begin
           [FStabilityDeviceChannelCount, FStabilityEnabledDeviceCount,
            Length(FDeviceStability), PendingCount, CompletedCount,
            FStabilitySkippedDeviceCount, FixedCount, StableCount, TimeoutCount,
-           BoolToStr(FStabilityEnabledDeviceCount = Length(FDeviceStability), True)]));
+           BoolToStr(FStabilityEnabledDeviceCount = Length(FDeviceStability), 'True', 'False')]));
       FLastDeviceStabilityLogTick := CurrentTick;
     end;
     Exit;
@@ -6334,9 +6334,9 @@ begin
       [FStabilityDeviceChannelCount, FStabilityEnabledDeviceCount,
        Length(FDeviceStability), CompletedCount, FStabilitySkippedDeviceCount,
        FixedCount, StableCount, TimeoutCount,
-       BoolToStr(FStabilityEnabledDeviceCount = Length(FDeviceStability), True),
+       BoolToStr(FStabilityEnabledDeviceCount = Length(FDeviceStability), 'True', 'False'),
        BoolToStr((Length(FDeviceStability) > 0) and
-         (CompletedCount = Length(FDeviceStability)), True), DecisionReason]));
+         (CompletedCount = Length(FDeviceStability)), 'True', 'False'), DecisionReason]));
   FireEvent(meStableReached);
   SetStage(msWaitMeasureStart);
 end;
@@ -6851,8 +6851,8 @@ begin
   AddDiagnosticEvent(Format(
     'RepeatTransition: PointName=%s; CurrentRepeat=%d; RepeatsTarget=%d; IsLastRepeat=%s; NextStage=%s; StabilizationSkipped=%s',
     [IfThen(Point <> nil, Point.Name, '<none>'), SavedRepeat, RepeatsTarget,
-     BoolToStr(IsLastRepeat, True), MeasurementStateToString(FNextStageAfterSave),
-     BoolToStr(FNextStageAfterSave = msWaitMeasureStart, True)]));
+     BoolToStr(IsLastRepeat, 'True', 'False'), MeasurementStateToString(FNextStageAfterSave),
+     BoolToStr(FNextStageAfterSave = msWaitMeasureStart, 'True', 'False')]));
   SetStage(FNextStageAfterSave);
 end;
 

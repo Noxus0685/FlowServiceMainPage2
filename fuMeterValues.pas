@@ -322,8 +322,8 @@ begin
         StringGridDimensions.Cells[1, I] := MeterValue.Dimensions[I].Name;
         StringGridDimensions.Cells[2, I] := FloatToStr(MeterValue.Dimensions[I].Rate);
         StringGridDimensions.Cells[3, I] := FloatToStr(MeterValue.Dimensions[I].Devider);
-        StringGridDimensions.Cells[4, I] := BoolToStr(MeterValue.Dimensions[I].Factor, True);
-        StringGridDimensions.Cells[5, I] := BoolToStr(MeterValue.Dimensions[I].Recip, True);
+        StringGridDimensions.Cells[4, I] := BoolToStr(MeterValue.Dimensions[I].Factor, 'True', 'False');
+        StringGridDimensions.Cells[5, I] := BoolToStr(MeterValue.Dimensions[I].Recip, 'True', 'False');
         StringGridDimensions.Cells[6, I] := MeterValue.Dimensions[I].Hash;
       end;
     end;
@@ -364,7 +364,7 @@ begin
       for I := 0 to ReferenceTable.Items.Count - 1 do
       begin
         ReferenceItem := ReferenceTable.Items[I];
-        StringGridCoefsData.Cells[0, I] := BoolToStr(ReferenceItem.Enable, True);
+        StringGridCoefsData.Cells[0, I] := BoolToStr(ReferenceItem.Enable, 'True', 'False');
         StringGridCoefsData.Cells[1, I] := ReferenceItem.Name;
         StringGridCoefsData.Cells[2, I] := MeterValue.GetStringNum(ReferenceItem.Value);
         StringGridCoefsData.Cells[3, I] := MeterValue.GetStringNum(ReferenceItem.Arg);
@@ -381,7 +381,7 @@ begin
       begin
         FCoef := MeterValue.Coefs[I];
 
-        StringGridCoefsData.Cells[0, I] := BoolToStr(FCoef.InUse, True);
+        StringGridCoefsData.Cells[0, I] := BoolToStr(FCoef.InUse, 'True', 'False');
         StringGridCoefsData.Cells[1, I] := FCoef.Name;
         StringGridCoefsData.Cells[2, I] := MeterValue.GetStringNum(FCoef.Value);
         StringGridCoefsData.Cells[3, I] := MeterValue.GetStringNum(FCoef.Arg);
@@ -435,7 +435,7 @@ begin
     begin
       for I := 0 to MeterValue.Coefs.Count - 1 do
       begin
-        StringGridCoefs.Cells[0, I] := BoolToStr(MeterValue.Coefs[I].InUse, True);
+        StringGridCoefs.Cells[0, I] := BoolToStr(MeterValue.Coefs[I].InUse, 'True', 'False');
         StringGridCoefs.Cells[1, I] := MeterValue.Coefs[I].Name;
         StringGridCoefs.Cells[2, I] := MeterValue.GetStringNum(MeterValue.Coefs[I].Q1);
         StringGridCoefs.Cells[3, I] := MeterValue.GetStringNum(MeterValue.Coefs[I].Q2);
