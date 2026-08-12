@@ -43,7 +43,7 @@ def test_channel_copy_uses_configuration_only_mode_before_persistence():
     helper = method(DEVICE, "procedure TDevice.AssignWithoutMeasurementHistory", "procedure TCalibrCoefItem.Assign")
     factory = method(REPOS, "function TDeviceRepository.CreateDeviceForChannelCopy", "function TDeviceRepository.GetDevice")
     channel_copy = method(WORK, "procedure TChannel.AssignFlowMeterFrom", "// =====================================================")
-    clipboard = method(MAIN, "procedure TFrameMainTable.SaveChannelToClipboard", "procedure TFrameMainTable.LoadChannelFromClipboard")
+    clipboard = method(MAIN, "procedure TFrameMainTable.SaveChannelToClipboard", "procedure TFrameMainTable.ValidateChannelDeviceUUIDs")
     assert "Assign(ASource, False)" in helper
     assert helper.index("FSessions.Clear") > helper.index("Assign(ASource, False)")
     assert helper.index("FSpillages.Clear") > helper.index("Assign(ASource, False)")
@@ -58,8 +58,8 @@ def test_channel_copy_uses_configuration_only_mode_before_persistence():
     assert "ASource.FSpillages" in legacy
 
 
-def test_version_1_0_145():
-    assert "APP_VERSION = '1.0.145'" in (ROOT / "uAppVersion.pas").read_text(encoding="utf-8")
+def test_version_1_0_146():
+    assert "APP_VERSION = '1.0.147'" in (ROOT / "uAppVersion.pas").read_text(encoding="utf-8")
     project = (ROOT / "ProjectFornTest.dproj").read_text(encoding="utf-8")
-    assert project.count("FileVersion=1.0.145.0") == 2
-    assert project.count("ProductVersion=1.0.145.0") == 2
+    assert project.count("FileVersion=1.0.147.0") == 2
+    assert project.count("ProductVersion=1.0.147.0") == 2

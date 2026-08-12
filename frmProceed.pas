@@ -252,6 +252,7 @@ type
     function HasDeviceInProcessing(ADevice: TDevice): Boolean;
     procedure AddProcessingDevice(ADevice: TDevice);
     procedure RemoveProcessingDevice(ADevice: TDevice);
+    procedure ReplaceProcessingDevice(AOldDevice, ANewDevice: TDevice; const ARemoveOld: Boolean);
     procedure MarkProcessingDeviceRemoved(ADevice: TDevice);
     procedure ApplyProcessingDeviceRemovals;
     function IsProcessingDevicePendingRemoved(ADevice: TDevice): Boolean;
@@ -978,6 +979,16 @@ begin
   FProcessingDevices.Add(ADevice);
   DbgProceedTree(1304, 'After FProcessingDevices.Add: Count=' + FProcessingDevices.Count.ToString);
 end;
+// Replaces processing references as one operation and rebuilds all result views.
+procedure TFrameProceed.ReplaceProcessingDevice(AOldDevice, ANewDevice: TDevice;
+  const ARemoveOld: Boolean);
+begin
+  if ARemoveOld then
+    RemoveProcessingDevice(AOldDevice);
+  AddProcessingDevice(ANewDevice);
+  RefreshResultsTab;
+end;
+
 procedure TFrameProceed.RemoveProcessingDevice(ADevice: TDevice);
 var
   Existing: TDevice;
