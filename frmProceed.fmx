@@ -1,4 +1,4 @@
-object FrameProceed: TFrameProceed
+﻿object FrameProceed: TFrameProceed
   Size.Width = 1564.000000000000000000
   Size.Height = 688.000000000000000000
   Size.PlatformDefault = False
@@ -224,8 +224,7 @@ object FrameProceed: TFrameProceed
           Size.Height = 609.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
-          Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
-          OnColumnMoved = GridDataPointsColumnMoved
+          Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = GridResultsSelChanged
           OnGetValue = GridResultsGetValue
           Viewport.Width = 961.000000000000000000
@@ -244,34 +243,6 @@ object FrameProceed: TFrameProceed
           end
           object StringColumnResultSerial: TStringColumn
             Header = #1057#1077#1088#1080#1081#1085#1099#1081' '#1085#1086#1084#1077#1088
-            HeaderSettings.TextSettings.Trimming = Character
-            HeaderSettings.TextSettings.WordWrap = False
-            HeaderSettings.TextSettings.HorzAlign = Center
-            Size.Width = 125.000000000000000000
-          end
-          object StringColumnPointNum1: TStringColumn
-            Header = #948'(1 '#1090#1086#1095#1082#1072'), %'
-            HeaderSettings.TextSettings.Trimming = Character
-            HeaderSettings.TextSettings.WordWrap = False
-            HeaderSettings.TextSettings.HorzAlign = Center
-            Size.Width = 125.000000000000000000
-          end
-          object StringColumnPointNum2: TStringColumn
-            Header = #948'(2 '#1090#1086#1095#1082#1072'), %'
-            HeaderSettings.TextSettings.Trimming = Character
-            HeaderSettings.TextSettings.WordWrap = False
-            HeaderSettings.TextSettings.HorzAlign = Center
-            Size.Width = 125.000000000000000000
-          end
-          object StringColumnPointNum3: TStringColumn
-            Header = #948'(3 '#1090#1086#1095#1082#1072'), %'
-            HeaderSettings.TextSettings.Trimming = Character
-            HeaderSettings.TextSettings.WordWrap = False
-            HeaderSettings.TextSettings.HorzAlign = Center
-            Size.Width = 125.000000000000000000
-          end
-          object StringColumnPointNum4: TStringColumn
-            Header = #948'(4 '#1090#1086#1095#1082#1072'), %'
             HeaderSettings.TextSettings.Trimming = Character
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center

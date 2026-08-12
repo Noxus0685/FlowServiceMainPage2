@@ -3,7 +3,7 @@
 interface
 
 uses
-  uGridStabilityRegistry,
+  FmxHelper,
   FMX.ActnList,
   FMX.Colors,
   FMX.ComboEdit,
@@ -67,7 +67,6 @@ uses
   uDataManager,
   uDeviceClass,
   uFlowMeter,
-  uGridLayoutManager,
   uMeasurementRun,
   uMeterValue,
   uObservable,
@@ -2483,8 +2482,6 @@ var
   LayoutOrder: string;
 
 begin
-  RegisterStableGrid(Self, GridDevices, Name);
-  RegisterStableGrid(Self, GridEtalons, Name);
   EnsureFlowGraphDictionaries;
   if ButtonClearFlowGraphs <> nil then
     ButtonClearFlowGraphs.OnClick := ButtonClearFlowGraphsClick;
@@ -2515,7 +2512,8 @@ begin
   FFrameChannelProperties := nil;
   FFrameWorkTableProperties := nil;
 
-  TGridLayoutManager.SetRowCount(GridDevices, 2);
+  RefreshGridRowCount(GridDevices, 2, 'initial-rows');
+  RefreshGridValues(GridDevices, 'initial-rows');
 
   // Заполняем список через имя колонки
   PopupColumnDeviceSignal1.Items.Clear;
@@ -3577,7 +3575,6 @@ begin
   begin
     AColumns[I].Name := AGrid.Columns[I].Name;
     AColumns[I].Position := AGrid.Columns[I].Index;
-    AColumns[I].Width := AGrid.Columns[I].Width;
     AColumns[I].Visible := AGrid.Columns[I].Visible;
   end;
 end;
@@ -3590,66 +3587,55 @@ end;
 procedure TFrameMainTable.ApplyGridColumnsLayout(AGrid: TGrid;
   const AColumns: TArray<TGridColumnLayout>);
 var
-  I, J: Integer;
+  I, J, IndexChanged, VisibleChanged: Integer;
   Column: TColumn;
 begin
+  { Applies a WorkTable layout only when order or visibility really differs. }
   if (AGrid = nil) or (Length(AColumns) = 0) then
+    Exit;
+  IndexChanged := 0;
+  VisibleChanged := 0;
+  for I := 0 to High(AColumns) do
+    for J := 0 to AGrid.ColumnCount - 1 do
+      if SameText(AGrid.Columns[J].Name, AColumns[I].Name) then
+      begin
+        Column := AGrid.Columns[J];
+        if Column.Visible <> AColumns[I].Visible then
+          Inc(VisibleChanged);
+        if (AColumns[I].Position >= 0) and
+           (AColumns[I].Position < AGrid.ColumnCount) and
+           (Column.Index <> AColumns[I].Position) then
+          Inc(IndexChanged);
+        Break;
+      end;
+  if (IndexChanged = 0) and (VisibleChanged = 0) then
     Exit;
 
   AGrid.BeginUpdate;
   try
     for I := 0 to High(AColumns) do
-    begin
-      Column := nil;
       for J := 0 to AGrid.ColumnCount - 1 do
         if SameText(AGrid.Columns[J].Name, AColumns[I].Name) then
         begin
           Column := AGrid.Columns[J];
+          if Column.Visible <> AColumns[I].Visible then
+            Column.Visible := AColumns[I].Visible;
+          if (AColumns[I].Position >= 0) and
+             (AColumns[I].Position < AGrid.ColumnCount) and
+             (Column.Index <> AColumns[I].Position) then
+            Column.Index := AColumns[I].Position;
           Break;
         end;
-
-      if Column = nil then
-        Continue;
-
-      if Column.Visible <> AColumns[I].Visible then
-        Column.Visible := AColumns[I].Visible;
-      if (AColumns[I].Width > 0) and
-         (Abs(Column.Width - AColumns[I].Width) > 0.01) then
-        Column.Width := AColumns[I].Width;
-      if (AColumns[I].Position >= 0) and
-         (AColumns[I].Position < AGrid.ColumnCount) and
-         (Column.Index <> AColumns[I].Position) then
-        Column.Index := AColumns[I].Position;
-    end;
   finally
     AGrid.EndUpdate;
   end;
+  AGrid.Repaint;
 end;
 
 procedure TFrameMainTable.RefreshGridColumns(AGrid: TGrid);
-var
-  ViewportY: Single;
 begin
-  if FRefreshingGridColumns or (AGrid = nil) then
-    Exit;
-
-  FRefreshingGridColumns := True;
-  try
-    ViewportY := AGrid.ViewportPosition.Y;
-
-    AGrid.Model.BeginUpdate;
-    try
-      AGrid.Model.InvalidateContentSize;
-      AGrid.Model.ContentChanged;
-    finally
-      AGrid.Model.EndUpdate;
-    end;
-
-    AGrid.ViewportPosition := PointF(0, ViewportY);
-    AGrid.Repaint;
-  finally
-    FRefreshingGridColumns := False;
-  end;
+  { Repaints visible cells after an explicit column-menu action. }
+  RefreshGridValues(AGrid, 'column-menu');
 end;
 
 procedure TFrameMainTable.EnforceDataPointsColumnsLayout;
@@ -4147,8 +4133,8 @@ begin
 
     if Assigned(GridEtalonsN) then
     begin
-      TGridLayoutManager.SetRowCount(GridEtalonsN,
-        WorkTable.EtalonChannels.Count);
+      RefreshGridRowCount(GridEtalonsN, WorkTable.EtalonChannels.Count, 'work-table-structure');
+      RefreshGridValues(GridEtalonsN, 'work-table-structure');
     end;
 
     GridDevicesN := FindComponent('GridDevices' + IntToStr(I)) as TGrid;
@@ -4157,8 +4143,8 @@ begin
 
     if Assigned(GridDevicesN) then
     begin
-      TGridLayoutManager.SetRowCount(GridDevicesN,
-        WorkTable.DeviceChannels.Count);
+      RefreshGridRowCount(GridDevicesN, WorkTable.DeviceChannels.Count, 'work-table-structure');
+      RefreshGridValues(GridDevicesN, 'work-table-structure');
     end;
 
     if WorkTable = FActiveWorkTable then
@@ -5730,9 +5716,7 @@ begin
 
 
 
-  if not (WorkTable.State in [swtMONITOR, swtEXECUTE]) then
-    Exit;
-
+  { Канальные значения могут изменяться во всех промежуточных состояниях. }
   IsUpdating := True;
   try
 //Grids
@@ -8253,8 +8237,6 @@ begin
   AddStringColumn(GridAutoTestNumbers, 'StringColumnVirtualResponse', 'Virtual response', 130);
   AddStringColumn(GridAutoTestNumbers, 'StringColumnProgress', 'Progress', 90);
   AddStringColumn(GridAutoTestNumbers, 'StringColumnReason', 'Причина', 300);
-  RegisterStableGrid(Self, GridAutoTestNumbers, Name);
-
   GridAutoTestResults := TGrid.Create(Self);
   GridAutoTestResults.Name := 'GridAutoTestResults';
   GridAutoTestResults.Parent := Layout;
@@ -8272,8 +8254,6 @@ begin
   AddStringColumn(GridAutoTestResults, 'StringColumnWorkTableState', 'WorkTable.State', 130);
   AddStringColumn(GridAutoTestResults, 'StringColumnReason', 'Причина', 240);
   AddStringColumn(GridAutoTestResults, 'StringColumnLogFile', 'Файл лога', 220);
-  RegisterStableGrid(Self, GridAutoTestResults, Name);
-
   InitializeAutoTestScenarioList;
   ButtonStopAutoTestScenario.Enabled := False;
   FAutoTestRealCommandsBlocked := False;
@@ -8605,6 +8585,8 @@ begin
               Break;
             end;
             StageBefore := Run.Stage;
+            { Возвращаем управление FMX message loop между шагами имитации. }
+            Application.ProcessMessages;
             TThread.Sleep(1);
             Point := Run.CurrentPoint;
             PointReady := (Point <> nil) and (Run.CurrentPointIndex >= 0) and
@@ -8725,6 +8707,8 @@ begin
               Break;
             end;
 
+            { Возвращаем управление FMX message loop между шагами имитации. }
+            Application.ProcessMessages;
             TThread.Sleep(1);
             StageAfter := Run.Stage;
             StableText := 'n/a';
@@ -8809,6 +8793,7 @@ begin
       begin
         if (Run = nil) or (not Run.IsWorkerThreadRunning) then
           Break;
+        Application.ProcessMessages;
         TThread.Sleep(1);
       end;
       if WT.FlowRate <> nil then RestoreMeter(WT.FlowRate.Value, OldFlowSamples, OldFlowValue);
@@ -8855,10 +8840,10 @@ begin
     SetLength(FAutoTestResultRows, Length(FAutoTestResultRows) + 1);
     FAutoTestResultRows[High(FAutoTestResultRows)] := ResultRow;
 
-    TGridLayoutManager.SetRowCount(GridAutoTestNumbers,
-      Length(FAutoTestStepRows));
-    TGridLayoutManager.SetRowCount(GridAutoTestResults,
-      Length(FAutoTestResultRows));
+    RefreshGridRowCount(GridAutoTestNumbers, Length(FAutoTestStepRows), 'auto-test-step');
+    RefreshGridValues(GridAutoTestNumbers, 'auto-test-step');
+    RefreshGridRowCount(GridAutoTestResults, Length(FAutoTestResultRows), 'auto-test-result');
+    RefreshGridValues(GridAutoTestResults, 'auto-test-result');
     if FAutoTestStatusLabel <> nil then
       FAutoTestStatusLabel.Text := FinalReason;
     RefreshAutoMeasurementTestContext;
@@ -9285,7 +9270,8 @@ begin
     end;
   end;
 
-  TGridLayoutManager.SetRowCount(GridDevices, Rows);
+  RefreshGridRowCount(GridDevices, Rows, 'device-structure');
+  RefreshGridValues(GridDevices, 'device-structure');
 
   UpdateFlowMeterPropertiesFrame(Row);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -9417,7 +9403,8 @@ begin
     end;
 
 
-  TGridLayoutManager.SetRowCount(GridDevices, Rows);
+  RefreshGridRowCount(GridDevices, Rows, 'device-structure');
+  RefreshGridValues(GridDevices, 'device-structure');
 
   UpdateFlowMeterPropertiesFrame(Row);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -9951,7 +9938,8 @@ begin
     end;
   end;
 
-  TGridLayoutManager.SetRowCount(GridEtalons, Rows);
+  RefreshGridRowCount(GridEtalons, Rows, 'etalon-structure');
+  RefreshGridValues(GridEtalons, 'etalon-structure');
 
   UpdateFlowMeterPropertiesFrame(Row, True);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -10004,7 +9992,8 @@ begin
     end;
 
 
-  TGridLayoutManager.SetRowCount(GridEtalons, Rows);
+  RefreshGridRowCount(GridEtalons, Rows, 'etalon-structure');
+  RefreshGridValues(GridEtalons, 'etalon-structure');
 
   UpdateFlowMeterPropertiesFrame(Row, True);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -10260,106 +10249,31 @@ begin
 end;
 
  procedure TFrameMainTable.UpdateGridDevices;
-  var
-    Rows: Integer;
- begin
-   Rows:= GridDevices.RowCount;
-   TGridLayoutManager.SetRowCount(GridDevices, Rows, True);
- end;
-
-procedure ReloadGridByGrowingRowCount(AGrid: TGrid; ANewRowCount: Integer);
-var
-  Sel: Integer;
 begin
-  if AGrid = nil then Exit;
-
-  Sel := AGrid.Selected;
-
-  TGridLayoutManager.SetRowCount(AGrid, ANewRowCount, True);
-
-  // вернуть выделение (если осталось валидным)
-  if (Sel >= 0) and (Sel < AGrid.RowCount) then
-    AGrid.Selected := Sel;
-
-end;
-
-procedure SoftReloadGridByGrowingRowCount(AGrid: TGrid; ANewRowCount: Integer;
-  const ARefreshColumns: array of TColumn);
-var
-  I: Integer;
-  Sel: Integer;
-begin
-  if AGrid = nil then
-    Exit;
-
-  Sel := AGrid.Selected;
-
-  TGridLayoutManager.SetRowCount(AGrid, ANewRowCount);
-
-  if (Sel >= 0) and (Sel < AGrid.RowCount) then
-    AGrid.Selected := Sel;
-
-  if Length(ARefreshColumns) = 0 then
-    AGrid.Repaint
-  else
-  begin
-    for I := Low(ARefreshColumns) to High(ARefreshColumns) do
-      if ARefreshColumns[I] <> nil then
-        ARefreshColumns[I].Repaint;
-    AGrid.Repaint;
-  end;
+  { Повторно запрашивает значения строк без изменения их структуры. }
+  RefreshGridRowCount(GridDevices, GridDevices.RowCount, 'device-values');
+  RefreshGridValues(GridDevices, 'device-values');
 end;
 
 procedure TFrameMainTable.UpdateGrids;
 var
   WT: TWorkTable;
+  DeviceRows, EtalonRows: Integer;
 begin
+  { Обновляет содержимое каналов, изменяя RowCount только при смене их числа. }
   NormalizeActiveWorkTable;
   WT := FActiveWorkTable;
-
+  DeviceRows := 0;
+  EtalonRows := 0;
   if WT <> nil then
-    SoftReloadGridByGrowingRowCount(
-      GridDevices,
-      WT.DeviceChannels.Count,
-      [ColumnDeviceType1, PopupColumnDeviceDN1, StringColumnDeviceName1,
-       StringColumnDeviceSerial1, PopupColumnDeviceSignal1, StringColumnUUID1,
-       StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
-       StringColumnDeviceFlowRate1, StringColumnDeviceAvgFlowRate1,
-       StringColumnDeviceQuantity1, StringColumnDeviceCoef1, StringColumnDeviceError1]
-    )
-  else
-    SoftReloadGridByGrowingRowCount(
-      GridDevices,
-      0,
-      [ColumnDeviceType1, PopupColumnDeviceDN1, StringColumnDeviceName1,
-       StringColumnDeviceSerial1, PopupColumnDeviceSignal1, StringColumnUUID1,
-       StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
-       StringColumnDeviceFlowRate1, StringColumnDeviceAvgFlowRate1,
-       StringColumnDeviceQuantity1, StringColumnDeviceCoef1, StringColumnDeviceError1]
-    );
-
-  if WT <> nil then
-    SoftReloadGridByGrowingRowCount(
-      GridEtalons,
-      WT.EtalonChannels.Count,
-      [StringColumnEtalonChanel1, StringColumnEtalonType1, PopupColumnEtalonDN1,
-       StringColumnEtalonName1, StringColumnEtalonSerial1, PopupColumnEtalonSignal1,
-       StringColumnEtalonRawValue1, StringColumnEtalonRawSumValue1,
-       StringColumnEtalonFlowRate1, StringColumnEtalonAvgFlowRate1,
-       StringColumnEtalonQuantity1, StringColumnEtalonError1]
-    )
-  else
-    SoftReloadGridByGrowingRowCount(
-      GridEtalons,
-      0,
-      [StringColumnEtalonChanel1, StringColumnEtalonType1, PopupColumnEtalonDN1,
-       StringColumnEtalonName1, StringColumnEtalonSerial1, PopupColumnEtalonSignal1,
-       StringColumnEtalonRawValue1, StringColumnEtalonRawSumValue1,
-       StringColumnEtalonFlowRate1, StringColumnEtalonAvgFlowRate1,
-       StringColumnEtalonQuantity1, StringColumnEtalonError1]
-    );
-
- // UpdateGridMesurmentRun;
+  begin
+    DeviceRows := WT.DeviceChannels.Count;
+    EtalonRows := WT.EtalonChannels.Count;
+  end;
+  RefreshGridRowCount(GridDevices, DeviceRows, 'channel-values');
+  RefreshGridValues(GridDevices, 'channel-values');
+  RefreshGridRowCount(GridEtalons, EtalonRows, 'channel-values');
+  RefreshGridValues(GridEtalons, 'channel-values');
 end;
 
 procedure TFrameMainTable.GridEtalonsSetValue(Sender: TObject;
