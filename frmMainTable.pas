@@ -637,6 +637,9 @@ type
     procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
+    procedure GridDevicesEnter(Sender: TObject);
+    procedure GridEtalonsEnter(Sender: TObject);
+    procedure ActivateMeasurementGrid(AGrid: TGrid);
     procedure GridDevicesHeaderClick(Column: TColumn);
     procedure ActionAddWorkTableExecute(Sender: TObject);
     procedure ActionAddDeviceChannelExecute(Sender: TObject);
@@ -805,6 +808,7 @@ type
   FLastClickTick: Cardinal;
   FLastPopupGrid: TGrid;
   FRefreshingGridColumns: Boolean;
+  FChangingMeasurementGridFocus: Boolean;
 
   FRows: array of TRowData;
   IsUpdating: Boolean;
@@ -847,6 +851,10 @@ type
     procedure ClearChannelSimulationValues(AChannel: TChannel);
     procedure DisableOtherChannelGroups(AChannels: TObjectList<TChannel>; const AActiveIndex: Integer);
     procedure ApplyEnabledChannelSimulationValues(AWorkTable: TWorkTable; const AEtalonChannels: Boolean);
+    // Определяет явный режим симуляции для гидравлических действий стола.
+    function IsHydraulicSimulationMode(AWorkTable: TWorkTable): Boolean;
+    procedure CompleteSimulatedHydraulicConfiguration(AWorkTable: TWorkTable);
+    procedure CompleteSimulatedHydraulicLineSetup(AWorkTable: TWorkTable);
     // Сбрасывает устаревшую ссылку FActiveWorkTable после удаления рабочего стола.
     procedure NormalizeActiveWorkTable;
     procedure EnsureActiveWorkTableMenu;
@@ -1952,8 +1960,9 @@ begin
 
          end;
     awtFindHydraulicConfiguration:
-
          begin
+         if IsHydraulicSimulationMode(AWorkTable) then
+           CompleteSimulatedHydraulicConfiguration(AWorkTable);
          if Assigned(ProtocolManager) then
           ProtocolManager.AddMessage(
             pcProc,
@@ -1965,6 +1974,11 @@ begin
          end;
     awtSetupHydraulicLine:
       begin
+        if IsHydraulicSimulationMode(AWorkTable) then
+        begin
+          CompleteSimulatedHydraulicLineSetup(AWorkTable);
+          Exit;
+        end;
         if Assigned(ProtocolManager) then
           ProtocolManager.AddMessage(pcProc, psForm,
             'SetupHydraulicLine', 'Гидравлическая линия устанавливается',
@@ -9279,6 +9293,38 @@ begin
     FFrameChannelProperties.LoadFromChannel(WorkTable.DeviceChannels[Row]);
 end;
 
+procedure TFrameMainTable.ActivateMeasurementGrid(AGrid: TGrid);
+var
+  OtherGrid: TGrid;
+begin
+  { Keep focus and selection mutually exclusive without recursive OnEnter calls. }
+  if FChangingMeasurementGridFocus or (AGrid = nil) then
+    Exit;
+  if AGrid = GridDevices then
+    OtherGrid := GridEtalons
+  else if AGrid = GridEtalons then
+    OtherGrid := GridDevices
+  else
+    Exit;
+  FChangingMeasurementGridFocus := True;
+  try
+    OtherGrid.Row := -1;
+    OtherGrid.ResetFocus;
+  finally
+    FChangingMeasurementGridFocus := False;
+  end;
+end;
+
+procedure TFrameMainTable.GridDevicesEnter(Sender: TObject);
+begin
+  ActivateMeasurementGrid(GridDevices);
+end;
+
+procedure TFrameMainTable.GridEtalonsEnter(Sender: TObject);
+begin
+  ActivateMeasurementGrid(GridEtalons);
+end;
+
 procedure TFrameMainTable.GridDevicesHeaderClick(Column: TColumn);
 begin
   if Column = CheckColumnDeviceEnable1 then
@@ -10007,6 +10053,103 @@ begin
   Result := GRID_ETALON_GROUP_COLORS[Abs(AGroup) mod Length(GRID_ETALON_GROUP_COLORS)];
 end;
 
+function TFrameMainTable.IsHydraulicSimulationMode(AWorkTable: TWorkTable): Boolean;
+begin
+  Result := (AWorkTable <> nil) and
+    (AWorkTable.IsSimulationMode or
+     ((WorkTableManager <> nil) and WorkTableManager.IsSimulationMode));
+end;
+
+procedure TFrameMainTable.CompleteSimulatedHydraulicConfiguration(AWorkTable: TWorkTable);
+var
+  State: EHydraulicLineState;
+  Error: TErrorInfo;
+  OperationID: Int64;
+  PointUUID: string;
+  PointIndex, I, EtalonCount, ScaleCount: Integer;
+  TargetFlow: Double;
+  Configuration: RWorkTableHydraulicConfiguration;
+  HydraulicRange: RWorkTableHydraulicRange;
+  Channel: TChannel;
+begin
+  { Simulation creates a valid virtual selection through the public completion API. }
+  if not IsHydraulicSimulationMode(AWorkTable) then
+    Exit;
+  AWorkTable.GetHydraulicStateSnapshot(State, Error, OperationID, PointUUID,
+    PointIndex, TargetFlow, Configuration, HydraulicRange);
+  if State <> hlsSelecting then
+    Exit;
+  Configuration := Default(RWorkTableHydraulicConfiguration);
+  HydraulicRange := Default(RWorkTableHydraulicRange);
+  Configuration.ChartIndex := 0;
+  Configuration.ChartName := 'Simulation';
+  Configuration.RangeIndex := 0;
+  HydraulicRange.IsValid := True;
+  HydraulicRange.Number := 0;
+  HydraulicRange.FlowMin := 0;
+  HydraulicRange.FlowMax := Max(TargetFlow, 1) * 2;
+  Configuration.Range := HydraulicRange;
+  EtalonCount := 0;
+  ScaleCount := 0;
+  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+  begin
+    Channel := AWorkTable.EtalonChannels[I];
+    if (Channel = nil) or not Channel.Enabled or (Channel.FlowMeter = nil) then
+      Continue;
+    if Channel.FlowMeter.MeterFlowCategory = mftWeightsType then
+    begin
+      SetLength(Configuration.ScaleNames, ScaleCount + 1);
+      Configuration.ScaleNames[ScaleCount] := Channel.FlowMeter.Name;
+      Inc(ScaleCount);
+    end
+    else
+    begin
+      SetLength(Configuration.EtalonNames, EtalonCount + 1);
+      Configuration.EtalonNames[EtalonCount] := Channel.FlowMeter.Name;
+      Inc(EtalonCount);
+    end;
+  end;
+  if not AWorkTable.CompleteHydraulicConfigurationSearch(OperationID,
+    PointUUID, PointIndex, Configuration, HydraulicRange) then
+  begin
+    Error := TErrorInfo.Empty(Integer(AWorkTable.State));
+    Error.Code := 1381;
+    Error.Msg := 'Не удалось завершить виртуальный поиск гидравлической конфигурации';
+    Error.Time := Now;
+    AWorkTable.FailHydraulicConfigurationSearch(OperationID, PointUUID,
+      PointIndex, Error);
+  end;
+end;
+
+procedure TFrameMainTable.CompleteSimulatedHydraulicLineSetup(AWorkTable: TWorkTable);
+var
+  State: EHydraulicLineState;
+  Error: TErrorInfo;
+  OperationID: Int64;
+  PointUUID: string;
+  PointIndex: Integer;
+  TargetFlow: Double;
+  Configuration: RWorkTableHydraulicConfiguration;
+  HydraulicRange: RWorkTableHydraulicRange;
+begin
+  { Simulation applies the saved virtual selection without equipment commands. }
+  if not IsHydraulicSimulationMode(AWorkTable) then
+    Exit;
+  AWorkTable.GetHydraulicStateSnapshot(State, Error, OperationID, PointUUID,
+    PointIndex, TargetFlow, Configuration, HydraulicRange);
+  if not AWorkTable.BeginHydraulicLineApply(OperationID, PointUUID, PointIndex,
+    Configuration, HydraulicRange) then
+    Exit;
+  if not AWorkTable.CompleteHydraulicLineApply(OperationID, PointUUID, PointIndex) then
+  begin
+    Error := TErrorInfo.Empty(Integer(AWorkTable.State));
+    Error.Code := 1382;
+    Error.Msg := 'Не удалось завершить виртуальную установку гидравлической линии';
+    Error.Time := Now;
+    AWorkTable.FailHydraulicLineApply(OperationID, PointUUID, PointIndex, Error);
+  end;
+end;
+
 procedure TFrameMainTable.ClearChannelSimulationValues(AChannel: TChannel);
 begin
   if AChannel = nil then
@@ -10251,7 +10394,6 @@ end;
  procedure TFrameMainTable.UpdateGridDevices;
 begin
   { Повторно запрашивает значения строк без изменения их структуры. }
-  RefreshGridRowCount(GridDevices, GridDevices.RowCount, 'device-values');
   RefreshGridValues(GridDevices, 'device-values');
 end;
 
@@ -10270,9 +10412,11 @@ begin
     DeviceRows := WT.DeviceChannels.Count;
     EtalonRows := WT.EtalonChannels.Count;
   end;
-  RefreshGridRowCount(GridDevices, DeviceRows, 'channel-values');
+  if GridDevices.RowCount <> DeviceRows then
+    RefreshGridRowCount(GridDevices, DeviceRows, 'channel-values');
   RefreshGridValues(GridDevices, 'channel-values');
-  RefreshGridRowCount(GridEtalons, EtalonRows, 'channel-values');
+  if GridEtalons.RowCount <> EtalonRows then
+    RefreshGridRowCount(GridEtalons, EtalonRows, 'channel-values');
   RefreshGridValues(GridEtalons, 'channel-values');
 end;
 

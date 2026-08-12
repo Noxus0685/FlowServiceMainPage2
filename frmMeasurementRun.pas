@@ -723,7 +723,6 @@ begin
   else if SelectedRow >= 0 then
     GridMeasurmentRun.Row := SelectedRow;
 
-  GridMeasurmentRun.Repaint;
   UpdateCurrentPointIndicator;
   UpdatePointOrderControls;
   UpdateMeasurementControls;
