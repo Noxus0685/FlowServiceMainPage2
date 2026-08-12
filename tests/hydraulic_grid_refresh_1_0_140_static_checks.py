@@ -10,7 +10,7 @@ assert ROOT_HELPER_PATH.parent == ROOT
 MAIN = (ROOT / "frmMainTable.pas").read_text(encoding="utf-8")
 MEASUREMENT_FRAME = (ROOT / "frmMeasurementRun.pas").read_text(encoding="utf-8")
 RUN = (ROOT / "uMeasurementRun.pas").read_text(encoding="utf-8")
-HELPER = ROOT_HELPER_PATH.read_text(encoding="cp1251")
+HELPER = ROOT_HELPER_PATH.read_text(encoding="utf-8")
 VERSION = (ROOT / "uAppVersion.pas").read_text(encoding="utf-8")
 PROJECT = (ROOT / "ProjectFornTest.dproj").read_text(encoding="utf-8")
 
@@ -39,10 +39,11 @@ def test_picchar_is_the_original_64_char_table():
     )
     assert match, f"PICCHAR Char declaration not found in {ROOT_HELPER_PATH}"
     assert not re.search(rb"array\[\$C0\.\.\$FF\]\s+of\s+string", raw, re.IGNORECASE)
-    elements = re.findall(rb"'([^']*)'", match.group(1))
+    block = match.group(1).decode("utf-8")
+    elements = re.findall(r"'([^']*)'", block)
     assert len(elements) == 64
-    assert all(elements)
-    assert elements == [bytes([value]) for value in range(0xC0, 0x100)]
+    assert all(len(element) == 1 for element in elements)
+    assert [ord(element) for element in elements] == list(range(0xC0, 0x100))
 
 
 def test_char2byte_uses_picchar_without_string_conversion():
@@ -104,10 +105,10 @@ def test_simulation_completes_both_hydraulic_actions_through_public_api():
     assert ".SetStage" not in find_completion + setup_completion
 
 
-def test_project_version_is_1_0_141():
-    assert "APP_VERSION = '1.0.141'" in VERSION
-    assert "FileVersion=1.0.141.0" in PROJECT
-    assert "ProductVersion=1.0.141.0" in PROJECT
+def test_project_version_is_1_0_142():
+    assert "APP_VERSION = '1.0.142'" in VERSION
+    assert "FileVersion=1.0.142.0" in PROJECT
+    assert "ProductVersion=1.0.142.0" in PROJECT
 
 
 def test_shortstring_trim_is_explicit_before_overload_resolution():
