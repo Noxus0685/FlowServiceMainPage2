@@ -2157,7 +2157,7 @@ begin
   Result := False;
   if (FWorkTable = nil) or not (FWorkTable.MeasurementRun is TMeasurementRun) then Exit;
   Stage := TMeasurementRun(FWorkTable.MeasurementRun).Stage;
-  Result := Stage in [msSelectPoint, msSelectEtalon, msSetupPoint];
+  Result := Stage in [msSelectPoint, msHydraulicLineConfiguration, msSetupHydraulicLine, msSetupPoint];
 end;
 
 procedure TFrameGraphsWorkspace.StartSharedSegment(

@@ -101,7 +101,8 @@ type
       msNone,
 
       msSelectPoint,        // Выбор точки измерения
-      msSelectEtalon,       // Выбор эталонов для текущей точки
+      msHydraulicLineConfiguration, // Выбор гидравлической конфигурации
+      msSetupHydraulicLine,       // Физическая установка гидравлической линии
       msSetupPoint,         // Задание параметров точки и ограничений измерения
       msWaitPointSetup,     // Ожидание подтверждения установки точки и запуска мониторинга
       msWaitStable,         // Ожидание стабилизации условий
