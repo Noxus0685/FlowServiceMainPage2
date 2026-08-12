@@ -3,7 +3,6 @@
 interface
 
 uses
-  uGridStabilityRegistry,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Forms,
@@ -30,7 +29,6 @@ uses
   uClasses,
   uDeviceClass,
   uDataManager,
-  uGridLayoutManager,
   uMeasurementRun,
   uObservable,
   uProtocols,
@@ -145,7 +143,6 @@ implementation
 constructor TFrameMeasurementRun.Create(AOwner: TComponent);
 begin
   inherited;
-  RegisterStableGrid(Self, GridMeasurmentRun, Name);
   FInvalidPointIndexes := TList<Integer>.Create;
   FSubscribedMeasurementRun := nil;
   GridMeasurmentRun.ShowHint := True;
@@ -715,7 +712,7 @@ begin
   SelectedRow := GridMeasurmentRun.Row;
   UpdateStopCriteriaColumns;
 
-  TGridLayoutManager.SetRowCount(GridMeasurmentRun, Rows, True);
+  GridMeasurmentRun.RowCount := Rows;
 
   if Rows = 0 then
     GridMeasurmentRun.Row := -1

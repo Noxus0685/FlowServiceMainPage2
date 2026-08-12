@@ -28,8 +28,6 @@ uses
   System.Types,
   System.UITypes,
   uBaseProcedures,
-  uGridLayoutManager,
-  uGridStabilityRegistry,
   uMeterValue, FMX.Grid.Style, FMX.ScrollBox, FMX.SimpleChart, uDebugLog;
 
 type
@@ -358,7 +356,6 @@ begin
   FTestStableCandidateSinceMs := 0;
   FTestStabilityConfirmed := False;
   BuildUI;
-  RegisterStableGrid(Self, GridSamples, Name);
   ClearAnalysisDisplay;
 end;
 
@@ -1326,8 +1323,7 @@ procedure TFrameMeterValueEdit.RefreshSamplesGrid(const AReload: Boolean);
 begin
   if AReload then
     RefreshDisplayedSamples;
-  TGridLayoutManager.SetRowCount(GridSamples,
-    Length(FDisplayedSamples));
+  GridSamples.RowCount := Length(FDisplayedSamples);
 
   if GridSamples.Row >= Length(FDisplayedSamples) then
     GridSamples.Row := Length(FDisplayedSamples) - 1;

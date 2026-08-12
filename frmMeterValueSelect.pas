@@ -3,7 +3,6 @@
 interface
 
 uses
-  uGridStabilityRegistry,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Edit,
@@ -18,7 +17,6 @@ uses
   System.SysUtils,
   System.Types,
   System.UITypes,
-  uGridLayoutManager,
   uMeterValue;
 
 type
@@ -173,7 +171,6 @@ begin
   AddColumn('StringColumnValue', 'Значение', 220);
   AddColumn('StringColumnCurrent', 'Текущее', 120);
   AddColumn('StringColumnHash', 'Hash', 220);
-  RegisterStableGrid(Self, StringGridValuesList, Name);
 end;
 
 procedure TFormMeterValueSelect.ApplyFilter;
@@ -213,7 +210,7 @@ var
   I: Integer;
 begin
   ApplyFilter;
-  TGridLayoutManager.SetRowCount(StringGridValuesList, FFilteredValues.Count);
+  StringGridValuesList.RowCount := FFilteredValues.Count;
   StringGridValuesList.BeginUpdate;
   try
     StringGridValuesList.Tag := 1;
