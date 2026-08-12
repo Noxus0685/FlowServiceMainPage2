@@ -1,4 +1,4 @@
-﻿unit uWorkTable;
+unit uWorkTable;
 
 interface
 
