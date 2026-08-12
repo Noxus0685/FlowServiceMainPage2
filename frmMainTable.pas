@@ -3416,6 +3416,7 @@ end;
 
 procedure TFrameMainTable.PopupMenuDevicesGridPopup(Sender: TObject);
 begin
+  ActivateMeasurementGrid(GridDevices);
   FLastPopupGrid := GridDevices;
   PopupMenuWorkTablesPopup(Sender);
   UpdateGridPopupActions;
@@ -3424,6 +3425,7 @@ end;
 
 procedure TFrameMainTable.PopupMenuEtalonsGridPopup(Sender: TObject);
 begin
+  ActivateMeasurementGrid(GridEtalons);
   FLastPopupGrid := GridEtalons;
   PopupMenuWorkTablesPopup(Sender);
   UpdateGridPopupActions;
@@ -4838,7 +4840,8 @@ begin
      (AClipboard.Snapshot.FlowMeter <> nil) then
   begin
     AClipboard.Snapshot.FlowMeter.Device := TDevice.Create;
-    AClipboard.Snapshot.FlowMeter.Device.Assign(AChannel.FlowMeter.Device, False);
+    AClipboard.Snapshot.FlowMeter.Device.AssignWithoutMeasurementHistory(
+      AChannel.FlowMeter.Device);
     AClipboard.Snapshot.FlowMeter.Device.SerialNumber := AChannel.FlowMeter.Device.SerialNumber;
   end;
 end;
@@ -9193,6 +9196,7 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
+  ActivateMeasurementGrid(GridDevices);
  if not CanEditActiveWorkTable then
   begin
     ApplyActiveWorkTableEditMode;
@@ -9308,6 +9312,8 @@ begin
     Exit;
   FChangingMeasurementGridFocus := True;
   try
+    OtherGrid.EditorMode := False;
+    OtherGrid.Selected := -1;
     OtherGrid.Row := -1;
     OtherGrid.ResetFocus;
   finally
@@ -9406,6 +9412,7 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
+  ActivateMeasurementGrid(GridDevices);
   if not CanEditActiveWorkTable then
   begin
     ApplyActiveWorkTableEditMode;
@@ -9470,6 +9477,7 @@ var
   NewValue: string;
   DuplicateFound: boolean;
 begin
+  ActivateMeasurementGrid(GridDevices);
   if not CanEditActiveWorkTable then
     Exit;
 
@@ -9886,6 +9894,7 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
+  ActivateMeasurementGrid(GridEtalons);
   if not CanEditActiveWorkTable then
   begin
     ApplyActiveWorkTableEditMode;
@@ -10001,6 +10010,7 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
+  ActivateMeasurementGrid(GridEtalons);
   if not CanEditActiveWorkTable then
   begin
     ApplyActiveWorkTableEditMode;
