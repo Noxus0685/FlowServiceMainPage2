@@ -210,6 +210,7 @@ function GetSecondsBetweenDates(const ADate1, ADate2: TDateTime): Int64;
 
 
 implementation
+
 uses
   System.DateUtils,
   System.SyncObjs;
