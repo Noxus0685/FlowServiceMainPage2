@@ -78,7 +78,8 @@
   Typical Flow
   ------------
     msSelectPoint
-      → msSelectEtalon
+      → msHydraulicLineConfiguration
+      → msSetupHydraulicLine
       → msSetupPoint
       → msWaitStable
       → msWaitMeasureStart
@@ -403,7 +404,11 @@ type
     procedure DoExitStage(AOldStage, ANewStage: EMeasurementState);
     procedure DoEnterStage(AOldStage, ANewStage: EMeasurementState);
     procedure EnterSelectPoint;
-    procedure EnterSelectEtalon;
+    procedure EnterHydraulicLineConfiguration;
+    /// <summary>
+    /// Один раз запускает применение ранее выбранной гидравлической конфигурации.
+    /// </summary>
+    procedure EnterSetupHydraulicLine;
     procedure EnterSetupPoint;
     procedure EnterWaitPointSetup;
     procedure EnterWaitStable;
@@ -440,7 +445,11 @@ type
     class function MeasurementStopReasonToString(AReason: TMeasurementStopReason): string; static;
     class function MeasurementPointStatusToString(AStatus: EMeasurementPointStatus): string; static;
     procedure ProcessSelectPoint;
-    procedure ProcessSelectEtalon;
+    procedure ProcessHydraulicLineConfiguration;
+    /// <summary>
+    /// Только контролирует уже запущенную установку линии и не повторяет команду.
+    /// </summary>
+    procedure ProcessSetupHydraulicLine;
     procedure ProcessSetupPoint;
     procedure ProcessWaitPointSetup;
     procedure ProcessWaitStable;
@@ -520,6 +529,8 @@ type
     procedure ContinueAfterPointError(const AStatus: EMeasurementPointStatus; AEvent: EMeasurementEvent; const AError: TErrorInfo);
     function IsTerminated: Boolean;
     function HydraulicSelection(APoint: TDevicePoint;
+      out ACompleted: Boolean; out AError: TErrorInfo): Boolean;
+    function HydraulicSetupCompleted(APoint: TDevicePoint;
       out ACompleted: Boolean; out AError: TErrorInfo): Boolean;
     procedure CancelHydraulicOperation(const AReason: string);
   public
@@ -1166,8 +1177,10 @@ begin
         Result := False;
       end;
     msSelectPoint:
-      Result := ANewStage in [msSelectEtalon, msSetupPoint, msDone, msNone];
-    msSelectEtalon:
+      Result := ANewStage in [msHydraulicLineConfiguration, msSetupPoint, msDone, msNone];
+    msHydraulicLineConfiguration:
+      Result := ANewStage in [msSetupHydraulicLine, msSelectPoint, msDone, msNone];
+    msSetupHydraulicLine:
       Result := ANewStage in [msSetupPoint, msSelectPoint, msDone, msNone];
     msSetupPoint:
       Result := ANewStage in [msWaitPointSetup, msWaitStable, msWaitMeasureStart, msSelectPoint, msDone, msNone];
@@ -1246,7 +1259,8 @@ begin
   end;
   case ANewStage of
     msSelectPoint: EnterSelectPoint;
-    msSelectEtalon: EnterSelectEtalon;
+    msHydraulicLineConfiguration: EnterHydraulicLineConfiguration;
+    msSetupHydraulicLine: EnterSetupHydraulicLine;
     msSetupPoint: EnterSetupPoint;
     msWaitPointSetup: EnterWaitPointSetup;
     msWaitStable: EnterWaitStable;
@@ -1373,7 +1387,7 @@ end;
 ///
 /// После успешного выбора точки машина состояний переходит:
 ///
-/// - в <c>msSelectEtalon</c>, если для точки требуется автоматический выбор
+/// - в <c>msHydraulicLineConfiguration</c>, если для точки требуется автоматический выбор
 ///   эталонных средств измерения;
 /// - в <c>msSetupPoint</c>, если выбор эталона не требуется.
 ///
@@ -1534,9 +1548,9 @@ begin
     // Определяем следующий этап подготовки измерения.
     //
     // Если текущий режим и параметры точки требуют автоматического выбора
-    // эталонных расходомеров, сначала переходим в msSelectEtalon.
+    // эталонных расходомеров, сначала переходим в msHydraulicLineConfiguration.
     if ShouldSelectEtalon then
-      SetStage(msSelectEtalon)
+      SetStage(msHydraulicLineConfiguration)
     else
       // Если эталон уже выбран, выбор эталона запрещён текущим режимом
       // либо не требуется для данной точки, сразу переходим к настройке
@@ -1567,12 +1581,17 @@ end;
 
 
 
-procedure TMeasurementRun.EnterSelectEtalon;
+procedure TMeasurementRun.EnterHydraulicLineConfiguration;
 var
   Point: TDevicePoint;
   Error: TErrorInfo;
 begin
   Point := GetCurrentPoint;
+
+  ProtocolManager.AddMessage(pcProc, psMeasurement,
+    'EnterHydraulicLineConfiguration',
+    'Начало выбора гидравлической конфигурации',
+    BuildPointSelectionLog(Point));
 
   SetCurrentPointStatus(mptsSelectEtalon);
 
@@ -1624,6 +1643,44 @@ begin
     Exit;
   end;
 
+end;
+
+/// <summary>
+/// Один раз инициирует физическую установку выбранной конфигурации через
+/// штатное действие рабочего стола. Повторная отправка команды здесь и в
+/// ProcessSetupHydraulicLine не выполняется.
+/// </summary>
+procedure TMeasurementRun.EnterSetupHydraulicLine;
+var
+  Error: TErrorInfo;
+begin
+  SetCurrentPointStatus(mptsSelectEtalon);
+  if IsStopRequested then
+    Exit;
+
+  ProtocolManager.AddMessage(pcProc, psMeasurement, 'EnterSetupHydraulicLine',
+    'Начало установки гидравлической линии',
+    Format('OperationID=%d; PointIndex=%d',
+      [FHydraulicOperationID, FCurrentPointIndex]));
+
+  if FWorkTable = nil then
+  begin
+    Error := BuildError(1117,
+      'Не назначен рабочий стол для установки гидравлической линии');
+    ProtocolManager.AddMessage(pcError, psMeasurement,
+      'EnterSetupHydraulicLine', 'Ошибка установки гидравлической линии',
+      Error.Msg);
+    ContinueAfterPointError(mptsSetupError, meEtalonAbsent, Error);
+    Exit;
+  end;
+
+  if not FWorkTable.SetupHydraulicLine(Error) then
+  begin
+    ProtocolManager.AddMessage(pcError, psMeasurement,
+      'EnterSetupHydraulicLine', 'Ошибка установки гидравлической линии',
+      Error.Msg);
+    ContinueAfterPointError(mptsSetupError, meEtalonAbsent, Error);
+  end;
 end;
 
 
@@ -4704,7 +4761,7 @@ begin
     MarkCurrentPointCancelled(ReasonSnapshot);
 
   if not HasPhysicalMeasurementStarted and
-     (StageSnapshot in [msSelectPoint, msSelectEtalon, msSetupPoint,
+     (StageSnapshot in [msSelectPoint, msHydraulicLineConfiguration, msSetupHydraulicLine, msSetupPoint,
        msWaitPointSetup, msWaitStable, msWaitMeasureStart]) then
     ProtocolManager.AddMessage(pcState, psMeasurement,
       'MeasurementStageExecutionAborted', 'Выполнение подготовительной стадии прекращено',
@@ -5109,7 +5166,7 @@ end;
 
 function TMeasurementRun.SelectEtalons(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
 begin
-  AError := TErrorInfo.Empty(Integer(msSelectEtalon));
+  AError := TErrorInfo.Empty(Integer(msHydraulicLineConfiguration));
   Result := False;
 
   if (APoint = nil) or (FWorkTable = nil) then
@@ -5124,7 +5181,7 @@ begin
     if GetSelectedEtalonUUID <> '' then
     begin
       AddDiagnosticEvent('SelectEtalons warning suppressed: existing selected etalon is valid; SelectedEtalonUUID=' + GetSelectedEtalonUUID + '; Error=' + AError.Msg);
-      AError := TErrorInfo.Empty(Integer(msSelectEtalon));
+      AError := TErrorInfo.Empty(Integer(msHydraulicLineConfiguration));
       Result := True;
     end
     else
@@ -5515,7 +5572,8 @@ begin
   end;
   case FCurrentStage of
     msSelectPoint: ProcessSelectPoint;
-    msSelectEtalon: ProcessSelectEtalon;
+    msHydraulicLineConfiguration: ProcessHydraulicLineConfiguration;
+    msSetupHydraulicLine: ProcessSetupHydraulicLine;
     msSetupPoint: ProcessSetupPoint;
     msWaitPointSetup: ProcessWaitPointSetup;
     msWaitStable: ProcessWaitStable;
@@ -5552,7 +5610,7 @@ var
 begin
   Result := False;
   ACompleted := False;
-  AError := TErrorInfo.Empty(Integer(msSelectEtalon));
+  AError := TErrorInfo.Empty(Integer(msHydraulicLineConfiguration));
 
   if FWorkTable = nil then
   begin
@@ -5717,7 +5775,7 @@ begin
         if AError.Time = 0 then
           AError.Time := Now;
 
-        AError.Stage := Integer(msSelectEtalon);
+        AError.Stage := Integer(msHydraulicLineConfiguration);
       end;
 
     hlsNone:
@@ -5765,7 +5823,7 @@ begin
   FHydraulicOperationID := 0;
 end;
 
-procedure TMeasurementRun.ProcessSelectEtalon;
+procedure TMeasurementRun.ProcessHydraulicLineConfiguration;
 const
   HYDRAULIC_SEARCH_TIMEOUT_MS = 30000;
 var
@@ -5800,23 +5858,13 @@ begin
 
   if Completed then
   begin
-    { Применяем найденную и сохранённую в TWorkTable
-      гидравлическую конфигурацию. }
-    if not FWorkTable.ApplyHydraulicConfiguration(Error) then
-    begin
-      ContinueAfterPointError(
-        mptsSetupError,
-        meEtalonAbsent,
-        Error
-      );
-      Exit;
-    end;
-
-    if IsStopRequested then
-      Exit;
-
+    ProtocolManager.AddMessage(pcProc, psMeasurement,
+      'ProcessHydraulicLineConfiguration',
+      'Гидравлическая конфигурация выбрана',
+      Format('OperationID=%d; PointIndex=%d',
+        [FHydraulicOperationID, FCurrentPointIndex]));
     FireEvent(meEtalonSelected);
-    SetStage(msSetupPoint);
+    SetStage(msSetupHydraulicLine);
     Exit;
   end;
 
@@ -5835,6 +5883,117 @@ begin
         'Превышено время поиска гидравлической конфигурации'
       )
     );
+  end;
+end;
+
+function TMeasurementRun.HydraulicSetupCompleted(APoint: TDevicePoint;
+  out ACompleted: Boolean; out AError: TErrorInfo): Boolean;
+var
+  HydraulicState: EHydraulicLineState;
+  HydraulicError: TErrorInfo;
+  OperationID: Int64;
+  PointUUID: string;
+  PointIndex: Integer;
+  TargetFlow, FlowScale, FlowTolerance: Double;
+  Configuration: RWorkTableHydraulicConfiguration;
+  Range: RWorkTableHydraulicRange;
+begin
+  Result := False;
+  ACompleted := False;
+  AError := TErrorInfo.Empty(Integer(msSetupHydraulicLine));
+  if (FWorkTable = nil) or (APoint = nil) then
+  begin
+    AError := BuildError(1120,
+      'Потерян контекст установки гидравлической линии');
+    Exit;
+  end;
+
+  FWorkTable.GetHydraulicStateSnapshot(HydraulicState, HydraulicError,
+    OperationID, PointUUID, PointIndex, TargetFlow, Configuration, Range);
+  FlowScale := Max(Max(Abs(TargetFlow), Abs(APoint.Q)), 1.0);
+  FlowTolerance := FlowScale * 1E-9;
+  if (OperationID <> FHydraulicOperationID) or
+     not SameText(Trim(PointUUID), Trim(APoint.UUID)) or
+     (PointIndex <> FCurrentPointIndex) or
+     not SameValue(TargetFlow, APoint.Q, FlowTolerance) then
+  begin
+    AError := BuildError(1121, Format(
+      'Результат установки относится к другой гидравлической операции: ' +
+      'ExpectedOperationID=%d; ActualOperationID=%d; ' +
+      'ExpectedPointUUID=%s; ActualPointUUID=%s; ' +
+      'ExpectedPointIndex=%d; ActualPointIndex=%d; ' +
+      'ExpectedFlow=%.6f; ActualFlow=%.6f',
+      [FHydraulicOperationID, OperationID, APoint.UUID, PointUUID,
+       FCurrentPointIndex, PointIndex, APoint.Q, TargetFlow]));
+    Exit;
+  end;
+
+  case HydraulicState of
+    hlsSelected, hlsSettingUp:
+      Result := True;
+    hlsConfigured:
+      begin
+        Result := True;
+        ACompleted := True;
+      end;
+    hlsFailed:
+      begin
+        AError := HydraulicError;
+        if AError.Code = 0 then AError.Code := 1122;
+        if Trim(AError.Msg) = '' then
+          AError.Msg := 'Не удалось установить гидравлическую линию';
+        if AError.Time = 0 then AError.Time := Now;
+        AError.Stage := Integer(msSetupHydraulicLine);
+      end;
+  else
+    AError := BuildError(1123, Format(
+      'Недопустимое состояние при установке гидравлической линии: %s',
+      [TWorkTable.HydraulicLineStateToString(HydraulicState)]));
+  end;
+end;
+
+/// <summary>
+/// Контролирует завершение команды, единожды отправленной при входе в стадию.
+/// Метод не применяет конфигурацию повторно.
+/// </summary>
+procedure TMeasurementRun.ProcessSetupHydraulicLine;
+const
+  HYDRAULIC_SETUP_TIMEOUT_MS = 30000;
+var
+  Point: TDevicePoint;
+  Error: TErrorInfo;
+  Completed: Boolean;
+begin
+  Point := GetCurrentPoint;
+  if not HydraulicSetupCompleted(Point, Completed, Error) then
+  begin
+    ProtocolManager.AddMessage(pcError, psMeasurement,
+      'ProcessSetupHydraulicLine', 'Ошибка установки гидравлической линии',
+      Error.Msg);
+    ContinueAfterPointError(mptsSetupError, meEtalonAbsent, Error);
+    Exit;
+  end;
+
+  if Completed then
+  begin
+    ProtocolManager.AddMessage(pcProc, psMeasurement,
+      'ProcessSetupHydraulicLine', 'Гидравлическая линия установлена',
+      Format('OperationID=%d; PointIndex=%d',
+        [FHydraulicOperationID, FCurrentPointIndex]));
+    SetStage(msSetupPoint);
+    Exit;
+  end;
+
+  if TMeterValue.GetMonotonicTimeMs - FWaitStartedTick >=
+     HYDRAULIC_SETUP_TIMEOUT_MS then
+  begin
+    CancelHydraulicOperation('Тайм-аут установки гидравлической линии');
+    Error := BuildError(1124,
+      'Превышено время установки гидравлической линии');
+    ProtocolManager.AddMessage(pcError, psMeasurement,
+      'ProcessSetupHydraulicLine',
+      'Тайм-аут установки гидравлической линии', Error.Msg);
+    ContinueAfterPointError(mptsSetupError, meEtalonAbsent, Error);
   end;
 end;
 
@@ -6845,8 +7004,13 @@ begin
   if (S = 'выбор точки') or (S = 'выборточки') or (S = 'msselectpoint') then
     Exit(msSelectPoint);
 
-  if (S = 'выбор эталона') or (S = 'msselectetalon') then
-    Exit(msSelectEtalon);
+  if (S = 'выбор гидравлической конфигурации') or
+     (S = 'mshydrauliclineconfiguration') then
+    Exit(msHydraulicLineConfiguration);
+
+  if (S = 'установка гидравлической линии') or
+     (S = 'mssetuphydraulicline') then
+    Exit(msSetupHydraulicLine);
 
   if (S = 'установка точки') or (S = 'mssetuppoint') then
     Exit(msSetupPoint);
@@ -6886,7 +7050,8 @@ begin
   case AState of
     msNone:             Result := '-';
     msSelectPoint:      Result := 'Выбор точки';
-    msSelectEtalon:     Result := 'Выбор эталона';
+    msHydraulicLineConfiguration: Result := 'Выбор гидравлической конфигурации';
+    msSetupHydraulicLine: Result := 'Установка гидравлической линии';
     msSetupPoint:       Result := 'Установка точки';
     msWaitPointSetup:   Result := 'Ожидание установки точки';
     msWaitStable:       Result := 'Стабилизация';
