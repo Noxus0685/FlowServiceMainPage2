@@ -43,6 +43,7 @@ type
     CheckBoxWorkLog: TCheckBox;
     CheckBoxProc: TCheckBox;
     CheckBoxHandler: TCheckBox;
+    CheckBoxEngine: TCheckBox;
     procedure SpeedButtonResumeClick(Sender: TObject);
     procedure SpeedButtonPauseClick(Sender: TObject);
     procedure SpeedButtonClearClick(Sender: TObject);
@@ -95,6 +96,7 @@ begin
   CheckBoxParameters.IsChecked := True;
   CheckBoxWorkTable.IsChecked := True;
   CheckBoxMeasurement.IsChecked := True;
+  CheckBoxEngine.IsChecked := True;
   CheckBoxMKS.IsChecked := True;
   FLoadingSettings := False;
   LoadProtocolSettings;
@@ -216,6 +218,7 @@ begin
     LoadCheckBoxSetting(Ini, CheckBoxParameters);
     LoadCheckBoxSetting(Ini, CheckBoxWorkTable);
     LoadCheckBoxSetting(Ini, CheckBoxMeasurement);
+    LoadCheckBoxSetting(Ini, CheckBoxEngine);
     LoadCheckBoxSetting(Ini, CheckBoxMKS);
     LoadCheckBoxSetting(Ini, CheckBoxWorkLog);
     LoadCheckBoxSetting(Ini, CheckBoxProc);
@@ -252,6 +255,7 @@ begin
     SaveCheckBoxSetting(Ini, CheckBoxParameters);
     SaveCheckBoxSetting(Ini, CheckBoxWorkTable);
     SaveCheckBoxSetting(Ini, CheckBoxMeasurement);
+    SaveCheckBoxSetting(Ini, CheckBoxEngine);
     SaveCheckBoxSetting(Ini, CheckBoxMKS);
     SaveCheckBoxSetting(Ini, CheckBoxWorkLog);
         SaveCheckBoxSetting(Ini, CheckBoxProc);
@@ -413,7 +417,7 @@ begin
     psParameters: Result := CheckBoxParameters.IsChecked;
     psWorkTable: Result := CheckBoxWorkTable.IsChecked;
     psMeasurement: Result := CheckBoxMeasurement.IsChecked;
-    psEngine: Result := CheckBoxWorkLog.IsChecked;
+    psEngine: Result := CheckBoxEngine.IsChecked;
   end;
 end;
 
