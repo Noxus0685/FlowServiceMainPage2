@@ -153,6 +153,7 @@ function AppLogName:String;
 function RenameFileWithLastWriteTime(const AFileName: string;out ANewName: string; const ADateTimeFormat: string = 'yyyymmdd"_"hhnnss'): Boolean;
 function RenameFileWithCreationTime(const AFileName: string; out ANewName: string; const ADateTimeFormat: string = 'yyyymmdd"_"hhnnss'): Boolean;
 procedure PackLogs(_LogsDir:String; _LogsExt:String='.log'; _LogsZipName:String='');
+// Updates grid data without rebuilding rows when their count is unchanged.
 procedure RefreshGridContent(AGrid: TCustomGrid; const ARowCount: Integer;
   const AReason: string = 'data-update');
 // 1. Ïîëó÷èòü MD5 ñàìîé ïðîãðàììû (èñïîëíÿåìîãî ôàéëà)
@@ -219,7 +220,7 @@ procedure RefreshGridContent(AGrid: TCustomGrid; const ARowCount: Integer;
 var
   OldRowCount: Integer;
 begin
-  {    presentation-     . }
+  { Updates grid content and its presentation model without changing columns. }
   if AGrid = nil then
     Exit;
 
@@ -237,7 +238,6 @@ begin
   OutputDebugMessage(Format('GridContentRefresh Grid="%s" Rows=%d->%d Reason="%s"',
     [AGrid.Name, OldRowCount, ARowCount, AReason]));
 end;
-
 
 var
   LogCriticalSection: TCriticalSection;
