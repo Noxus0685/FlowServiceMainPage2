@@ -366,6 +366,7 @@ type
 
     function CreateDevice(AIndex: Integer): TDevice; overload;
     function CreateDevice(const ASource: TDevice): TDevice; overload;
+    function CreateDeviceForChannelCopy(const ASource: TDevice): TDevice;
 
     function GetDevice(ADeviceID: Integer): TDevice;
 
@@ -3841,6 +3842,20 @@ begin
 
   Result := CreateNewDevice;
   Result.Assign(ASource, False);
+  Result.ID := GenerateDeviceID;
+  Result.State := osNew;
+end;
+
+function TDeviceRepository.CreateDeviceForChannelCopy(
+  const ASource: TDevice): TDevice;
+begin
+  if ASource = nil then
+    Exit(CreateNewDevice);
+
+  { Keep the copied configuration, but start measurement history only when the
+    new channel starts measuring. }
+  Result := CreateNewDevice;
+  Result.AssignWithoutMeasurementHistory(ASource);
   Result.ID := GenerateDeviceID;
   Result.State := osNew;
 end;

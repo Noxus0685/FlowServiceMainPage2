@@ -51,6 +51,7 @@ uses
   uFlowMeter,
   uRepositories,
   uProtocols,
+  uProjectSettings,
   uWorkTable,
   uMKSDebug,
   uMeasurementRun,
@@ -563,8 +564,13 @@ end;
 function ResolveManagerWorkTable(AWorkTableManager: TWorkTableManager): TWorkTable;
 begin
   Result := nil;
-  if (AWorkTableManager = nil) or (AWorkTableManager.WorkTables = nil) or
-     (AWorkTableManager.WorkTables.Count = 0) then
+  if (AWorkTableManager = nil) then
+      Exit;
+
+   if (AWorkTableManager.WorkTables = nil) then
+     Exit;
+
+    if  (AWorkTableManager.WorkTables.Count = 0) then
     Exit;
 
   Result := AWorkTableManager.ActiveWorkTable;
@@ -1066,7 +1072,7 @@ end;
 
 procedure TFrameProceed.LoadManualProcessingDevices;
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   I, Count: Integer;
   DeviceUUID: string;
 begin
@@ -1075,11 +1081,10 @@ begin
 
   FManualProcessingDeviceUUIDs.Clear;
 
-  if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') or
-     (not FileExists(FWorkTableManager.IniFileName)) then
+  if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') then
     Exit;
 
-  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  Ini := TProjectSettingsIni.Create(FWorkTableManager.IniFileName, STORAGE_TABLE_SETTINGS);
   try
     Count := Ini.ReadInteger(CManualProcessingDevicesSection, CProcessingDevicesCountKey, 0);
     for I := 0 to Count - 1 do
@@ -1097,7 +1102,7 @@ end;
 
 procedure TFrameProceed.SaveManualProcessingDevices;
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   I, SaveIndex: Integer;
   DeviceUUID: string;
 begin
@@ -1105,7 +1110,7 @@ begin
      (FManualProcessingDeviceUUIDs = nil) then
     Exit;
 
-  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  Ini := TProjectSettingsIni.Create(FWorkTableManager.IniFileName, STORAGE_TABLE_SETTINGS);
   try
     Ini.EraseSection(CManualProcessingDevicesSection);
     SaveIndex := 0;
@@ -1263,7 +1268,7 @@ end;
 
 procedure TFrameProceed.SaveProcessingPointCounts;
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   I: Integer;
   WT: TWorkTable;
   Ch: TChannel;
@@ -1273,7 +1278,7 @@ begin
   if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') then
     Exit;
 
-  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  Ini := TProjectSettingsIni.Create(FWorkTableManager.IniFileName, STORAGE_TABLE_SETTINGS);
   SavedUUIDs := TStringList.Create;
   try
     SavedUUIDs.Sorted := False;
@@ -1308,7 +1313,7 @@ end;
 
 procedure TFrameProceed.SaveProcessingDevices;
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   I, SaveIndex: Integer;
   Device: TDevice;
 begin
@@ -1321,7 +1326,7 @@ begin
      (FProcessingDevices = nil) then
     Exit;
 
-  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  Ini := TProjectSettingsIni.Create(FWorkTableManager.IniFileName, STORAGE_TABLE_SETTINGS);
   try
     Ini.EraseSection(CProcessingDevicesSection);
 
@@ -1985,7 +1990,7 @@ end;
 
 procedure TFrameProceed.LoadProcessingDevices;
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   I, Count: Integer;
   DeviceUUID: string;
   Device: TDevice;
@@ -2003,11 +2008,10 @@ begin
 
   FProcessingDevices.Clear;
 
-  if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') or
-     (not FileExists(FWorkTableManager.IniFileName)) then
+  if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') then
     Exit;
 
-  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  Ini := TProjectSettingsIni.Create(FWorkTableManager.IniFileName, STORAGE_TABLE_SETTINGS);
   try
     Count := Ini.ReadInteger(CProcessingDevicesSection, CProcessingDevicesCountKey, 0);
     DbgProceedTree(1402, 'LoadProcessingDevices Count=' + Count.ToString);
@@ -5441,7 +5445,7 @@ end;
 
 procedure TFrameProceed.SyncProcessingDevicesWithNewPoints;
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   I, OldCount, PointCount, SavedPointCount: Integer;
   WT: TWorkTable;
   Ch: TChannel;
@@ -5452,7 +5456,7 @@ begin
     Exit;
 
   OldCount := FProcessingDevices.Count;
-  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  Ini := TProjectSettingsIni.Create(FWorkTableManager.IniFileName, STORAGE_TABLE_SETTINGS);
   try
     for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
     begin

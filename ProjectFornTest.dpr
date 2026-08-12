@@ -31,6 +31,7 @@ uses
   uObservable in 'uObservable.pas',
   uParameter in 'uParameter.pas',
   uProtocols in 'uProtocols.pas',
+  uProjectSettings in 'uProjectSettings.pas',
   uRepositories in 'uRepositories.pas',
   uAppServices in 'uAppServices.pas',
   uAppVersion in 'uAppVersion.pas',
