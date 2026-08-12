@@ -15,8 +15,22 @@ def method(text: str, start: str, following: str) -> str:
     return text[begin:end]
 
 
-def test_fmx_helper_declares_its_windows_1251_source_encoding():
-    assert HELPER.startswith("{$CODEPAGE 1251}")
+def test_fmx_helper_remains_windows_1251_without_unsupported_directive():
+    raw = (ROOT / "FmxHelper.pas").read_bytes()
+    assert "{$CODEPAGE" not in HELPER
+    assert raw.decode("cp1251") == HELPER
+    try:
+        raw.decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+    else:
+        raise AssertionError("FmxHelper.pas must remain Windows-1251")
+
+
+def test_legacy_conversion_tables_accept_rad_studio_string_literals():
+    assert "PICCHAR:array[$C0..$FF] of string=" in HELPER
+    assert "WinR: Array[0..66] of string =" in HELPER
+    assert "KoiR: Array[0..66] of string =" in HELPER
 
 
 def test_value_refresh_invalidates_each_cell_cache():
