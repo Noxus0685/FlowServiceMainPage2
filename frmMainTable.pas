@@ -637,6 +637,8 @@ type
     procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
+    procedure GridDevicesEnter(Sender: TObject);
+    procedure GridEtalonsEnter(Sender: TObject);
     procedure GridDevicesHeaderClick(Column: TColumn);
     procedure ActionAddWorkTableExecute(Sender: TObject);
     procedure ActionAddDeviceChannelExecute(Sender: TObject);
@@ -805,6 +807,7 @@ type
   FLastClickTick: Cardinal;
   FLastPopupGrid: TGrid;
   FRefreshingGridColumns: Boolean;
+  FGridFocusUpdating: Boolean;
 
   FRows: array of TRowData;
   IsUpdating: Boolean;
@@ -9285,6 +9288,34 @@ begin
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
      (Row >= 0) and (Row < WorkTable.DeviceChannels.Count) then
     FFrameChannelProperties.LoadFromChannel(WorkTable.DeviceChannels[Row]);
+end;
+
+procedure TFrameMainTable.GridDevicesEnter(Sender: TObject);
+begin
+  { Keep selection and keyboard focus in only one of the channel grids. }
+  if FGridFocusUpdating then
+    Exit;
+  FGridFocusUpdating := True;
+  try
+    GridEtalons.Row := -1;
+    GridEtalons.ResetFocus;
+  finally
+    FGridFocusUpdating := False;
+  end;
+end;
+
+procedure TFrameMainTable.GridEtalonsEnter(Sender: TObject);
+begin
+  { Keep selection and keyboard focus in only one of the channel grids. }
+  if FGridFocusUpdating then
+    Exit;
+  FGridFocusUpdating := True;
+  try
+    GridDevices.Row := -1;
+    GridDevices.ResetFocus;
+  finally
+    FGridFocusUpdating := False;
+  end;
 end;
 
 procedure TFrameMainTable.GridDevicesHeaderClick(Column: TColumn);

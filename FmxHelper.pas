@@ -394,7 +394,7 @@ var s:String;
     i:integer;
 begin
    result:=True;
-   s:=Trim(AStr);
+   s:=Trim(string(AStr));
    for i:=1 to Length(s) do
    begin
     if not (s[i] in ['0'..'9',',','.']) then
