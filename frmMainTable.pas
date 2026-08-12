@@ -639,6 +639,7 @@ type
     procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
     procedure GridDevicesEnter(Sender: TObject);
     procedure GridEtalonsEnter(Sender: TObject);
+    procedure ActivateMeasurementGrid(AGrid: TGrid);
     procedure GridDevicesHeaderClick(Column: TColumn);
     procedure ActionAddWorkTableExecute(Sender: TObject);
     procedure ActionAddDeviceChannelExecute(Sender: TObject);
@@ -807,7 +808,7 @@ type
   FLastClickTick: Cardinal;
   FLastPopupGrid: TGrid;
   FRefreshingGridColumns: Boolean;
-  FGridFocusUpdating: Boolean;
+  FChangingMeasurementGridFocus: Boolean;
 
   FRows: array of TRowData;
   IsUpdating: Boolean;
@@ -9290,32 +9291,36 @@ begin
     FFrameChannelProperties.LoadFromChannel(WorkTable.DeviceChannels[Row]);
 end;
 
+procedure TFrameMainTable.ActivateMeasurementGrid(AGrid: TGrid);
+var
+  OtherGrid: TGrid;
+begin
+  { Keep focus and selection mutually exclusive without recursive OnEnter calls. }
+  if FChangingMeasurementGridFocus or (AGrid = nil) then
+    Exit;
+  if AGrid = GridDevices then
+    OtherGrid := GridEtalons
+  else if AGrid = GridEtalons then
+    OtherGrid := GridDevices
+  else
+    Exit;
+  FChangingMeasurementGridFocus := True;
+  try
+    OtherGrid.Row := -1;
+    OtherGrid.ResetFocus;
+  finally
+    FChangingMeasurementGridFocus := False;
+  end;
+end;
+
 procedure TFrameMainTable.GridDevicesEnter(Sender: TObject);
 begin
-  { Keep selection and keyboard focus in only one of the channel grids. }
-  if FGridFocusUpdating then
-    Exit;
-  FGridFocusUpdating := True;
-  try
-    GridEtalons.Row := -1;
-    GridEtalons.ResetFocus;
-  finally
-    FGridFocusUpdating := False;
-  end;
+  ActivateMeasurementGrid(GridDevices);
 end;
 
 procedure TFrameMainTable.GridEtalonsEnter(Sender: TObject);
 begin
-  { Keep selection and keyboard focus in only one of the channel grids. }
-  if FGridFocusUpdating then
-    Exit;
-  FGridFocusUpdating := True;
-  try
-    GridDevices.Row := -1;
-    GridDevices.ResetFocus;
-  finally
-    FGridFocusUpdating := False;
-  end;
+  ActivateMeasurementGrid(GridEtalons);
 end;
 
 procedure TFrameMainTable.GridDevicesHeaderClick(Column: TColumn);

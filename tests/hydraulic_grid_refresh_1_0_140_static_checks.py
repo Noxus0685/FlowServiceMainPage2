@@ -1,10 +1,16 @@
 from pathlib import Path
+import hashlib
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
+ROOT_HELPER_PATH = (ROOT / "FmxHelper.pas").resolve()
+COMPONENT_HELPER_PATH = (ROOT / "Components" / "FP" / "FmxHelper.pas").resolve()
+assert ROOT_HELPER_PATH.is_absolute()
+assert ROOT_HELPER_PATH.parent == ROOT
 MAIN = (ROOT / "frmMainTable.pas").read_text(encoding="utf-8")
 MEASUREMENT_FRAME = (ROOT / "frmMeasurementRun.pas").read_text(encoding="utf-8")
 RUN = (ROOT / "uMeasurementRun.pas").read_text(encoding="utf-8")
-HELPER = (ROOT / "FmxHelper.pas").read_text(encoding="cp1251")
+HELPER = ROOT_HELPER_PATH.read_text(encoding="cp1251")
 VERSION = (ROOT / "uAppVersion.pas").read_text(encoding="utf-8")
 PROJECT = (ROOT / "ProjectFornTest.dproj").read_text(encoding="utf-8")
 
@@ -15,23 +21,43 @@ def method(text: str, start: str, following: str) -> str:
     return text[begin:end]
 
 
-def test_fmx_helper_remains_windows_1251_without_unsupported_directive():
-    raw = (ROOT / "FmxHelper.pas").read_bytes()
-    assert "{$CODEPAGE" not in HELPER
+def test_root_fmx_helper_path_encoding_and_first_line(capsys):
+    print(f"Root FmxHelper: {ROOT_HELPER_PATH}")
+    assert str(ROOT_HELPER_PATH) in capsys.readouterr().out
+    raw = ROOT_HELPER_PATH.read_bytes()
+    assert raw.splitlines()[0] == b"unit FmxHelper;"
+    assert b"CODEPAGE" not in raw.upper()
     assert raw.decode("cp1251") == HELPER
-    try:
-        raw.decode("utf-8")
-    except UnicodeDecodeError:
-        pass
-    else:
-        raise AssertionError("FmxHelper.pas must remain Windows-1251")
 
 
-def test_legacy_conversion_tables_accept_rad_studio_string_literals():
-    assert "PICCHAR:array[$C0..$FF] of string=" in HELPER
-    assert "WinR: Array[0..66] of string =" in HELPER
-    assert "KoiR: Array[0..66] of string =" in HELPER
+def test_picchar_is_the_original_64_char_table():
+    raw = ROOT_HELPER_PATH.read_bytes()
+    match = re.search(
+        rb"PICCHAR\s*:\s*array\[\$C0\.\.\$FF\]\s+of\s+Char\s*=\s*\((.*?)\);",
+        raw,
+        re.IGNORECASE | re.DOTALL,
+    )
+    assert match, f"PICCHAR Char declaration not found in {ROOT_HELPER_PATH}"
+    assert not re.search(rb"array\[\$C0\.\.\$FF\]\s+of\s+string", raw, re.IGNORECASE)
+    elements = re.findall(rb"'([^']*)'", match.group(1))
+    assert len(elements) == 64
+    assert all(elements)
+    assert elements == [bytes([value]) for value in range(0xC0, 0x100)]
 
+
+def test_char2byte_uses_picchar_without_string_conversion():
+    implementation = HELPER.index("implementation")
+    start = HELPER.index("function Char2Byte(ch: BYTE):char;", implementation)
+    body = HELPER[start:HELPER.index("function GetKM5CRC", start)]
+    assert "result:=PICCHAR[ord(ch)]" in body
+    assert "Char(PICCHAR" not in body
+    assert "PICCHAR[ord(ch)][" not in body
+    assert ".Chars[" not in body
+
+
+def test_nested_component_helper_is_unchanged():
+    assert hashlib.sha256(COMPONENT_HELPER_PATH.read_bytes()).hexdigest() == \
+        "f858a31801349f3cfc080110632a0f07cec93969b4abf4089cd36fed3ab03d6d"
 
 def test_value_refresh_invalidates_each_cell_cache():
     implementation = HELPER.index("implementation")
@@ -78,10 +104,10 @@ def test_simulation_completes_both_hydraulic_actions_through_public_api():
     assert ".SetStage" not in find_completion + setup_completion
 
 
-def test_project_version_is_1_0_140():
-    assert "APP_VERSION = '1.0.140'" in VERSION
-    assert "FileVersion=1.0.140.0" in PROJECT
-    assert "ProductVersion=1.0.140.0" in PROJECT
+def test_project_version_is_1_0_141():
+    assert "APP_VERSION = '1.0.141'" in VERSION
+    assert "FileVersion=1.0.141.0" in PROJECT
+    assert "ProductVersion=1.0.141.0" in PROJECT
 
 
 def test_shortstring_trim_is_explicit_before_overload_resolution():
@@ -93,12 +119,17 @@ def test_shortstring_trim_is_explicit_before_overload_resolution():
 
 
 def test_channel_grid_focus_is_mutually_exclusive_and_not_timer_driven():
-    assert "OnEnter = GridDevicesEnter" in (ROOT / "frmMainTable.fmx").read_text(encoding="utf-8")
-    assert "OnEnter = GridEtalonsEnter" in (ROOT / "frmMainTable.fmx").read_text(encoding="utf-8")
+    form = (ROOT / "frmMainTable.fmx").read_text(encoding="utf-8")
+    assert "OnEnter = GridDevicesEnter" in form
+    assert "OnEnter = GridEtalonsEnter" in form
+    activate = method(MAIN, "procedure TFrameMainTable.ActivateMeasurementGrid", "procedure TFrameMainTable.GridDevicesEnter")
     devices = method(MAIN, "procedure TFrameMainTable.GridDevicesEnter", "procedure TFrameMainTable.GridEtalonsEnter")
     etalons = method(MAIN, "procedure TFrameMainTable.GridEtalonsEnter", "procedure TFrameMainTable.GridDevicesHeaderClick")
-    assert "FGridFocusUpdating" in devices and "GridEtalons.Row := -1" in devices and "GridEtalons.ResetFocus" in devices
-    assert "FGridFocusUpdating" in etalons and "GridDevices.Row := -1" in etalons and "GridDevices.ResetFocus" in etalons
+    assert "FChangingMeasurementGridFocus" in activate
+    assert "OtherGrid.Row := -1" in activate and "OtherGrid.ResetFocus" in activate
+    assert "ActivateMeasurementGrid(GridDevices)" in devices
+    assert "ActivateMeasurementGrid(GridEtalons)" in etalons
     timer = method(MAIN, "procedure TFrameMainTable.TimerMainTimer", "function TFrameMainTable.IsValidFlowGraphChannel")
     update = method(MAIN, "procedure TFrameMainTable.UpdateGrids", "procedure TFrameMainTable.GridEtalonsSetValue")
-    assert "ResetFocus" not in timer + update
+    refresh = method(HELPER, "procedure RefreshGridValues(AGrid: TCustomGrid;", "var\n  LogCriticalSection")
+    assert "ResetFocus" not in timer + update + refresh
