@@ -15,6 +15,10 @@ def method(text: str, start: str, following: str) -> str:
     return text[begin:end]
 
 
+def test_fmx_helper_declares_its_windows_1251_source_encoding():
+    assert HELPER.startswith("{$CODEPAGE 1251}")
+
+
 def test_value_refresh_invalidates_each_cell_cache():
     implementation = HELPER.index("implementation")
     cell_start = HELPER.index("procedure RefreshGridCell(AGrid: TCustomGrid;", implementation)
