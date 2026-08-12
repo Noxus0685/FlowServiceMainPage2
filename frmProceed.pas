@@ -564,8 +564,13 @@ end;
 function ResolveManagerWorkTable(AWorkTableManager: TWorkTableManager): TWorkTable;
 begin
   Result := nil;
-  if (AWorkTableManager = nil) or (AWorkTableManager.WorkTables = nil) or
-     (AWorkTableManager.WorkTables.Count = 0) then
+  if (AWorkTableManager = nil) then
+      Exit;
+
+   if (AWorkTableManager.WorkTables = nil) then
+     Exit;
+
+    if  (AWorkTableManager.WorkTables.Count = 0) then
     Exit;
 
   Result := AWorkTableManager.ActiveWorkTable;
