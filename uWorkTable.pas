@@ -316,6 +316,12 @@ type
       заданное для строки гидравлической схемы. }
     MaxError: Byte;
 
+    { Максимальное время установки гидравлической линии в секундах.
+
+      Нулевое значение означает, что должен использоваться
+      стандартный тайм-аут этапа. }
+    SetupTime: Byte;
+
     { Минимальное давление, допустимое для выбранной строки. }
     PressureMin: Double;
 
@@ -8427,9 +8433,9 @@ var State: EHydraulicLineState; ErrorInfo: TErrorInfo; OperationID: Int64; Point
   PointIndex: Integer; TargetFlow: Double; C: RWorkTableHydraulicConfiguration; R: RWorkTableHydraulicRange;
 begin
   GetHydraulicStateSnapshot(State, ErrorInfo, OperationID, PointUUID, PointIndex, TargetFlow, C, R);
-  Result := Format('OperationID=%d; State=%s; PointUUID=%s; PointIndex=%d; TargetFlow=%.6f; ChartIndex=%d; ChartName=%s; RangeIndex=%d; ConfigurationRangeValid=%s; RangeValid=%s; RangeNumber=%d; FlowMin=%.6f; FlowMax=%.6f; EtalonCount=%d; ScaleCount=%d; PumpCount=%d; RegulatingPumpCount=%d; UnregulatedPumpCount=%d; RegulatingValveCount=%d; ErrorCode=%d; ErrorMessage=%s; ErrorTime=%s',
+  Result := Format('OperationID=%d; State=%s; PointUUID=%s; PointIndex=%d; TargetFlow=%.6f; ChartIndex=%d; ChartName=%s; RangeIndex=%d; ConfigurationRangeValid=%s; RangeValid=%s; RangeNumber=%d; FlowMin=%.6f; FlowMax=%.6f; MaxError=%d; SetupTime=%d; EtalonCount=%d; ScaleCount=%d; PumpCount=%d; RegulatingPumpCount=%d; UnregulatedPumpCount=%d; RegulatingValveCount=%d; ErrorCode=%d; ErrorMessage=%s; ErrorTime=%s',
     [OperationID, HydraulicLineStateToString(State), PointUUID, PointIndex, TargetFlow, C.ChartIndex, C.ChartName,
-     C.RangeIndex, BoolToStr(C.Range.IsValid, 'True','False'), BoolToStr(R.IsValid, 'True','False'), R.Number, R.FlowMin, R.FlowMax,
+     C.RangeIndex, BoolToStr(C.Range.IsValid, 'True','False'), BoolToStr(R.IsValid, 'True','False'), R.Number, R.FlowMin, R.FlowMax, R.MaxError, R.SetupTime,
      Length(C.EtalonNames), Length(C.ScaleNames), Length(C.PumpNames), Length(C.RegulatingPumpNames),
      Length(C.UnregulatedPumpNames), Length(C.RegulatingValveNames), ErrorInfo.Code, ErrorInfo.Msg, DateTimeToStr(ErrorInfo.Time)]);
 end;
