@@ -56,6 +56,9 @@ uses
   uMeasurementRun,
   uReportTemplates;
 
+const
+  C_RESULTS_POINT_COLUMN_COUNT = 20;
+
 type
   // Направление сортировки таблицы обработки.
   TGridSortDirection = (gsdNone, gsdAscending, gsdDescending);
