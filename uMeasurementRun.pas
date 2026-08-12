@@ -531,7 +531,8 @@ type
     function HydraulicSelection(APoint: TDevicePoint;
       out ACompleted: Boolean; out AError: TErrorInfo): Boolean;
     function HydraulicSetupCompleted(APoint: TDevicePoint;
-      out ACompleted: Boolean; out AError: TErrorInfo): Boolean;
+      out ACompleted: Boolean; out ASetupTime: Byte;
+      out AError: TErrorInfo): Boolean;
     procedure CancelHydraulicOperation(const AReason: string);
   public
     constructor Create(AWorkTable: TWorkTable);
@@ -5887,7 +5888,8 @@ begin
 end;
 
 function TMeasurementRun.HydraulicSetupCompleted(APoint: TDevicePoint;
-  out ACompleted: Boolean; out AError: TErrorInfo): Boolean;
+  out ACompleted: Boolean; out ASetupTime: Byte;
+  out AError: TErrorInfo): Boolean;
 var
   HydraulicState: EHydraulicLineState;
   HydraulicError: TErrorInfo;
@@ -5900,6 +5902,7 @@ var
 begin
   Result := False;
   ACompleted := False;
+  ASetupTime := 0;
   AError := TErrorInfo.Empty(Integer(msSetupHydraulicLine));
   if (FWorkTable = nil) or (APoint = nil) then
   begin
@@ -5927,6 +5930,10 @@ begin
        FCurrentPointIndex, PointIndex, APoint.Q, TargetFlow]));
     Exit;
   end;
+
+  { Return the value from the same validated range snapshot that supplied
+    the hydraulic state. }
+  ASetupTime := Range.SetupTime;
 
   case HydraulicState of
     hlsSelected, hlsSettingUp:
@@ -5963,9 +5970,11 @@ var
   Point: TDevicePoint;
   Error: TErrorInfo;
   Completed: Boolean;
+  SetupTime: Byte;
+  SetupTimeoutMs: UInt64;
 begin
   Point := GetCurrentPoint;
-  if not HydraulicSetupCompleted(Point, Completed, Error) then
+  if not HydraulicSetupCompleted(Point, Completed, SetupTime, Error) then
   begin
     ProtocolManager.AddMessage(pcError, psMeasurement,
       'ProcessSetupHydraulicLine', 'Ошибка установки гидравлической линии',
@@ -5984,15 +5993,22 @@ begin
     Exit;
   end;
 
-  if TMeterValue.GetMonotonicTimeMs - FWaitStartedTick >=
-     HYDRAULIC_SETUP_TIMEOUT_MS then
+  if SetupTime = 0 then
+    SetupTimeoutMs := HYDRAULIC_SETUP_TIMEOUT_MS
+  else
+    SetupTimeoutMs := UInt64(SetupTime) * 1000;
+
+  if UInt64(TMeterValue.GetMonotonicTimeMs - FWaitStartedTick) >=
+     SetupTimeoutMs then
   begin
     CancelHydraulicOperation('Тайм-аут установки гидравлической линии');
     Error := BuildError(1124,
       'Превышено время установки гидравлической линии');
     ProtocolManager.AddMessage(pcError, psMeasurement,
       'ProcessSetupHydraulicLine',
-      'Тайм-аут установки гидравлической линии', Error.Msg);
+      'Тайм-аут установки гидравлической линии',
+      Format('%s; SetupTime=%d; TimeoutMs=%d',
+        [Error.Msg, SetupTime, SetupTimeoutMs]));
     ContinueAfterPointError(mptsSetupError, meEtalonAbsent, Error);
   end;
 end;
