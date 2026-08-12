@@ -1,4 +1,4 @@
-unit uWorkTable;
+﻿unit uWorkTable;
 
 interface
 
@@ -1435,6 +1435,10 @@ type
   procedure StartMonitor;
   procedure StopMonitor;
   procedure SaveMeasurementResults;
+  // Проверяет, что погрешность поверяемого канала связана с его измеренным
+  // значением и эталоном рабочего стола.
+  function IsDeviceErrorBindingValid(AChannel: TChannel;
+    out AReason: string): Boolean;
 
   { Публикует единственную команду физической установки выбранной линии. }
   function SetupHydraulicLine(out AError: TErrorInfo): Boolean;
@@ -2246,16 +2250,24 @@ procedure TChannel.AssignFlowMeterFrom(const ASource: TChannel;
 var
   SrcDevice: TDevice;
   NewDevice: TDevice;
+  OldDeviceUUID: string;
+  BindingValid: Boolean;
+  NewDeviceUUID: string;
+  ValueBaseMultiplierHash: string;
+  ValueEtalonHash: string;
+  BindingLogCategory: EProtocolCategory;
+  ValueBaseMultiplierAssigned: Boolean;
+  ValueEtalonAssigned: Boolean;
 begin
   if (ASource = nil) or (ASource.FFlowMeter = nil) then
     Exit;
 
+  OldDeviceUUID := DeviceUUID;
   RecreateFlowMeter(AWorkTable);
 
   FFlowMeter.UUID := TGUID.NewGuid.ToString;
   FFlowMeter.Name := ASource.FFlowMeter.Name;
-  // DeviceUUID is assigned from the newly created instance below.
-  FFlowMeter.DeviceUUID := '';
+  FFlowMeter.DeviceUUID := ASource.FFlowMeter.DeviceUUID;
   FFlowMeter.DeviceTypeName := ASource.FFlowMeter.DeviceTypeName;
   FFlowMeter.DeviceTypeUUID := ASource.FFlowMeter.DeviceTypeUUID;
   FFlowMeter.RepoTypeName := ASource.FFlowMeter.RepoTypeName;
@@ -2316,16 +2328,6 @@ begin
     NewDevice := DataManager.ActiveDeviceRepo.CreateDeviceForChannelCopy(SrcDevice);
     NewDevice.SerialNumber := SrcDevice.SerialNumber;
     FFlowMeter.Device := NewDevice;
-    // Keep instance, type and repository identities synchronized independently.
-    FFlowMeter.DeviceUUID := NewDevice.UUID;
-    FFlowMeter.DeviceTypeName := NewDevice.DeviceTypeName;
-    FFlowMeter.DeviceTypeUUID := NewDevice.DeviceTypeUUID;
-    FFlowMeter.SerialNumber := NewDevice.SerialNumber;
-    FFlowMeter.OutputType := NewDevice.OutputType;
-    FFlowMeter.RepoTypeName := NewDevice.RepoTypeName;
-    FFlowMeter.RepoTypeUUID := NewDevice.RepoTypeUUID;
-    FFlowMeter.RepoDeviceName := NewDevice.RepoDeviceName;
-    FFlowMeter.RepoDeviceUUID := NewDevice.RepoDeviceUUID;
   end
   else if SrcDevice <> nil then
   begin
@@ -2336,6 +2338,57 @@ begin
   end;
 
   RebindFlowMeterValues(AWorkTable);
+
+  // После пересоздания TFlowMeter восстанавливает связь погрешности с
+  // эталонным расходомером рабочего стола.
+  if ACloneDeviceToRepo and (AWorkTable <> nil) and
+     (AWorkTable.TableFlow <> nil) and (FFlowMeter <> nil) and
+     (AWorkTable.DeviceChannels.IndexOf(Self) >= 0) and
+     not FFlowMeter.IsEtalon then
+  begin
+    FFlowMeter.SetEtalon(AWorkTable.TableFlow);
+    FFlowMeter.RebindCalculatedValues;
+
+    BindingValid := (FFlowMeter.Device <> nil) and
+      SameText(FFlowMeter.Device.UUID, FFlowMeter.DeviceUUID) and
+      (FFlowMeter.ValueError <> nil) and (FFlowMeter.ValueQuantity <> nil) and
+      (FFlowMeter.ValueError.ValueBaseMultiplier = FFlowMeter.ValueQuantity) and
+      (FFlowMeter.ValueError.ValueEtalon = AWorkTable.TableFlow.ValueQuantity);
+    NewDeviceUUID := '';
+    ValueBaseMultiplierHash := '';
+    ValueEtalonHash := '';
+    ValueBaseMultiplierAssigned := False;
+    ValueEtalonAssigned := False;
+    BindingLogCategory := pcError;
+    if FFlowMeter.Device <> nil then
+      NewDeviceUUID := FFlowMeter.Device.UUID;
+    if FFlowMeter.ValueError <> nil then
+    begin
+      ValueBaseMultiplierAssigned :=
+        FFlowMeter.ValueError.ValueBaseMultiplier <> nil;
+      ValueEtalonAssigned := FFlowMeter.ValueError.ValueEtalon <> nil;
+      ValueBaseMultiplierHash := FFlowMeter.ValueError.HashValueBaseMultiplier;
+      ValueEtalonHash := FFlowMeter.ValueError.HashValueEtalon;
+    end;
+    if BindingValid then
+      BindingLogCategory := pcProc;
+    ProtocolManager.AddMessage(BindingLogCategory, psWorkTable,
+      'CopiedDeviceErrorBinding',
+      'Восстановлена связь погрешности скопированного прибора',
+      Format('ChannelName=%s; OldDeviceUUID=%s; NewDeviceUUID=%s; ' +
+        'FlowMeterUUID=%s; DeviceUUID=%s; TableFlowAssigned=%s; ' +
+        'ValueErrorAssigned=%s; ValueQuantityAssigned=%s; ' +
+        'ValueBaseMultiplierAssigned=%s; ValueEtalonAssigned=%s; ' +
+        'ValueBaseMultiplierHash=%s; ValueEtalonHash=%s; BindingValid=%s',
+        [Name, OldDeviceUUID, NewDeviceUUID, FFlowMeter.UUID,
+         FFlowMeter.DeviceUUID, BoolToStr(AWorkTable.TableFlow <> nil, True),
+         BoolToStr(FFlowMeter.ValueError <> nil, True),
+         BoolToStr(FFlowMeter.ValueQuantity <> nil, True),
+         BoolToStr(ValueBaseMultiplierAssigned, True),
+         BoolToStr(ValueEtalonAssigned, True),
+         ValueBaseMultiplierHash, ValueEtalonHash,
+         BoolToStr(BindingValid, True)]));
+  end;
 end;
 
 // =====================================================
@@ -6443,6 +6496,45 @@ begin
     ResetMeter(Ch.ValueInterface);
   end;
 end;
+function TWorkTable.IsDeviceErrorBindingValid(AChannel: TChannel;
+  out AReason: string): Boolean;
+var
+  FlowMeter: TFlowMeter;
+begin
+  Result := False;
+  AReason := '';
+  if AChannel = nil then
+    AReason := 'Channel=nil'
+  else if AChannel.FlowMeter = nil then
+    AReason := 'FlowMeter=nil'
+  else if TableFlow = nil then
+    AReason := 'TableFlow=nil'
+  else if TableFlow.ValueQuantity = nil then
+    AReason := 'TableFlow.ValueQuantity=nil'
+  else
+  begin
+    FlowMeter := AChannel.FlowMeter;
+    if FlowMeter.Device = nil then
+      AReason := 'Device=nil'
+    else if not SameText(FlowMeter.Device.UUID, FlowMeter.DeviceUUID) then
+      AReason := 'Device.UUID<>DeviceUUID'
+    else if FlowMeter.ValueError = nil then
+      AReason := 'ValueError=nil'
+    else if FlowMeter.ValueQuantity = nil then
+      AReason := 'ValueQuantity=nil'
+    else if FlowMeter.ValueError.ValueBaseMultiplier = nil then
+      AReason := 'ValueError.ValueBaseMultiplier=nil'
+    else if FlowMeter.ValueError.ValueEtalon = nil then
+      AReason := 'ValueError.ValueEtalon=nil'
+    else if FlowMeter.ValueError.ValueBaseMultiplier <> FlowMeter.ValueQuantity then
+      AReason := 'ValueBaseMultiplier<>ValueQuantity'
+    else if FlowMeter.ValueError.ValueEtalon <> TableFlow.ValueQuantity then
+      AReason := 'ValueEtalon<>TableFlow.ValueQuantity'
+    else
+      Result := True;
+  end;
+end;
+
 procedure TWorkTable.SaveMeasurementResults;
 var
   DeviceChannel: TChannel;
@@ -6463,6 +6555,18 @@ var
   ValueTimeSnapshot: Double;
   SavedPointTime: Double;
   ProcessedDeviceCount: Integer;
+  BindingReason: string;
+  BindingValid: Boolean;
+  BindingRepairAttempted: Boolean;
+  BindingRepairSucceeded: Boolean;
+  CalculatedError: Double;
+  LoggedValueQuantity: Double;
+  LoggedEtalonQuantity: Double;
+  LoggedCalculatedError: string;
+  ValueErrorHash: string;
+  ValueBaseMultiplierHash: string;
+  ValueEtalonHash: string;
+  ErrorLogCategory: EProtocolCategory;
 
   function BoolText(const AValue: Boolean): string;
   begin
@@ -7215,8 +7319,72 @@ begin
       Point.Density :=
         DeviceChannel.FlowMeter.ValueDensity.GetDoubleValue;
 
+      BindingRepairAttempted := False;
+      BindingRepairSucceeded := False;
+      BindingValid := IsDeviceErrorBindingValid(DeviceChannel, BindingReason);
+      if not BindingValid and (TableFlow <> nil) and
+         (DeviceChannel.FlowMeter <> nil) then
+      begin
+        BindingRepairAttempted := True;
+        DeviceChannel.FlowMeter.SetEtalon(TableFlow);
+        DeviceChannel.FlowMeter.RebindCalculatedValues;
+        DeviceChannel.FlowMeter.SetValues;
+        BindingValid := IsDeviceErrorBindingValid(DeviceChannel, BindingReason);
+        BindingRepairSucceeded := BindingValid;
+      end;
+
+      if BindingValid then
+        CalculatedError := DeviceChannel.FlowMeter.ValueError.GetDoubleValue;
+
+      LoggedValueQuantity := 0.0;
+      LoggedEtalonQuantity := 0.0;
+      LoggedCalculatedError := 'not available';
+      ValueErrorHash := '';
+      ValueBaseMultiplierHash := '';
+      ValueEtalonHash := '';
+      ErrorLogCategory := pcError;
+      if DeviceChannel.FlowMeter.ValueQuantity <> nil then
+        LoggedValueQuantity := DeviceChannel.FlowMeter.ValueQuantity.GetDoubleValue;
+      if (TableFlow <> nil) and (TableFlow.ValueQuantity <> nil) then
+        LoggedEtalonQuantity := TableFlow.ValueQuantity.GetDoubleValue;
+      if DeviceChannel.FlowMeter.ValueError <> nil then
+      begin
+        ValueErrorHash := DeviceChannel.FlowMeter.ValueError.Hash;
+        ValueBaseMultiplierHash :=
+          DeviceChannel.FlowMeter.ValueError.HashValueBaseMultiplier;
+        ValueEtalonHash := DeviceChannel.FlowMeter.ValueError.HashValueEtalon;
+      end;
+      if BindingValid then
+      begin
+        LoggedCalculatedError := FloatToStr(CalculatedError);
+        ErrorLogCategory := pcProc;
+      end;
+
+      ProtocolManager.AddMessage(
+        ErrorLogCategory, psWorkTable,
+        'DeviceErrorBeforeSave', 'Проверка связи погрешности перед сохранением',
+        Format('ChannelName=%s; DeviceUUID=%s; Serial=%s; ' +
+          'ValueQuantity=%.9f; EtalonQuantity=%.9f; CalculatedError=%s; ' +
+          'ValueErrorHash=%s; ValueBaseMultiplierHash=%s; ValueEtalonHash=%s; ' +
+          'BindingValid=%s; BindingRepairAttempted=%s; ' +
+          'BindingRepairSucceeded=%s; Reason=%s',
+          [DeviceChannel.Name, Device.UUID, Device.SerialNumber,
+           LoggedValueQuantity, LoggedEtalonQuantity, LoggedCalculatedError,
+           ValueErrorHash, ValueBaseMultiplierHash, ValueEtalonHash,
+           BoolText(BindingValid), BoolText(BindingRepairAttempted),
+           BoolText(BindingRepairSucceeded), BindingReason]));
+
+      if not BindingValid then
+      begin
+        ProtocolManager.AddMessage(pcError, psWorkTable,
+          'DeviceErrorBeforeSave', 'Результат канала не сохранён: связь погрешности отсутствует',
+          Format('ChannelName=%s; DeviceUUID=%s; Reason=%s',
+            [DeviceChannel.Name, Device.UUID, BindingReason]));
+        Continue;
+      end;
+
       Point.Error :=
-        DeviceChannel.FlowMeter.ValueError.GetDoubleValue;
+        CalculatedError;
 
       Point.PulseCount :=
         DeviceChannel.ValueImpResult.GetDoubleValue;
