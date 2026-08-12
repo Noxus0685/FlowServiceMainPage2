@@ -3,7 +3,7 @@
 interface
 
 uses
-  uGridStabilityRegistry,
+  FmxHelper,
   FMX.ActnList,
   FMX.Controls,
   FMX.Controls.Presentation,
@@ -51,7 +51,6 @@ uses
   uClasses,
   uDataManager,
   uDeviceClass,
-  uGridLayoutManager,
   uRepositories,
   uProtocols;
 
@@ -287,7 +286,6 @@ end;
 constructor TFormDeviceSelect.Create(AOwner: TComponent);
 begin
   inherited;
-  RegisterStableGrid(Self, GridDevices, Name);
   FDeletedDeviceUUIDs := TStringList.Create;
   FDeletedDeviceUUIDs.Duplicates := dupIgnore;
   FDeletedDeviceUUIDs.CaseSensitive := False;
@@ -764,7 +762,7 @@ begin
   begin
     DebugLog('DBG 2012'#13#10'DeviceSelect.BuildTree before TreeViewDevices.Clear');
     TreeViewDevices.Clear;
-    TGridLayoutManager.SetRowCount(GridDevices, 0);
+    RefreshGridContent(GridDevices, 0, 'device-filter');
     DebugLog('DBG 2013'#13#10'DeviceSelect.BuildTree EXIT');
     Exit;
   end;
@@ -1724,10 +1722,9 @@ begin
         FCheckedDevices.Delete(I);
 
   if FDevFilteredDevices <> nil then
-    TGridLayoutManager.SetRowCount(GridDevices,
-      FDevFilteredDevices.Count, True)
+    RefreshGridContent(GridDevices, FDevFilteredDevices.Count, 'device-filter')
   else
-    TGridLayoutManager.SetRowCount(GridDevices, 0, True);
+    RefreshGridContent(GridDevices, 0, 'device-filter');
 
   if (GridDevices.Row < 0) or (GridDevices.Row >= GridDevices.RowCount) then
     GridDevices.Row := -1;
