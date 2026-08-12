@@ -1,4 +1,4 @@
-﻿unit frmProceed;
+unit frmProceed;
 
 interface
 
