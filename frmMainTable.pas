@@ -71,6 +71,7 @@ uses
   uMeterValue,
   uObservable,
   uParameter,
+  uProjectSettings,
   uProtocols,
   uRepositories,
   uGraphsViewConfig,
@@ -3416,6 +3417,7 @@ end;
 
 procedure TFrameMainTable.PopupMenuDevicesGridPopup(Sender: TObject);
 begin
+  ActivateMeasurementGrid(GridDevices);
   FLastPopupGrid := GridDevices;
   PopupMenuWorkTablesPopup(Sender);
   UpdateGridPopupActions;
@@ -3424,6 +3426,7 @@ end;
 
 procedure TFrameMainTable.PopupMenuEtalonsGridPopup(Sender: TObject);
 begin
+  ActivateMeasurementGrid(GridEtalons);
   FLastPopupGrid := GridEtalons;
   PopupMenuWorkTablesPopup(Sender);
   UpdateGridPopupActions;
@@ -3747,23 +3750,21 @@ end;
 procedure TFrameMainTable.PersistChannelEnabled(AWorkTable: TWorkTable; AChannel: TChannel;
   const AKind: string; const AOldEnabled, ANewEnabled: Boolean);
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   StoragePath: string;
   SectionName: string;
 begin
   if (AWorkTable = nil) or (AChannel = nil) then
     Exit;
 
-  StoragePath := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
-    'Settings' + PathDelim + 'TableSettings.ini';
-  ForceDirectories(ExtractFilePath(StoragePath));
+  StoragePath := GetProjectSettingsFileName;
 
   if SameText(AKind, 'Etalon') then
     SectionName := Format('WorkTables/%s/EtalonChannels/%s', [AWorkTable.UUID, AChannel.UUID])
   else
     SectionName := Format('WorkTables/%s/DeviceChannels/%s', [AWorkTable.UUID, AChannel.UUID]);
 
-  Ini := TIniFile.Create(StoragePath);
+  Ini := TProjectSettingsIni.Create(StoragePath, STORAGE_TABLE_SETTINGS);
   try
     Ini.WriteBool(SectionName, 'Enabled', ANewEnabled);
     Ini.UpdateFile;
@@ -4838,20 +4839,45 @@ begin
      (AClipboard.Snapshot.FlowMeter <> nil) then
   begin
     AClipboard.Snapshot.FlowMeter.Device := TDevice.Create;
-    AClipboard.Snapshot.FlowMeter.Device.Assign(AChannel.FlowMeter.Device, False);
+    AClipboard.Snapshot.FlowMeter.Device.AssignWithoutMeasurementHistory(
+      AChannel.FlowMeter.Device);
     AClipboard.Snapshot.FlowMeter.Device.SerialNumber := AChannel.FlowMeter.Device.SerialNumber;
   end;
 end;
 
 procedure TFrameMainTable.LoadChannelFromClipboard(AChannel: TChannel;
   const AClipboard: TChannelClipboardData);
+var
+  OldDevice, NewDevice: TDevice;
+  OldFlowMeter: TFlowMeter;
+  OldDeviceUUID, NewDeviceUUID: string;
 begin
   if (AChannel = nil) or not AClipboard.HasData or (AClipboard.Snapshot = nil) then
     Exit;
 
+  OldFlowMeter := AChannel.FlowMeter;
+  OldDevice := nil;
+  OldDeviceUUID := AChannel.DeviceUUID;
+  if OldFlowMeter <> nil then
+    OldDevice := OldFlowMeter.Device;
+
   CloneSelectedChannelDevice(AClipboard.Snapshot, AChannel);
-  if FFrameProceed <> nil then
-    FFrameProceed.AddProcessingDevice(AChannel.FlowMeter.Device);
+  NewDevice := nil;
+  NewDeviceUUID := '';
+  if AChannel.FlowMeter <> nil then
+  begin
+    NewDevice := AChannel.FlowMeter.Device;
+    NewDeviceUUID := AChannel.FlowMeter.DeviceUUID;
+  end;
+  if (FFrameProceed <> nil) and (FActiveWorkTable <> nil) and
+     (FActiveWorkTable.DeviceChannels.IndexOf(AChannel) >= 0) and
+     not SameText(Trim(OldDeviceUUID), Trim(NewDeviceUUID)) then
+  begin
+    if OldDevice <> nil then
+      FFrameProceed.RemoveProcessingDevice(OldDevice);
+    if NewDevice <> nil then
+      FFrameProceed.AddProcessingDevice(NewDevice);
+  end;
   MarkChannelDeviceModified(AChannel);
 end;
 
@@ -9193,6 +9219,7 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
+  ActivateMeasurementGrid(GridDevices);
  if not CanEditActiveWorkTable then
   begin
     ApplyActiveWorkTableEditMode;
@@ -9308,6 +9335,8 @@ begin
     Exit;
   FChangingMeasurementGridFocus := True;
   try
+    OtherGrid.EditorMode := False;
+    OtherGrid.Selected := -1;
     OtherGrid.Row := -1;
     OtherGrid.ResetFocus;
   finally
@@ -9406,6 +9435,7 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
+  ActivateMeasurementGrid(GridDevices);
   if not CanEditActiveWorkTable then
   begin
     ApplyActiveWorkTableEditMode;
@@ -9470,6 +9500,7 @@ var
   NewValue: string;
   DuplicateFound: boolean;
 begin
+  ActivateMeasurementGrid(GridDevices);
   if not CanEditActiveWorkTable then
     Exit;
 
@@ -9886,6 +9917,7 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
+  ActivateMeasurementGrid(GridEtalons);
   if not CanEditActiveWorkTable then
   begin
     ApplyActiveWorkTableEditMode;
@@ -10001,6 +10033,7 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
+  ActivateMeasurementGrid(GridEtalons);
   if not CanEditActiveWorkTable then
   begin
     ApplyActiveWorkTableEditMode;

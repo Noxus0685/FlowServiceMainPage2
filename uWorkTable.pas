@@ -20,6 +20,7 @@ uses
   uMeterValue,
   uObservable,
   uParameter,
+  uProjectSettings,
   uProtocols,
   uRepositories,
   uSyncSetup;
@@ -1435,6 +1436,10 @@ type
   procedure StartMonitor;
   procedure StopMonitor;
   procedure SaveMeasurementResults;
+  // Проверяет, что погрешность поверяемого канала связана с его измеренным
+  // значением и эталоном рабочего стола.
+  function IsDeviceErrorBindingValid(AChannel: TChannel;
+    out AReason: string): Boolean;
 
   { Публикует единственную команду физической установки выбранной линии. }
   function SetupHydraulicLine(out AError: TErrorInfo): Boolean;
@@ -2246,10 +2251,19 @@ procedure TChannel.AssignFlowMeterFrom(const ASource: TChannel;
 var
   SrcDevice: TDevice;
   NewDevice: TDevice;
+  OldDeviceUUID: string;
+  BindingValid: Boolean;
+  NewDeviceUUID: string;
+  ValueBaseMultiplierHash: string;
+  ValueEtalonHash: string;
+  BindingLogCategory: EProtocolCategory;
+  ValueBaseMultiplierAssigned: Boolean;
+  ValueEtalonAssigned: Boolean;
 begin
   if (ASource = nil) or (ASource.FFlowMeter = nil) then
     Exit;
 
+  OldDeviceUUID := DeviceUUID;
   RecreateFlowMeter(AWorkTable);
 
   FFlowMeter.UUID := TGUID.NewGuid.ToString;
@@ -2312,8 +2326,7 @@ begin
   SrcDevice := ASource.FFlowMeter.Device;
   if ACloneDeviceToRepo and (SrcDevice <> nil) and (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
   begin
-    NewDevice := DataManager.ActiveDeviceRepo.CreateDevice(SrcDevice);
-    NewDevice.UUID := TGUID.NewGuid.ToString;
+    NewDevice := DataManager.ActiveDeviceRepo.CreateDeviceForChannelCopy(SrcDevice);
     NewDevice.SerialNumber := SrcDevice.SerialNumber;
     FFlowMeter.Device := NewDevice;
   end
@@ -2326,6 +2339,69 @@ begin
   end;
 
   RebindFlowMeterValues(AWorkTable);
+
+  // После пересоздания TFlowMeter восстанавливает связь погрешности с
+  // эталонным расходомером рабочего стола.
+  if ACloneDeviceToRepo and (AWorkTable <> nil) and
+     (AWorkTable.TableFlow <> nil) and (FFlowMeter <> nil) and
+     (AWorkTable.DeviceChannels.IndexOf(Self) >= 0) and
+     not FFlowMeter.IsEtalon then
+  begin
+    FFlowMeter.SetEtalon(AWorkTable.TableFlow);
+    FFlowMeter.RebindCalculatedValues;
+
+    BindingValid := (FFlowMeter.Device <> nil) and
+      SameText(FFlowMeter.Device.UUID, FFlowMeter.DeviceUUID) and
+      (FFlowMeter.ValueError <> nil) and (FFlowMeter.ValueQuantity <> nil) and
+      (FFlowMeter.ValueError.ValueBaseMultiplier = FFlowMeter.ValueQuantity) and
+      (FFlowMeter.ValueError.ValueEtalon = AWorkTable.TableFlow.ValueQuantity);
+    NewDeviceUUID := '';
+    ValueBaseMultiplierHash := '';
+    ValueEtalonHash := '';
+    ValueBaseMultiplierAssigned := False;
+    ValueEtalonAssigned := False;
+    BindingLogCategory := pcError;
+    if FFlowMeter.Device <> nil then
+      NewDeviceUUID := FFlowMeter.Device.UUID;
+    if FFlowMeter.ValueError <> nil then
+    begin
+      ValueBaseMultiplierAssigned :=
+        FFlowMeter.ValueError.ValueBaseMultiplier <> nil;
+      ValueEtalonAssigned := FFlowMeter.ValueError.ValueEtalon <> nil;
+      ValueBaseMultiplierHash := FFlowMeter.ValueError.HashValueBaseMultiplier;
+      ValueEtalonHash := FFlowMeter.ValueError.HashValueEtalon;
+    end;
+    if BindingValid then
+      BindingLogCategory := pcProc;
+ProtocolManager.AddMessage(
+  BindingLogCategory,
+  psWorkTable,
+  'CopiedDeviceErrorBinding',
+  'Восстановлена связь погрешности скопированного прибора',
+  Format(
+    'ChannelName=%s; OldDeviceUUID=%s; NewDeviceUUID=%s; ' +
+    'FlowMeterUUID=%s; DeviceUUID=%s; TableFlowAssigned=%s; ' +
+    'ValueErrorAssigned=%s; ValueQuantityAssigned=%s; ' +
+    'ValueBaseMultiplierAssigned=%s; ValueEtalonAssigned=%s; ' +
+    'ValueBaseMultiplierHash=%s; ValueEtalonHash=%s; BindingValid=%s',
+    [
+      Name,
+      OldDeviceUUID,
+      NewDeviceUUID,
+      FFlowMeter.UUID,
+      FFlowMeter.DeviceUUID,
+      BoolToStr(AWorkTable.TableFlow <> nil, 'True', 'False'),
+      BoolToStr(FFlowMeter.ValueError <> nil, 'True', 'False'),
+      BoolToStr(FFlowMeter.ValueQuantity <> nil, 'True', 'False'),
+      BoolToStr(ValueBaseMultiplierAssigned, 'True', 'False'),
+      BoolToStr(ValueEtalonAssigned, 'True', 'False'),
+      ValueBaseMultiplierHash,
+      ValueEtalonHash,
+      BoolToStr(BindingValid, 'True', 'False')
+    ]
+  )
+);
+  end;
 end;
 
 // =====================================================
@@ -3394,7 +3470,7 @@ var
 
   procedure RemoveMeterValue(AMeterValue: TMeterValue);
   begin
-    // Запоминаем Hash: по этому списку затем физически чистится MeterValues.ini.
+    // Запоминаем Hash: по этому списку затем очищается хранилище MeterValues.
     if AMeterValue <> nil then
     begin
       if (ADeletedHashes <> nil) and (Trim(AMeterValue.Hash) <> '') and
@@ -5034,18 +5110,17 @@ begin
   UpdateFlowRateLimitsByEtalons;
 end;
 
-{ Saves work table list, channels, and meter values to INI files. }
+{ Сохраняет рабочие столы и их значения в setting.fpp. }
 class procedure TWorkTable.Save(const AIniFileName: string;
   AWorkTables: TObjectList<TWorkTable>);
 var
-  Ini: TMemIniFile;
-  ValuesIni: TMemIniFile;
+  Ini: TCustomIniFile;
+  ValuesIni: TCustomIniFile;
   I: Integer;
   WorkTable: TWorkTable;
   Section: string;
-  WorkTableValuesFileName: string;
 
-  procedure ClearOldWorkTableSections(AIni: TMemIniFile);
+  procedure ClearOldWorkTableSections(AIni: TCustomIniFile);
   var
     Sections: TStringList;
     J: Integer;
@@ -5074,9 +5149,8 @@ begin
   if (AIniFileName = '') or (AWorkTables = nil) then
     Exit;
 
-  Ini := TMemIniFile.Create(AIniFileName);
-  WorkTableValuesFileName := IncludeTrailingPathDelimiter(ExtractFilePath(AIniFileName)) + 'WorkTableValues.ini';
-  ValuesIni := TMemIniFile.Create(WorkTableValuesFileName);
+  Ini := TProjectSettingsIni.Create(AIniFileName, STORAGE_TABLE_SETTINGS);
+  ValuesIni := TProjectSettingsIni.Create(AIniFileName, STORAGE_WORK_TABLE_VALUES);
   try
     ClearOldWorkTableSections(Ini);
     ClearOldWorkTableSections(ValuesIni);
@@ -5194,30 +5268,25 @@ begin
   end;
 end;
 
-{ Loads work table list, channels, and meter values from INI files. }
+{ Загружает рабочие столы и их значения из setting.fpp. }
 class procedure TWorkTable.Load(const AIniFileName: string;
   AWorkTables: TObjectList<TWorkTable>);
 var
-  Ini: TIniFile;
-  ValuesIni: TIniFile;
+  Ini: TCustomIniFile;
+  ValuesIni: TCustomIniFile;
   Count, I: Integer;
   WorkTable: TWorkTable;
   Section: string;
-  WorkTableValuesFileName: string;
 begin
   if (AIniFileName = '') or (AWorkTables = nil) then
-    Exit;
-
-  if not FileExists(AIniFileName) then
     Exit;
 
   AWorkTables.Clear;
   if TWeight.Weights <> nil then
     TWeight.Weights.Clear;
 
-  Ini := TIniFile.Create(AIniFileName);
-  WorkTableValuesFileName := IncludeTrailingPathDelimiter(ExtractFilePath(AIniFileName)) + 'WorkTableValues.ini';
-  ValuesIni := TIniFile.Create(WorkTableValuesFileName);
+  Ini := TProjectSettingsIni.Create(AIniFileName, STORAGE_TABLE_SETTINGS);
+  ValuesIni := TProjectSettingsIni.Create(AIniFileName, STORAGE_WORK_TABLE_VALUES);
   try
     Count := Ini.ReadInteger('WorkTables', 'Count', 0);
     TMeterValue.SetInitDensity(S2F(ValuesIni.ReadString('Common', 'InitDensity', FloatToStr(TMeterValue.GetInitDensity))));
@@ -6433,6 +6502,45 @@ begin
     ResetMeter(Ch.ValueInterface);
   end;
 end;
+function TWorkTable.IsDeviceErrorBindingValid(AChannel: TChannel;
+  out AReason: string): Boolean;
+var
+  FlowMeter: TFlowMeter;
+begin
+  Result := False;
+  AReason := '';
+  if AChannel = nil then
+    AReason := 'Channel=nil'
+  else if AChannel.FlowMeter = nil then
+    AReason := 'FlowMeter=nil'
+  else if TableFlow = nil then
+    AReason := 'TableFlow=nil'
+  else if TableFlow.ValueQuantity = nil then
+    AReason := 'TableFlow.ValueQuantity=nil'
+  else
+  begin
+    FlowMeter := AChannel.FlowMeter;
+    if FlowMeter.Device = nil then
+      AReason := 'Device=nil'
+    else if not SameText(FlowMeter.Device.UUID, FlowMeter.DeviceUUID) then
+      AReason := 'Device.UUID<>DeviceUUID'
+    else if FlowMeter.ValueError = nil then
+      AReason := 'ValueError=nil'
+    else if FlowMeter.ValueQuantity = nil then
+      AReason := 'ValueQuantity=nil'
+    else if FlowMeter.ValueError.ValueBaseMultiplier = nil then
+      AReason := 'ValueError.ValueBaseMultiplier=nil'
+    else if FlowMeter.ValueError.ValueEtalon = nil then
+      AReason := 'ValueError.ValueEtalon=nil'
+    else if FlowMeter.ValueError.ValueBaseMultiplier <> FlowMeter.ValueQuantity then
+      AReason := 'ValueBaseMultiplier<>ValueQuantity'
+    else if FlowMeter.ValueError.ValueEtalon <> TableFlow.ValueQuantity then
+      AReason := 'ValueEtalon<>TableFlow.ValueQuantity'
+    else
+      Result := True;
+  end;
+end;
+
 procedure TWorkTable.SaveMeasurementResults;
 var
   DeviceChannel: TChannel;
@@ -6453,6 +6561,18 @@ var
   ValueTimeSnapshot: Double;
   SavedPointTime: Double;
   ProcessedDeviceCount: Integer;
+  BindingReason: string;
+  BindingValid: Boolean;
+  BindingRepairAttempted: Boolean;
+  BindingRepairSucceeded: Boolean;
+  CalculatedError: Double;
+  LoggedValueQuantity: Double;
+  LoggedEtalonQuantity: Double;
+  LoggedCalculatedError: string;
+  ValueErrorHash: string;
+  ValueBaseMultiplierHash: string;
+  ValueEtalonHash: string;
+  ErrorLogCategory: EProtocolCategory;
 
   function BoolText(const AValue: Boolean): string;
   begin
@@ -7205,8 +7325,72 @@ begin
       Point.Density :=
         DeviceChannel.FlowMeter.ValueDensity.GetDoubleValue;
 
+      BindingRepairAttempted := False;
+      BindingRepairSucceeded := False;
+      BindingValid := IsDeviceErrorBindingValid(DeviceChannel, BindingReason);
+      if not BindingValid and (TableFlow <> nil) and
+         (DeviceChannel.FlowMeter <> nil) then
+      begin
+        BindingRepairAttempted := True;
+        DeviceChannel.FlowMeter.SetEtalon(TableFlow);
+        DeviceChannel.FlowMeter.RebindCalculatedValues;
+        DeviceChannel.FlowMeter.SetValues;
+        BindingValid := IsDeviceErrorBindingValid(DeviceChannel, BindingReason);
+        BindingRepairSucceeded := BindingValid;
+      end;
+
+      if BindingValid then
+        CalculatedError := DeviceChannel.FlowMeter.ValueError.GetDoubleValue;
+
+      LoggedValueQuantity := 0.0;
+      LoggedEtalonQuantity := 0.0;
+      LoggedCalculatedError := 'not available';
+      ValueErrorHash := '';
+      ValueBaseMultiplierHash := '';
+      ValueEtalonHash := '';
+      ErrorLogCategory := pcError;
+      if DeviceChannel.FlowMeter.ValueQuantity <> nil then
+        LoggedValueQuantity := DeviceChannel.FlowMeter.ValueQuantity.GetDoubleValue;
+      if (TableFlow <> nil) and (TableFlow.ValueQuantity <> nil) then
+        LoggedEtalonQuantity := TableFlow.ValueQuantity.GetDoubleValue;
+      if DeviceChannel.FlowMeter.ValueError <> nil then
+      begin
+        ValueErrorHash := DeviceChannel.FlowMeter.ValueError.Hash;
+        ValueBaseMultiplierHash :=
+          DeviceChannel.FlowMeter.ValueError.HashValueBaseMultiplier;
+        ValueEtalonHash := DeviceChannel.FlowMeter.ValueError.HashValueEtalon;
+      end;
+      if BindingValid then
+      begin
+        LoggedCalculatedError := FloatToStr(CalculatedError);
+        ErrorLogCategory := pcProc;
+      end;
+
+      ProtocolManager.AddMessage(
+        ErrorLogCategory, psWorkTable,
+        'DeviceErrorBeforeSave', 'Проверка связи погрешности перед сохранением',
+        Format('ChannelName=%s; DeviceUUID=%s; Serial=%s; ' +
+          'ValueQuantity=%.9f; EtalonQuantity=%.9f; CalculatedError=%s; ' +
+          'ValueErrorHash=%s; ValueBaseMultiplierHash=%s; ValueEtalonHash=%s; ' +
+          'BindingValid=%s; BindingRepairAttempted=%s; ' +
+          'BindingRepairSucceeded=%s; Reason=%s',
+          [DeviceChannel.Name, Device.UUID, Device.SerialNumber,
+           LoggedValueQuantity, LoggedEtalonQuantity, LoggedCalculatedError,
+           ValueErrorHash, ValueBaseMultiplierHash, ValueEtalonHash,
+           BoolText(BindingValid), BoolText(BindingRepairAttempted),
+           BoolText(BindingRepairSucceeded), BindingReason]));
+
+      if not BindingValid then
+      begin
+        ProtocolManager.AddMessage(pcError, psWorkTable,
+          'DeviceErrorBeforeSave', 'Результат канала не сохранён: связь погрешности отсутствует',
+          Format('ChannelName=%s; DeviceUUID=%s; Reason=%s',
+            [DeviceChannel.Name, Device.UUID, BindingReason]));
+        Continue;
+      end;
+
       Point.Error :=
-        DeviceChannel.FlowMeter.ValueError.GetDoubleValue;
+        CalculatedError;
 
       Point.PulseCount :=
         DeviceChannel.ValueImpResult.GetDoubleValue;
@@ -8681,10 +8865,10 @@ begin
   inherited;
 end;
 
-{ Loads managed work tables from configured INI file. }
+{ Загружает рабочие столы из проектной базы настроек. }
 procedure TWorkTableManager.Load;
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   ActiveUUID: string;
   ActiveName: string;
   ActiveIndex: Integer;
@@ -8698,9 +8882,9 @@ begin
   ActiveName := '';
   ActiveIndex := -1;
 
-  if (FIniFileName <> '') and FileExists(FIniFileName) then
+  if FIniFileName <> '' then
   begin
-    Ini := TIniFile.Create(FIniFileName);
+    Ini := TProjectSettingsIni.Create(FIniFileName, STORAGE_TABLE_SETTINGS);
     try
       ActiveUUID := Trim(Ini.ReadString('WorkTables', 'ActiveUUID', ''));
       ActiveName := Trim(Ini.ReadString('WorkTables', 'ActiveName', ''));
@@ -8732,17 +8916,17 @@ begin
   SetActiveWorkTable(WorkTable);
 end;
 
-{ Saves managed work tables to configured INI file. }
+{ Сохраняет рабочие столы в проектную базу настроек. }
 procedure TWorkTableManager.Save;
 var
-  Ini: TMemIniFile;
+  Ini: TCustomIniFile;
 begin
   TWorkTable.Save(FIniFileName, FWorkTables);
 
   if FIniFileName = '' then
     Exit;
 
-  Ini := TMemIniFile.Create(FIniFileName);
+  Ini := TProjectSettingsIni.Create(FIniFileName, STORAGE_TABLE_SETTINGS);
   try
     if (FActiveWorkTable <> nil) and (FWorkTables <> nil) and
        (FWorkTables.IndexOf(FActiveWorkTable) >= 0) then
@@ -8883,7 +9067,7 @@ begin
             SetActiveWorkTable(FWorkTables[FWorkTables.Count - 1]);
         end;
 
-        TMeterValue.DeleteFromFile(DeletedMeterValueHashes, DeletedMeterValueOwners);
+        TMeterValue.DeleteFromStorage(DeletedMeterValueHashes, DeletedMeterValueOwners);
 
         Result := True;
         Break;

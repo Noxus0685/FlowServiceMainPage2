@@ -274,7 +274,7 @@ begin
   MeterValue.MaxValue := MeterValue.GetDoubleNum(EditMax.Text);
   MeterValue.Hash := EditHash.Text;
 
-  TMeterValue.SaveToFile(0);
+  TMeterValue.SaveToStorage;
 end;
 
 procedure TFormMeterValues.FormShow(Sender: TObject);
@@ -526,7 +526,7 @@ end;
 
 procedure TFormMeterValues.SaveConfigButtonClick(Sender: TObject);
 begin
-  TMeterValue.SaveToFile(0);
+  TMeterValue.SaveToStorage;
 end;
 
 procedure TFormMeterValues.DeleteRowButtonClick(Sender: TObject);
@@ -555,7 +555,7 @@ end;
 
 procedure TFormMeterValues.LoadConfigButtonClick(Sender: TObject);
 begin
-  TMeterValue.LoadFromFile;
+  TMeterValue.LoadFromStorage;
   UpdateStringGridCoefsData;
   MeterValue.CalcCoefs;
   UpdateStringGridCoefs;
@@ -569,7 +569,7 @@ end;
 
 procedure TFormMeterValues.ButtonCoefsLoadClick(Sender: TObject);
 begin
-  TMeterValue.LoadFromFile;
+  TMeterValue.LoadFromStorage;
 end;
 
 procedure TFormMeterValues.TabControlMeterValueSettingsChange(Sender: TObject);

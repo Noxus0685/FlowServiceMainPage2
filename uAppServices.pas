@@ -8,6 +8,7 @@ uses
   uDataManager,
   uMeterValue,
   uParameter,
+  uProjectSettings,
   uProtocols,
   uFlowMeter,
   uWorkTable;
@@ -35,8 +36,8 @@ type
     function GetDataManager: TManagerTTableDM;
     function GetWorkTableManager: TWorkTableManager;
 
-    function BuildSettingsPath(const AFileName: string): string;
-    procedure EnsureSettingsDirectory;
+    function BuildSettingsDatabasePath: string;
+    procedure EnsureProjectSettingsDirectory;
     procedure LoadPersistentState;
     procedure ResetGlobalStatics;
 
@@ -90,9 +91,12 @@ begin
   inherited;
 end;
 
-function TAppServices.BuildSettingsPath(const AFileName: string): string;
+function TAppServices.BuildSettingsDatabasePath: string;
 begin
-  Result := TPath.Combine(TPath.Combine(FBasePath, 'Settings'), AFileName);
+  Result := TPath.Combine(
+    TPath.Combine(FBasePath, 'DATA\Projects'),
+    PROJECT_SETTINGS_FILE_NAME
+  );
 end;
 
 function TAppServices.GetProtocolManager: TProtocolManager;
@@ -110,14 +114,14 @@ begin
   Result := FWorkTableManager;
 end;
 
-procedure TAppServices.EnsureSettingsDirectory;
+procedure TAppServices.EnsureProjectSettingsDirectory;
 begin
-  ForceDirectories(TPath.Combine(FBasePath, 'Settings'));
+  ForceDirectories(TPath.Combine(FBasePath, 'DATA\Projects'));
 end;
 
 procedure TAppServices.LoadPersistentState;
 begin
-  TMeterValue.LoadFromFile;
+  TMeterValue.LoadFromStorage;
 end;
 
 procedure TAppServices.Initialize;
@@ -125,12 +129,12 @@ begin
   if FInitialized then
     Exit;
 
-  EnsureSettingsDirectory;
+  EnsureProjectSettingsDirectory;
 
   // --- DataManager ---
   if FDataManager = nil then
   begin
-    FDataManager := TManagerTTableDM.Create(BuildSettingsPath('dbsettings.ini'));
+    FDataManager := TManagerTTableDM.Create(BuildSettingsDatabasePath);
     uDataManager.DataManager := FDataManager;
     FOwnsDataManager := True;
   end;
@@ -149,9 +153,7 @@ begin
   // --- WorkTableManager ---
   if FWorkTableManager = nil then
   begin
-    FWorkTableManager := TWorkTableManager.Create(
-      BuildSettingsPath('TableSettings.ini')
-    );
+    FWorkTableManager := TWorkTableManager.Create(BuildSettingsDatabasePath);
     uWorkTable.WorkTableManager := FWorkTableManager;
     FOwnsWorkTableManager := True;
   end;
@@ -169,7 +171,7 @@ begin
   if FDataManager <> nil then
     FDataManager.Save;
 
-  TMeterValue.SaveToFile(0);
+  TMeterValue.SaveToStorage;
 end;
 
 procedure TAppServices.ResetGlobalStatics;
