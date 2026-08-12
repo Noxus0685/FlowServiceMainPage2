@@ -153,8 +153,11 @@ function AppLogName:String;
 function RenameFileWithLastWriteTime(const AFileName: string;out ANewName: string; const ADateTimeFormat: string = 'yyyymmdd"_"hhnnss'): Boolean;
 function RenameFileWithCreationTime(const AFileName: string; out ANewName: string; const ADateTimeFormat: string = 'yyyymmdd"_"hhnnss'): Boolean;
 procedure PackLogs(_LogsDir:String; _LogsExt:String='.log'; _LogsZipName:String='');
-// Updates grid data without rebuilding rows when their count is unchanged.
-procedure RefreshGridContent(AGrid: TCustomGrid; const ARowCount: Integer;
+// Changes only the number of grid rows when the requested count differs.
+procedure RefreshGridRowCount(AGrid: TCustomGrid; const ARowCount: Integer;
+  const AReason: string = 'row-count');
+// Repaints existing cells so FMX requests their current OnGetValue values.
+procedure RefreshGridValues(AGrid: TCustomGrid;
   const AReason: string = 'data-update');
 // 1. Ïîëó÷èòü MD5 ñàìîé ïðîãðàììû (èñïîëíÿåìîãî ôàéëà)
 function GetMyMD5: string;
@@ -215,28 +218,37 @@ uses
   System.DateUtils,
   System.SyncObjs;
 
-procedure RefreshGridContent(AGrid: TCustomGrid; const ARowCount: Integer;
+procedure RefreshGridRowCount(AGrid: TCustomGrid; const ARowCount: Integer;
   const AReason: string);
 var
   OldRowCount: Integer;
 begin
-  { Updates grid content and its presentation model without changing columns. }
-  if AGrid = nil then
+  { Changes row structure once and leaves all grid and column properties intact. }
+  if not Assigned(AGrid) then
     Exit;
-
   OldRowCount := AGrid.RowCount;
+  if OldRowCount = ARowCount then
+    Exit;
   AGrid.BeginUpdate;
   try
-    if OldRowCount <> ARowCount then
-      AGrid.RowCount := ARowCount
-    else if AGrid.Model <> nil then
-      AGrid.Model.ContentChanged;
+    AGrid.RowCount := ARowCount;
   finally
     AGrid.EndUpdate;
   end;
   AGrid.Repaint;
-  OutputDebugMessage(Format('GridContentRefresh Grid="%s" Rows=%d->%d Reason="%s"',
-    [AGrid.Name, OldRowCount, ARowCount, AReason]));
+  OutputDebugMessage(Format('GridStructuralRefresh Grid="%s" Reason="%s" Rows=%d->%d OldSignature="" NewSignature="" IndexChanged=0 VisibleChanged=0 ContentChanged=False',
+    [AGrid.Name, AReason, OldRowCount, ARowCount]));
+end;
+
+procedure RefreshGridValues(AGrid: TCustomGrid; const AReason: string);
+begin
+  { RAD Studio 12 has no public value-only model notification; Repaint is the
+    narrow public path that redraws existing cells and invokes OnGetValue. }
+  if not Assigned(AGrid) then
+    Exit;
+  AGrid.Repaint;
+  OutputDebugMessage(Format('GridValuesRefresh Grid="%s" Reason="%s" ContentChanged=False',
+    [AGrid.Name, AReason]));
 end;
 
 var

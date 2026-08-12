@@ -13,17 +13,17 @@ def method(text, marker, following):
 
 
 def test_refresh_helper_updates_rows_only_when_count_changes():
-    body = method(HELPER, "procedure RefreshGridContent(AGrid", "var\n  LogCriticalSection")
-    assert "if AGrid = nil then" in body
+    body = method(HELPER, "procedure RefreshGridRowCount(AGrid", "var\n  LogCriticalSection")
+    assert "if not Assigned(AGrid) then" in body
     assert "AGrid.BeginUpdate" in body
     assert "try" in body and "finally" in body and "AGrid.EndUpdate" in body
-    assert "if OldRowCount <> ARowCount then" in body
+    assert "if OldRowCount = ARowCount then" in body
     assert "AGrid.RowCount := ARowCount" in body
-    assert "AGrid.Model.ContentChanged" in body
+    assert "AGrid.Model.ContentChanged" not in body
     assert "AGrid.Repaint" in body
     for forbidden in (".Width", ".Index", ".Parent", ".Visible"):
         assert forbidden not in body
-    assert "GridContentRefresh" in body
+    assert "GridStructuralRefresh" in body
     assert "AReason" in body
 
 
@@ -37,7 +37,7 @@ def test_frequent_grids_use_content_refresh():
     for filename, grids in expected.items():
         text = (ROOT / filename).read_text(encoding="utf-8-sig")
         for grid in grids:
-            assert f"RefreshGridContent({grid}," in text
+            assert f"RefreshGridRowCount({grid}," in text and f"RefreshGridValues({grid}," in text
 
 
 def test_no_direct_rowcount_mutation_remains_outside_helper():
@@ -57,4 +57,4 @@ def test_timer_refreshes_intermediate_states_and_simulation_yields():
 
 
 def test_release_version():
-    assert "APP_VERSION = '1.0.135'" in VERSION
+    assert "APP_VERSION = '1.0.136'" in VERSION

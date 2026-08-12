@@ -26,10 +26,9 @@ def test_display_position_and_visibility_are_captured_without_width():
 def test_saved_order_is_applied_by_stable_column_name():
     apply = body("ApplyGridColumnsLayout")
     assert "SortedColumns[J].Position > Temp.Position" in apply
-    assert "SameText(AGrid.Columns[J].Name, SortedColumns[I].Name)" in apply
+    assert "SameText(AGrid.Columns[ColumnIndex].Name, AName)" in apply
     assert "Column.Index := TargetIndex" in apply
-    assert "GetResultsPointColumnIndex(Column) >= 0" in apply
-    assert "Column = StringColumnResultComment" in apply
+    assert "if (IndexChanged = 0) and (VisibleChanged = 0) then" in apply
 
 
 def test_columns_menu_uses_logical_items_not_fmx_style_children():
@@ -44,21 +43,15 @@ def test_columns_menu_uses_logical_items_not_fmx_style_children():
 
 
 def test_release_version():
-    assert "APP_VERSION = '1.0.135'" in VERSION
+    assert "APP_VERSION = '1.0.136'" in VERSION
 
 
-def test_results_point_columns_are_fixed_and_normalized_after_layout():
+def test_results_point_columns_are_dynamic_and_signature_gated():
     update = body("UpdateResultsPointColumns")
-    normalize = body("NormalizeResultsPointColumnsVisibility")
-    results = body("UpdateGridResults")
-    assert "C_RESULTS_POINT_COLUMN_COUNT" in update
-    assert "FResultsPointColumns[I].Header" in update
-    assert "FResultsPointColumns[I].Visible := True" in update
-    assert "FResultsPointColumns[I].Visible := False" in update
-    assert "ProcessingResultPointColumnLimitExceeded" in update
-    assert "FResultsPointColumns[I].Visible" in normalize
-    assert "NormalizeResultsPointColumnsVisibility" in results
-
+    assert "NewSignature = FResultsPointColumnSignature" in update
+    assert "TStringColumn.Create(GridResults)" in update
+    assert "C_RESULTS_POINT_COLUMN_COUNT" not in PROCEED
+    assert ".Width :=" not in update
 
 def test_results_grid_fixed_point_access_uses_component_index():
     get_value = body("GridResultsGetValue")

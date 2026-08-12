@@ -824,7 +824,8 @@ end;
 
 procedure TFrameMRResults.RefreshRows;
 begin
-  RefreshGridContent(GridMRResults, FRows.Count, 'mr-results');
+  RefreshGridRowCount(GridMRResults, FRows.Count, 'mr-results');
+  RefreshGridValues(GridMRResults, 'mr-results');
 end;
 
 function TFrameMRResults.GetRowChannel(const ARow: Integer): TChannel;

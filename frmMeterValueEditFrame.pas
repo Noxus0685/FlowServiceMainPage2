@@ -1324,7 +1324,8 @@ procedure TFrameMeterValueEdit.RefreshSamplesGrid(const AReload: Boolean);
 begin
   if AReload then
     RefreshDisplayedSamples;
-  RefreshGridContent(GridSamples, Length(FDisplayedSamples), 'meter-samples');
+  RefreshGridRowCount(GridSamples, Length(FDisplayedSamples), 'meter-samples');
+  RefreshGridValues(GridSamples, 'meter-samples');
 
   if GridSamples.Row >= Length(FDisplayedSamples) then
     GridSamples.Row := Length(FDisplayedSamples) - 1;

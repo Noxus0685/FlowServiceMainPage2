@@ -2487,7 +2487,8 @@ begin
   FFrameChannelProperties := nil;
   FFrameWorkTableProperties := nil;
 
-  RefreshGridContent(GridDevices, 2, 'initial-rows');
+  RefreshGridRowCount(GridDevices, 2, 'initial-rows');
+  RefreshGridValues(GridDevices, 'initial-rows');
 
   // Заполняем список через имя колонки
   PopupColumnDeviceSignal1.Items.Clear;
@@ -3549,7 +3550,6 @@ begin
   begin
     AColumns[I].Name := AGrid.Columns[I].Name;
     AColumns[I].Position := AGrid.Columns[I].Index;
-    AColumns[I].Width := AGrid.Columns[I].Width;
     AColumns[I].Visible := AGrid.Columns[I].Visible;
   end;
 end;
@@ -3562,66 +3562,55 @@ end;
 procedure TFrameMainTable.ApplyGridColumnsLayout(AGrid: TGrid;
   const AColumns: TArray<TGridColumnLayout>);
 var
-  I, J: Integer;
+  I, J, IndexChanged, VisibleChanged: Integer;
   Column: TColumn;
 begin
+  { Applies a WorkTable layout only when order or visibility really differs. }
   if (AGrid = nil) or (Length(AColumns) = 0) then
+    Exit;
+  IndexChanged := 0;
+  VisibleChanged := 0;
+  for I := 0 to High(AColumns) do
+    for J := 0 to AGrid.ColumnCount - 1 do
+      if SameText(AGrid.Columns[J].Name, AColumns[I].Name) then
+      begin
+        Column := AGrid.Columns[J];
+        if Column.Visible <> AColumns[I].Visible then
+          Inc(VisibleChanged);
+        if (AColumns[I].Position >= 0) and
+           (AColumns[I].Position < AGrid.ColumnCount) and
+           (Column.Index <> AColumns[I].Position) then
+          Inc(IndexChanged);
+        Break;
+      end;
+  if (IndexChanged = 0) and (VisibleChanged = 0) then
     Exit;
 
   AGrid.BeginUpdate;
   try
     for I := 0 to High(AColumns) do
-    begin
-      Column := nil;
       for J := 0 to AGrid.ColumnCount - 1 do
         if SameText(AGrid.Columns[J].Name, AColumns[I].Name) then
         begin
           Column := AGrid.Columns[J];
+          if Column.Visible <> AColumns[I].Visible then
+            Column.Visible := AColumns[I].Visible;
+          if (AColumns[I].Position >= 0) and
+             (AColumns[I].Position < AGrid.ColumnCount) and
+             (Column.Index <> AColumns[I].Position) then
+            Column.Index := AColumns[I].Position;
           Break;
         end;
-
-      if Column = nil then
-        Continue;
-
-      if Column.Visible <> AColumns[I].Visible then
-        Column.Visible := AColumns[I].Visible;
-      if (AColumns[I].Width > 0) and
-         (Abs(Column.Width - AColumns[I].Width) > 0.01) then
-        Column.Width := AColumns[I].Width;
-      if (AColumns[I].Position >= 0) and
-         (AColumns[I].Position < AGrid.ColumnCount) and
-         (Column.Index <> AColumns[I].Position) then
-        Column.Index := AColumns[I].Position;
-    end;
   finally
     AGrid.EndUpdate;
   end;
+  AGrid.Repaint;
 end;
 
 procedure TFrameMainTable.RefreshGridColumns(AGrid: TGrid);
-var
-  ViewportY: Single;
 begin
-  if FRefreshingGridColumns or (AGrid = nil) then
-    Exit;
-
-  FRefreshingGridColumns := True;
-  try
-    ViewportY := AGrid.ViewportPosition.Y;
-
-    AGrid.Model.BeginUpdate;
-    try
-      AGrid.Model.InvalidateContentSize;
-      AGrid.Model.ContentChanged;
-    finally
-      AGrid.Model.EndUpdate;
-    end;
-
-    AGrid.ViewportPosition := PointF(0, ViewportY);
-    AGrid.Repaint;
-  finally
-    FRefreshingGridColumns := False;
-  end;
+  { Repaints visible cells after an explicit column-menu action. }
+  RefreshGridValues(AGrid, 'column-menu');
 end;
 
 procedure TFrameMainTable.EnforceDataPointsColumnsLayout;
@@ -4119,7 +4108,8 @@ begin
 
     if Assigned(GridEtalonsN) then
     begin
-      RefreshGridContent(GridEtalonsN, WorkTable.EtalonChannels.Count, 'work-table-structure');
+      RefreshGridRowCount(GridEtalonsN, WorkTable.EtalonChannels.Count, 'work-table-structure');
+      RefreshGridValues(GridEtalonsN, 'work-table-structure');
     end;
 
     GridDevicesN := FindComponent('GridDevices' + IntToStr(I)) as TGrid;
@@ -4128,7 +4118,8 @@ begin
 
     if Assigned(GridDevicesN) then
     begin
-      RefreshGridContent(GridDevicesN, WorkTable.DeviceChannels.Count, 'work-table-structure');
+      RefreshGridRowCount(GridDevicesN, WorkTable.DeviceChannels.Count, 'work-table-structure');
+      RefreshGridValues(GridDevicesN, 'work-table-structure');
     end;
 
     if WorkTable = FActiveWorkTable then
@@ -8824,8 +8815,10 @@ begin
     SetLength(FAutoTestResultRows, Length(FAutoTestResultRows) + 1);
     FAutoTestResultRows[High(FAutoTestResultRows)] := ResultRow;
 
-    RefreshGridContent(GridAutoTestNumbers, Length(FAutoTestStepRows), 'auto-test-step');
-    RefreshGridContent(GridAutoTestResults, Length(FAutoTestResultRows), 'auto-test-result');
+    RefreshGridRowCount(GridAutoTestNumbers, Length(FAutoTestStepRows), 'auto-test-step');
+    RefreshGridValues(GridAutoTestNumbers, 'auto-test-step');
+    RefreshGridRowCount(GridAutoTestResults, Length(FAutoTestResultRows), 'auto-test-result');
+    RefreshGridValues(GridAutoTestResults, 'auto-test-result');
     if FAutoTestStatusLabel <> nil then
       FAutoTestStatusLabel.Text := FinalReason;
     RefreshAutoMeasurementTestContext;
@@ -9251,7 +9244,8 @@ begin
     end;
   end;
 
-  RefreshGridContent(GridDevices, Rows, 'device-structure');
+  RefreshGridRowCount(GridDevices, Rows, 'device-structure');
+  RefreshGridValues(GridDevices, 'device-structure');
 
   UpdateFlowMeterPropertiesFrame(Row);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -9383,7 +9377,8 @@ begin
     end;
 
 
-  RefreshGridContent(GridDevices, Rows, 'device-structure');
+  RefreshGridRowCount(GridDevices, Rows, 'device-structure');
+  RefreshGridValues(GridDevices, 'device-structure');
 
   UpdateFlowMeterPropertiesFrame(Row);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -9917,7 +9912,8 @@ begin
     end;
   end;
 
-  RefreshGridContent(GridEtalons, Rows, 'etalon-structure');
+  RefreshGridRowCount(GridEtalons, Rows, 'etalon-structure');
+  RefreshGridValues(GridEtalons, 'etalon-structure');
 
   UpdateFlowMeterPropertiesFrame(Row, True);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -9970,7 +9966,8 @@ begin
     end;
 
 
-  RefreshGridContent(GridEtalons, Rows, 'etalon-structure');
+  RefreshGridRowCount(GridEtalons, Rows, 'etalon-structure');
+  RefreshGridValues(GridEtalons, 'etalon-structure');
 
   UpdateFlowMeterPropertiesFrame(Row, True);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
@@ -10228,7 +10225,8 @@ end;
  procedure TFrameMainTable.UpdateGridDevices;
 begin
   { Повторно запрашивает значения строк без изменения их структуры. }
-  RefreshGridContent(GridDevices, GridDevices.RowCount, 'device-values');
+  RefreshGridRowCount(GridDevices, GridDevices.RowCount, 'device-values');
+  RefreshGridValues(GridDevices, 'device-values');
 end;
 
 procedure TFrameMainTable.UpdateGrids;
@@ -10246,8 +10244,10 @@ begin
     DeviceRows := WT.DeviceChannels.Count;
     EtalonRows := WT.EtalonChannels.Count;
   end;
-  RefreshGridContent(GridDevices, DeviceRows, 'channel-values');
-  RefreshGridContent(GridEtalons, EtalonRows, 'channel-values');
+  RefreshGridRowCount(GridDevices, DeviceRows, 'channel-values');
+  RefreshGridValues(GridDevices, 'channel-values');
+  RefreshGridRowCount(GridEtalons, EtalonRows, 'channel-values');
+  RefreshGridValues(GridEtalons, 'channel-values');
 end;
 
 procedure TFrameMainTable.GridEtalonsSetValue(Sender: TObject;

@@ -310,7 +310,8 @@ procedure TFormMeterValues.UpdateStringGridDimensions;
 var
   I: Integer;
 begin
-  RefreshGridContent(StringGridDimensions, MeterValue.Dimensions.Count, 'dimensions');
+  RefreshGridRowCount(StringGridDimensions, MeterValue.Dimensions.Count, 'dimensions');
+  RefreshGridValues(StringGridDimensions, 'dimensions');
   StringGridDimensions.BeginUpdate;
   try
     if MeterValue.Dimensions.Count > 0 then
@@ -346,11 +347,12 @@ begin
   FlowMeter := FindOwnerFlowMeter;
   ReferenceTable := FindTableByType(FlowMeter, cctReference);
   if (ReferenceTable <> nil) and (ReferenceTable.Items <> nil) then
-    RefreshGridContent(StringGridCoefsData, ReferenceTable.Items.Count, 'coef-data')
+    RefreshGridRowCount(StringGridCoefsData, ReferenceTable.Items.Count, 'coef-data')
   else if FlowMeter = nil then
-    RefreshGridContent(StringGridCoefsData, MeterValue.Coefs.Count, 'coef-data')
+    RefreshGridRowCount(StringGridCoefsData, MeterValue.Coefs.Count, 'coef-data')
   else
-    RefreshGridContent(StringGridCoefsData, 0, 'coef-data');
+    RefreshGridRowCount(StringGridCoefsData, 0, 'coef-data');
+    RefreshGridValues(StringGridCoefsData, 'coef-data');
 
   StringGridCoefsData.BeginUpdate;
   try
@@ -425,7 +427,8 @@ procedure TFormMeterValues.UpdateStringGridCoefs;
 var
   I: Integer;
 begin
-  RefreshGridContent(StringGridCoefs, MeterValue.Coefs.Count, 'coefs');
+  RefreshGridRowCount(StringGridCoefs, MeterValue.Coefs.Count, 'coefs');
+  RefreshGridValues(StringGridCoefs, 'coefs');
   StringGridCoefs.BeginUpdate;
   try
     if MeterValue.Coefs.Count > 0 then
@@ -902,9 +905,10 @@ var
 begin
   Index := -1;
   if FFilteredValues <> nil then
-    RefreshGridContent(StringGridValuesList, FFilteredValues.Count, 'values')
+    RefreshGridRowCount(StringGridValuesList, FFilteredValues.Count, 'values')
   else
-    RefreshGridContent(StringGridValuesList, 0, 'values');
+    RefreshGridRowCount(StringGridValuesList, 0, 'values');
+    RefreshGridValues(StringGridValuesList, 'values');
 
   StringGridValuesList.BeginUpdate;
   try

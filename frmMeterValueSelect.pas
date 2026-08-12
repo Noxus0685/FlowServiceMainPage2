@@ -211,7 +211,8 @@ var
   I: Integer;
 begin
   ApplyFilter;
-  RefreshGridContent(StringGridValuesList, FFilteredValues.Count, 'meter-value-filter');
+  RefreshGridRowCount(StringGridValuesList, FFilteredValues.Count, 'meter-value-filter');
+  RefreshGridValues(StringGridValuesList, 'meter-value-filter');
   StringGridValuesList.BeginUpdate;
   try
     StringGridValuesList.Tag := 1;

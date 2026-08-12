@@ -159,26 +159,6 @@ type
     StringColumnResultName: TStringColumn;
     StringColumnResultType: TStringColumn;
     StringColumnResultSerial: TStringColumn;
-    StringColumnPointNum1: TStringColumn;
-    StringColumnPointNum2: TStringColumn;
-    StringColumnPointNum3: TStringColumn;
-    StringColumnPointNum4: TStringColumn;
-    StringColumnPointNum5: TStringColumn;
-    StringColumnPointNum6: TStringColumn;
-    StringColumnPointNum7: TStringColumn;
-    StringColumnPointNum8: TStringColumn;
-    StringColumnPointNum9: TStringColumn;
-    StringColumnPointNum10: TStringColumn;
-    StringColumnPointNum11: TStringColumn;
-    StringColumnPointNum12: TStringColumn;
-    StringColumnPointNum13: TStringColumn;
-    StringColumnPointNum14: TStringColumn;
-    StringColumnPointNum15: TStringColumn;
-    StringColumnPointNum16: TStringColumn;
-    StringColumnPointNum17: TStringColumn;
-    StringColumnPointNum18: TStringColumn;
-    StringColumnPointNum19: TStringColumn;
-    StringColumnPointNum20: TStringColumn;
     StringColumnResult: TStringColumn;
     StringColumnResultComment: TStringColumn;
     MemoLog: TMemo;
@@ -308,14 +288,11 @@ type
     function BuildSpillageCommentText(ASpillage: TPointSpillage): string;
     function GetSpillageErrorResultColor(ASpillage: TPointSpillage): TAlphaColor;
     function ResolveDeviceSummaryStatus(ADevice: TDevice): Integer;
-    // Синхронизирует видимость двадцати фиксированных point-колонок с результатами.
-    procedure NormalizeResultsPointColumnsVisibility;
-    // Формирует массив ссылок на двадцать фиксированных компонентов point-колонок.
-    procedure InitializeResultsPointColumns;
-    // Возвращает индекс фиксированной point-колонки или -1.
     function GetResultsPointColumnIndex(AColumn: TColumn): Integer;
-    // Заполняет заголовки и переключает видимость двадцати фиксированных колонок.
+    // Перестраивает динамические point-колонки только при изменении их сигнатуры.
     procedure UpdateResultsPointColumns;
+    // Один раз настраивает оба грида результатов после загрузки FMX-ресурса.
+    procedure InitializeResultsGrid;
     function FindResultPointForColumn(ADevice: TDevice; const AColumn: TProceedResultPointColumn): TDevicePoint;
     // Проверяет принадлежность сохранённой проливки merged-колонке Summary по расходу и признакам эталона; не зависит от TMeasurementRun.Points.
     function IsProcessingSpillageInMergedColumn(ASpillage: TPointSpillage; const AColumn: TProceedResultPointColumn): Boolean;
@@ -453,7 +430,10 @@ type
     FCurrentResultRows: TArray<TResultGridRow>;
     FCurrentSpillages: TArray<TPointSpillage>;
     FResultPointColumns: TArray<TProceedResultPointColumn>;
-    FResultsPointColumns: array[0..C_RESULTS_POINT_COLUMN_COUNT - 1] of TStringColumn;
+    FResultsPointColumns: TObjectList<TStringColumn>;
+    FResultsPointColumnSignature: string;
+    FResultsGridInitialized: Boolean;
+    FResultsGridUpdateCount: Int64;
     FActiveWorkTable: TWorkTable;
     FSessionDevice: TFlowMeter;
     FSessionEtalon: TFlowMeter;
@@ -613,6 +593,7 @@ begin
   FreeAndNil(FProcessingDevices);
   FreeAndNil(FManualProcessingDeviceUUIDs);
   FreeAndNil(FPendingRemovedProcessingUUIDs);
+  FreeAndNil(FResultsPointColumns);
   FreeAndNil(FChartPointColors);
   FreeAndNil(FChartLineColors);
   FreeAndNil(FChartDeviceVisibility);
@@ -623,9 +604,9 @@ procedure TFrameProceed.Initialize;
 var
   UnitName: string;
 begin
-  InitializeResultsPointColumns;
   FWorkTableManager := WorkTableManager;
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
+  InitializeResultsGrid;
 
   if FProcessingDevices = nil then
     FProcessingDevices := TObjectList<TDevice>.Create(False);
@@ -1566,16 +1547,24 @@ end;
 procedure TFrameProceed.ApplyGridColumnsLayout(AGrid: TGrid;
   const AColumns: TArray<TGridColumnLayout>);
 var
-  I, J, TargetIndex: Integer;
+  I, J, TargetIndex, IndexChanged, VisibleChanged: Integer;
   Column: TColumn;
   SortedColumns: TArray<TGridColumnLayout>;
   Temp: TGridColumnLayout;
+
+  function FindColumn(const AName: string): TColumn;
+  var
+    ColumnIndex: Integer;
+  begin
+    Result := nil;
+    for ColumnIndex := 0 to AGrid.ColumnCount - 1 do
+      if SameText(AGrid.Columns[ColumnIndex].Name, AName) then
+        Exit(AGrid.Columns[ColumnIndex]);
+  end;
 begin
+  { Applies persisted order/visibility only when a real layout difference exists. }
   if (AGrid = nil) or (Length(AColumns) = 0) then
     Exit;
-
-  // Work on a copy: the WorkTable array remains in its persisted form. FMX
-  // receives columns in ascending visual Position order.
   SortedColumns := Copy(AColumns, 0, Length(AColumns));
   for I := 1 to High(SortedColumns) do
   begin
@@ -1589,71 +1578,46 @@ begin
     SortedColumns[J + 1] := Temp;
   end;
 
+  IndexChanged := 0;
+  VisibleChanged := 0;
+  for I := 0 to High(SortedColumns) do
+  begin
+    Column := FindColumn(SortedColumns[I].Name);
+    if Column = nil then
+      Continue;
+    TargetIndex := EnsureRange(SortedColumns[I].Position, 0,
+      AGrid.ColumnCount - 1);
+    if Column.Index <> TargetIndex then
+      Inc(IndexChanged);
+    if Column.Visible <> SortedColumns[I].Visible then
+      Inc(VisibleChanged);
+  end;
+  if (IndexChanged = 0) and (VisibleChanged = 0) then
+    Exit;
+
   FApplyingGridColumnsLayout := True;
   AGrid.BeginUpdate;
   try
     for I := 0 to High(SortedColumns) do
     begin
-      Column := nil;
-      // Name is the persistent identity: the current index changes when a user
-      // moves a column and therefore cannot identify it on the next form open.
-      for J := 0 to AGrid.ColumnCount - 1 do
-        if SameText(AGrid.Columns[J].Name, SortedColumns[I].Name) then
-        begin
-          Column := AGrid.Columns[J];
-          Break;
-        end;
+      Column := FindColumn(SortedColumns[I].Name);
       if Column = nil then
         Continue;
-      // Фиксированные point-колонки и итоговые колонки сохраняют ресурсный порядок.
-      if (AGrid = GridResults) and
-         ((GetResultsPointColumnIndex(Column) >= 0) or
-          (Column = StringColumnResult) or
-          (Column = StringColumnResultComment)) then
-        Continue;
-
       if Column.Visible <> SortedColumns[I].Visible then
         Column.Visible := SortedColumns[I].Visible;
-    end;
-
-    for I := 0 to High(SortedColumns) do
-    begin
       TargetIndex := EnsureRange(SortedColumns[I].Position, 0,
         AGrid.ColumnCount - 1);
-      Column := nil;
-      for J := 0 to AGrid.ColumnCount - 1 do
-        if SameText(AGrid.Columns[J].Name, SortedColumns[I].Name) then
-        begin
-          Column := AGrid.Columns[J];
-          Break;
-        end;
-      if Column = nil then
-        Continue;
-      // Не переставляем фиксированный блок результатов во время выполнения.
-      if (AGrid = GridResults) and
-         ((GetResultsPointColumnIndex(Column) >= 0) or
-          (Column = StringColumnResult) or
-          (Column = StringColumnResultComment)) then
-        Continue;
-
-      // Index is the standard FMX column move mechanism and triggers the grid
-      // model's normal reindexing. Suppress the resulting save callback while
-      // the complete saved order is still being restored.
       if Column.Index <> TargetIndex then
         Column.Index := TargetIndex;
-      if Assigned(ProtocolManager) then
-        ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutLoaded',
-          'Загружена раскладка столбца',
-          Format('GridName=%s; ColumnName=%s; SavedPosition=%d; AppliedPosition=%d',
-            [AGrid.Name, Column.Name, SortedColumns[I].Position, Column.Index]));
     end;
   finally
     AGrid.EndUpdate;
     FApplyingGridColumnsLayout := False;
   end;
   AGrid.Repaint;
+  OutputDebugMessage(Format('GridStructuralRefresh Grid="%s" Reason="saved-layout" Rows=%d->%d OldSignature="" NewSignature="" IndexChanged=%d VisibleChanged=%d ContentChanged=False',
+    [AGrid.Name, AGrid.RowCount, AGrid.RowCount, IndexChanged, VisibleChanged]));
 end;
-
 
 procedure TFrameProceed.SaveLayoutSettingsToWorkTable;
 var
@@ -4167,97 +4131,88 @@ begin
   end;
 end;
 
-procedure TFrameProceed.InitializeResultsPointColumns;
+procedure TFrameProceed.InitializeResultsGrid;
 begin
-  { Формирует массив ссылок на двадцать фиксированных компонентов point-колонок. }
-  FResultsPointColumns[0] := StringColumnPointNum1;
-  FResultsPointColumns[1] := StringColumnPointNum2;
-  FResultsPointColumns[2] := StringColumnPointNum3;
-  FResultsPointColumns[3] := StringColumnPointNum4;
-  FResultsPointColumns[4] := StringColumnPointNum5;
-  FResultsPointColumns[5] := StringColumnPointNum6;
-  FResultsPointColumns[6] := StringColumnPointNum7;
-  FResultsPointColumns[7] := StringColumnPointNum8;
-  FResultsPointColumns[8] := StringColumnPointNum9;
-  FResultsPointColumns[9] := StringColumnPointNum10;
-  FResultsPointColumns[10] := StringColumnPointNum11;
-  FResultsPointColumns[11] := StringColumnPointNum12;
-  FResultsPointColumns[12] := StringColumnPointNum13;
-  FResultsPointColumns[13] := StringColumnPointNum14;
-  FResultsPointColumns[14] := StringColumnPointNum15;
-  FResultsPointColumns[15] := StringColumnPointNum16;
-  FResultsPointColumns[16] := StringColumnPointNum17;
-  FResultsPointColumns[17] := StringColumnPointNum18;
-  FResultsPointColumns[18] := StringColumnPointNum19;
-  FResultsPointColumns[19] := StringColumnPointNum20;
+  { Performs the one-time FMX presentation setup outside frequent data refreshes. }
+  if FResultsGridInitialized then
+    Exit;
+  FResultsPointColumns := TObjectList<TStringColumn>.Create(False);
+  if GridDataPoints <> nil then
+  begin
+    GridResults.Options := GridDataPoints.Options;
+    GridResults.RowHeight := GridDataPoints.RowHeight;
+    GridResults.StyleLookup := GridDataPoints.StyleLookup;
+  end;
+  SetGridReadOnly(GridResults);
+  SetGridReadOnly(GridDataPoints);
+  if FActiveWorkTable <> nil then
+  begin
+    ApplyGridColumnsLayout(GridResults, FActiveWorkTable.ResultsGridColumns);
+    ApplyGridColumnsLayout(GridDataPoints, FActiveWorkTable.DataPointsGridColumns);
+  end;
+  FResultsGridInitialized := True;
 end;
 
 function TFrameProceed.GetResultsPointColumnIndex(AColumn: TColumn): Integer;
-var
-  I: Integer;
 begin
-  { Возвращает индекс фиксированной point-колонки или -1 для другой колонки. }
+  { Returns the current dynamic point-column index without using display text. }
   Result := -1;
-  for I := 0 to C_RESULTS_POINT_COLUMN_COUNT - 1 do
-    if FResultsPointColumns[I] = AColumn then
-      Exit(I);
-end;
-
-procedure TFrameProceed.NormalizeResultsPointColumnsVisibility;
-var
-  I, VisiblePointCount: Integer;
-begin
-  { Синхронизирует только видимость двадцати фиксированных point-колонок. }
-  VisiblePointCount := Min(Length(FResultPointColumns),
-    C_RESULTS_POINT_COLUMN_COUNT);
-  for I := 0 to C_RESULTS_POINT_COLUMN_COUNT - 1 do
-    if FResultsPointColumns[I] <> nil then
-      FResultsPointColumns[I].Visible := I < VisiblePointCount;
+  if (AColumn is TStringColumn) and (FResultsPointColumns <> nil) then
+    Result := FResultsPointColumns.IndexOf(TStringColumn(AColumn));
 end;
 
 procedure TFrameProceed.UpdateResultsPointColumns;
 var
-  I, VisiblePointCount: Integer;
-
-  function FormatPointHeader(const APointName: string): string;
-  begin
-    { Формирует штатный заголовок результата по метрологической точке. }
-    Result := #948 + '(' + APointName + '), %';
-  end;
+  I: Integer;
+  Column: TStringColumn;
+  NewSignature, Key, HeaderText: string;
 begin
-  { Заполняет и переключает видимость двадцати фиксированных point-колонок. }
-  VisiblePointCount := Min(Length(FResultPointColumns),
-    C_RESULTS_POINT_COLUMN_COUNT);
-
-  if (Length(FResultPointColumns) > C_RESULTS_POINT_COLUMN_COUNT) and
-     Assigned(ProtocolManager) then
-    ProtocolManager.AddMessage(pcError, psForm,
-      'ProcessingResultPointColumnLimitExceeded',
-      'Превышено количество колонок точек результатов',
-      Format('ActualCount=%d; Limit=%d',
-        [Length(FResultPointColumns), C_RESULTS_POINT_COLUMN_COUNT]));
+  { Rebuilds point columns only when their stable UUID/order signature changes. }
+  NewSignature := '';
+  for I := 0 to High(FResultPointColumns) do
+  begin
+    Key := LowerCase(Trim(FResultPointColumns[I].DeviceUUID)) + '|' +
+      LowerCase(Trim(FResultPointColumns[I].SourcePointUUID)) + '|' +
+      LowerCase(Trim(FResultPointColumns[I].EtalonUUID)) + '|' +
+      FloatToStr(FResultPointColumns[I].TargetFlow) + '|' +
+      BoolToStr(FResultPointColumns[I].IsMerged, True) + '|' +
+      FResultPointColumns[I].Header;
+    NewSignature := NewSignature + IntToStr(Length(Key)) + ':' + Key + ';';
+  end;
+  if NewSignature = FResultsPointColumnSignature then
+    Exit;
 
   GridResults.BeginUpdate;
   try
-    for I := 0 to C_RESULTS_POINT_COLUMN_COUNT - 1 do
-      if FResultsPointColumns[I] <> nil then
-      begin
-        if I < VisiblePointCount then
-        begin
-          FResultsPointColumns[I].Header :=
-            FormatPointHeader(FResultPointColumns[I].Header);
-          FResultsPointColumns[I].Tag := I;
-          FResultsPointColumns[I].Visible := True;
-        end
-        else
-        begin
-          FResultsPointColumns[I].Tag := -1;
-          FResultsPointColumns[I].Visible := False;
-        end;
-      end;
+    if FResultsPointColumns <> nil then
+    begin
+      for I := FResultsPointColumns.Count - 1 downto 0 do
+        FResultsPointColumns[I].Free;
+      FResultsPointColumns.Clear;
+    end;
+    for I := 0 to High(FResultPointColumns) do
+    begin
+      Column := TStringColumn.Create(GridResults);
+      Column.Parent := GridResults;
+      Column.Name := 'ResultPointColumn' + IntToStr(I + 1);
+      Column.Tag := I;
+      HeaderText := #948 + '(' + FResultPointColumns[I].Header + '), %';
+      if Column.Header <> HeaderText then
+        Column.Header := HeaderText;
+      Column.HeaderSettings.TextSettings.Trimming := TTextTrimming.Character;
+      Column.HeaderSettings.TextSettings.WordWrap := False;
+      Column.HeaderSettings.TextSettings.HorzAlign := TTextAlign.Center;
+      Column.Index := StringColumnResult.Index;
+      FResultsPointColumns.Add(Column);
+    end;
+    StringColumnResult.Index := GridResults.ColumnCount - 2;
+    StringColumnResultComment.Index := GridResults.ColumnCount - 1;
+    FResultsPointColumnSignature := NewSignature;
   finally
     GridResults.EndUpdate;
   end;
+  OutputDebugMessage(Format('GridStructuralRefresh Grid="%s" Reason="point-signature" Rows=%d->%d OldSignature="changed" NewSignature="%s" IndexChanged=0 VisibleChanged=0 ContentChanged=False',
+    [GridResults.Name, GridResults.RowCount, GridResults.RowCount, NewSignature]));
 end;
 
 function TFrameProceed.FindResultSpillageForPoint(ADevice: TDevice;
@@ -4385,8 +4340,6 @@ begin
   finally
     Devices.Free;
   end;
-  UpdateGridResults
-
 end;
 procedure TFrameProceed.ShowDevicesResults(const ADevices: TList<TDevice>);
 var
@@ -4632,47 +4585,43 @@ begin
 end;
 procedure TFrameProceed.UpdateGridResults;
 var
-  I, VisibleColumnCount: Integer;
+  PreviousRow, NewRow, I, VisibleColumnCount: Integer;
+  ModeChanged, SelectionChanged: Boolean;
 begin
-  FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
-  GridResults.BeginUpdate;
-  try
-    if GridDataPoints <> nil then
-    begin
-      GridResults.Options := GridDataPoints.Options;
-      GridResults.RowHeight := GridDataPoints.RowHeight;
-      GridResults.StyleLookup := GridDataPoints.StyleLookup;
-    end;
-  finally
-    GridResults.EndUpdate;
-  end;
-
-  RefreshGridContent(GridResults, Length(FCurrentResultRows), 'results-data');
+  { Refreshes result rows and values without touching grid presentation or columns. }
+  Inc(FResultsGridUpdateCount);
+  PreviousRow := GridResults.Row;
+  RefreshGridRowCount(GridResults, Length(FCurrentResultRows), 'results-data');
+  RefreshGridValues(GridResults, 'results-data');
   ButtonExportExcel.Enabled := GridResults.RowCount > 0;
   if Length(FCurrentResultRows) = 0 then
-    GridResults.Row := -1
-  else if (GridResults.Row < 0) or (GridResults.Row >= Length(FCurrentResultRows)) then
-    GridResults.Row := 0;
+    NewRow := -1
+  else if (PreviousRow < 0) or (PreviousRow >= Length(FCurrentResultRows)) then
+    NewRow := 0
+  else
+    NewRow := PreviousRow;
+  SelectionChanged := NewRow <> PreviousRow;
+  if SelectionChanged then
+    GridResults.Row := NewRow;
 
-  GridResults.Repaint;
-  GridResultsSelChanged(GridResults);
+  ModeChanged := (not GridResults.Visible) or GridDataPoints.Visible;
+  if ModeChanged then
+  begin
+    GridResults.Visible := True;
+    GridDataPoints.Visible := False;
+  end;
+  if SelectionChanged then
+    GridResultsSelChanged(GridResults);
 
-  GridResults.Visible := True;
-  GridDataPoints.Visible := False;
-  // Data and all named columns now exist, so no later default population can
-  // overwrite the persisted order, width or visibility.
-  if FActiveWorkTable <> nil then
-    ApplyGridColumnsLayout(GridResults, FActiveWorkTable.ResultsGridColumns);
-  NormalizeResultsPointColumnsVisibility;
-  SetGridReadOnly(GridResults);
   UpdateActionHints;
   VisibleColumnCount := 0;
   for I := 0 to GridResults.ColumnCount - 1 do
     if GridResults.Columns[I].Visible then
       Inc(VisibleColumnCount);
-  LogProceedGridContext('Summary', nil, nil, GridResults.RowCount,
-    VisibleColumnCount);
+  LogProceedGridContext('SummaryRefresh=' + IntToStr(FResultsGridUpdateCount),
+    nil, nil, GridResults.RowCount, VisibleColumnCount);
 end;
+
 procedure TFrameProceed.UpdateGridDataPoints;
 var
   I, Count: Integer;
@@ -4689,15 +4638,14 @@ begin
   SetLength(FCurrentSpillages, Count);
   SortProcessingDataByDate;
 
-  RefreshGridContent(GridDataPoints, Length(FCurrentSpillages), 'data-points');
-  GridResults.Visible := False;
-  GridDataPoints.Visible := True;
+  RefreshGridRowCount(GridDataPoints, Length(FCurrentSpillages), 'data-points');
+  RefreshGridValues(GridDataPoints, 'data-points');
+  if GridResults.Visible or (not GridDataPoints.Visible) then
+  begin
+    GridResults.Visible := False;
+    GridDataPoints.Visible := True;
+  end;
   ButtonExportExcel.Enabled := GridDataPoints.RowCount > 0;
-  // Restore through the existing WorkTable layout only after rows and headers
-  // have been populated.
-  if FActiveWorkTable <> nil then
-    ApplyGridColumnsLayout(GridDataPoints, FActiveWorkTable.DataPointsGridColumns);
-  SetGridReadOnly(GridDataPoints);
   UpdateActionHints;
   LogProceedGridContext('Measurements', ResolveSelectedDevice, FCurrentSession,
     GridDataPoints.RowCount, GridDataPoints.ColumnCount);
@@ -5624,11 +5572,14 @@ begin
     LabelSessionActive.Text := '';
 
   if GridResults <> nil then
-    RefreshGridContent(GridResults, 0, 'clear-results');
+    RefreshGridRowCount(GridResults, 0, 'clear-results');
+    RefreshGridValues(GridResults, 'clear-results');
   if GridDataPoints <> nil then
-    RefreshGridContent(GridDataPoints, 0, 'clear-data-points');
+    RefreshGridRowCount(GridDataPoints, 0, 'clear-data-points');
+    RefreshGridValues(GridDataPoints, 'clear-data-points');
   if GridCoefs <> nil then
-    RefreshGridContent(GridCoefs, 0, 'clear-coefs');
+    RefreshGridRowCount(GridCoefs, 0, 'clear-coefs');
+    RefreshGridValues(GridCoefs, 'clear-coefs');
   if Chart1 <> nil then
     Chart1.ClearAllSeries;
 

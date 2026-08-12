@@ -151,28 +151,11 @@ def test_fmx_remains_ascii_safe():
     FMX_BYTES.decode("ascii")
 
 
-def test_grid_model_and_viewport_are_refreshed_after_structural_changes():
+def test_refresh_grid_columns_repaints_without_structural_invalidation():
     body = procedure_body("RefreshGridColumns")
-    assert "FRefreshingGridColumns or (AGrid = nil)" in body
-    assert "ViewportY := AGrid.ViewportPosition.Y;" in body
-    assert "AGrid.Model.BeginUpdate;" in body
-    assert "AGrid.Model.InvalidateContentSize;" in body
-    assert "AGrid.Model.ContentChanged;" in body
-    assert "AGrid.Model.EndUpdate;" in body
-    assert "AGrid.ViewportPosition := PointF(0, ViewportY);" in body
-    assert "AGrid.Repaint;" in body
-    assert "AGrid.Realign" not in body
-    assert body.index("AGrid.Model.InvalidateContentSize;") < body.index("AGrid.Model.ContentChanged;")
-    assert body.index("AGrid.Model.ContentChanged;") < body.index("AGrid.ViewportPosition := PointF(0, ViewportY);")
-
-    load = procedure_body("LoadLayoutSettingsFromWorkTable")
-    for grid in ("GridEtalons", "GridDevices", "FFrameProceed.GridDataPoints", "FFrameProceed.GridResults"):
-        apply = f"ApplyGridColumnsLayout({grid},"
-        refresh = f"RefreshGridColumns({grid});"
-        assert apply in load
-        assert refresh in load
-        assert load.index(apply) < load.index(refresh)
-
+    assert "RefreshGridValues(AGrid, 'column-menu')" in body
+    assert "InvalidateContentSize" not in body
+    assert "Model.ContentChanged" not in body
 
 def test_model_refresh_is_not_called_from_hot_grid_callbacks():
     for callback in ("GridDevicesGetValue", "GridEtalonsGetValue", "GridDevicesDrawColumnCell",

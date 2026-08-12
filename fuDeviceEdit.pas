@@ -1744,9 +1744,10 @@ begin
   Table := GetSelectedCalibrCoefTable;
 
   if Table <> nil then
-    RefreshGridContent(FGridCoefs, Table.Items.Count, 'device-coefs')
+    RefreshGridRowCount(FGridCoefs, Table.Items.Count, 'device-coefs')
   else
-    RefreshGridContent(FGridCoefs, 0, 'device-coefs');
+    RefreshGridRowCount(FGridCoefs, 0, 'device-coefs');
+    RefreshGridValues(FGridCoefs, 'device-coefs');
 end;
 
 function TFormDeviceEditor.GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;
@@ -4303,7 +4304,8 @@ begin
     if FDevice.Points[i].State <> osDeleted then
       Inc(VisibleCount);
 
-  RefreshGridContent(GridPoints, VisibleCount, 'device-points');
+  RefreshGridRowCount(GridPoints, VisibleCount, 'device-points');
+  RefreshGridValues(GridPoints, 'device-points');
 
   { корректировка текущей строки }
   if GridPoints.Row >= GridPoints.RowCount then

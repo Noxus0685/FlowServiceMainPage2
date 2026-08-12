@@ -486,7 +486,8 @@ begin
   if ActiveRepo = nil then
   begin
     TreeViewTypes.Clear;
-    RefreshGridContent(GridTypes, 0, 'type-filter');
+    RefreshGridRowCount(GridTypes, 0, 'type-filter');
+    RefreshGridValues(GridTypes, 'type-filter');
     Exit;
   end;
 
@@ -1775,9 +1776,10 @@ begin
         FCheckedTypes.Delete(I);
 
   if FDevFilteredTypes <> nil then
-    RefreshGridContent(GridTypes, FDevFilteredTypes.Count, 'type-filter')
+    RefreshGridRowCount(GridTypes, FDevFilteredTypes.Count, 'type-filter')
   else
-    RefreshGridContent(GridTypes, 0, 'type-filter');
+    RefreshGridRowCount(GridTypes, 0, 'type-filter');
+    RefreshGridValues(GridTypes, 'type-filter');
 
   if (GridTypes.Row >= GridTypes.RowCount) then
     GridTypes.Row := -1;

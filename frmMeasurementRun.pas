@@ -713,7 +713,8 @@ begin
   SelectedRow := GridMeasurmentRun.Row;
   UpdateStopCriteriaColumns;
 
-  RefreshGridContent(GridMeasurmentRun, Rows, 'measurement-run');
+  RefreshGridRowCount(GridMeasurmentRun, Rows, 'measurement-run');
+  RefreshGridValues(GridMeasurmentRun, 'measurement-run');
 
   if Rows = 0 then
     GridMeasurmentRun.Row := -1

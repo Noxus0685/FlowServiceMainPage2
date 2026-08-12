@@ -1490,7 +1490,8 @@ begin
       Inc(VisibleCount);
     end;
 
-  RefreshGridContent(GridDiameters, VisibleCount, 'type-diameters');
+  RefreshGridRowCount(GridDiameters, VisibleCount, 'type-diameters');
+  RefreshGridValues(GridDiameters, 'type-diameters');
   if VisibleCount <= 0 then
     GridDiameters.Row := -1
   else if PrevRow < 0 then
@@ -1577,7 +1578,8 @@ begin
     if (P <> nil) and (P.State <> osDeleted) then
       Inc(VisibleCount);
 
-  RefreshGridContent(GridPoints, VisibleCount, 'type-points');
+  RefreshGridRowCount(GridPoints, VisibleCount, 'type-points');
+  RefreshGridValues(GridPoints, 'type-points');
 end;
 
 procedure TFormTypeEditor.UpdateCoefsGrid;
@@ -1585,7 +1587,8 @@ begin
   if FGridCoefs = nil then
     Exit;
 
-  RefreshGridContent(FGridCoefs, FCalibrCoefItemsLocal.Count, 'type-coefs');
+  RefreshGridRowCount(FGridCoefs, FCalibrCoefItemsLocal.Count, 'type-coefs');
+  RefreshGridValues(FGridCoefs, 'type-coefs');
 end;
 
 function TFormTypeEditor.GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;

@@ -762,7 +762,8 @@ begin
   begin
     DebugLog('DBG 2012'#13#10'DeviceSelect.BuildTree before TreeViewDevices.Clear');
     TreeViewDevices.Clear;
-    RefreshGridContent(GridDevices, 0, 'device-filter');
+    RefreshGridRowCount(GridDevices, 0, 'device-filter');
+    RefreshGridValues(GridDevices, 'device-filter');
     DebugLog('DBG 2013'#13#10'DeviceSelect.BuildTree EXIT');
     Exit;
   end;
@@ -1722,9 +1723,10 @@ begin
         FCheckedDevices.Delete(I);
 
   if FDevFilteredDevices <> nil then
-    RefreshGridContent(GridDevices, FDevFilteredDevices.Count, 'device-filter')
+    RefreshGridRowCount(GridDevices, FDevFilteredDevices.Count, 'device-filter')
   else
-    RefreshGridContent(GridDevices, 0, 'device-filter');
+    RefreshGridRowCount(GridDevices, 0, 'device-filter');
+    RefreshGridValues(GridDevices, 'device-filter');
 
   if (GridDevices.Row < 0) or (GridDevices.Row >= GridDevices.RowCount) then
     GridDevices.Row := -1;

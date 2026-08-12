@@ -543,9 +543,10 @@ end;
 procedure TFrameCalibrCoefs.UpdateGrid;
 begin
   if (FCurrentTable <> nil) and (FCurrentTable.Items <> nil) then
-    RefreshGridContent(GridCoefs, FCurrentTable.Items.Count, 'calibration-coefs')
+    RefreshGridRowCount(GridCoefs, FCurrentTable.Items.Count, 'calibration-coefs')
   else
-    RefreshGridContent(GridCoefs, 0, 'calibration-coefs');
+    RefreshGridRowCount(GridCoefs, 0, 'calibration-coefs');
+    RefreshGridValues(GridCoefs, 'calibration-coefs');
 end;
 
 function TFrameCalibrCoefs.InitErrorPercent(AItem: TCalibrCoefItem): Double;
