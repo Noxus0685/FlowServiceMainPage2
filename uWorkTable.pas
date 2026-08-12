@@ -20,6 +20,7 @@ uses
   uMeterValue,
   uObservable,
   uParameter,
+  uProjectSettings,
   uProtocols,
   uRepositories,
   uSyncSetup;
@@ -3457,7 +3458,7 @@ var
 
   procedure RemoveMeterValue(AMeterValue: TMeterValue);
   begin
-    // Запоминаем Hash: по этому списку затем физически чистится MeterValues.ini.
+    // Запоминаем Hash: по этому списку затем очищается хранилище MeterValues.
     if AMeterValue <> nil then
     begin
       if (ADeletedHashes <> nil) and (Trim(AMeterValue.Hash) <> '') and
@@ -5097,18 +5098,17 @@ begin
   UpdateFlowRateLimitsByEtalons;
 end;
 
-{ Saves work table list, channels, and meter values to INI files. }
+{ Сохраняет рабочие столы и их значения в setting.fpp. }
 class procedure TWorkTable.Save(const AIniFileName: string;
   AWorkTables: TObjectList<TWorkTable>);
 var
-  Ini: TMemIniFile;
-  ValuesIni: TMemIniFile;
+  Ini: TCustomIniFile;
+  ValuesIni: TCustomIniFile;
   I: Integer;
   WorkTable: TWorkTable;
   Section: string;
-  WorkTableValuesFileName: string;
 
-  procedure ClearOldWorkTableSections(AIni: TMemIniFile);
+  procedure ClearOldWorkTableSections(AIni: TCustomIniFile);
   var
     Sections: TStringList;
     J: Integer;
@@ -5137,9 +5137,8 @@ begin
   if (AIniFileName = '') or (AWorkTables = nil) then
     Exit;
 
-  Ini := TMemIniFile.Create(AIniFileName);
-  WorkTableValuesFileName := IncludeTrailingPathDelimiter(ExtractFilePath(AIniFileName)) + 'WorkTableValues.ini';
-  ValuesIni := TMemIniFile.Create(WorkTableValuesFileName);
+  Ini := TProjectSettingsIni.Create(AIniFileName, STORAGE_TABLE_SETTINGS);
+  ValuesIni := TProjectSettingsIni.Create(AIniFileName, STORAGE_WORK_TABLE_VALUES);
   try
     ClearOldWorkTableSections(Ini);
     ClearOldWorkTableSections(ValuesIni);
@@ -5257,30 +5256,25 @@ begin
   end;
 end;
 
-{ Loads work table list, channels, and meter values from INI files. }
+{ Загружает рабочие столы и их значения из setting.fpp. }
 class procedure TWorkTable.Load(const AIniFileName: string;
   AWorkTables: TObjectList<TWorkTable>);
 var
-  Ini: TIniFile;
-  ValuesIni: TIniFile;
+  Ini: TCustomIniFile;
+  ValuesIni: TCustomIniFile;
   Count, I: Integer;
   WorkTable: TWorkTable;
   Section: string;
-  WorkTableValuesFileName: string;
 begin
   if (AIniFileName = '') or (AWorkTables = nil) then
-    Exit;
-
-  if not FileExists(AIniFileName) then
     Exit;
 
   AWorkTables.Clear;
   if TWeight.Weights <> nil then
     TWeight.Weights.Clear;
 
-  Ini := TIniFile.Create(AIniFileName);
-  WorkTableValuesFileName := IncludeTrailingPathDelimiter(ExtractFilePath(AIniFileName)) + 'WorkTableValues.ini';
-  ValuesIni := TIniFile.Create(WorkTableValuesFileName);
+  Ini := TProjectSettingsIni.Create(AIniFileName, STORAGE_TABLE_SETTINGS);
+  ValuesIni := TProjectSettingsIni.Create(AIniFileName, STORAGE_WORK_TABLE_VALUES);
   try
     Count := Ini.ReadInteger('WorkTables', 'Count', 0);
     TMeterValue.SetInitDensity(S2F(ValuesIni.ReadString('Common', 'InitDensity', FloatToStr(TMeterValue.GetInitDensity))));
@@ -8859,10 +8853,10 @@ begin
   inherited;
 end;
 
-{ Loads managed work tables from configured INI file. }
+{ Загружает рабочие столы из проектной базы настроек. }
 procedure TWorkTableManager.Load;
 var
-  Ini: TIniFile;
+  Ini: TCustomIniFile;
   ActiveUUID: string;
   ActiveName: string;
   ActiveIndex: Integer;
@@ -8876,9 +8870,9 @@ begin
   ActiveName := '';
   ActiveIndex := -1;
 
-  if (FIniFileName <> '') and FileExists(FIniFileName) then
+  if FIniFileName <> '' then
   begin
-    Ini := TIniFile.Create(FIniFileName);
+    Ini := TProjectSettingsIni.Create(FIniFileName, STORAGE_TABLE_SETTINGS);
     try
       ActiveUUID := Trim(Ini.ReadString('WorkTables', 'ActiveUUID', ''));
       ActiveName := Trim(Ini.ReadString('WorkTables', 'ActiveName', ''));
@@ -8910,17 +8904,17 @@ begin
   SetActiveWorkTable(WorkTable);
 end;
 
-{ Saves managed work tables to configured INI file. }
+{ Сохраняет рабочие столы в проектную базу настроек. }
 procedure TWorkTableManager.Save;
 var
-  Ini: TMemIniFile;
+  Ini: TCustomIniFile;
 begin
   TWorkTable.Save(FIniFileName, FWorkTables);
 
   if FIniFileName = '' then
     Exit;
 
-  Ini := TMemIniFile.Create(FIniFileName);
+  Ini := TProjectSettingsIni.Create(FIniFileName, STORAGE_TABLE_SETTINGS);
   try
     if (FActiveWorkTable <> nil) and (FWorkTables <> nil) and
        (FWorkTables.IndexOf(FActiveWorkTable) >= 0) then
@@ -9061,7 +9055,7 @@ begin
             SetActiveWorkTable(FWorkTables[FWorkTables.Count - 1]);
         end;
 
-        TMeterValue.DeleteFromFile(DeletedMeterValueHashes, DeletedMeterValueOwners);
+        TMeterValue.DeleteFromStorage(DeletedMeterValueHashes, DeletedMeterValueOwners);
 
         Result := True;
         Break;
