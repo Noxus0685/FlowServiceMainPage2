@@ -1,21 +1,21 @@
 unit FmxFPDeviceManager;
 
-{ ===== Класс DeviceManager =====
-Класс отвечает за создание модулей и назначение их устройствам.
+uses System.SysUtils, FmxFPModule,FmxFPModuleManager;
+ГЉГ«Г Г±Г± Г®ГІГўГҐГ·Г ГҐГІ Г§Г  Г±Г®Г§Г¤Г Г­ГЁГҐ Г¬Г®Г¤ГіГ«ГҐГ© ГЁ Г­Г Г§Г­Г Г·ГҐГ­ГЁГҐ ГЁГµ ГіГ±ГІГ°Г®Г©Г±ГІГўГ Г¬.
 }
 
 interface
 
 uses FmxFPModule,FmxFPModuleManager;
 const
-  cBooleanName:array[boolean] of String=('Нет','Да');
+  cBooleanName:array[boolean] of String=('ГЌГҐГІ','Г„Г ');
   cSimpleBooleanName:array[boolean] of String=('0','1');
 type
 //============================================================================================================
 
-  // Запись, представляющая используемый модуль.
+  // Г‡Г ГЇГЁГ±Гј, ГЇГ°ГҐГ¤Г±ГІГ ГўГ«ГїГѕГ№Г Гї ГЁГ±ГЇГ®Г«ГјГ§ГіГҐГ¬Г»Г© Г¬Г®Г¤ГіГ«Гј.
   TUsedModule = record
-    // Указатель на используемый модуль.
+    // Г“ГЄГ Г§Г ГІГҐГ«Гј Г­Г  ГЁГ±ГЇГ®Г«ГјГ§ГіГҐГ¬Г»Г© Г¬Г®Г¤ГіГ«Гј.
     Module: TFmxModule;
   end;
 
@@ -27,7 +27,7 @@ type
 
     FModuleManager: TFmxModuleManager;
 
-    // Динамический массив используемых модулей.
+    // Г„ГЁГ­Г Г¬ГЁГ·ГҐГ±ГЄГЁГ© Г¬Г Г±Г±ГЁГў ГЁГ±ГЇГ®Г«ГјГ§ГіГҐГ¬Г»Гµ Г¬Г®Г¤ГіГ«ГҐГ©.
 //    UsedModules: array of TUsedModule;
     FModbusTCPPort: word;
     FModbusTCPHost: string;
@@ -40,21 +40,21 @@ type
 
   public
 
-    // Используемый менеджер модулей.
+    // Г€Г±ГЇГ®Г«ГјГ§ГіГҐГ¬Г»Г© Г¬ГҐГ­ГҐГ¤Г¦ГҐГ° Г¬Г®Г¤ГіГ«ГҐГ©.
     property ModuleManager: TFmxModuleManager read FModuleManager;
 
     constructor Create(AHost:String;APort:Word);
     destructor Destroy; override;
 
     { ===== DetermineModule =====
-    Определяет (назначает) используемый устройством модуль.
-    Принимаемые параметры:
-    module_type - тип используемого модуля;
-    module_identifier - идентификатор используемого модуля (одинаковый для устройств, использующих один
-                        модуль); если используется модуль с адресом, то этот адрес передается в качестве
-                        идентификатора.
-    Если модуля такого типа еще не создано или среди созданных нет с таким же идентификатором, то создает
-    новый и возвращает указатель на него. Иначе возвращает указатель на уже созданный.
+    ГЋГЇГ°ГҐГ¤ГҐГ«ГїГҐГІ (Г­Г Г§Г­Г Г·Г ГҐГІ) ГЁГ±ГЇГ®Г«ГјГ§ГіГҐГ¬Г»Г© ГіГ±ГІГ°Г®Г©Г±ГІГўГ®Г¬ Г¬Г®Г¤ГіГ«Гј.
+    ГЏГ°ГЁГ­ГЁГ¬Г ГҐГ¬Г»ГҐ ГЇГ Г°Г Г¬ГҐГІГ°Г»:
+    module_type - ГІГЁГЇ ГЁГ±ГЇГ®Г«ГјГ§ГіГҐГ¬Г®ГЈГ® Г¬Г®Г¤ГіГ«Гї;
+    module_identifier - ГЁГ¤ГҐГ­ГІГЁГґГЁГЄГ ГІГ®Г° ГЁГ±ГЇГ®Г«ГјГ§ГіГҐГ¬Г®ГЈГ® Г¬Г®Г¤ГіГ«Гї (Г®Г¤ГЁГ­Г ГЄГ®ГўГ»Г© Г¤Г«Гї ГіГ±ГІГ°Г®Г©Г±ГІГў, ГЁГ±ГЇГ®Г«ГјГ§ГіГѕГ№ГЁГµ Г®Г¤ГЁГ­
+                        Г¬Г®Г¤ГіГ«Гј); ГҐГ±Г«ГЁ ГЁГ±ГЇГ®Г«ГјГ§ГіГҐГІГ±Гї Г¬Г®Г¤ГіГ«Гј Г± Г Г¤Г°ГҐГ±Г®Г¬, ГІГ® ГЅГІГ®ГІ Г Г¤Г°ГҐГ± ГЇГҐГ°ГҐГ¤Г ГҐГІГ±Гї Гў ГЄГ Г·ГҐГ±ГІГўГҐ
+                        ГЁГ¤ГҐГ­ГІГЁГґГЁГЄГ ГІГ®Г°Г .
+    Г…Г±Г«ГЁ Г¬Г®Г¤ГіГ«Гї ГІГ ГЄГ®ГЈГ® ГІГЁГЇГ  ГҐГ№ГҐ Г­ГҐ Г±Г®Г§Г¤Г Г­Г® ГЁГ«ГЁ Г±Г°ГҐГ¤ГЁ Г±Г®Г§Г¤Г Г­Г­Г»Гµ Г­ГҐГІ Г± ГІГ ГЄГЁГ¬ Г¦ГҐ ГЁГ¤ГҐГ­ГІГЁГґГЁГЄГ ГІГ®Г°Г®Г¬, ГІГ® Г±Г®Г§Г¤Г ГҐГІ
+    Г­Г®ГўГ»Г© ГЁ ГўГ®Г§ГўГ°Г Г№Г ГҐГІ ГіГЄГ Г§Г ГІГҐГ«Гј Г­Г  Г­ГҐГЈГ®. Г€Г­Г Г·ГҐ ГўГ®Г§ГўГ°Г Г№Г ГҐГІ ГіГЄГ Г§Г ГІГҐГ«Гј Г­Г  ГіГ¦ГҐ Г±Г®Г§Г¤Г Г­Г­Г»Г©.
     }
     function DetermineModule(port:integer;module_type: TFmxModuleType; BR: Cardinal; addr: integer; _typeOfProtocol:TTypeOfProtocol=tpProprietary;AInputRegister:Word=0;AOutputRegister:word=0): TFmxModule;
 
@@ -71,12 +71,12 @@ type
     property ModbusTCPPort:word read FModbusTCPPort write SetModbusTCPPort;
   end;
 //const
-//  cModuleTypeNames:Array [TFmxModuleType] of String = ('Счетчики', 'Новые счетчики','УПП(1)', 'УПП(2)', 'Prover', 'Весы','Весы Толедо',
-//    'Пневматика', 'Температура', 'Температура(2)', 'Температура(6)', 'Напряжение/Ток',
-//    'Напряжение/Ток(Old)', 'Электрозадвижки','Част. Danfoss','Част. Schneider','ЦАП I702X','Warm',
-//    'DigitalUnit','FastWell', 'Virt', 'ИВДГ', 'Heat', 'Агат','Отключатель','Текст','КМ5','РТ2',
+//  cModuleTypeNames:Array [TFmxModuleType] of String = ('Г‘Г·ГҐГІГ·ГЁГЄГЁ', 'ГЌГ®ГўГ»ГҐ Г±Г·ГҐГІГ·ГЁГЄГЁ','Г“ГЏГЏ(1)', 'Г“ГЏГЏ(2)', 'Prover', 'Г‚ГҐГ±Г»','Г‚ГҐГ±Г» Г’Г®Г«ГҐГ¤Г®',
+//    'ГЏГ­ГҐГўГ¬Г ГІГЁГЄГ ', 'Г’ГҐГ¬ГЇГҐГ°Г ГІГіГ°Г ', 'Г’ГҐГ¬ГЇГҐГ°Г ГІГіГ°Г (2)', 'Г’ГҐГ¬ГЇГҐГ°Г ГІГіГ°Г (6)', 'ГЌГ ГЇГ°ГїГ¦ГҐГ­ГЁГҐ/Г’Г®ГЄ',
+//    'ГЌГ ГЇГ°ГїГ¦ГҐГ­ГЁГҐ/Г’Г®ГЄ(Old)', 'ГќГ«ГҐГЄГІГ°Г®Г§Г Г¤ГўГЁГ¦ГЄГЁ','Г—Г Г±ГІ. Danfoss','Г—Г Г±ГІ. Schneider','Г–ГЂГЏ I702X','Warm',
+//    'DigitalUnit','FastWell', 'Virt', 'Г€Г‚Г„Гѓ', 'Heat', 'ГЂГЈГ ГІ','ГЋГІГЄГ«ГѕГ·Г ГІГҐГ«Гј','Г’ГҐГЄГ±ГІ','ГЉГЊ5','ГђГ’2',
 //    'Danfoss(Modbus)','LogoDAC(Modbus)','Vacon(Modbus)','Hsc_Ctrl(Modbus)','Hsc_IMP(Modbus)',
-//    'HSC_FCD(Modbus)','BIO2','Modbus(D)','Modbus(A)','LTA-K(USB)','Весы AD103С','Весы RADWAG','Част. ABB','???');
+//    'HSC_FCD(Modbus)','BIO2','Modbus(D)','Modbus(A)','LTA-K(USB)','Г‚ГҐГ±Г» AD103Г‘','Г‚ГҐГ±Г» RADWAG','Г—Г Г±ГІ. ABB','???');
 
 //============================================================================================================
 //============================================================================================================
@@ -132,14 +132,16 @@ var
   i: integer;
 begin
   if Assigned(FModuleManager) then
-  for i:=1 to FModuleManager.ModulesCount do
   begin
-    if Assigned(FModuleManager.Module[i-1]) then
+    FModuleManager.StopAndWait;
+    for i := 0 to FModuleManager.ModulesCount - 1 do
     begin
-      FModuleManager.Module[i-1].Free;
-      FModuleManager.Module[i-1]:=nil;
+      FModuleManager.Module[i].Free;
+      FModuleManager.Module[i] := nil;
     end;
   end;
+  FreeAndNil(FModuleManager);
+  inherited Destroy;
 end;
 
 //============================================================================================================
@@ -149,7 +151,7 @@ var
   i,len: integer;
 begin
 
-  // Поиск среди созданных модулей.
+  // ГЏГ®ГЁГ±ГЄ Г±Г°ГҐГ¤ГЁ Г±Г®Г§Г¤Г Г­Г­Г»Гµ Г¬Г®Г¤ГіГ«ГҐГ©.
   Result := nil;
   if not Assigned(ModuleManager) then Exit;
 
@@ -169,7 +171,7 @@ begin
  then
       Result := ModuleManager.Module[i-1];
 
-  // Создание нового модуля, если поиск не принес результатов.
+  // Г‘Г®Г§Г¤Г Г­ГЁГҐ Г­Г®ГўГ®ГЈГ® Г¬Г®Г¤ГіГ«Гї, ГҐГ±Г«ГЁ ГЇГ®ГЁГ±ГЄ Г­ГҐ ГЇГ°ГЁГ­ГҐГ± Г°ГҐГ§ГіГ«ГјГІГ ГІГ®Гў.
   if Result = nil then
   begin
     //ModuleManager.ModulesCount:=ModuleManager.ModulesCount+1;
