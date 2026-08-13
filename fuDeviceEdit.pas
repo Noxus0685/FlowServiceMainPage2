@@ -2227,21 +2227,21 @@ var
   Frm: TFormTypeSelect;
   CurrentType, NewType: TDeviceType;
   FoundRepo: TTypeRepository;
-  NeedFill: Boolean;
+  NeedFill, IsTypeChanged: Boolean;
   RepoName: string;
-  OldTypeUUID: string;
+  OldTypeUUID : string;
 
-  function AskFillFromType: Boolean;
-  begin
-    Result :=
-      MessageDlg(
-        'Тип прибора изменён.' + sLineBreak +
-        'Заполнить данные прибора на основании выбранного типа?',
-        TMsgDlgType.mtConfirmation,
-        [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
-        0
-      ) = mrYes;
-  end;
+function AskFillFromType: Boolean;
+begin
+  Result :=
+    MessageDlg(
+      'Тип прибора изменён.' + sLineBreak +
+      'Заполнить данные прибора на основании выбранного типа?',
+      TMsgDlgType.mtConfirmation,
+      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+      0
+    ) = mrYes;
+end;
 
 begin
   if (FDevice = nil) or (AppServices.DataManager = nil) then
@@ -2253,15 +2253,8 @@ begin
   if (CurrentType <> nil) and (FoundRepo <> nil) then
     AppServices.DataManager.ActiveTypeRepo := FoundRepo;
 
-  OldTypeUUID := string(FDevice.DeviceTypeUUID);
-
   Frm := TFormTypeSelect.Create(Self);
   try
-    { Конструктор TFormTypeSelect перезагружает ActiveRepo.Types,
-      поэтому полученная до Create ссылка CurrentType уже недействительна. }
-    CurrentType := ResolveDeviceType(FoundRepo);
-    FDeviceType := CurrentType;
-
     {----------------------------------------------------}
     { 1. Предвыбор текущего типа }
     {----------------------------------------------------}
@@ -2276,44 +2269,66 @@ begin
     if Frm.ShowModal <> mrOk then
       Exit;
 
+    OldTypeUUID := FDevice.DeviceTypeUUID;
     NewType := Frm.SelectedType;
     if NewType = nil then
       Exit;
 
     FoundRepo := AppServices.DataManager.ActiveTypeRepo;
-    NeedFill := AskFillFromType;
 
     {----------------------------------------------------}
-    { 3. Привязываем тип }
+    { 3. Проверяем смену типа }
+    {----------------------------------------------------}
+    IsTypeChanged := True;
+
+    if CurrentType <> nil then
+    begin
+      if (CurrentType = NewType) then
+        IsTypeChanged := False
+      else if (CurrentType.UUID <> '') and (NewType.UUID <> '') then
+        IsTypeChanged := not SameText(CurrentType.UUID, NewType.UUID)
+      else
+        IsTypeChanged :=
+          (CurrentType.ID <> NewType.ID) or
+          (not SameText(CurrentType.Name, NewType.Name)) or
+          (not SameText(CurrentType.Modification, NewType.Modification));
+    end;
+
+    //NeedFill := IsTypeChanged;
+
+    //if NeedFill then
+      NeedFill := AskFillFromType;
+
+    {----------------------------------------------------}
+    { 4. Привязываем тип }
     {----------------------------------------------------}
     if FoundRepo <> nil then
       RepoName := FoundRepo.Name
     else
       RepoName := '';
 
-    if NeedFill then
-    begin
-      FDevice.AttachType(NewType, RepoName);
-      FDeviceType := NewType;
-      FTypeChangedDuringEdit :=
-        not SameText(OldTypeUUID, string(FDevice.DeviceTypeUUID));
+  if NeedFill then
+  begin
+    FDevice.AttachType(NewType, RepoName);
+    FDeviceType := NewType;
+    FTypeChangedDuringEdit := not SameText(OldTypeUUID, string(FDevice.DeviceTypeUUID));
 
-      WriteDeviceEditActionLog(
-        'Изменён тип прибора',
-        FDevice,
-        'OldTypeUUID=' + OldTypeUUID +
-        '; NewTypeUUID=' + string(FDevice.DeviceTypeUUID)
-      );
-    end;
+    WriteDeviceEditActionLog('Изменён тип прибора', FDevice,
+      'OldTypeUUID=' + OldTypeUUID + '; NewTypeUUID=' + string(FDevice.DeviceTypeUUID));
+  end;
+
+
+
 
     {----------------------------------------------------}
-    { 4. Обновляем UI }
+    { 6. Обновляем UI }
     {----------------------------------------------------}
     UpdateUIFromDevice;
+
     SetModified;
+
   finally
     Frm.Free;
-    RefreshDeviceTypeReference;
   end;
 end;
 
