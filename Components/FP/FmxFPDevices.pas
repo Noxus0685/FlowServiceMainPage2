@@ -28,8 +28,7 @@ uses
   FmxFPDeviceManager,
   SYNCOBJS,
   FmxMedianFilter,
-  uProcedureOfObject,
-  System.SysUtils; // 28.09.09 - добавл для реализации функции AddReceiver у модуля TBigScales
+  uProcedureOfObject; // 28.09.09 - добавл для реализации функции AddReceiver у модуля TBigScales
 
   const
   cHSC_CTRL_OpenPosition=97.9;
@@ -8118,8 +8117,4 @@ initialization
   CreateMainDeviceManagerIfNotCreated('',502);
   DigitalDeviceManager := nil;
   CreateDigitalDeviceManagerIfNotCreated('',502);
-
-finalization
-  FreeAndNil(DigitalDeviceManager);
-  FreeAndNil(MainDeviceManager);
 end.

@@ -4,7 +4,6 @@ interface
 
 uses
   frmProceed,
-  FmxFPDevices,
   frmMainTable,
   UnitBaseProcedures,
   UnitWorkTable,
@@ -258,12 +257,6 @@ end;
 procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   Self.WindowState := TWindowState.wsMinimized;
-
-  if Assigned(MainDeviceManager) then
-    MainDeviceManager.ModuleManager.StopAndWait;
-  if Assigned(DigitalDeviceManager) and
-     (DigitalDeviceManager <> MainDeviceManager) then
-    DigitalDeviceManager.ModuleManager.StopAndWait;
 
   if FFrameMainTable <> nil then
     FFrameMainTable.SaveLayoutSettingsToWorkTable;

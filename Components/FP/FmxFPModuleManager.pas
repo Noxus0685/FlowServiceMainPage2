@@ -1,9 +1,9 @@
 unit FmxFPModuleManager;
 
-{ ===== ГЉГ«Г Г±Г± TFmxModuleManager =====
-  ГЌГ®ГўГ Гї Г Г°ГµГЁГІГҐГЄГІГіГ°Г : Г®ГІГ¤ГҐГ«ГјГ­Г»ГҐ ГЇГ®ГІГ®ГЄГЁ Г¤Г«Гї ГЄГ Г¦Г¤Г®ГЈГ® COM-ГЇГ®Г°ГІГ .
-  ГЉГ Г¦Г¤Г»Г© ГЇГ®Г°ГІ ГЁГ¬ГҐГҐГІ Г±ГўГ®Г© TPortPollThread, ГЄГ®ГІГ®Г°Г»Г© Г±ГЁГ­ГµГ°Г®Г­Г­Г® Г®ГЇГ°Г ГёГЁГўГ ГҐГІ Г¬Г®Г¤ГіГ«ГЁ.
-  SendCommand Г°Г ГЎГ®ГІГ ГҐГІ Г·ГҐГ°ГҐГ§ TTransferManager (Г±ГЁГ­ГµГ°Г®Г­Г­Г®, ГЎГҐГ§ Г®Г·ГҐГ°ГҐГ¤ГЁ).
+{ ===== Класс TFmxModuleManager =====
+  Новая архитектура: отдельные потоки для каждого COM-порта.
+  Каждый порт имеет свой TPortPollThread, который синхронно опрашивает модули.
+  SendCommand работает через TTransferManager (синхронно, без очереди).
 }
 
 interface
@@ -28,7 +28,7 @@ uses
   uProcedureOfObject;
 
 const
-  cTimeout = 'Г­ГҐГІ Г®ГІГўГҐГІГ ...';
+  cTimeout = 'нет ответа...';
   cSleepBeforeRead = 50;
   cMinSleepBeforeRead = 1;
   cViewIOBufMin = 20;
@@ -39,7 +39,7 @@ const
   c_DopTimOut = 50;
   COM_RUN_QUERY_BUFFER_LENGTH = 10;
   PORT_NUMBER = 1;
-  cPortHeader = 'ГЏГ®Г°ГІ:COM';
+  cPortHeader = 'Порт:COM';
 
 type
 //  TComPortInfo = record
@@ -66,8 +66,7 @@ type
 
   TFmxModuleManager=class;
   // ============================================================
-    FStopping: Integer;
-  // ГЉГ«Г Г±Г± ГЇГ®ГІГ®ГЄГ  Г¤Г«Гї Г®ГЇГ°Г®Г±Г  Г®Г¤Г­Г®ГЈГ® COM-ГЇГ®Г°ГІГ  (Г±ГЁГ­ГµГ°Г®Г­Г­Г»Г©)
+  // Класс потока для опроса одного COM-порта (синхронный)
   // ============================================================
   TPortPollThread = class(TThread)
   private
@@ -82,14 +81,14 @@ type
 
   TFmxModuleManager = class
   private
-    // ГЊГҐГ­ГҐГ¤Г¦ГҐГ° ГЇГ®Г°ГІГ®Гў (Г¤Г«Гї SendCommand)
+    // Менеджер портов (для SendCommand)
     FTransferManager: TTransferManager;
 
-    // ГЏГ®ГІГ®ГЄГЁ Г¤Г«Гї ГЄГ Г¦Г¤Г®ГЈГ® ГЇГ®Г°ГІГ 
+    // Потоки для каждого порта
     FPortThreads: TDictionary<Integer, TPortPollThread>;
-    FPortCurrentModule: TDictionary<Integer, Integer>; // ГЇГ®Г°ГІ -> ГІГҐГЄГіГ№ГЁГ© ГЁГ­Г¤ГҐГЄГ± Г¬Г®Г¤ГіГ«Гї
+    FPortCurrentModule: TDictionary<Integer, Integer>; // порт -> текущий индекс модуля
 
-    // Г‘ГІГ ГІГЁГ±ГІГЁГЄГ  Г¶ГЁГЄГ«Г®Гў
+    // Статистика циклов
     FCycleStartTime: Cardinal;
     FLastCycleTime: Double;
     FAverageCycleTime: Double;
@@ -148,7 +147,7 @@ type
     FTimeDebug: string;
     FClosePorts: boolean;
 
-    // Г‚Г±ГЇГ®Г¬Г®ГЈГ ГІГҐГ«ГјГ­Г»ГҐ Г¬ГҐГІГ®Г¤Г»
+    // Вспомогательные методы
 //    function FindComPortIndex(PortNumber: integer): integer;
 //    function GetComPortInfo(PortNumber: integer; var PortInfo: TComPortInfo; var PortIndex: integer): Boolean;
 //    procedure UpdateComPortInfo(const PortInfo: TComPortInfo);
@@ -167,7 +166,7 @@ type
     procedure UpdateNextForPort(APortNumber: Integer);
     function GetNextModuleForPort(APortNumber: Integer): TFmxModule;
 
-    // Г‘ГҐГІГІГҐГ°Г» ГЁ ГЈГҐГІГІГҐГ°Г»
+    // Сеттеры и геттеры
     procedure SetOnSendCommand(const Value: TSendCommandProcs);
     procedure SetOnUpdateNext(const Value: TUpdateNextProcs);
     procedure SetOnGetPort(const Value: TProcedureOfGetPortObject);
@@ -230,7 +229,7 @@ type
     function IsOverallCommunicationAlive(): Boolean;
     function GetPercentOfQuality: integer;
 
-    // Г‡Г ГЇГіГ±ГЄ ГЇГ®ГІГ®ГЄГ®Гў Г¤Г«Гї ГЇГ®Г°ГІГ®Гў
+    // Запуск потоков для портов
     procedure StartPortThreads;
     function GetMaxChannels: byte;
     procedure SetMaxChannels(const Value: byte);
@@ -264,9 +263,8 @@ type
     procedure TerminateCOMThread;
     procedure ClearViewIOBuff;
     procedure ResetCycleStats;
-    procedure StopAndWait;
 
-    // Г‘ГўГ®Г©Г±ГІГўГ 
+    // Свойства
     property OnUpdateNext: TUpdateNextProcs read FOnUpdateNext write SetOnUpdateNext;
     property OnSendCommand: TSendCommandProcs read FOnSendCommand write SetOnSendCommand;
     property OnGetPort: TProcedureOfGetPortObject read FOnGetPort write SetOnGetPort;
@@ -366,7 +364,7 @@ begin
 end;
 
 // ============================================================
-//  TFmxModuleManager - Г°ГҐГ Г«ГЁГ§Г Г¶ГЁГї
+//  TFmxModuleManager - реализация
 // ============================================================
 (*
 procedure TFmxModuleManager.AddToLog(Module: TFmxModule; buffer: PByte; length: integer; sended: Boolean; err: Boolean = false);
@@ -385,7 +383,7 @@ begin
   try
     if not LogFileIsOpened then Exit;
 
-//    // ГЏГ°Г®ГўГҐГ°ГїГҐГ¬ Г±Г®Г±ГІГ®ГїГ­ГЁГҐ ГЇГ®Г°ГІГ  Г·ГҐГ°ГҐГ§ Г±ГЇГ°Г ГўГ®Г·Г­ГЁГЄ
+//    // Проверяем состояние порта через справочник
 //    PortIndex := FindComPortIndex(Module.PortNumber);
 //    PortOpen := (PortIndex >= 0) and FComPorts[PortIndex].IsOpen;
 
@@ -472,7 +470,7 @@ begin
   try
     if not LogFileIsOpened then Exit;
 
-    // ГЏГ°Г®ГўГҐГ°ГїГҐГ¬ Г±Г®Г±ГІГ®ГїГ­ГЁГҐ ГЇГ®Г°ГІГ  Г·ГҐГ°ГҐГ§ TransferManager
+    // Проверяем состояние порта через TransferManager
     if Assigned(FTransferManager) then
       PortOpen := FTransferManager.IsPortOpen(Module.PortNumber)
     else
@@ -565,7 +563,7 @@ end;
 //  CloseAllComPorts;
 //  ComPortNumber := -1;
 //  PortStatus := psClose;
-//  PortState := 'ГЏГ®Г°ГІ Г§Г ГЄГ°Г»ГІ';
+//  PortState := 'Порт закрыт';
 //end;
 
 //procedure TFmxModuleManager.OpenPort;
@@ -575,7 +573,7 @@ end;
 //  if FComPortNumber <= 0 then
 //  begin
 //    PortStatus := psError;
-//    PortState := 'ГЌГҐГўГҐГ°Г­Г»Г© Г­Г®Г¬ГҐГ° ГЇГ®Г°ГІГ ';
+//    PortState := 'Неверный номер порта';
 //    Exit;
 //  end;
 //  {$IFDEF WINDOWS}
@@ -585,33 +583,33 @@ end;
 //  begin
 //    PortStatus := psOpen;
 //    PortReady := True;
-//    PortState := 'ГЏГ®Г°ГІ ' + PortName + ' Г®ГІГЄГ°Г»ГІ';
+//    PortState := 'Порт ' + PortName + ' открыт';
 //  end
 //  else
 //  begin
 //    PortStatus := psError;
 //    PortReady := False;
-//    PortState := 'ГЋГёГЁГЎГЄГ  Г®ГІГЄГ°Г»ГІГЁГї ГЇГ®Г°ГІГ  ' + PortName;
+//    PortState := 'Ошибка открытия порта ' + PortName;
 //    ErrorConnection := True;
 //  end;
 //end;
 
 // ============================================================
-//  UpdateNextForPort - Г®ГЇГ°Г®Г± Г¬Г®Г¤ГіГ«ГҐГ© Г­Г  ГЄГ®Г­ГЄГ°ГҐГІГ­Г®Г¬ ГЇГ®Г°ГІГі
+//  UpdateNextForPort - опрос модулей на конкретном порту
 // ============================================================
 
 procedure TFmxModuleManager.UpdateNextForPort(APortNumber: Integer);
 var
   CurrentModuleObj: TFmxModule;
 begin
-  // ГЏГ°Г®ГўГҐГ°ГЄГЁ
+  // Проверки
   if (Length(Modules) = 0) or (not Update) or (not Active) or (not Assigned(Application)) then
   begin
     Sleep(100);
     Exit;
   end;
 
-  // ГЏГ®Г«ГіГ·Г ГҐГ¬ Г±Г«ГҐГ¤ГіГѕГ№ГЁГ© Г¬Г®Г¤ГіГ«Гј Г¤Г«Гї ГЅГІГ®ГЈГ® ГЇГ®Г°ГІГ 
+  // Получаем следующий модуль для этого порта
   CurrentModuleObj := GetNextModuleForPort(APortNumber);
   if not Assigned(CurrentModuleObj) then
   begin
@@ -619,14 +617,14 @@ begin
     Exit;
   end;
 
-  // ГЋГІГЄГ«ГѕГ·ВёГ­Г­Г»ГҐ Г¬Г®Г¤ГіГ«ГЁ
+  // Отключённые модули
   if CurrentModuleObj.Disguise or (not CurrentModuleObj.EnabledAutoUpdate) then
   begin
     CurrentModuleObj.ReceiveResponse('*', '');
     Exit;
   end;
 
-  // Г‘ГЁГ­ГµГ°Г®Г­Г­Г»Г© Г®ГЇГ°Г®Г±
+  // Синхронный опрос
   CurrentModuleObj.TotalSended := CurrentModuleObj.TotalSended + 1;
   CurrentModuleObj.MustUpdate := False;
 
@@ -637,7 +635,7 @@ begin
 end;
 
 // ============================================================
-//  GetNextModuleForPort - ГЇГ®ГЁГ±ГЄ Г±Г«ГҐГ¤ГіГѕГ№ГҐГЈГ® Г¬Г®Г¤ГіГ«Гї Г­Г  ГЇГ®Г°ГІГі
+//  GetNextModuleForPort - поиск следующего модуля на порту
 // ============================================================
 
 function TFmxModuleManager.GetNextModuleForPort(APortNumber: Integer): TFmxModule;
@@ -649,7 +647,7 @@ begin
 
   if Length(Modules) = 0 then Exit;
 
-  // ГЏГ®Г«ГіГ·Г ГҐГ¬ ГІГҐГЄГіГ№ГЁГ© ГЁГ­Г¤ГҐГЄГ± Г¤Г«Гї ГЅГІГ®ГЈГ® ГЇГ®Г°ГІГ 
+  // Получаем текущий индекс для этого порта
   if not FPortCurrentModule.TryGetValue(APortNumber, StartIndex) then
   begin
     StartIndex := 0;
@@ -659,7 +657,7 @@ begin
   Found := False;
   idx := StartIndex;
 
-  // Г€Г№ГҐГ¬ Г±Г«ГҐГ¤ГіГѕГ№ГЁГ© Г ГЄГІГЁГўГ­Г»Г© Г¬Г®Г¤ГіГ«Гј Г­Г  ГЅГІГ®Г¬ ГЇГ®Г°ГІГі
+  // Ищем следующий активный модуль на этом порту
   for i := 0 to Length(Modules) - 1 do
   begin
     idx := (idx + 1) mod Length(Modules);
@@ -682,26 +680,13 @@ begin
 end;
 
 // ============================================================
-  if FPortThreads.Count <> 0 then Exit;
-  TInterlocked.Exchange(FStopping, 0);
-      if FPortThreads.ContainsKey(PortNumber) then
-        Continue;
+//  StartPortThreads - запуск потоков для всех портов
+// ============================================================
 
+procedure TFmxModuleManager.StartPortThreads;
 var
-  LThread: TThread;
-  if (not Assigned(method)) or
-     (TInterlocked.CompareExchange(FStopping, 0, 0) <> 0) then
-    Exit;
-
-  LThread := TThread.CurrentThread;
-  TThread.Queue(LThread,
-    procedure
-    begin
-      if TInterlocked.CompareExchange(FStopping, 0, 0) <> 0 then
-        Exit;
-      method();
-    end
-  );
+  i: Integer;
+  PortNumber: Integer;
   Thread: TPortPollThread;
   PortsList: TList<Integer>;
 begin
@@ -709,7 +694,7 @@ begin
 
   PortsList := TList<Integer>.Create;
   try
-    // Г‘Г®ГЎГЁГ°Г ГҐГ¬ ГіГ­ГЁГЄГ Г«ГјГ­Г»ГҐ Г­Г®Г¬ГҐГ°Г  ГЇГ®Г°ГІГ®Гў ГЁГ§ Г ГЄГІГЁГўГ­Г»Гµ Г¬Г®Г¤ГіГ«ГҐГ©
+    // Собираем уникальные номера портов из активных модулей
     for i := 0 to ModulesCount - 1 do
     begin
       if Assigned(Modules[i]) and Modules[i].EnabledAutoUpdate and (not Modules[i].Disguise) then
@@ -721,7 +706,7 @@ begin
       end;
     end;
 
-    // Г„Г«Гї ГЄГ Г¦Г¤Г®ГЈГ® ГЇГ®Г°ГІГ  Г±Г®Г§Г¤Г ВёГ¬ ГЇГ®ГІГ®ГЄ
+    // Для каждого порта создаём поток
     for PortNumber in PortsList do
     begin
       if not FPortCurrentModule.ContainsKey(PortNumber) then
@@ -732,7 +717,7 @@ begin
       Thread.Resume;
 
       if Debug then
-        DebugOutput('Г‡Г ГЇГіГ№ГҐГ­ ГЇГ®ГІГ®ГЄ Г®ГЇГ°Г®Г±Г  Г¤Г«Гї COM' + IntToStr(PortNumber));
+        DebugOutput('Запущен поток опроса для COM' + IntToStr(PortNumber));
     end;
   finally
     PortsList.Free;
@@ -740,7 +725,7 @@ begin
 end;
 
 // ============================================================
-//  SendCommand - Г±ГЁГ­ГµГ°Г®Г­Г­Г Гї Г®ГІГЇГ°Г ГўГЄГ  ГЄГ®Г¬Г Г­Г¤Г»
+//  SendCommand - синхронная отправка команды
 // ============================================================
 
 function TFmxModuleManager.SendCommand(module: TFmxModule; const command: ShortString;
@@ -781,7 +766,7 @@ begin
 end;
 
 // ============================================================
-//  ExecuteInCOMThread - Г§Г ГЈГ«ГіГёГЄГ  (ГЎГ®Г«ГјГёГҐ Г­ГҐ ГЁГ±ГЇГ®Г«ГјГ§ГіГҐГІГ±Гї)
+//  ExecuteInCOMThread - заглушка (больше не используется)
 // ============================================================
 
 
@@ -818,7 +803,7 @@ begin
 end;
 
 // ============================================================
-//  IterateCOMLoop - Г§Г ГЈГ«ГіГёГЄГ 
+//  IterateCOMLoop - заглушка
 // ============================================================
 
 function TFmxModuleManager.IterateCOMLoop(iterations_count: integer): Boolean;
@@ -828,22 +813,22 @@ end;
 
 procedure TFmxModuleManager.IterateCOMLoop1;
 begin
-  // Г§Г ГЈГ«ГіГёГЄГ 
+  // заглушка
 end;
 
 procedure TFmxModuleManager.ResumeCOMThread;
 begin
-  // Г§Г ГЈГ«ГіГёГЄГ 
+  // заглушка
 end;
 
 procedure TFmxModuleManager.SuspendCOMThread;
 begin
-  // Г§Г ГЈГ«ГіГёГЄГ 
+  // заглушка
 end;
 
 procedure TFmxModuleManager.TerminateCOMThread;
 begin
-  // Г§Г ГЈГ«ГіГёГЄГ 
+  // заглушка
 end;
 
 // ============================================================
@@ -876,33 +861,27 @@ begin
 end;
 
 // ============================================================
-  FStopping := 0;
-procedure TFmxModuleManager.StopAndWait;
-var
-  Thread: TPortPollThread;
+//  Конструктор и деструктор
+// ============================================================
+
+constructor TFmxModuleManager.Create(AModbusTCPHost: String; AModbusTCPPort: Word);
 begin
-  TInterlocked.Exchange(FStopping, 1);
-  FActive := False;
+  inherited Create;
 
-  if not Assigned(FPortThreads) then
-    Exit;
+  FTransferManager := TTransferManager.Create(Self);
+  FTransferManager.DefaultRetryCount := SENDING_TRIES_COUNT;
 
-  for Thread in FPortThreads.Values do
-    Thread.Terminate;
+  FPortThreads := TDictionary<Integer, TPortPollThread>.Create;
+  FPortCurrentModule := TDictionary<Integer, Integer>.Create;
 
-  for Thread in FPortThreads.Values do
-  begin
-    Thread.WaitFor;
-    TThread.RemoveQueuedEvents(Thread);
-  end;
-end;
-
-  StopAndWait;
-    FreeAndNil(FPortThreads);
-  FreeAndNil(FPortCurrentModule);
-  FreeAndNil(FTransferManager);
-      FreeAndNil(TCP_Client);
-  FreeAndNil(FLogCriticalSection);
+  FClosePorts := True;
+  FCycleStartTime := GetTickCount;
+  FLastCycleTime := 0.0;
+  FAverageCycleTime := 0.0;
+  FMinCycleTime := 0.0;
+  FMaxCycleTime := 0.0;
+  FCycleCount := 0;
+  FTotalCycleTime := 0;
   FCurrentCycleModules := 0;
 
   Active := False;
@@ -944,7 +923,7 @@ var
 begin
   Active := False;
 
-  // Г‡Г ГўГҐГ°ГёГ ГҐГ¬ ГЇГ®ГІГ®ГЄГЁ Г®ГЇГ°Г®Г±Г  ГЇГ®Г°ГІГ®Гў
+  // Завершаем потоки опроса портов
   if Assigned(FPortThreads) then
   begin
     for Thread in FPortThreads.Values do
@@ -979,7 +958,7 @@ begin
       TCP_Client.Free;
     except
       on E: Exception do
-        if Debug then DebugOutput('ГЋГёГЁГЎГЄГ  ГЇГ°ГЁ Г®Г±ГўГ®ГЎГ®Г¦Г¤ГҐГ­ГЁГЁ TCP ГЄГ«ГЁГҐГ­ГІГ : ' + E.Message);
+        if Debug then DebugOutput('Ошибка при освобождении TCP клиента: ' + E.Message);
     end;
   end;
 
@@ -992,7 +971,7 @@ begin
 end;
 
 // ============================================================
-//  SetActive - Г§Г ГЇГіГ±ГЄ/Г®Г±ГІГ Г­Г®ГўГЄГ  ГЇГ®ГІГ®ГЄГ®Гў
+//  SetActive - запуск/остановка потоков
 // ============================================================
 
 procedure TFmxModuleManager.SetActive(const Value: boolean);
@@ -1004,7 +983,7 @@ begin
   end
   else
   begin
-    // ГЋГ±ГІГ Г­Г ГўГ«ГЁГўГ ГҐГ¬ ГЇГ®ГІГ®ГЄГЁ
+    // Останавливаем потоки
     if Assigned(FPortThreads) then
     begin
       for var Thread in FPortThreads.Values do
@@ -1014,7 +993,7 @@ begin
 end;
 
 // ============================================================
-//  ГђГ ГЎГ®ГІГ  Г± COM-ГЇГ®Г°ГІГ Г¬ГЁ (ГЁГ§ Г®Г°ГЁГЈГЁГ­Г Г«ГјГ­Г®ГЈГ® ГґГ Г©Г«Г )
+//  Работа с COM-портами (из оригинального файла)
 // ============================================================
 
 //procedure TFmxModuleManager.OpenComPort(PortNumber, BaudRate, Parity, Timeout: integer;
@@ -1064,7 +1043,7 @@ end;
 //    if PortInfo.PortHandle = INVALID_HANDLE_VALUE then
 //    begin
 //      PortInfo.IsOpen := False;
-//      PortState := 'ГЋГёГЁГЎГЄГ  Г®ГІГЄГ°Г»ГІГЁГї ГЇГ®Г°ГІГ  COM' + IntToStr(PortNumber);
+//      PortState := 'Ошибка открытия порта COM' + IntToStr(PortNumber);
 //      if FindComPortIndex(PortNumber) >= 0 then
 //        UpdateComPortInfo(PortInfo)
 //      else
@@ -1098,7 +1077,7 @@ end;
 //    else
 //      AddComPortInfo(PortInfo);
 //
-//    PortState := 'ГЏГ®Г°ГІ COM' + IntToStr(PortNumber) + ' Г®ГІГЄГ°Г»ГІ';
+//    PortState := 'Порт COM' + IntToStr(PortNumber) + ' открыт';
 //
 //  finally    FComPortsLock.Leave;
 //  end;
@@ -1261,7 +1240,7 @@ end;
 //          Inc(ClosedCount);
 //
 //          if Debug then
-//            DebugOutput('ГЂГўГІГ®Г¬Г ГІГЁГ·ГҐГ±ГЄГЁ Г§Г ГЄГ°Г»ГІ Г­ГҐГЁГ±ГЇГ®Г«ГјГ§ГіГҐГ¬Г»Г© ГЇГ®Г°ГІ COM' +
+//            DebugOutput('Автоматически закрыт неиспользуемый порт COM' +
 //              IntToStr(FComPorts[i].PortNumber));
 //        end;
 //      end;
@@ -1273,7 +1252,7 @@ end;
 //  end;
 //
 //  if (ClosedCount > 0) and Debug then
-//    DebugOutput('ГЂГўГІГ®Г¬Г ГІГЁГ·ГҐГ±ГЄГЁ Г§Г ГЄГ°Г»ГІГ® ГЇГ®Г°ГІГ®Гў: ' + IntToStr(ClosedCount));
+//    DebugOutput('Автоматически закрыто портов: ' + IntToStr(ClosedCount));
 //end;
 
 //procedure TFmxModuleManager.RemoveClosedPortsFromArray;
@@ -1352,21 +1331,21 @@ begin
       if CloseHandle(PortHandle) then
       begin
         if Debug then
-          DebugOutput('ГЏГ®Г°ГІ ГіГ±ГЇГҐГёГ­Г® Г§Г ГЄГ°Г»ГІ');
+          DebugOutput('Порт успешно закрыт');
         Exit;
       end
       else
       begin
         if Debug then
-          DebugOutput('ГЏГ®ГЇГ»ГІГЄГ  ' + IntToStr(Attempts + 1) +
-            ': Г­ГҐ ГіГ¤Г Г«Г®Г±Гј Г§Г ГЄГ°Г»ГІГј ГЇГ®Г°ГІ. ГЉГ®Г¤ Г®ГёГЁГЎГЄГЁ: ' + IntToStr(GetLastError));
+          DebugOutput('Попытка ' + IntToStr(Attempts + 1) +
+            ': не удалось закрыть порт. Код ошибки: ' + IntToStr(GetLastError));
       end;
       {$ENDIF}
     except
       on E: Exception do
       begin
         if Debug then
-          DebugOutput('Г€Г±ГЄГ«ГѕГ·ГҐГ­ГЁГҐ ГЇГ°ГЁ Г§Г ГЄГ°Г»ГІГЁГЁ ГЇГ®Г°ГІГ  (ГЇГ®ГЇГ»ГІГЄГ  ' +
+          DebugOutput('Исключение при закрытии порта (попытка ' +
             IntToStr(Attempts + 1) + '): ' + E.Message);
       end;
     end;
@@ -1377,12 +1356,12 @@ begin
   end;
 
   if Debug then
-    DebugOutput('ГЌГҐ ГіГ¤Г Г«Г®Г±Гј ГЄГ®Г°Г°ГҐГЄГІГ­Г® Г§Г ГЄГ°Г»ГІГј ГЇГ®Г°ГІ ГЇГ®Г±Г«ГҐ 3 ГЇГ®ГЇГ»ГІГ®ГЄ. ' +
-                'Г„ГҐГ±ГЄГ°ГЁГЇГІГ®Г°: ' + IntToStr(PortHandle));
+    DebugOutput('Не удалось корректно закрыть порт после 3 попыток. ' +
+                'Дескриптор: ' + IntToStr(PortHandle));
 end;
 
 // ============================================================
-//  Г‘ГІГ ГІГЁГ±ГІГЁГЄГ  ГЁ ГўГ±ГЇГ®Г¬Г®ГЈГ ГІГҐГ«ГјГ­Г»ГҐ Г¬ГҐГІГ®Г¤Г»
+//  Статистика и вспомогательные методы
 // ============================================================
 
 function TFmxModuleManager.CountActiveModules: Integer;
@@ -1567,7 +1546,7 @@ begin
 end;
 
 // ============================================================
-//  Г‘ГҐГІГІГҐГ°Г» Г±ГўГ®Г©Г±ГІГў
+//  Сеттеры свойств
 // ============================================================
 
 procedure TFmxModuleManager.SetOnSendCommand(const Value: TSendCommandProcs);
@@ -1690,7 +1669,7 @@ end;
 
 procedure TFmxModuleManager.SetCOMRunQueriesCount(const Value: integer);
 begin
-  // Г‡Г ГЈГ«ГіГёГЄГ  - ГЎГ®Г«ГјГёГҐ Г­ГҐ ГЁГ±ГЇГ®Г«ГјГ§ГіГҐГІГ±Гї
+  // Заглушка - больше не используется
 end;
 
 procedure TFmxModuleManager.SetCurrentModule(const Value: integer);
@@ -1735,7 +1714,7 @@ begin
     FUpdate := Value;
     if not Value then
     begin
-      // Г‡Г ГЄГ°Г»ГўГ ГҐГ¬ ГўГ±ГҐ ГЇГ®Г°ГІГ» Г·ГҐГ°ГҐГ§ TransferManager
+      // Закрываем все порты через TransferManager
       if Assigned(FTransferManager) then
         FTransferManager.CloseAllPorts;
 
@@ -1789,7 +1768,7 @@ procedure TFmxModuleManager.SetLogFileName(log_filename: String);
 var
   LogDir: string;
 begin
-  // Г‡Г ГЄГ°Г»ГўГ ГҐГ¬ ГґГ Г©Г« ГҐГ±Г«ГЁ Г®Г­ ГЎГ»Г« Г®ГІГЄГ°Г»ГІ
+  // Закрываем файл если он был открыт
   if LogFileIsOpened then
   begin
     try
@@ -1804,7 +1783,7 @@ begin
     LogFileIsOpened := false;
     FLogFileName := '';
     if Debug then
-      DebugOutput('Г‹ГЋГѓ Г®ГЎГ¬ГҐГ­Г  Г®ГІГЄГ«ГѕГ·ГҐГ­');
+      DebugOutput('ЛОГ обмена отключен');
   end
   else
   begin
@@ -1816,7 +1795,7 @@ begin
       except
         on E: Exception do
         begin
-          DebugOutput('ГЋГёГЁГЎГЄГ  Г±Г®Г§Г¤Г Г­ГЁГї Г¤ГЁГ°ГҐГЄГІГ®Г°ГЁГЁ Г¤Г«Гї Г«Г®ГЈГ : ' + E.Message);
+          DebugOutput('Ошибка создания директории для лога: ' + E.Message);
           LogFileIsOpened := false;
           FLogFileName := '';
           Exit;
@@ -1840,17 +1819,17 @@ begin
       begin
         if FileSize(LogFile) = 0 then
         begin
-          WriteLn(LogFile, '=== Г‹Г®ГЈ Г®ГЎГ¬ГҐГ­Г  Г¤Г Г­Г­Г»Г¬ГЁ Г·ГҐГ°ГҐГ§ COM-ГЇГ®Г°ГІ ГЁ Modbus TCP ===');
-          WriteLn(LogFile, '=== ГЌГ Г·Г Г«Г®: ' + DateTimeToStr(Now) + ' ===');
+          WriteLn(LogFile, '=== Лог обмена данными через COM-порт и Modbus TCP ===');
+          WriteLn(LogFile, '=== Начало: ' + DateTimeToStr(Now) + ' ===');
           WriteLn(LogFile, '');
         end;
         CloseFile(LogFile);
         if Debug then
-          DebugOutput('Г‹ГЋГѓ Г®ГЎГ¬ГҐГ­Г : ' + log_filename);
+          DebugOutput('ЛОГ обмена: ' + log_filename);
       end
       else
       begin
-        DebugOutput('ГЋГёГЁГЎГЄГ  Г®ГІГЄГ°Г»ГІГЁГї ГґГ Г©Г«Г  Г«Г®ГЈГ : ' + log_filename);
+        DebugOutput('Ошибка открытия файла лога: ' + log_filename);
         FLogFileName := '';
       end;
     except
@@ -1858,14 +1837,14 @@ begin
       begin
         LogFileIsOpened := false;
         FLogFileName := '';
-        DebugOutput('ГЋГёГЁГЎГЄГ  ГЇГ°ГЁ Г°Г ГЎГ®ГІГҐ Г± ГґГ Г©Г«Г®Г¬ Г«Г®ГЈГ : ' + E.Message);
+        DebugOutput('Ошибка при работе с файлом лога: ' + E.Message);
       end;
     end;
   end;
 end;
 
 // ============================================================
-//  ГѓГҐГІГІГҐГ°Г» Г±ГўГ®Г©Г±ГІГў
+//  Геттеры свойств
 // ============================================================
 
 function TFmxModuleManager.GetDebug: boolean;
@@ -1931,9 +1910,9 @@ end;
 //    if Result = '' then
 //    begin
 //      if FComPortNumber > 0 then
-//        Result := 'COM' + IntToStr(FComPortNumber) + ' (Г§Г ГЄГ°Г»ГІ)'
+//        Result := 'COM' + IntToStr(FComPortNumber) + ' (закрыт)'
 //      else
-//        Result := 'ГЏГ®Г°ГІГ» Г­ГҐ Г­Г Г±ГІГ°Г®ГҐГ­Г»';
+//        Result := 'Порты не настроены';
 //    end;
 //  finally
 //    FComPortsLock.Leave;
@@ -1975,7 +1954,7 @@ end;
 
 function TFmxModuleManager.GetComPortsCount: integer;
 begin
-  // ГЏГ®Г«ГіГ·Г ГҐГ¬ ГЄГ®Г«ГЁГ·ГҐГ±ГІГўГ® Г®ГІГЄГ°Г»ГІГ»Гµ ГЇГ®Г°ГІГ®Гў ГЁГ§ TransferManager
+  // Получаем количество открытых портов из TransferManager
   if Assigned(FTransferManager) then
     Result := FTransferManager.GetOpenPortsCount
   else
@@ -1986,7 +1965,7 @@ function TFmxModuleManager.GetComPortInformation(Idx: integer): TComPortInfo;
 var
   PortInfo: TComPortInfo;
 begin
-  // Г€Г­ГЁГ¶ГЁГ Г«ГЁГ§ГЁГ°ГіГҐГ¬ ГЇГіГ±ГІГ®Г© Г±ГІГ°ГіГЄГІГіГ°Г®Г© Г­Г  Г±Г«ГіГ·Г Г© Г®ГёГЁГЎГЄГЁ
+  // Инициализируем пустой структурой на случай ошибки
   FillChar(Result, SizeOf(Result), 0);
   Result.PortHandle := INVALID_HANDLE_VALUE;
   Result.PortNumber := -1;
@@ -2007,11 +1986,11 @@ var
 begin
   Result := '';
 
-  // TCP Г·Г Г±ГІГј
+  // TCP часть
   if TCP_Client_Active and TCP_Client.Connected then
     Result := 'TCP(' + ModbusTCPHost + ':' + IntToStr(ModbusTCPPort) + ')';
 
-  // COM ГЇГ®Г°ГІГ» ГЁГ§ TransferManager
+  // COM порты из TransferManager
   if Assigned(FTransferManager) then
   begin
     PortsList := FTransferManager.GetOpenPortsList;
@@ -2043,13 +2022,13 @@ begin
   if Result = '' then
   begin
     if FComPortNumber > 0 then
-      Result := 'COM' + IntToStr(FComPortNumber) + ' (Г§Г ГЄГ°Г»ГІ)'
+      Result := 'COM' + IntToStr(FComPortNumber) + ' (закрыт)'
     else
-      Result := 'ГЏГ®Г°ГІГ» Г­ГҐ Г­Г Г±ГІГ°Г®ГҐГ­Г»';
+      Result := 'Порты не настроены';
   end;
 end;
 
-// === ГЌГЋГ‚Г›Г‰ ГЊГ…Г’ГЋГ„ Г„Г‹Гџ ГЏГЋГ‹Г“Г—Г…ГЌГ€Гџ Г‘ГЏГ€Г‘ГЉГЂ ГЏГЋГђГ’ГЋГ‚ ===
+// === НОВЫЙ МЕТОД ДЛЯ ПОЛУЧЕНИЯ СПИСКА ПОРТОВ ===
 
 function TFmxModuleManager.GetOpenPortsList: TList<Integer>;
 begin
@@ -2060,7 +2039,7 @@ begin
 end;
 
 // ============================================================
-//  ГЊГҐГІГ®Г¤Г»-Г§Г ГЈГ«ГіГёГЄГЁ Г¤Г«Гї Г±Г®ГўГ¬ГҐГ±ГІГЁГ¬Г®Г±ГІГЁ
+//  Методы-заглушки для совместимости
 // ============================================================
 
 
@@ -2071,16 +2050,16 @@ end;
 
 procedure TFmxModuleManager.SetMaxChannels(const Value: byte);
 begin
-  // Г‡Г ГЈГ«ГіГёГЄГ 
+  // Заглушка
 end;
 
 // ============================================================
-//  ГЋГЎГ­Г®ГўГ«ГҐГ­ГЁГҐ UpdateNext (Г±ГІГ Г°Г»Г© Г¬ГҐГІГ®Г¤ - Г§Г ГЈГ«ГіГёГЄГ )
+//  Обновление UpdateNext (старый метод - заглушка)
 // ============================================================
 
 procedure TFmxModuleManager.UpdateNext;
 begin
-  // Г‡Г ГЈГ«ГіГёГЄГ  - ГЎГ®Г«ГјГёГҐ Г­ГҐ ГЁГ±ГЇГ®Г«ГјГ§ГіГҐГІГ±Гї
+  // Заглушка - больше не используется
 end;
 
 // ============================================================
