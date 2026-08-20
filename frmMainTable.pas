@@ -159,7 +159,9 @@ type
 
   TFlowGraphSample = record
     TimeStampMs: Int64;
-    Value: Double;
+    FlowValue: Double;
+    ErrorValue: Double;
+    ErrorValid: Boolean;
   end;
 
   TFlowGraphSeries = class
@@ -169,7 +171,8 @@ type
     FUserVisible: Boolean;
     FChannelAvailable: Boolean;
     FGraphIndex: Integer;
-    FColor: TAlphaColor;
+    FPointColor: TAlphaColor;
+    FLineColor: TAlphaColor;
     FSamples: TList<TFlowGraphSample>;
   public
     constructor Create(const AKey, ACaption: string; AColor: TAlphaColor; AVisible: Boolean);
@@ -180,7 +183,8 @@ type
     property UserVisible: Boolean read FUserVisible write FUserVisible;
     property ChannelAvailable: Boolean read FChannelAvailable write FChannelAvailable;
     property GraphIndex: Integer read FGraphIndex write FGraphIndex;
-    property Color: TAlphaColor read FColor write FColor;
+    property PointColor: TAlphaColor read FPointColor write FPointColor;
+    property LineColor: TAlphaColor read FLineColor write FLineColor;
     property Samples: TList<TFlowGraphSample> read FSamples;
   end;
 
@@ -207,6 +211,9 @@ type
     TargetLS: Double;
     LowerLS: Double;
     UpperLS: Double;
+    AccuracyText: string;
+    LowerPercent: Double;
+    UpperPercent: Double;
   end;
 
   TFlowGraphHistory = class
@@ -446,6 +453,7 @@ type
     MenuItemDevicesColumnStatus: TMenuItem;
     MenuItemDevicesColumnUUID: TMenuItem;
     MenuItemDevicesColumnCoefficient: TMenuItem;
+    MenuItemDevicesColumnCalculatedCoefficient: TMenuItem;
     MenuItemEtalonsWorkTablesGroup: TMenuItem;
     MenuItemEtalonsWorkTablesAddTable: TMenuItem;
     MenuItemEtalonsWorkTablesAddDeviceChannel: TMenuItem;
@@ -574,6 +582,7 @@ type
     TabItemChannelProperties: TTabItem;
     TabItemWorkTableProperties: TTabItem;
     StringColumnDeviceCoef1: TStringColumn;
+    StringColumnDeviceCalculatedCoef1: TStringColumn;
     ActionSessionCreatePoints: TAction;
     LayoutRepeats: TLayout;
     RectangleRepeats: TRectangle;
@@ -603,23 +612,27 @@ type
     LayoutEtalonGraphSection: TLayout;
     LayoutEtalonChart: TLayout;
     ChartEtalonFlow: TSimpleChart;
-    LayoutEtalonSelection: TLayout;
-    LabelEtalonSelection: TLabel;
-    HorzScrollBoxEtalonSelection: THorzScrollBox;
-    FlowLayoutEtalonChecks: TFlowLayout;
     SplitterFlowGraphs: TSplitter;
     LayoutDeviceGraphSection: TLayout;
     LayoutDeviceChart: TLayout;
     ChartDeviceFlow: TSimpleChart;
-    LayoutDeviceSelection: TLayout;
-    LabelDeviceSelection: TLabel;
-    HorzScrollBoxDeviceSelection: THorzScrollBox;
-    FlowLayoutDeviceChecks: TFlowLayout;
     LayoutGraphCommands: TLayout;
     ButtonClearFlowGraphs: TButton;
     Label3: TLabel;
     SpeedButton7: TSpeedButton;
     LabelScaleTotalWeight: TLabel;
+    PopupMenuFlowChart: TPopupMenu;
+    MenuItemFlowChartSettings: TMenuItem;
+    MenuItemFlowChartLineMode: TMenuItem;
+    MenuItemFlowChartLinePchip: TMenuItem;
+    MenuItemFlowChartLineSegments: TMenuItem;
+    MenuItemFlowChartValueMode: TMenuItem;
+    MenuItemFlowChartValueFlow: TMenuItem;
+    MenuItemFlowChartValueError: TMenuItem;
+    MenuItemFlowChartScale: TMenuItem;
+    MenuItemFlowChartScaleLog: TMenuItem;
+    MenuItemFlowChartScaleLinear: TMenuItem;
+    MenuItemFlowChartSeries: TMenuItem;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -772,6 +785,7 @@ type
     FGraphChannelsReady: Boolean;
     FGraphSamplingActive: Boolean;
     FLastGraphRunActive: Boolean;
+    FLastFlowGraphLimits: TFlowGraphLimits;
     FGraphsViewConfig: TGraphsViewConfig;
     FGraphsWorkspace: TFrameGraphsWorkspace;
     FGraphsRoot: TLayout;
@@ -817,6 +831,8 @@ type
   FUpdatingAutoSwitch: Boolean;
   FLastAutoStatusText: string;
   FLastMeasurementMainButtonAction: string;
+  FLastUiDataLogTick: UInt64;
+  FLastUiTimeText: string;
   FAutoTestTab: TTabItem;
   FAutoTestInfoLabel: TLabel;
   ComboBoxAutoTestScenario: TComboBox;
@@ -878,9 +894,8 @@ type
     procedure UpdateEtalonFlowChart;
     procedure UpdateDeviceFlowChart;
     procedure RenderFlowChart(AChart: TSimpleChart; AGraphSeries: TObjectDictionary<string, TFlowGraphSeries>; const ATitle: string; const AVisibleXMinMs, AVisibleXMaxMs: Int64; const AAxisMinSec, AAxisMaxSec: Double; AMeasurementSegment: Boolean);
-    procedure AddFlowLimitSeries(AChart: TSimpleChart; const ALimits: TFlowGraphLimits; const AAxisMinSec, AAxisMaxSec: Double);
+    procedure AddFlowLimitSeries(AChart: TSimpleChart; const ALimits: TFlowGraphLimits; const AAxisMinSec, AAxisMaxSec: Double; const AValueMode: TGraphValueMode);
     procedure ApplyFlowChartSeriesStyle(const ASeries: TChartSeries; const AColor: TAlphaColor; const AThickness: Single; const AShowMarkers: Boolean);
-    procedure RefreshFlowGraphCheckBoxes;
     procedure FlowGraphCheckBoxChange(Sender: TObject);
     function TryGetCurrentPointGraphTarget(out ATargetLS: Double): Boolean;
     function TryGetCurrentPointGraphTolerance(out ALowerLS: Double; out AUpperLS: Double): Boolean;
@@ -911,8 +926,16 @@ type
     procedure RenderConfiguredGraph(AView: TGraphPanelView);
     procedure GraphViewClick(Sender: TObject);
     procedure GraphPopupMenuPopup(Sender: TObject);
+    // Открывает штатное ПКМ видимого графика после обновления динамической ветки.
+    procedure FlowChartMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
+    // Назначает одно меню из .fmx обоим видимым графикам рабочего стола.
+    procedure InitializeVisibleGraphPopupMenus;
+    // Формирует только динамическую ветку серий штатного меню из .fmx.
+    procedure RebuildVisibleFlowChartMenu(const AGraphIndex: Integer);
     procedure SyncGraphsSettingsControls;
-    procedure RebuildGraphPopupMenu(AView: TGraphPanelView);
+    procedure RebuildGraphPopupMenu(APopupMenu: TPopupMenu;
+      const AGraphIndex: Integer);
     procedure RebuildSelectedGraphLegend;
     procedure GraphMenuClick(Sender: TObject);
     procedure BuildGraphsSettingsPanel;
@@ -1044,6 +1067,7 @@ type
 
     procedure SaveLayoutSettingsToWorkTable;
     procedure LoadLayoutSettingsFromWorkTable;
+    procedure SaveActiveWorkTableConfiguration;
     procedure ReleaseEmptyGridDevicesBeforeSave;
     property NewInstrumentName: string read FNewInstrumentName write FNewInstrumentName;
     property OnWorkTableCommand: TWorkTableCommandEvent read FOnWorkTableCommand write FOnWorkTableCommand;
@@ -1071,6 +1095,18 @@ type
     function GetAverageFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
     function CalculateCurrentDeviationPercent(const ACurrentValue,
       AMeanValue: Double): Double;
+    { Returns the common coefficient representation for the whole grid.
+      Mixed representations are displayed as the base imp/l representation. }
+    function GetGridCoefficientDimensionCoef(AWorkTable: TWorkTable): Integer;
+    function GetCoefficientUnit(ADimensionCoef: Integer): string;
+    { Updates both coefficient column headers for the whole grid. }
+    procedure UpdateDeviceCoefficientHeaders;
+    { Returns the passport coefficient in the common grid representation. }
+    function GetDeviceCoefficientText(AChannel: TChannel): string;
+    { Returns the conversion coefficient that would give zero error for the
+      current pulse count and the reference quantity. }
+    function GetCalculatedDeviceCoefficientText(AChannel: TChannel;
+      AWorkTable: TWorkTable): string;
     function GetErrorCellColor(AChannel: TChannel; const AText: string; out AColor: TAlphaColor): Boolean;
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
@@ -1156,7 +1192,8 @@ begin
   inherited Create;
   FKey := AKey;
   FCaption := ACaption;
-  FColor := AColor;
+  FPointColor := AColor;
+  FLineColor := AColor;
   FUserVisible := AVisible;
   FChannelAvailable := AVisible;
   FGraphIndex := 0;
@@ -1402,6 +1439,16 @@ begin
   FreeAndNil(FGraphSplitters);
   FreeAndNil(FGraphLayoutContainers);
   FreeAndNil(FGraphViews);
+  if ChartEtalonFlow <> nil then
+  begin
+    ChartEtalonFlow.OnMouseDown := nil;
+    ChartEtalonFlow.PopupMenu := nil;
+  end;
+  if ChartDeviceFlow <> nil then
+  begin
+    ChartDeviceFlow.OnMouseDown := nil;
+    ChartDeviceFlow.PopupMenu := nil;
+  end;
   FreeAndNil(FFlowGraphHistory);
   FreeAndNil(FGraphsViewConfig);
   FreeAndNil(FFrameMeasurementRun);
@@ -2042,17 +2089,17 @@ function TryToGetEvent:  EEventWorkTable;
 begin
     Result:=EEventWorkTable.ewtEvent;
 
-   if Assigned(AData)  and (AData is TEventNotification) then
+   if Assigned(AData) and (AData is TEventNotification) then
   begin
+    Notification := TEventNotification(AData);
 
-    WorkTableEvent := EEventWorkTable(Notification.Event);
-
-  if (Notification.Event < Ord(Low(EEventWorkTable))) or
+    if (Notification.Event < Ord(Low(EEventWorkTable))) or
      (Notification.Event > Ord(High(EEventWorkTable))) then
-    Exit;
+      Exit;
 
-   Result:=WorkTableEvent;
-  end else
+    Result := EEventWorkTable(Notification.Event);
+  end
+  else
   begin
 
      Result:=EEventWorkTable(AWorkTable.Event);
@@ -2088,6 +2135,29 @@ begin
     UpdateUIScale;
     OnChangeState(FActiveWorkTable.State);
     UpdateForm;
+    Exit;
+  end;
+
+  if WorkTableEvent = ewtSimulationMeasurementResultsSaved then
+  begin
+    { SaveMeasurementResults уже завершён, поэтому обработка перечитывает
+      окончательно сохранённые имитационные проливки, а не предыдущее состояние. }
+    if FActiveWorkTable = AWorkTable then
+    begin
+      if FFrameProceed <> nil then
+        FFrameProceed.RefreshResultsTab;
+      if FFrameMRResults <> nil then
+        FFrameMRResults.ReloadAndUpdate;
+    end;
+
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(
+        pcProc,
+        psForm,
+        'SimulationResultsUiRefreshed',
+        'Обработка обновлена после сохранения имитационной проливки',
+        AWorkTable.Name
+      );
     Exit;
   end;
 
@@ -2497,7 +2567,19 @@ var
   LayoutOrder: string;
 
 begin
+  { TMenuItem.TagString is not streamable in all supported Delphi versions.
+    Assign grid column names at runtime so lookup remains name-based. }
+  if (MenuItemDevicesColumnCoefficient <> nil) and
+     (StringColumnDeviceCoef1 <> nil) then
+    MenuItemDevicesColumnCoefficient.TagString := StringColumnDeviceCoef1.Name;
+
+  if (MenuItemDevicesColumnCalculatedCoefficient <> nil) and
+     (StringColumnDeviceCalculatedCoef1 <> nil) then
+    MenuItemDevicesColumnCalculatedCoefficient.TagString :=
+      StringColumnDeviceCalculatedCoef1.Name;
+
   EnsureFlowGraphDictionaries;
+  InitializeVisibleGraphPopupMenus;
   if ButtonClearFlowGraphs <> nil then
     ButtonClearFlowGraphs.OnClick := ButtonClearFlowGraphsClick;
   if (PanelControlWorkTables <> nil) and (TabItemWorkTable1 <> nil) and
@@ -2526,6 +2608,11 @@ begin
   FFrameFlowMeterProperties := nil;
   FFrameChannelProperties := nil;
   FFrameWorkTableProperties := nil;
+
+  { Toolbar trash removes the selected channel; the context-menu clear command
+    remains available through ActionDevicesClearRow. }
+  if SpeedButton3 <> nil then
+    SpeedButton3.Action := ActionDeleteDevice;
 
   RefreshGridRowCount(GridDevices, 2, 'initial-rows');
   RefreshGridValues(GridDevices, 'initial-rows');
@@ -3592,6 +3679,7 @@ begin
   begin
     AColumns[I].Name := AGrid.Columns[I].Name;
     AColumns[I].Position := AGrid.Columns[I].Index;
+    AColumns[I].Width := AGrid.Columns[I].Width;
     AColumns[I].Visible := AGrid.Columns[I].Visible;
   end;
 end;
@@ -3604,28 +3692,11 @@ end;
 procedure TFrameMainTable.ApplyGridColumnsLayout(AGrid: TGrid;
   const AColumns: TArray<TGridColumnLayout>);
 var
-  I, J, IndexChanged, VisibleChanged: Integer;
+  I, J, TargetPosition: Integer;
   Column: TColumn;
 begin
-  { Applies a WorkTable layout only when order or visibility really differs. }
+  { Restores visibility, width and order saved for the WorkTable grid. }
   if (AGrid = nil) or (Length(AColumns) = 0) then
-    Exit;
-  IndexChanged := 0;
-  VisibleChanged := 0;
-  for I := 0 to High(AColumns) do
-    for J := 0 to AGrid.ColumnCount - 1 do
-      if SameText(AGrid.Columns[J].Name, AColumns[I].Name) then
-      begin
-        Column := AGrid.Columns[J];
-        if Column.Visible <> AColumns[I].Visible then
-          Inc(VisibleChanged);
-        if (AColumns[I].Position >= 0) and
-           (AColumns[I].Position < AGrid.ColumnCount) and
-           (Column.Index <> AColumns[I].Position) then
-          Inc(IndexChanged);
-        Break;
-      end;
-  if (IndexChanged = 0) and (VisibleChanged = 0) then
     Exit;
 
   AGrid.BeginUpdate;
@@ -3635,12 +3706,24 @@ begin
         if SameText(AGrid.Columns[J].Name, AColumns[I].Name) then
         begin
           Column := AGrid.Columns[J];
-          if Column.Visible <> AColumns[I].Visible then
-            Column.Visible := AColumns[I].Visible;
-          if (AColumns[I].Position >= 0) and
-             (AColumns[I].Position < AGrid.ColumnCount) and
-             (Column.Index <> AColumns[I].Position) then
-            Column.Index := AColumns[I].Position;
+          Column.Visible := AColumns[I].Visible;
+          if AColumns[I].Width > 0 then
+            Column.Width := AColumns[I].Width;
+          Break;
+        end;
+
+    { Apply positions from left to right so an Index change cannot undo
+      positions that have already been restored. }
+    for TargetPosition := 0 to AGrid.ColumnCount - 1 do
+      for I := 0 to High(AColumns) do
+        if AColumns[I].Position = TargetPosition then
+        begin
+          for J := 0 to AGrid.ColumnCount - 1 do
+            if SameText(AGrid.Columns[J].Name, AColumns[I].Name) then
+            begin
+              AGrid.Columns[J].Index := TargetPosition;
+              Break;
+            end;
           Break;
         end;
   finally
@@ -3733,6 +3816,51 @@ begin
   if Length(WorkTable.DataPointsGridColumns) = 0 then
     EnforceDataPointsColumnsLayout;
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+end;
+
+{ Saves the current channel collection and grid layout immediately. }
+procedure TFrameMainTable.SaveActiveWorkTableConfiguration;
+var
+  Ini: TCustomIniFile;
+  WorkTableIndex: Integer;
+  WorkTableSection: string;
+begin
+  SaveLayoutSettingsToWorkTable;
+  if WorkTableManager = nil then
+    Exit;
+
+  WorkTableManager.Save;
+
+  { Persist the actual collection sizes explicitly in the selected project.
+    Loading is driven by these Count values, so a deleted trailing channel
+    cannot be restored from an obsolete channel section. }
+  if (FActiveWorkTable = nil) or (WorkTableManager.WorkTables = nil) then
+    Exit;
+
+  WorkTableIndex := WorkTableManager.WorkTables.IndexOf(FActiveWorkTable);
+  if WorkTableIndex < 0 then
+    Exit;
+
+  WorkTableSection := 'WorkTable.' + IntToStr(WorkTableIndex);
+  Ini := TProjectSettingsIni.Create(
+    GetProjectSettingsFileName,
+    STORAGE_TABLE_SETTINGS
+  );
+  try
+    Ini.WriteInteger(
+      WorkTableSection + '.Device',
+      'Count',
+      FActiveWorkTable.DeviceChannels.Count
+    );
+    Ini.WriteInteger(
+      WorkTableSection + '.Etalon',
+      'Count',
+      FActiveWorkTable.EtalonChannels.Count
+    );
+    Ini.UpdateFile;
+  finally
+    Ini.Free;
+  end;
 end;
 
 procedure TFrameMainTable.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -4657,6 +4785,7 @@ begin
     end;
 
     UpdateGrids;
+    SaveActiveWorkTableConfiguration;
   finally
     ClearChannelsByMissingDevices;
     if DataManager <> nil then
@@ -4686,6 +4815,7 @@ begin
   );
 
   InitTables;
+  SaveActiveWorkTableConfiguration;
 end;
 
 procedure TFrameMainTable.ActionAddEtalonChannelExecute(Sender: TObject);
@@ -4710,6 +4840,7 @@ begin
   );
 
   InitTables;
+  SaveActiveWorkTableConfiguration;
 end;
 
 procedure TFrameMainTable.ActionSaveWorkTableExecute(Sender: TObject);
@@ -5193,11 +5324,34 @@ begin
 end;
 
 procedure TFrameMainTable.CloneSelectedChannelDevice(ASource, ADest: TChannel);
+var
+  SourceDevice: TDevice;
+  ClonedDevice: TDevice;
+  ClonedDeviceUUID: string;
 begin
   if (ASource = nil) or (ADest = nil) then
     Exit;
 
   ADest.AssignFlowMeterFrom(ASource, FActiveWorkTable, True);
+
+  SourceDevice := nil;
+  ClonedDevice := nil;
+  if ASource.FlowMeter <> nil then
+    SourceDevice := ASource.FlowMeter.Device;
+  if ADest.FlowMeter <> nil then
+    ClonedDevice := ADest.FlowMeter.Device;
+
+  { AssignWithoutMeasurementHistory copies the source UUID. A channel copy must
+    receive its own UUID or later synchronization will replace another channel. }
+  if (SourceDevice <> nil) and (ClonedDevice <> nil) and
+     SameText(Trim(SourceDevice.UUID), Trim(ClonedDevice.UUID)) then
+  begin
+    ClonedDeviceUUID := TGUID.NewGuid.ToString;
+    ClonedDevice.UUID := ClonedDeviceUUID;
+    ADest.FlowMeter.DeviceUUID := ClonedDeviceUUID;
+    ADest.DeviceUUID := ClonedDeviceUUID;
+  end;
+
   MarkChannelDeviceModified(ADest);
 end;
 
@@ -5273,6 +5427,7 @@ begin
   Ch := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
   LoadChannelFromClipboard(Ch, FDeviceClipboard);
   UpdateGrids;
+  SaveActiveWorkTableConfiguration;
 end;
 
 procedure TFrameMainTable.ActionDevicesClearAllExecute(Sender: TObject);
@@ -5309,6 +5464,14 @@ begin
     Exit;
   end;
 
+  if MessageDlg(
+       'Заполнить все строки приборов по выбранной?',
+       TMsgDlgType.mtConfirmation,
+       [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+       0
+     ) <> mrYes then
+    Exit;
+
   for Ch in FActiveWorkTable.DeviceChannels do
     if (Ch <> Src) and Ch.Enabled then
     begin
@@ -5331,6 +5494,7 @@ begin
     end;
 
   UpdateGrids;
+  SaveActiveWorkTableConfiguration;
 end;
 
 procedure TFrameMainTable.ActionDevicesFromArchiveExecute(Sender: TObject);
@@ -5443,8 +5607,11 @@ begin
    Src := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
    if (FFrameProceed <> nil) and (Src <> nil) and (Src.FlowMeter <> nil) then
      FFrameProceed.RemoveProcessingDevice(Src.FlowMeter.Device);
-   FActiveWorkTable.DeleteChannel(Src);
-   UpdateGrids;
+   if FActiveWorkTable.DeleteChannel(Src) then
+   begin
+     UpdateGrids;
+     SaveActiveWorkTableConfiguration;
+   end;
 end;
 
 
@@ -5456,8 +5623,11 @@ begin
     Exit;
 
    Src := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
-   FActiveWorkTable.DeleteChannel(Src);
-   UpdateGrids;
+   if FActiveWorkTable.DeleteChannel(Src) then
+   begin
+     UpdateGrids;
+     SaveActiveWorkTableConfiguration;
+   end;
 end;
 
 procedure TFrameMainTable.ActionDevicesAssignEtalonExecute(Sender: TObject);
@@ -5510,6 +5680,7 @@ begin
   Ch := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
   LoadChannelFromClipboard(Ch, FEtalonClipboard);
   UpdateGrids;
+  SaveActiveWorkTableConfiguration;
 end;
 
 procedure TFrameMainTable.ActionEtalonsClearAllExecute(Sender: TObject);
@@ -5532,10 +5703,20 @@ begin
   Src := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
   if Src = nil then
     Exit;
+
+  if MessageDlg(
+       'Заполнить все строки эталонов по выбранной?',
+       TMsgDlgType.mtConfirmation,
+       [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+       0
+     ) <> mrYes then
+    Exit;
+
   for Ch in FActiveWorkTable.EtalonChannels do
     if Ch <> Src then
       CloneSelectedChannelDevice(Src, Ch);
   UpdateGrids;
+  SaveActiveWorkTableConfiguration;
 end;
 
 procedure TFrameMainTable.ActionEtalonsFromArchiveExecute(Sender: TObject);
@@ -5640,17 +5821,37 @@ var
   I: Integer;
   DeviceChannel: TChannel;
   EtalonChannel: TChannel;
+  SignalSource: string;
+  AcquisitionActive: Boolean;
+
+  procedure StoreChannelSignals(AChannel: TChannel);
+  begin
+    if AChannel = nil then Exit;
+    if not AChannel.Enabled then
+    begin
+      AChannel.ClearRuntimeMeasurements;
+      Exit;
+    end;
+    AChannel.RecordPendingMeasurements(SignalSource);
+    if AChannel.ValueImpTotal <> nil then
+      AChannel.ValueImpTotal.SetValue(AChannel.ImpResult);
+  end;
 begin
   NormalizeActiveWorkTable;
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
+  { Only an active acquisition cycle turns runtime fields into valid samples. }
+  AcquisitionActive := WorkTable.State in [swtMONITOR, swtEXECUTE];
+  if WorkTable.IsSimulationMode then SignalSource := 'Simulation'
+  else SignalSource := 'Device';
+
 
 
 
   // Основные MeterValues рабочего стола.
-   WorkTable.SetTemperature(WorkTable.FluidTemp.BeforeValue, WorkTable.FluidTemp.AfterValue);
+  WorkTable.SetTemperature(WorkTable.FluidTemp.BeforeValue, WorkTable.FluidTemp.AfterValue);
   WorkTable.ValueTempertureBefore.SetValue(WorkTable.FluidTemp.BeforeValue);
   WorkTable.ValueTempertureAfter.SetValue(WorkTable.FluidTemp.AfterValue);
 
@@ -5668,9 +5869,8 @@ begin
     if (EtalonChannel = nil) or (EtalonChannel.FlowMeter = nil) then
       Continue;
 
-    EtalonChannel.ValueCurrent.SetValue(EtalonChannel.CurSec);
-    EtalonChannel.ValueImp.SetValue(EtalonChannel.ImpSec);
-    EtalonChannel.ValueImpTotal.SetValue(EtalonChannel.ImpResult);
+    if AcquisitionActive then StoreChannelSignals(EtalonChannel)
+    else if not EtalonChannel.Enabled then EtalonChannel.ClearRuntimeMeasurements;
   end;
 
   // Основные MeterValues каналов приборов.
@@ -5680,14 +5880,8 @@ begin
     if (DeviceChannel = nil) or (DeviceChannel.FlowMeter = nil) then
       Continue;
 
-         if DeviceChannel.ValueCurrent<>nil then
-    DeviceChannel.ValueCurrent.SetValue(DeviceChannel.CurSec);
-         if DeviceChannel.ValueImp<>nil then
-    DeviceChannel.ValueImp.SetValue(DeviceChannel.ImpSec);
-         if DeviceChannel.ValueImpTotal<>nil then
-    DeviceChannel.ValueImpTotal.SetValue(DeviceChannel.ImpResult);
-         if DeviceChannel.ValueInterface<>nil then
-    DeviceChannel.ValueInterface.SetValue(DeviceChannel.ValueSec);
+    if AcquisitionActive then StoreChannelSignals(DeviceChannel)
+    else if not DeviceChannel.Enabled then DeviceChannel.ClearRuntimeMeasurements;
   end;
 
   WorkTable.RecalculateAllMeterValues;
@@ -5750,6 +5944,8 @@ begin
     UpdateUIScale;
     UpdateUIFlowRate;
     UpdateUIConditions;
+    if FFrameChannelProperties <> nil then
+      FFrameChannelProperties.UpdateDynamicValues;
   finally
     IsUpdating := False;
   end;
@@ -5760,6 +5956,7 @@ begin
   IsUpdating := True;
   try
 //Grids
+    if (WorkTable.State =  swtMONITOR) or (WorkTable.State =  swtEXECUTE) then
    UpdateGrids;
   finally
    IsUpdating := False;
@@ -5876,6 +6073,158 @@ begin
     FFlowGraphHistory := TFlowGraphHistory.Create;
 end;
 
+// Создаёт контекстные меню для реально отображаемых ChartEtalonFlow и
+// ChartDeviceFlow; меню родительского рабочего стола больше не перехватывает ПКМ.
+procedure TFrameMainTable.InitializeVisibleGraphPopupMenus;
+begin
+  if FGraphsViewConfig = nil then
+    FGraphsViewConfig := TGraphsViewConfig.Create;
+  FGraphsViewConfig.EnsurePanelCount(2);
+
+  { GraphMenuClick is private, therefore its handlers must not be streamed
+    from .fmx and are assigned only after the frame has been loaded. }
+  if MenuItemFlowChartLinePchip <> nil then
+    MenuItemFlowChartLinePchip.OnClick := GraphMenuClick;
+  if MenuItemFlowChartLineSegments <> nil then
+    MenuItemFlowChartLineSegments.OnClick := GraphMenuClick;
+  if MenuItemFlowChartValueFlow <> nil then
+    MenuItemFlowChartValueFlow.OnClick := GraphMenuClick;
+  if MenuItemFlowChartValueError <> nil then
+    MenuItemFlowChartValueError.OnClick := GraphMenuClick;
+  if MenuItemFlowChartScaleLog <> nil then
+    MenuItemFlowChartScaleLog.OnClick := GraphMenuClick;
+  if MenuItemFlowChartScaleLinear <> nil then
+    MenuItemFlowChartScaleLinear.OnClick := GraphMenuClick;
+
+  if ChartEtalonFlow <> nil then
+  begin
+    ChartEtalonFlow.PopupMenu := nil;
+    ChartEtalonFlow.OnMouseDown := FlowChartMouseDown;
+  end;
+  if ChartDeviceFlow <> nil then
+  begin
+    ChartDeviceFlow.PopupMenu := nil;
+    ChartDeviceFlow.OnMouseDown := FlowChartMouseDown;
+  end;
+end;
+
+// Формирует только список серий; постоянные настройки принадлежат меню из .fmx.
+procedure TFrameMainTable.RebuildVisibleFlowChartMenu(
+  const AGraphIndex: Integer);
+const
+  ColorNames: array[0..11] of string = ('Синий', 'Красный', 'Зелёный',
+    'Оранжевый', 'Фиолетовый', 'Бирюзовый', 'Жёлтый', 'Коричневый',
+    'Индиго', 'Салатовый', 'Розовый', 'Серый');
+var
+  CurrentPair: TPair<string, TFlowGraphSeries>;
+
+  function AddItem(AParent: TFmxObject; const ACaption,
+    ACommand: string): TMenuItem;
+  begin
+    Result := TMenuItem.Create(nil);
+    Result.Text := ACaption;
+    Result.TagString := ACommand;
+    if ACommand <> '' then
+      Result.OnClick := GraphMenuClick;
+    AParent.AddObject(Result);
+  end;
+
+  procedure AddSeries(ASeries: TFlowGraphSeries);
+  var
+    SeriesRoot, PointColorRoot, LineColorRoot, Item: TMenuItem;
+    ColorIndex: Integer;
+  begin
+    if (ASeries = nil) or (ASeries.GraphIndex <> AGraphIndex) then
+      Exit;
+
+    SeriesRoot := AddItem(MenuItemFlowChartSeries, ASeries.Caption, '');
+    Item := AddItem(SeriesRoot, 'Показывать',
+      Format('visible|%d|%s', [AGraphIndex, ASeries.Key]));
+    Item.IsChecked := ASeries.UserVisible;
+
+    PointColorRoot := AddItem(SeriesRoot, 'Цвет точек', '');
+    LineColorRoot := AddItem(SeriesRoot, 'Цвет линии', '');
+    for ColorIndex := Low(FLOW_GRAPH_COLORS) to High(FLOW_GRAPH_COLORS) do
+    begin
+      Item := AddItem(PointColorRoot, ColorNames[ColorIndex],
+        Format('pointcolor|%d|%s|%d', [AGraphIndex, ASeries.Key,
+          ColorIndex]));
+      Item.IsChecked := ASeries.PointColor = FLOW_GRAPH_COLORS[ColorIndex];
+
+      Item := AddItem(LineColorRoot, ColorNames[ColorIndex],
+        Format('linecolor|%d|%s|%d', [AGraphIndex, ASeries.Key,
+          ColorIndex]));
+      Item.IsChecked := ASeries.LineColor = FLOW_GRAPH_COLORS[ColorIndex];
+    end;
+  end;
+begin
+  if (PopupMenuFlowChart = nil) or (MenuItemFlowChartSeries = nil) or
+     (FFlowGraphHistory = nil) or (FGraphsViewConfig = nil) or
+     (AGraphIndex < 0) or
+     (AGraphIndex >= FGraphsViewConfig.Panels.Count) then
+    Exit;
+
+  MenuItemFlowChartLinePchip.TagString :=
+    Format('linemode|%d|pchip', [AGraphIndex]);
+  MenuItemFlowChartLineSegments.TagString :=
+    Format('linemode|%d|linear', [AGraphIndex]);
+  MenuItemFlowChartValueFlow.TagString :=
+    Format('valuemode|%d|flow', [AGraphIndex]);
+  MenuItemFlowChartValueError.TagString :=
+    Format('valuemode|%d|error', [AGraphIndex]);
+  MenuItemFlowChartScaleLog.TagString :=
+    Format('flowscale|%d|log', [AGraphIndex]);
+  MenuItemFlowChartScaleLinear.TagString :=
+    Format('flowscale|%d|linear', [AGraphIndex]);
+
+  MenuItemFlowChartLinePchip.IsChecked :=
+    FGraphsViewConfig.Panels[AGraphIndex].LineMode = glmPchipTime;
+  MenuItemFlowChartLineSegments.IsChecked :=
+    FGraphsViewConfig.Panels[AGraphIndex].LineMode = glmLinearSegments;
+  MenuItemFlowChartValueFlow.IsChecked :=
+    FGraphsViewConfig.Panels[AGraphIndex].ValueMode = gvmFlow;
+  MenuItemFlowChartValueError.IsChecked :=
+    FGraphsViewConfig.Panels[AGraphIndex].ValueMode = gvmError;
+  MenuItemFlowChartScale.Enabled :=
+    FGraphsViewConfig.Panels[AGraphIndex].ValueMode = gvmFlow;
+  MenuItemFlowChartScaleLog.IsChecked :=
+    FGraphsViewConfig.Panels[AGraphIndex].FlowScale = gfsLogarithmic;
+  MenuItemFlowChartScaleLinear.IsChecked :=
+    FGraphsViewConfig.Panels[AGraphIndex].FlowScale = gfsLinear;
+
+  while MenuItemFlowChartSeries.ItemsCount > 0 do
+    MenuItemFlowChartSeries.Items[
+      MenuItemFlowChartSeries.ItemsCount - 1].Free;
+
+  for CurrentPair in FFlowGraphHistory.EtalonSeries do
+    AddSeries(CurrentPair.Value);
+  for CurrentPair in FFlowGraphHistory.DeviceSeries do
+    AddSeries(CurrentPair.Value);
+end;
+
+// Открывает штатное меню в точке ПКМ по рабочей схеме frmProceed.Chart1MouseDown.
+procedure TFrameMainTable.FlowChartMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+var
+  GraphIndex: Integer;
+  P: TPointF;
+begin
+  if (Button <> TMouseButton.mbRight) or not (Sender is TControl) or
+     (PopupMenuFlowChart = nil) then
+    Exit;
+
+  if Sender = ChartEtalonFlow then
+    GraphIndex := 0
+  else if Sender = ChartDeviceFlow then
+    GraphIndex := 1
+  else
+    Exit;
+
+  RebuildVisibleFlowChartMenu(GraphIndex);
+  P := TControl(Sender).LocalToScreen(PointF(X, Y));
+  PopupMenuFlowChart.Popup(P.X, P.Y);
+end;
+
 function TFrameMainTable.FlowGraphSamplesCount(ADict: TObjectDictionary<string, TFlowGraphSeries>): Integer;
 var
   Pair: TPair<string, TFlowGraphSeries>;
@@ -5945,13 +6294,40 @@ begin
 end;
 
 function TFrameMainTable.TryGetFlowGraphLimits(out ALimits: TFlowGraphLimits): Boolean;
+var
+  Run: TMeasurementRun;
+  Point: TDevicePoint;
+  MinPercent, MaxPercent: Double;
 begin
   ALimits := Default(TFlowGraphLimits);
   ALimits.TargetValid := TryGetCurrentPointGraphTarget(ALimits.TargetLS);
-  ALimits.ToleranceValid := False;
   if ALimits.TargetValid then
-    ALimits.ToleranceValid := TryGetCurrentPointGraphTolerance(ALimits.LowerLS, ALimits.UpperLS);
-  ALimits.Valid := ALimits.ToleranceValid;
+  begin
+    Run := TMeasurementRun(FActiveWorkTable.MeasurementRun);
+    Point := Run.CurrentPoint;
+    if Point <> nil then
+    begin
+      ALimits.AccuracyText := Point.FlowAccuracy;
+      if AccuracyToRange(ALimits.AccuracyText, MinPercent, MaxPercent) then
+      begin
+        ALimits.LowerPercent := -Abs(MinPercent);
+        ALimits.UpperPercent := Abs(MaxPercent);
+        ALimits.LowerLS := ALimits.TargetLS +
+          Abs(ALimits.TargetLS) * ALimits.LowerPercent / 100.0;
+        ALimits.UpperLS := ALimits.TargetLS +
+          Abs(ALimits.TargetLS) * ALimits.UpperPercent / 100.0;
+        ALimits.ToleranceValid :=
+          (not IsNan(ALimits.LowerLS)) and
+          (not IsInfinite(ALimits.LowerLS)) and
+          (not IsNan(ALimits.UpperLS)) and
+          (not IsInfinite(ALimits.UpperLS));
+      end;
+    end;
+    ALimits.Valid := ALimits.ToleranceValid;
+    FLastFlowGraphLimits := ALimits;
+  end
+  else
+    ALimits := FLastFlowGraphLimits;
   Result := ALimits.TargetValid;
 end;
 
@@ -6031,6 +6407,7 @@ begin
     FFlowGraphXMin := 0; FFlowGraphXMax := 0; FCurrentGraphPointUUID := ''; FCurrentGraphPointIndex := -1;
     FCurrentGraphPointKey := ''; FCurrentGraphPointStartMs := 0; FGraphMonitorStartMs := 0; FLastFlowGraphSampleMs := 0;
     FMeasurementRunInstance := nil; FGraphChannelsReady := False; FGraphSamplingActive := False; FLastGraphRunActive := False;
+    FLastFlowGraphLimits := Default(TFlowGraphLimits);
   end;
   ValidKeys := TDictionary<string, Boolean>.Create;
   try
@@ -6046,7 +6423,6 @@ begin
   finally
     ValidKeys.Free;
   end;
-  RefreshFlowGraphCheckBoxes;
   RebuildSelectedGraphLegend;
   if FActiveWorkTable <> nil then
     RenderFlowGraphs;
@@ -6075,38 +6451,6 @@ begin
   QueueRenderGraphViews;
 end;
 
-procedure TFrameMainTable.RefreshFlowGraphCheckBoxes;
-  procedure BuildChecks(AParent: TFlowLayout; ADict: TObjectDictionary<string, TFlowGraphSeries>);
-  var
-    Pair: TPair<string, TFlowGraphSeries>;
-    CheckBox: TCheckBox;
-  begin
-    if (AParent = nil) or (ADict = nil) then
-      Exit;
-    while AParent.ChildrenCount > 0 do
-      AParent.Children[0].Free;
-    for Pair in ADict do
-    begin
-      if Pair.Value = nil then
-        Continue;
-      CheckBox := TCheckBox.Create(AParent);
-      CheckBox.Parent := AParent;
-      CheckBox.Text := Pair.Value.Caption;
-      CheckBox.TagString := Pair.Key;
-      CheckBox.IsChecked := Pair.Value.UserVisible;
-      CheckBox.Enabled := Pair.Value.ChannelAvailable;
-      CheckBox.Width := 220;
-      CheckBox.Height := 32;
-      CheckBox.OnChange := FlowGraphCheckBoxChange;
-    end;
-  end;
-begin
-  if FFlowGraphHistory = nil then
-    Exit;
-  BuildChecks(FlowLayoutEtalonChecks, FFlowGraphHistory.EtalonSeries);
-  BuildChecks(FlowLayoutDeviceChecks, FFlowGraphHistory.DeviceSeries);
-end;
-
 procedure TFrameMainTable.AddFlowGraphSamples(const ATimeStampMs: Int64);
   procedure LogSample(const AKind, AKey: string; const ARawValue: Double; const AAccepted: Boolean; const AReason: string; const ASamplesBefore, ASamplesAfter: Integer);
   begin
@@ -6124,7 +6468,7 @@ procedure TFrameMainTable.AddFlowGraphSamples(const ATimeStampMs: Int64);
     Key: string;
     S: TFlowGraphSeries;
     Sample: TFlowGraphSample;
-    RawValue: Double;
+    RawValue, RawError: Double;
   begin
     if AList = nil then
       Exit;
@@ -6133,6 +6477,7 @@ procedure TFrameMainTable.AddFlowGraphSamples(const ATimeStampMs: Int64);
       C := AList[I];
       Key := '';
       RawValue := 0;
+      RawError := 0;
       if FActiveWorkTable <> nil then
         Key := BuildFlowGraphSeriesKey(AKind, FActiveWorkTable, C, I);
       if C = nil then
@@ -6174,7 +6519,18 @@ procedure TFrameMainTable.AddFlowGraphSamples(const ATimeStampMs: Int64);
         Continue;
       end;
       Sample.TimeStampMs := ATimeStampMs;
-      Sample.Value := RawValue;
+      Sample.FlowValue := RawValue;
+      Sample.ErrorValue := 0;
+      Sample.ErrorValid := False;
+      if C.FlowMeter.ValueError <> nil then
+      begin
+        RawError := C.FlowMeter.ValueError.GetDoubleValue;
+        if (not IsNan(RawError)) and (not IsInfinite(RawError)) then
+        begin
+          Sample.ErrorValue := RawError;
+          Sample.ErrorValid := True;
+        end;
+      end;
       LogSample(AKind, Key, RawValue, True, '', S.Samples.Count, S.Samples.Count + 1);
       S.Samples.Add(Sample);
       while S.Samples.Count > MaxGraphSampleCountPerSeries do
@@ -6202,15 +6558,27 @@ end;
 
 
 procedure TFrameMainTable.SetFlowChartYAxis(AChart: TSimpleChart; const AYMin, AYMax: Double);
+var
+  SafeMin: Double;
 begin
   if (AChart = nil) or IsNan(AYMin) or IsInfinite(AYMin) or
      IsNan(AYMax) or IsInfinite(AYMax) or (AYMax <= AYMin) then
     Exit;
-  AChart.YMin := AYMin;
+  SafeMin := AYMin;
+  if AChart.LogarithmicY then
+  begin
+    if AYMax <= 0 then
+      Exit;
+    if SafeMin <= 0 then
+      SafeMin := AYMax / 1000;
+  end;
+  AChart.YMin := SafeMin;
   AChart.YMax := AYMax;
 end;
 
-procedure TFrameMainTable.AddFlowLimitSeries(AChart: TSimpleChart; const ALimits: TFlowGraphLimits; const AAxisMinSec, AAxisMaxSec: Double);
+procedure TFrameMainTable.AddFlowLimitSeries(AChart: TSimpleChart;
+  const ALimits: TFlowGraphLimits; const AAxisMinSec, AAxisMaxSec: Double;
+  const AValueMode: TGraphValueMode);
 var
   TargetSeries, LowerSeries, UpperSeries: TChartSeries;
   TargetValue, LowerValue, UpperValue: Double;
@@ -6220,25 +6588,50 @@ begin
 
   if ALimits.TargetValid then
   begin
-    TargetValue := FlowToCurrentDimension(ALimits.TargetLS);
-    TargetSeries := AChart.AddSeries('Заданный расход');
-    ApplyFlowChartSeriesStyle(TargetSeries, TAlphaColors.Green, 1.5, False);
-    TargetSeries.AddPoint(AAxisMinSec, TargetValue);
-    TargetSeries.AddPoint(AAxisMaxSec, TargetValue);
+    if AValueMode = gvmError then
+      TargetValue := 0
+    else
+      TargetValue := FlowToCurrentDimension(ALimits.TargetLS);
+    if AChart.LogarithmicY and (TargetValue <= 0) then
+      TargetValue := 0;
+    if (not AChart.LogarithmicY) or (TargetValue > 0) then
+    begin
+      if AValueMode = gvmError then
+        TargetSeries := AChart.AddSeries('Нулевая погрешность')
+      else
+        TargetSeries := AChart.AddSeries('Заданный расход');
+      ApplyFlowChartSeriesStyle(TargetSeries, TAlphaColors.Green, 1.5, False);
+      TargetSeries.AddPoint(AAxisMinSec, TargetValue);
+      TargetSeries.AddPoint(AAxisMaxSec, TargetValue);
+    end;
   end;
 
   if ALimits.ToleranceValid then
   begin
-    LowerValue := FlowToCurrentDimension(ALimits.LowerLS);
-    UpperValue := FlowToCurrentDimension(ALimits.UpperLS);
-    LowerSeries := AChart.AddSeries('Нижняя граница');
-    UpperSeries := AChart.AddSeries('Верхняя граница');
-    ApplyFlowChartSeriesStyle(LowerSeries, TAlphaColors.Red, 1.0, False);
-    ApplyFlowChartSeriesStyle(UpperSeries, TAlphaColors.Red, 1.0, False);
-    LowerSeries.AddPoint(AAxisMinSec, LowerValue);
-    LowerSeries.AddPoint(AAxisMaxSec, LowerValue);
-    UpperSeries.AddPoint(AAxisMinSec, UpperValue);
-    UpperSeries.AddPoint(AAxisMaxSec, UpperValue);
+    if AValueMode = gvmError then
+    begin
+      LowerValue := ALimits.LowerPercent;
+      UpperValue := ALimits.UpperPercent;
+    end
+    else
+    begin
+      LowerValue := FlowToCurrentDimension(ALimits.LowerLS);
+      UpperValue := FlowToCurrentDimension(ALimits.UpperLS);
+    end;
+    if (not AChart.LogarithmicY) or (LowerValue > 0) then
+    begin
+      LowerSeries := AChart.AddSeries('Нижняя граница');
+      ApplyFlowChartSeriesStyle(LowerSeries, TAlphaColors.Red, 1.0, False);
+      LowerSeries.AddPoint(AAxisMinSec, LowerValue);
+      LowerSeries.AddPoint(AAxisMaxSec, LowerValue);
+    end;
+    if (not AChart.LogarithmicY) or (UpperValue > 0) then
+    begin
+      UpperSeries := AChart.AddSeries('Верхняя граница');
+      ApplyFlowChartSeriesStyle(UpperSeries, TAlphaColors.Red, 1.0, False);
+      UpperSeries.AddPoint(AAxisMinSec, UpperValue);
+      UpperSeries.AddPoint(AAxisMaxSec, UpperValue);
+    end;
   end;
 end;
 
@@ -6246,17 +6639,129 @@ procedure TFrameMainTable.RenderFlowChart(AChart: TSimpleChart; AGraphSeries: TO
 var
   Pair: TPair<string, TFlowGraphSeries>;
   Sample: TFlowGraphSample;
-  Series: TChartSeries;
-  XSec, V: Double;
+  Series, PointSeries: TChartSeries;
+  XSec, V, DisplayValue: Double;
   UnitName: string;
   Limits: TFlowGraphLimits;
   HasData: Boolean;
-  DataMinLS, DataMaxLS, YDataMin, YDataMax, RangeLS, PaddingLS: Double;
+  DataMin, DataMax, YDataMin, YDataMax, ValueRange, Padding: Double;
   AxisMinDisplay, AxisMaxDisplay: Double;
   MinimumRange, CenterValue: Double;
   AutoScaleMode: TGraphAutoScaleMode;
+  LineMode: TGraphLineMode;
+  FlowScale: TGraphFlowScale;
+  ValueMode: TGraphValueMode;
   ViewIndex, ScaleSeriesCount: Integer;
   UseForAutoScale: Boolean;
+
+  // Строит формосохраняющую PCHIP-линию по времени, не меняя исходные точки.
+  procedure BuildPchipTimeLine(const APoints: TList<TPointF>;
+    ASeries: TChartSeries);
+  const
+    CSamplesPerInterval = 12;
+  var
+    PointX, PointY, H, Delta, Derivative: TArray<Double>;
+    PointCount, PointIndex, SegmentIndex, SampleIndex: Integer;
+    T, H00, H10, H01, H11, CurveX, CurveY: Double;
+
+    function SameNonZeroSign(const A, B: Double): Boolean;
+    begin
+      Result := not SameValue(A, 0.0) and not SameValue(B, 0.0) and
+        ((A > 0) = (B > 0));
+    end;
+
+    function EndpointDerivative(const H0, H1, Delta0,
+      Delta1: Double): Double;
+    begin
+      Result := ((2 * H0 + H1) * Delta0 - H0 * Delta1) / (H0 + H1);
+      if not SameNonZeroSign(Result, Delta0) then
+        Result := 0
+      else if not SameNonZeroSign(Delta0, Delta1) and
+              (Abs(Result) > 3 * Abs(Delta0)) then
+        Result := 3 * Delta0;
+    end;
+
+    procedure CopyPoints;
+    var
+      P: TPointF;
+    begin
+      ASeries.ClearPoints;
+      for P in APoints do
+        ASeries.AddPoint(P.X, P.Y);
+    end;
+  begin
+    if (APoints = nil) or (ASeries = nil) then
+      Exit;
+    if APoints.Count < 3 then
+    begin
+      CopyPoints;
+      Exit;
+    end;
+
+    PointCount := APoints.Count;
+    SetLength(PointX, PointCount);
+    SetLength(PointY, PointCount);
+    SetLength(H, PointCount - 1);
+    SetLength(Delta, PointCount - 1);
+    SetLength(Derivative, PointCount);
+    for PointIndex := 0 to PointCount - 1 do
+    begin
+      PointX[PointIndex] := APoints[PointIndex].X;
+      PointY[PointIndex] := APoints[PointIndex].Y;
+      if (PointIndex > 0) and
+         (PointX[PointIndex] <= PointX[PointIndex - 1]) then
+      begin
+        CopyPoints;
+        Exit;
+      end;
+    end;
+
+    for PointIndex := 0 to PointCount - 2 do
+    begin
+      H[PointIndex] := PointX[PointIndex + 1] - PointX[PointIndex];
+      Delta[PointIndex] :=
+        (PointY[PointIndex + 1] - PointY[PointIndex]) / H[PointIndex];
+    end;
+    Derivative[0] := EndpointDerivative(H[0], H[1], Delta[0], Delta[1]);
+    Derivative[PointCount - 1] := EndpointDerivative(
+      H[PointCount - 2], H[PointCount - 3], Delta[PointCount - 2],
+      Delta[PointCount - 3]);
+    for PointIndex := 1 to PointCount - 2 do
+      if SameNonZeroSign(Delta[PointIndex - 1], Delta[PointIndex]) then
+        Derivative[PointIndex] :=
+          (2 * H[PointIndex] + H[PointIndex - 1] + H[PointIndex] +
+           2 * H[PointIndex - 1]) /
+          ((2 * H[PointIndex] + H[PointIndex - 1]) /
+             Delta[PointIndex - 1] +
+           (H[PointIndex] + 2 * H[PointIndex - 1]) /
+             Delta[PointIndex])
+      else
+        Derivative[PointIndex] := 0;
+
+    ASeries.ClearPoints;
+    for SegmentIndex := 0 to PointCount - 2 do
+      for SampleIndex := 0 to CSamplesPerInterval do
+      begin
+        if (SegmentIndex > 0) and (SampleIndex = 0) then
+          Continue;
+        T := SampleIndex / CSamplesPerInterval;
+        H00 := 2 * T * T * T - 3 * T * T + 1;
+        H10 := T * T * T - 2 * T * T + T;
+        H01 := -2 * T * T * T + 3 * T * T;
+        H11 := T * T * T - T * T;
+        CurveX := PointX[SegmentIndex] + H[SegmentIndex] * T;
+        CurveY := H00 * PointY[SegmentIndex] +
+          H10 * H[SegmentIndex] * Derivative[SegmentIndex] +
+          H01 * PointY[SegmentIndex + 1] +
+          H11 * H[SegmentIndex] * Derivative[SegmentIndex + 1];
+        if IsNan(CurveY) or IsInfinite(CurveY) then
+        begin
+          CopyPoints;
+          Exit;
+        end;
+        ASeries.AddPoint(CurveX, CurveY);
+      end;
+  end;
 begin
   if (AChart = nil) or (AGraphSeries = nil) then
     Exit;
@@ -6268,22 +6773,57 @@ begin
   AChart.BeginUpdate;
   try
     AChart.ClearAllSeries;
-    AChart.Title := ATitle;
     AChart.XTitle := 'Время, с';
-    AChart.YTitle := 'Расход, ' + UnitName;
 
     HasData := False;
     ScaleSeriesCount := 0;
     AutoScaleMode := gasWorkingValues;
-    if FGraphViews <> nil then
-      for ViewIndex := 0 to FGraphViews.Count - 1 do
-        if FGraphViews[ViewIndex].Chart = AChart then
-        begin
-          AutoScaleMode := FGraphsViewConfig.Panels[ViewIndex].AutoScaleMode;
-          Break;
-        end;
-    DataMinLS := 0;
-    DataMaxLS := 0;
+    LineMode := glmLinearSegments;
+    ValueMode := gvmFlow;
+    FlowScale := gfsLinear;
+    ViewIndex := -1;
+    if FGraphsViewConfig <> nil then
+    begin
+      if AChart = ChartEtalonFlow then
+        ViewIndex := 0
+      else if AChart = ChartDeviceFlow then
+        ViewIndex := 1;
+
+      if (ViewIndex < 0) and (FGraphViews <> nil) then
+        for ViewIndex := 0 to FGraphViews.Count - 1 do
+          if FGraphViews[ViewIndex].Chart = AChart then
+            Break;
+
+      if (ViewIndex >= 0) and
+         (ViewIndex < FGraphsViewConfig.Panels.Count) then
+      begin
+        AutoScaleMode := FGraphsViewConfig.Panels[ViewIndex].AutoScaleMode;
+        LineMode := FGraphsViewConfig.Panels[ViewIndex].LineMode;
+        ValueMode := FGraphsViewConfig.Panels[ViewIndex].ValueMode;
+        FlowScale := FGraphsViewConfig.Panels[ViewIndex].FlowScale;
+      end;
+    end;
+
+    if ValueMode = gvmError then
+    begin
+      if AChart = ChartEtalonFlow then
+        AChart.Title := 'Погрешность эталонов'
+      else if AChart = ChartDeviceFlow then
+        AChart.Title := 'Погрешность поверяемых приборов'
+      else
+        AChart.Title := ATitle + ' (погрешность)';
+      AChart.YTitle := 'Погрешность, %';
+      AChart.LogarithmicY := False;
+    end
+    else
+    begin
+      AChart.Title := ATitle;
+      AChart.YTitle := 'Расход, ' + UnitName;
+      AChart.LogarithmicY := FlowScale = gfsLogarithmic;
+    end;
+
+    DataMin := 0;
+    DataMax := 0;
     TryGetFlowGraphLimits(Limits);
 
     for Pair in AGraphSeries do
@@ -6291,19 +6831,24 @@ begin
       if (Pair.Value = nil) or (not Pair.Value.EffectiveVisible) then
         Continue;
       Series := AChart.AddSeries(Pair.Value.Caption);
+      PointSeries := AChart.AddSeries('');
       Inc(ScaleSeriesCount);
-      ApplyFlowChartSeriesStyle(Series, Pair.Value.Color, 2.0, True);
+      ApplyFlowChartSeriesStyle(Series, Pair.Value.LineColor, 2.0, False);
+      ApplyFlowChartSeriesStyle(PointSeries, Pair.Value.PointColor, 2.0, True);
+      PointSeries.ShowLine := False;
       for Sample in Pair.Value.Samples do
       begin
         if AMeasurementSegment then
         begin
-          if (FCurrentGraphPointStartMs <= 0) or (Sample.TimeStampMs < FCurrentGraphPointStartMs) then
+          if (FCurrentGraphPointStartMs <= 0) or
+             (Sample.TimeStampMs < FCurrentGraphPointStartMs) then
             Continue;
           XSec := (Sample.TimeStampMs - FCurrentGraphPointStartMs) / 1000.0;
         end
         else
         begin
-          if (Sample.TimeStampMs < AVisibleXMinMs) or (Sample.TimeStampMs > AVisibleXMaxMs) then
+          if (Sample.TimeStampMs < AVisibleXMinMs) or
+             (Sample.TimeStampMs > AVisibleXMaxMs) then
             Continue;
           if FGraphMonitorStartMs > 0 then
             XSec := (Sample.TimeStampMs - FGraphMonitorStartMs) / 1000.0
@@ -6312,83 +6857,155 @@ begin
         end;
         if (XSec < AAxisMinSec) or (XSec > AAxisMaxSec) then
           Continue;
-        V := Sample.Value;
+
+        if ValueMode = gvmError then
+        begin
+          if not Sample.ErrorValid then
+            Continue;
+          V := Sample.ErrorValue;
+          DisplayValue := V;
+        end
+        else
+        begin
+          V := Sample.FlowValue;
+          DisplayValue := FlowToCurrentDimension(V);
+        end;
         if IsNan(V) or IsInfinite(V) then
           Continue;
-        UseForAutoScale := (AutoScaleMode = gasAllSeries) or
+        if AChart.LogarithmicY and (DisplayValue <= 0) then
+          Continue;
+
+        UseForAutoScale := (ValueMode = gvmError) or
+          (AutoScaleMode = gasAllSeries) or
           (not SameValue(V, 0.0, 1E-12)) or
           (Limits.TargetValid and SameValue(Limits.TargetLS, 0.0, 1E-12));
         if UseForAutoScale then
         begin
           if not HasData then
           begin
-            DataMinLS := V;
-            DataMaxLS := V;
+            DataMin := V;
+            DataMax := V;
             HasData := True;
           end
           else
           begin
-            DataMinLS := Min(DataMinLS, V);
-            DataMaxLS := Max(DataMaxLS, V);
+            DataMin := Min(DataMin, V);
+            DataMax := Max(DataMax, V);
           end;
         end;
-        Series.AddPoint(XSec, FlowToCurrentDimension(V));
+        PointSeries.AddPoint(XSec, DisplayValue);
+      end;
+      if LineMode = glmPchipTime then
+        BuildPchipTimeLine(PointSeries.Points, Series)
+      else
+      begin
+        Series.ClearPoints;
+        for ViewIndex := 0 to PointSeries.Points.Count - 1 do
+          Series.AddPoint(PointSeries.Points[ViewIndex].X,
+            PointSeries.Points[ViewIndex].Y);
       end;
     end;
 
-    if Limits.TargetValid then
+    if Limits.ToleranceValid then
     begin
-      if HasData and (AutoScaleMode <> gasTargetTolerance) then
+      if ValueMode = gvmError then
       begin
-        YDataMin := Min(DataMinLS, Limits.TargetLS);
-        YDataMax := Max(DataMaxLS, Limits.TargetLS);
+        YDataMin := Min(Limits.LowerPercent, Limits.UpperPercent);
+        YDataMax := Max(Limits.LowerPercent, Limits.UpperPercent);
+      end
+      else
+      begin
+        YDataMin := Min(Limits.LowerLS, Limits.UpperLS);
+        YDataMax := Max(Limits.LowerLS, Limits.UpperLS);
+      end;
+      ValueRange := YDataMax - YDataMin;
+      if ValueRange > 0 then
+        Padding := ValueRange * 0.10
+      else
+        Padding := Max(Abs(YDataMin) * 0.01, 0.001);
+      if ValueMode = gvmError then
+      begin
+        AxisMinDisplay := YDataMin - Padding;
+        AxisMaxDisplay := YDataMax + Padding;
+      end
+      else
+      begin
+        AxisMinDisplay := FlowToCurrentDimension(YDataMin - Padding);
+        AxisMaxDisplay := FlowToCurrentDimension(YDataMax + Padding);
+      end;
+      SetFlowChartYAxis(AChart, AxisMinDisplay, AxisMaxDisplay);
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcMKS, psForm, 'FlowChartLimits',
+          Format('PointName=%s; ValueMode=%d; FlowAccuracy=%s; LowerRaw=%.12g; UpperRaw=%.12g; YAxisMin=%.12g; YAxisMax=%.12g',
+            [FCurrentGraphPointKey, Ord(ValueMode), Limits.AccuracyText,
+             YDataMin, YDataMax, AxisMinDisplay, AxisMaxDisplay]), '');
+    end
+    else if Limits.TargetValid then
+    begin
+      if ValueMode = gvmError then
+      begin
+        YDataMin := 0;
+        YDataMax := 0;
       end
       else
       begin
         YDataMin := Limits.TargetLS;
         YDataMax := Limits.TargetLS;
       end;
-      if Limits.ToleranceValid then
+      if HasData and (AutoScaleMode <> gasTargetTolerance) then
       begin
-        YDataMin := Min(YDataMin, Min(Limits.LowerLS, Limits.UpperLS));
-        YDataMax := Max(YDataMax, Max(Limits.LowerLS, Limits.UpperLS));
+        YDataMin := Min(YDataMin, DataMin);
+        YDataMax := Max(YDataMax, DataMax);
       end;
-      RangeLS := YDataMax - YDataMin;
-      if RangeLS > 0 then
-        PaddingLS := Max(RangeLS * 0.10, Max(Abs(Limits.TargetLS) * 0.001, 0.000001))
+      ValueRange := YDataMax - YDataMin;
+      if ValueRange > 0 then
+        Padding := ValueRange * 0.10
       else
-        PaddingLS := Max(Abs(YDataMin) * 0.01, 0.001);
-      AxisMinDisplay := FlowToCurrentDimension(YDataMin - PaddingLS);
-      AxisMaxDisplay := FlowToCurrentDimension(YDataMax + PaddingLS);
-      SetFlowChartYAxis(AChart, AxisMinDisplay, AxisMaxDisplay);
-      if Assigned(ProtocolManager) then
-        ProtocolManager.AddMessage(pcMKS, psForm, 'FlowChartLimits',
-          Format('PointName=%s; PointQ_LS=%.12g; PointQ_Display=%.12g; FlowAccuracy=%s; LowerLS=%.12g; UpperLS=%.12g; LowerDisplay=%.12g; UpperDisplay=%.12g; ActualMinLS=%.12g; ActualMaxLS=%.12g; ActualMinDisplay=%.12g; ActualMaxDisplay=%.12g; YAxisMin=%.12g; YAxisMax=%.12g; DisplayUnit=%s',
-            [FCurrentGraphPointKey, Limits.TargetLS, FlowToCurrentDimension(Limits.TargetLS), TMeasurementRun(FActiveWorkTable.MeasurementRun).CurrentPoint.FlowAccuracy, Limits.LowerLS, Limits.UpperLS, FlowToCurrentDimension(Limits.LowerLS), FlowToCurrentDimension(Limits.UpperLS), DataMinLS, DataMaxLS, FlowToCurrentDimension(DataMinLS), FlowToCurrentDimension(DataMaxLS), AxisMinDisplay, AxisMaxDisplay, UnitName]), '');
-    end;
-    if HasData and not Limits.TargetValid then
-    begin
-      CenterValue := (DataMinLS + DataMaxLS) / 2;
-      RangeLS := DataMaxLS - DataMinLS;
-      MinimumRange := Max(Abs(CenterValue) * 0.01, 0.000001);
-      if RangeLS < MinimumRange then
+        Padding := Max(Abs(YDataMin) * 0.01, 0.001);
+      if ValueMode = gvmError then
       begin
-        DataMinLS := CenterValue - MinimumRange / 2;
-        DataMaxLS := CenterValue + MinimumRange / 2;
-        RangeLS := MinimumRange;
+        AxisMinDisplay := YDataMin - Padding;
+        AxisMaxDisplay := YDataMax + Padding;
+      end
+      else
+      begin
+        AxisMinDisplay := FlowToCurrentDimension(YDataMin - Padding);
+        AxisMaxDisplay := FlowToCurrentDimension(YDataMax + Padding);
       end;
-      PaddingLS := Max(RangeLS * 0.10, Abs(CenterValue) * 0.001);
-      AxisMinDisplay := FlowToCurrentDimension(DataMinLS - PaddingLS);
-      AxisMaxDisplay := FlowToCurrentDimension(DataMaxLS + PaddingLS);
+      SetFlowChartYAxis(AChart, AxisMinDisplay, AxisMaxDisplay);
+    end
+    else if HasData then
+    begin
+      CenterValue := (DataMin + DataMax) / 2;
+      ValueRange := DataMax - DataMin;
+      MinimumRange := Max(Abs(CenterValue) * 0.01, 0.000001);
+      if ValueRange < MinimumRange then
+      begin
+        DataMin := CenterValue - MinimumRange / 2;
+        DataMax := CenterValue + MinimumRange / 2;
+        ValueRange := MinimumRange;
+      end;
+      Padding := Max(ValueRange * 0.10, Abs(CenterValue) * 0.001);
+      if ValueMode = gvmError then
+      begin
+        AxisMinDisplay := DataMin - Padding;
+        AxisMaxDisplay := DataMax + Padding;
+      end
+      else
+      begin
+        AxisMinDisplay := FlowToCurrentDimension(DataMin - Padding);
+        AxisMaxDisplay := FlowToCurrentDimension(DataMax + Padding);
+      end;
       SetFlowChartYAxis(AChart, AxisMinDisplay, AxisMaxDisplay);
     end;
+
     if Assigned(ProtocolManager) and (ScaleSeriesCount > 0) then
       ProtocolManager.AddMessage(pcMKS, psForm, 'GraphScale', ATitle,
-        Format('AutoScaleMode=%d; ScaleMin=%g; ScaleMax=%g; Target=%g; Lower=%g; Upper=%g; SeriesCount=%d',
-        [Ord(AutoScaleMode), AChart.YMin, AChart.YMax, Limits.TargetLS,
-         Limits.LowerLS, Limits.UpperLS, ScaleSeriesCount]));
+        Format('ValueMode=%d; AutoScaleMode=%d; ScaleMin=%g; ScaleMax=%g; SeriesCount=%d',
+          [Ord(ValueMode), Ord(AutoScaleMode), AChart.YMin, AChart.YMax,
+           ScaleSeriesCount]));
 
-    AddFlowLimitSeries(AChart, Limits, AAxisMinSec, AAxisMaxSec);
+    AddFlowLimitSeries(AChart, Limits, AAxisMinSec, AAxisMaxSec, ValueMode);
   finally
     AChart.EndUpdate;
   end;
@@ -6439,7 +7056,7 @@ end;
 
 procedure TFrameMainTable.RenderFlowGraphs;
 var
-  CurrentTimeMs, VisibleXMinMs, VisibleXMaxMs: Int64;
+  CurrentTimeMs, SegmentTimeMs, VisibleXMinMs, VisibleXMaxMs: Int64;
   AxisMinSec, AxisMaxSec, ElapsedSec: Double;
   Run: TMeasurementRun;
   Point: TDevicePoint;
@@ -6456,6 +7073,7 @@ begin
     Exit;
 
   CurrentTimeMs := TMeterValue.GetMonotonicTimeMs;
+  SegmentTimeMs := CurrentTimeMs;
   MeasurementSegment := False;
   RunActive := False;
   NewRunStarted := False;
@@ -6482,6 +7100,7 @@ begin
       FCurrentGraphPointKey := '';
       FCurrentGraphPointStartMs := 0;
       FLastFlowGraphSampleMs := 0;
+      FLastFlowGraphLimits := Default(TFlowGraphLimits);
     end;
     RunActive := not (Run.Stage in [msNone, msDone]);
     NewRunStarted := RunActive and not FLastGraphRunActive;
@@ -6493,6 +7112,7 @@ begin
       FCurrentGraphPointKey := '';
       FCurrentGraphPointStartMs := 0;
       FLastFlowGraphSampleMs := 0;
+      FLastFlowGraphLimits := Default(TFlowGraphLimits);
       FGraphSamplingActive := False;
     end;
     if RunActive then
@@ -6552,8 +7172,10 @@ begin
         SampleAdded := True;
       end;
     end;
-    MeasurementSegment := RunActive and (FCurrentGraphPointStartMs > 0);
   end;
+
+  { Keep the completed point visible until a new run/work table resets it. }
+  MeasurementSegment := FCurrentGraphPointStartMs > 0;
 
   if (not MeasurementSegment) and IsFlowGraphSamplingActive(FActiveWorkTable) and (FGraphMonitorStartMs = 0) then
   begin
@@ -6571,7 +7193,13 @@ begin
 
   if MeasurementSegment then
   begin
-    ElapsedSec := Max(0.0, (CurrentTimeMs - FCurrentGraphPointStartMs) / 1000.0);
+    if not RunActive then
+    begin
+      SegmentTimeMs := FLastFlowGraphSampleMs;
+      if SegmentTimeMs < FCurrentGraphPointStartMs then
+        SegmentTimeMs := FCurrentGraphPointStartMs;
+    end;
+    ElapsedSec := Max(0.0, (SegmentTimeMs - FCurrentGraphPointStartMs) / 1000.0);
     if ElapsedSec <= GraphVisibleWindowSec then
     begin
       AxisMinSec := 0;
@@ -6622,6 +7250,14 @@ procedure TFrameMainTable.AttachGraphsTo(AParent: TFmxObject);
 begin
   if AParent = nil then
     Exit;
+
+  { The embedded work-table graphs tab is legacy.  The current graphs
+    workspace belongs to the main form and is opened by its own button. }
+  if TabItemWorkTableGraphs <> nil then
+  begin
+    TabItemWorkTableGraphs.Visible := False;
+    TabItemWorkTableGraphs.Parent := nil;
+  end;
 
   if FGraphsWorkspace = nil then
   begin
@@ -7027,24 +7663,34 @@ var
 begin
   if not (Sender is TPopupMenu) then
     Exit;
+
   if FGraphViews = nil then
     Exit;
   for I := 0 to FGraphViews.Count - 1 do
     if (FGraphViews[I] <> nil) and (FGraphViews[I].PopupMenu = Sender) then
     begin
-      RebuildGraphPopupMenu(FGraphViews[I]);
+      RebuildGraphPopupMenu(FGraphViews[I].PopupMenu,
+        FGraphViews[I].GraphIndex);
       Exit;
     end;
 end;
 
-procedure TFrameMainTable.RebuildGraphPopupMenu(AView: TGraphPanelView);
+procedure TFrameMainTable.RebuildGraphPopupMenu(APopupMenu: TPopupMenu;
+  const AGraphIndex: Integer);
+const
+  ColorNames: array[0..11] of string = ('Синий', 'Красный', 'Зелёный',
+    'Оранжевый', 'Фиолетовый', 'Бирюзовый', 'Жёлтый', 'Коричневый',
+    'Индиго', 'Салатовый', 'Розовый', 'Серый');
 var
-  AddRoot, FlowRoot, EtalonRoot, DeviceRoot, RemoveRoot, ColorRoot: TMenuItem;
-  I: Integer;
+  AddRoot, FlowRoot, EtalonRoot, DeviceRoot, RemoveRoot, VisibilityRoot,
+  SettingsRoot, LineModeRoot, ValueModeRoot, ScaleRoot, ColorRoot, PointColorRoot,
+  LineColorRoot, SeriesRoot, Item: TMenuItem;
+  I, ColorIndex: Integer;
+  CurrentPair: TPair<string, TFlowGraphSeries>;
 
   function AddItem(AParent: TFmxObject; const ACaption, ACommand: string): TMenuItem;
   begin
-    Result := TMenuItem.Create(AView.PopupMenu);
+    Result := TMenuItem.Create(APopupMenu);
     Result.Text := ACaption;
     Result.TagString := ACommand;
     Result.OnClick := GraphMenuClick;
@@ -7059,7 +7705,7 @@ var
     for SourcePair in ADictionary do
       if (SourcePair.Value <> nil) and SourcePair.Value.ChannelAvailable then
         AddItem(AParent, SourcePair.Value.Caption,
-          Format('add|%d|%s', [AView.GraphIndex, SourcePair.Key]));
+          Format('add|%d|%s', [AGraphIndex, SourcePair.Key]));
   end;
 
   procedure AddCurrent(ARoot: TMenuItem; const ACommand: string);
@@ -7068,39 +7714,132 @@ var
   begin
     for CurrentPair in FFlowGraphHistory.EtalonSeries do
       if (CurrentPair.Value <> nil) and
-         (CurrentPair.Value.GraphIndex = AView.GraphIndex) then
+         (CurrentPair.Value.GraphIndex = AGraphIndex) then
         AddItem(ARoot, CurrentPair.Value.Caption, ACommand + '|' +
-          IntToStr(AView.GraphIndex) + '|' + CurrentPair.Key);
+          IntToStr(AGraphIndex) + '|' + CurrentPair.Key);
     for CurrentPair in FFlowGraphHistory.DeviceSeries do
       if (CurrentPair.Value <> nil) and
-         (CurrentPair.Value.GraphIndex = AView.GraphIndex) then
+         (CurrentPair.Value.GraphIndex = AGraphIndex) then
         AddItem(ARoot, CurrentPair.Value.Caption, ACommand + '|' +
-          IntToStr(AView.GraphIndex) + '|' + CurrentPair.Key);
+          IntToStr(AGraphIndex) + '|' + CurrentPair.Key);
   end;
 begin
-  if (AView = nil) or (AView.PopupMenu = nil) or
-     (FFlowGraphHistory = nil) then
+  if (APopupMenu = nil) or (FFlowGraphHistory = nil) or
+     (FGraphsViewConfig = nil) or (AGraphIndex < 0) or
+     (AGraphIndex >= FGraphsViewConfig.Panels.Count) then
     Exit;
-  for I := AView.PopupMenu.ChildrenCount - 1 downto 0 do
-    AView.PopupMenu.Children[I].Free;
-  AddRoot := AddItem(AView.PopupMenu, 'Добавить серию', '');
+  for I := APopupMenu.ChildrenCount - 1 downto 0 do
+    APopupMenu.Children[I].Free;
+  AddRoot := AddItem(APopupMenu, 'Добавить серию', '');
   FlowRoot := AddItem(AddRoot, 'Расход', '');
   EtalonRoot := AddItem(FlowRoot, 'Эталоны', '');
   DeviceRoot := AddItem(FlowRoot, 'Приборы', '');
   AddSources(FFlowGraphHistory.EtalonSeries, EtalonRoot);
   AddSources(FFlowGraphHistory.DeviceSeries, DeviceRoot);
-  RemoveRoot := AddItem(AView.PopupMenu, 'Удалить серию', '');
+  RemoveRoot := AddItem(APopupMenu, 'Удалить серию', '');
   AddCurrent(RemoveRoot, 'remove');
-  AddItem(AView.PopupMenu, 'Очистить график',
-    Format('clear|%d|', [AView.GraphIndex]));
-  AddItem(AView.PopupMenu, 'Переименовать график', 'rename|' +
-    IntToStr(AView.GraphIndex) + '|');
-  AddItem(AView.PopupMenu, 'Автомасштаб', 'autoscale|' +
-    IntToStr(AView.GraphIndex) + '|');
-  AddItem(AView.PopupMenu, 'Сброс масштаба', 'autoscale|' +
-    IntToStr(AView.GraphIndex) + '|');
-  ColorRoot := AddItem(AView.PopupMenu, 'Настроить цвета', '');
-  AddCurrent(ColorRoot, 'color');
+  AddItem(APopupMenu, 'Очистить график',
+    Format('clear|%d|', [AGraphIndex]));
+  AddItem(APopupMenu, 'Переименовать график', 'rename|' +
+    IntToStr(AGraphIndex) + '|');
+  AddItem(APopupMenu, 'Автомасштаб', 'autoscale|' +
+    IntToStr(AGraphIndex) + '|');
+  AddItem(APopupMenu, 'Сброс масштаба', 'autoscale|' +
+    IntToStr(AGraphIndex) + '|');
+  VisibilityRoot := AddItem(APopupMenu, 'Видимость серий', '');
+  for CurrentPair in FFlowGraphHistory.EtalonSeries do
+    if (CurrentPair.Value <> nil) and
+       (CurrentPair.Value.GraphIndex = AGraphIndex) then
+    begin
+      Item := AddItem(VisibilityRoot, CurrentPair.Value.Caption, 'visible|' +
+        IntToStr(AGraphIndex) + '|' + CurrentPair.Key);
+      Item.IsChecked := CurrentPair.Value.UserVisible;
+    end;
+  for CurrentPair in FFlowGraphHistory.DeviceSeries do
+    if (CurrentPair.Value <> nil) and
+       (CurrentPair.Value.GraphIndex = AGraphIndex) then
+    begin
+      Item := AddItem(VisibilityRoot, CurrentPair.Value.Caption, 'visible|' +
+        IntToStr(AGraphIndex) + '|' + CurrentPair.Key);
+      Item.IsChecked := CurrentPair.Value.UserVisible;
+    end;
+
+  SettingsRoot := AddItem(APopupMenu, 'Настройки', '');
+  LineModeRoot := AddItem(SettingsRoot, 'Линия значений', '');
+  Item := AddItem(LineModeRoot, 'PCHIP по времени',
+    Format('linemode|%d|pchip', [AGraphIndex]));
+  Item.IsChecked :=
+    FGraphsViewConfig.Panels[AGraphIndex].LineMode = glmPchipTime;
+  Item := AddItem(LineModeRoot, 'Прямые отрезки',
+    Format('linemode|%d|linear', [AGraphIndex]));
+  Item.IsChecked :=
+    FGraphsViewConfig.Panels[AGraphIndex].LineMode = glmLinearSegments;
+
+  ValueModeRoot := AddItem(SettingsRoot, 'Отображаемое значение', '');
+  Item := AddItem(ValueModeRoot, 'Расход',
+    Format('valuemode|%d|flow', [AGraphIndex]));
+  Item.IsChecked :=
+    FGraphsViewConfig.Panels[AGraphIndex].ValueMode = gvmFlow;
+  Item := AddItem(ValueModeRoot, 'Погрешность',
+    Format('valuemode|%d|error', [AGraphIndex]));
+  Item.IsChecked :=
+    FGraphsViewConfig.Panels[AGraphIndex].ValueMode = gvmError;
+
+  ScaleRoot := AddItem(SettingsRoot, 'Шкала расхода', '');
+  ScaleRoot.Enabled :=
+    FGraphsViewConfig.Panels[AGraphIndex].ValueMode = gvmFlow;
+  Item := AddItem(ScaleRoot, 'Логарифмическая',
+    Format('flowscale|%d|log', [AGraphIndex]));
+  Item.IsChecked :=
+    FGraphsViewConfig.Panels[AGraphIndex].FlowScale = gfsLogarithmic;
+  Item := AddItem(ScaleRoot, 'Обычная',
+    Format('flowscale|%d|linear', [AGraphIndex]));
+  Item.IsChecked :=
+    FGraphsViewConfig.Panels[AGraphIndex].FlowScale = gfsLinear;
+
+  ColorRoot := AddItem(APopupMenu, 'Настроить цвета', '');
+  for CurrentPair in FFlowGraphHistory.EtalonSeries do
+    if (CurrentPair.Value <> nil) and
+       (CurrentPair.Value.GraphIndex = AGraphIndex) then
+    begin
+      SeriesRoot := AddItem(ColorRoot, CurrentPair.Value.Caption, '');
+      PointColorRoot := AddItem(SeriesRoot, 'Цвет точек', '');
+      LineColorRoot := AddItem(SeriesRoot, 'Цвет линии', '');
+      for ColorIndex := Low(FLOW_GRAPH_COLORS) to High(FLOW_GRAPH_COLORS) do
+      begin
+        Item := AddItem(PointColorRoot, ColorNames[ColorIndex],
+          Format('pointcolor|%d|%s|%d', [AGraphIndex,
+            CurrentPair.Key, ColorIndex]));
+        Item.IsChecked :=
+          CurrentPair.Value.PointColor = FLOW_GRAPH_COLORS[ColorIndex];
+        Item := AddItem(LineColorRoot, ColorNames[ColorIndex],
+          Format('linecolor|%d|%s|%d', [AGraphIndex,
+            CurrentPair.Key, ColorIndex]));
+        Item.IsChecked :=
+          CurrentPair.Value.LineColor = FLOW_GRAPH_COLORS[ColorIndex];
+      end;
+    end;
+  for CurrentPair in FFlowGraphHistory.DeviceSeries do
+    if (CurrentPair.Value <> nil) and
+       (CurrentPair.Value.GraphIndex = AGraphIndex) then
+    begin
+      SeriesRoot := AddItem(ColorRoot, CurrentPair.Value.Caption, '');
+      PointColorRoot := AddItem(SeriesRoot, 'Цвет точек', '');
+      LineColorRoot := AddItem(SeriesRoot, 'Цвет линии', '');
+      for ColorIndex := Low(FLOW_GRAPH_COLORS) to High(FLOW_GRAPH_COLORS) do
+      begin
+        Item := AddItem(PointColorRoot, ColorNames[ColorIndex],
+          Format('pointcolor|%d|%s|%d', [AGraphIndex,
+            CurrentPair.Key, ColorIndex]));
+        Item.IsChecked :=
+          CurrentPair.Value.PointColor = FLOW_GRAPH_COLORS[ColorIndex];
+        Item := AddItem(LineColorRoot, ColorNames[ColorIndex],
+          Format('linecolor|%d|%s|%d', [AGraphIndex,
+            CurrentPair.Key, ColorIndex]));
+        Item.IsChecked :=
+          CurrentPair.Value.LineColor = FLOW_GRAPH_COLORS[ColorIndex];
+      end;
+    end;
 end;
 
 procedure TFrameMainTable.GraphMenuClick(Sender: TObject);
@@ -7144,16 +7883,57 @@ begin
       if Series.GraphIndex = GraphIndex then
         Series.Samples.Clear;
   end
-  else if SameText(Command, 'color') and (Series <> nil) then
+  else if SameText(Command, 'visible') and (Series <> nil) then
+    Series.UserVisible := not Series.UserVisible
+  else if SameText(Command, 'pointcolor') and (Series <> nil) and
+          (Length(Parts) > 3) then
   begin
-    ColorIndex := 0;
-    while (ColorIndex < Length(FLOW_GRAPH_COLORS)) and
-      (FLOW_GRAPH_COLORS[ColorIndex] <> Series.Color) do
-      Inc(ColorIndex);
-    Series.Color := FLOW_GRAPH_COLORS[(ColorIndex + 1) mod Length(FLOW_GRAPH_COLORS)];
+    ColorIndex := EnsureRange(StrToIntDef(Parts[3], 0),
+      Low(FLOW_GRAPH_COLORS), High(FLOW_GRAPH_COLORS));
+    Series.PointColor := FLOW_GRAPH_COLORS[ColorIndex];
+  end
+  else if SameText(Command, 'linecolor') and (Series <> nil) and
+          (Length(Parts) > 3) then
+  begin
+    ColorIndex := EnsureRange(StrToIntDef(Parts[3], 0),
+      Low(FLOW_GRAPH_COLORS), High(FLOW_GRAPH_COLORS));
+    Series.LineColor := FLOW_GRAPH_COLORS[ColorIndex];
+  end
+  else if SameText(Command, 'linemode') and
+          (GraphIndex >= 0) and
+          (GraphIndex < FGraphsViewConfig.Panels.Count) then
+  begin
+    if SameText(Key, 'pchip') then
+      FGraphsViewConfig.Panels[GraphIndex].LineMode := glmPchipTime
+    else if SameText(Key, 'linear') then
+      FGraphsViewConfig.Panels[GraphIndex].LineMode := glmLinearSegments;
+  end
+  else if SameText(Command, 'valuemode') and
+          (GraphIndex >= 0) and
+          (GraphIndex < FGraphsViewConfig.Panels.Count) then
+  begin
+    if SameText(Key, 'flow') then
+      FGraphsViewConfig.Panels[GraphIndex].ValueMode := gvmFlow
+    else if SameText(Key, 'error') then
+      FGraphsViewConfig.Panels[GraphIndex].ValueMode := gvmError;
+  end
+  else if SameText(Command, 'flowscale') and
+          (GraphIndex >= 0) and
+          (GraphIndex < FGraphsViewConfig.Panels.Count) then
+  begin
+    if SameText(Key, 'log') then
+      FGraphsViewConfig.Panels[GraphIndex].FlowScale := gfsLogarithmic
+    else if SameText(Key, 'linear') then
+      FGraphsViewConfig.Panels[GraphIndex].FlowScale := gfsLinear;
   end;
   RebuildSelectedGraphLegend;
-  QueueRenderGraphViews;
+  if (FGraphViews <> nil) and (FGraphViews.Count > 0) then
+    QueueRenderGraphViews
+  else
+  begin
+    UpdateEtalonFlowChart;
+    UpdateDeviceFlowChart;
+  end;
 end;
 
 procedure TFrameMainTable.RebuildSelectedGraphLegend;
@@ -7178,7 +7958,7 @@ var
       Marker.Parent := FSelectedGraphLegend;
       Marker.Width := 16;
       Marker.Height := 16;
-      Marker.Fill.Color := LegendPair.Value.Color;
+      Marker.Fill.Color := LegendPair.Value.LineColor;
       Marker.Stroke.Kind := TBrushKind.None;
       CheckBox := TCheckBox.Create(FSelectedGraphLegend);
       CheckBox.Parent := FSelectedGraphLegend;
@@ -7374,6 +8154,12 @@ var
   MinImpTotalValue: TMeterValue;
   RawValueBaseMultiplier: TMeterValue;
   RawQuantityBaseMultiplier: TMeterValue;
+  Channel: TChannel;
+  UiLogTick: UInt64;
+  ValueTimeRaw: Double;
+  EtalonSnapshot: string;
+  DeviceSnapshot: string;
+  UiSnapshot: string;
 
   function FindFirstValueBaseMultiplier(
     AChannels: TObjectList<TChannel>): TMeterValue;
@@ -7521,6 +8307,7 @@ begin
     Exit;
 
   UpdateConditionsCurrentValues(WorkTable);
+  UpdateDeviceCoefficientHeaders;
 
   if WorkTable.ValueTime <> nil then
   begin
@@ -7710,6 +8497,64 @@ begin
   if WorkTable.State in [swtSTARTMONITORWAIT, swtMONITOR, swtSTOPMONITOR] then
     RefreshMonitorIndicator;
 
+
+  UiLogTick := TThread.GetTickCount64;
+  if (FLastUiDataLogTick = 0) or
+     (UiLogTick < FLastUiDataLogTick) or
+     (UiLogTick - FLastUiDataLogTick >= 1000) or
+     (FLastUiTimeText <> LabelTime.Text) then
+  begin
+    ValueTimeRaw := 0;
+    if WorkTable.ValueTime <> nil then
+      ValueTimeRaw := WorkTable.ValueTime.GetDoubleValue;
+
+    EtalonSnapshot := '';
+    for I := 0 to WorkTable.EtalonChannels.Count - 1 do
+    begin
+      Channel := WorkTable.EtalonChannels[I];
+      if Channel = nil then
+        Continue;
+      if EtalonSnapshot <> '' then
+        EtalonSnapshot := EtalonSnapshot + ',';
+      EtalonSnapshot := EtalonSnapshot + Format(
+        '#%d(%s;Enabled=%s;CurSec=%.6f;ImpSec=%.6f;ImpResult=%.6f;ValueSec=%.6f)',
+        [I, Channel.Text, BoolToStr(Channel.Enabled, True), Channel.CurSec,
+         Channel.ImpSec, Channel.ImpResult, Channel.ValueSec]);
+    end;
+    if EtalonSnapshot = '' then
+      EtalonSnapshot := '<none>';
+
+    DeviceSnapshot := '';
+    for I := 0 to WorkTable.DeviceChannels.Count - 1 do
+    begin
+      Channel := WorkTable.DeviceChannels[I];
+      if Channel = nil then
+        Continue;
+      if DeviceSnapshot <> '' then
+        DeviceSnapshot := DeviceSnapshot + ',';
+      DeviceSnapshot := DeviceSnapshot + Format(
+        '#%d(%s;Enabled=%s;CurSec=%.6f;ImpSec=%.6f;ImpResult=%.6f;ValueSec=%.6f)',
+        [I, Channel.Text, BoolToStr(Channel.Enabled, True), Channel.CurSec,
+         Channel.ImpSec, Channel.ImpResult, Channel.ValueSec]);
+    end;
+    if DeviceSnapshot = '' then
+      DeviceSnapshot := '<none>';
+
+    UiSnapshot := Format(
+      'WorkTable="%s"; State=%d; WorkTable.Time=%.6f; TimeResult=%.6f; ' +
+      'ValueTime=%.6f; DisplayTime="%s"; DisplayFlow="%s"; ' +
+      'DisplayQuantity="%s"; DisplayTemperature="%s"; DisplayPressure="%s"; ' +
+      'EtalonChannels=[%s]; DeviceChannels=[%s]',
+      [WorkTable.Text, Ord(WorkTable.State), WorkTable.Time,
+       WorkTable.TimeResult, ValueTimeRaw, LabelTime.Text, LabelFlowRate.Text,
+       LabelQuantity.Text, LabelTemp.Text, LabelPressure.Text,
+       EtalonSnapshot, DeviceSnapshot]);
+
+    ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementUiData',
+      'Данные, отображённые в интерфейсе', UiSnapshot);
+    FLastUiDataLogTick := UiLogTick;
+    FLastUiTimeText := LabelTime.Text;
+  end;
 
 end;
 
@@ -9036,7 +9881,7 @@ begin
   ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementMainButtonClicked',
     'Нажата центральная кнопка измерения',
     Format('Action=%s; WorkTableState=%d; RunStage=%d; CurrentPointIndex=%d',
-      [IfThen(Active, 'Stop', 'Start'), Ord(FActiveWorkTable.State), StageValue, PointIndex]));
+      [System.StrUtils.IfThen(Active, 'Stop', 'Start'), Ord(FActiveWorkTable.State), StageValue, PointIndex]));
   if Active then
   begin
     ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementStopRequested',
@@ -9312,6 +10157,8 @@ begin
   end;
 
   RefreshGridRowCount(GridDevices, Rows, 'device-structure');
+  if Column = CheckColumnDeviceEnable1 then
+    UpdateDeviceCoefficientHeaders;
   RefreshGridValues(GridDevices, 'device-structure');
 
   UpdateFlowMeterPropertiesFrame(Row);
@@ -9645,6 +10492,201 @@ begin
 end;
 
 
+function TFrameMainTable.GetGridCoefficientDimensionCoef(
+  AWorkTable: TWorkTable): Integer;
+var
+  I: Integer;
+  CurrentDimensionCoef: Integer;
+  CommonDimensionCoef: Integer;
+  Channel: TChannel;
+  Device: TDevice;
+  RepresentationFound: Boolean;
+begin
+  { imp/l is the base and fallback representation. }
+  Result := 0;
+  if (AWorkTable = nil) or (AWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  CommonDimensionCoef := 0;
+  RepresentationFound := False;
+
+  for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Channel := AWorkTable.DeviceChannels[I];
+    if (Channel = nil) or
+       (not Channel.Enabled) or
+       not (Channel.Signal in [Ord(otFrequency), Ord(otImpulse)]) or
+       (Channel.FlowMeter = nil) then
+      Continue;
+
+    Device := Channel.FlowMeter.Device;
+    if Device = nil then
+      Continue;
+
+    if Device.DimensionCoef = 1 then
+      CurrentDimensionCoef := 1
+    else
+      CurrentDimensionCoef := 0;
+
+    if not RepresentationFound then
+    begin
+      CommonDimensionCoef := CurrentDimensionCoef;
+      RepresentationFound := True;
+    end
+    else if CommonDimensionCoef <> CurrentDimensionCoef then
+      Exit(0);
+  end;
+
+  if RepresentationFound then
+    Result := CommonDimensionCoef;
+end;
+
+
+function TFrameMainTable.GetCoefficientUnit(
+  ADimensionCoef: Integer): string;
+begin
+  if ADimensionCoef = 1 then
+    Result := 'л/имп'
+  else
+    Result := 'имп/л';
+end;
+
+
+procedure TFrameMainTable.UpdateDeviceCoefficientHeaders;
+var
+  I: Integer;
+  GridDimensionCoef: Integer;
+  Channel: TChannel;
+  UnitName: string;
+  CoefHeader: string;
+  CalculatedCoefHeader: string;
+begin
+  GridDimensionCoef := GetGridCoefficientDimensionCoef(FActiveWorkTable);
+
+  { Set one common representation for every coefficient meter value.
+    GetStrNum then performs both dimension conversion and error-based rounding. }
+  if (FActiveWorkTable <> nil) and
+     (FActiveWorkTable.DeviceChannels <> nil) then
+    for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+    begin
+      Channel := FActiveWorkTable.DeviceChannels[I];
+      if (Channel = nil) or
+         not (Channel.Signal in [Ord(otFrequency), Ord(otImpulse)]) or
+         (Channel.FlowMeter = nil) or
+         (Channel.FlowMeter.ValueCoef = nil) then
+        Continue;
+
+      Channel.FlowMeter.ValueCoef.SetDim(GridDimensionCoef);
+    end;
+
+  UnitName := GetCoefficientUnit(GridDimensionCoef);
+
+  CoefHeader := 'Кф, ' + UnitName;
+  CalculatedCoefHeader := 'Кф расч., ' + UnitName;
+
+  if (StringColumnDeviceCoef1 <> nil) and
+     (StringColumnDeviceCoef1.Header <> CoefHeader) then
+    StringColumnDeviceCoef1.Header := CoefHeader;
+
+  if (StringColumnDeviceCalculatedCoef1 <> nil) and
+     (StringColumnDeviceCalculatedCoef1.Header <> CalculatedCoefHeader) then
+    StringColumnDeviceCalculatedCoef1.Header := CalculatedCoefHeader;
+end;
+
+
+function TFrameMainTable.GetDeviceCoefficientText(
+  AChannel: TChannel): string;
+var
+  Device: TDevice;
+  BaseCoef: Double;
+begin
+  Result := '-';
+
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) then
+    Exit;
+
+  Device := AChannel.FlowMeter.Device;
+
+  { Representation applies only to pulse and frequency signals. }
+  if (Device = nil) or
+     not (AChannel.Signal in [Ord(otFrequency), Ord(otImpulse)]) then
+  begin
+    if AChannel.FlowMeter.ValueCoef <> nil then
+      Result := AChannel.FlowMeter.ValueCoef.GetStrValue;
+    Exit;
+  end;
+
+  if AChannel.FlowMeter.ValueCoef = nil then
+    Exit;
+
+  { Device.Coef and ValueCoef.Value are stored in the base imp/l representation.
+    CurrentDimIndex was set once for the whole grid in the header update. }
+  BaseCoef := Device.Coef;
+  if BaseCoef <= 0 then
+    BaseCoef := AChannel.FlowMeter.ValueCoef.Value;
+
+  if (BaseCoef <= 0) or IsNan(BaseCoef) or IsInfinite(BaseCoef) then
+    Exit;
+
+  Result := AChannel.FlowMeter.ValueCoef.GetStrNum(BaseCoef);
+end;
+
+
+function TFrameMainTable.GetCalculatedDeviceCoefficientText(
+  AChannel: TChannel; AWorkTable: TWorkTable): string;
+var
+  Device: TDevice;
+  PulseCount: Double;
+  ReferenceQuantity: Double;
+  CalculatedCoef: Double;
+begin
+  Result := '-';
+
+  if (AChannel = nil) or (AWorkTable = nil) or
+     (AChannel.FlowMeter = nil) or (AChannel.FlowMeter.Device = nil) then
+    Exit;
+
+  if not (AChannel.Signal in [Ord(otFrequency), Ord(otImpulse)]) then
+    Exit;
+
+  if AChannel.FlowMeter.ValueCoef = nil then
+    Exit;
+
+  Device := AChannel.FlowMeter.Device;
+  if AChannel.ValueImpTotal <> nil then
+    PulseCount := AChannel.ValueImpTotal.GetDoubleValue
+  else
+    PulseCount := AChannel.ImpResult;
+
+  ReferenceQuantity := 0.0;
+  case TMeasuredDimension(Device.MeasuredDimension) of
+    mdVolumeFlow,
+    mdVolume:
+      if (AWorkTable.TableFlow <> nil) and
+         (AWorkTable.TableFlow.ValueVolume <> nil) then
+        ReferenceQuantity := AWorkTable.TableFlow.ValueVolume.GetDoubleValue;
+
+    mdMassFlow,
+    mdMass:
+      if (AWorkTable.TableFlow <> nil) and
+         (AWorkTable.TableFlow.ValueMass <> nil) then
+        ReferenceQuantity := AWorkTable.TableFlow.ValueMass.GetDoubleValue;
+  end;
+
+  if (PulseCount <= 1E-12) or (ReferenceQuantity <= 1E-12) then
+    Exit;
+
+  { Calculate in the base imp/l representation. GetStrNum uses the common
+    CurrentDimIndex and applies the coefficient meter value Accuracy/Error. }
+  CalculatedCoef := PulseCount / ReferenceQuantity;
+
+  if IsNan(CalculatedCoef) or IsInfinite(CalculatedCoef) then
+    Exit;
+
+  Result := AChannel.FlowMeter.ValueCoef.GetStrNum(CalculatedCoef);
+end;
+
+
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
@@ -9702,13 +10744,10 @@ begin
         Value := '-';
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceCoef1 then
-    begin
-      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueCoef <> nil) then
-        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueCoef.GetStrValue
-      else
-        Value := '-';
-    end
+      Value := GetDeviceCoefficientText(WorkTable.DeviceChannels[ARow])
+    else if GridDevices.Columns[ACol] = StringColumnDeviceCalculatedCoef1 then
+      Value := GetCalculatedDeviceCoefficientText(
+        WorkTable.DeviceChannels[ARow], WorkTable)
     else if GridDevices.Columns[ACol] = StringColumnDeviceRawValue1 then
     begin
       if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
@@ -10447,7 +11486,12 @@ begin
   end;
   if GridDevices.RowCount <> DeviceRows then
     RefreshGridRowCount(GridDevices, DeviceRows, 'channel-values');
+
+  { Set the common representation before repainting the grid. Otherwise
+    the new header becomes visible only after a later focus change. }
+  UpdateDeviceCoefficientHeaders;
   RefreshGridValues(GridDevices, 'channel-values');
+
   if GridEtalons.RowCount <> EtalonRows then
     RefreshGridRowCount(GridEtalons, EtalonRows, 'channel-values');
   RefreshGridValues(GridEtalons, 'channel-values');

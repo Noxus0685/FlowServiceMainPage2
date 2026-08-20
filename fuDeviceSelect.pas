@@ -312,6 +312,12 @@ begin
     Exit;
 
   Result := FDevFilteredDevices[Row];
+
+  { Для установки прибора на рабочий стол история проливов не требуется:
+    догружаем только точки и таблицы коэффициентов. }
+  if (Result <> nil) and (ActiveRepo <> nil) and
+     (Trim(Result.UUID) <> '') then
+    Result := ActiveRepo.LoadDeviceRuntimeData(Result.UUID);
 end;
 
 procedure TFormDeviceSelect.WriteDeviceActionLog(const AAction: string; ADevice: TDevice; const ADetails: string);
@@ -448,7 +454,7 @@ begin
     Dlg.Filter := 'SQLite database (*.db)|*.db|Все файлы (*.*)|*.*';
     Dlg.DefaultExt := 'db';
     Dlg.FileName := RepoName + '.db';
-    Dlg.InitialDir := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'Devices';
+    Dlg.InitialDir := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'Devices');
 
     ForceDirectories(Dlg.InitialDir);
 
@@ -594,7 +600,7 @@ begin
     Dlg.Title := 'Открыть файл репозитория приборов';
     Dlg.Filter := 'SQLite database (*.db)|*.db|Все файлы (*.*)|*.*';
     Dlg.Options := [TOpenOption.ofFileMustExist];
-    Dlg.InitialDir := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'Devices';
+    Dlg.InitialDir := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'Devices');
 
     ForceDirectories(Dlg.InitialDir);
 
@@ -2171,6 +2177,12 @@ var
 begin
   Result := False;
 
+  if ADevice = nil then
+    Exit;
+
+  { Редактору нужны точки, коэффициенты и сохранённая история прибора. }
+  if (ActiveRepo <> nil) and (Trim(ADevice.UUID) <> '') then
+    ADevice := ActiveRepo.LoadDevice(ADevice.UUID);
   if ADevice = nil then
     Exit;
 

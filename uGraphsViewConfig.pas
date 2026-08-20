@@ -11,6 +11,12 @@ type
   TGraphLayoutKind = (glSingle, glTwoRows, glTwoColumns, glThreePanels,
     glGrid2x2);
   TGraphAutoScaleMode = (gasWorkingValues, gasAllSeries, gasTargetTolerance);
+  // Способ соединения текущих значений на графике рабочего стола.
+  TGraphLineMode = (glmPchipTime, glmLinearSegments);
+  // Отображаемая величина выбирается независимо для каждого графика.
+  TGraphValueMode = (gvmFlow, gvmError);
+  // Способ отображения расхода по оси Y графика рабочего стола.
+  TGraphFlowScale = (gfsLogarithmic, gfsLinear);
   TGraphSourceKind = (gskFlow, gskTemperature, gskPressure, gskMass,
     gskVolume, gskCustomMeterValue);
   TGraphSeriesOwnerKind = (gsokEtalon, gsokDevice, gsokWorkTable, gsokSystem);
@@ -49,6 +55,11 @@ type
     ShowLegend: Boolean;
     VisibleDurationSec: Integer;
     AutoScaleMode: TGraphAutoScaleMode;
+    LineMode: TGraphLineMode;
+    ValueMode: TGraphValueMode;
+    FlowScale: TGraphFlowScale;
+    DataScalePercent: Integer;
+    TimeScrollPercent: Integer;
     constructor Create(const ATitle: string);
     destructor Destroy; override;
     function FindSeries(const ASeries: TGraphSeriesConfig): TGraphSeriesConfig;
@@ -122,6 +133,11 @@ begin
   ShowLegend := True;
   VisibleDurationSec := 0;
   AutoScaleMode := gasWorkingValues;
+  LineMode := glmLinearSegments;
+  ValueMode := gvmFlow;
+  FlowScale := gfsLinear;
+  DataScalePercent := 100;
+  TimeScrollPercent := 100;
   FSeries := TObjectList<TGraphSeriesConfig>.Create(True);
 end;
 

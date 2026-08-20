@@ -478,7 +478,11 @@ type
     ewtEtalonsChanged,
 
     // Изменилось состояние поиска или установки гидравлической линии.
-    ewtHydraulicStateChanged
+    ewtHydraulicStateChanged,
+
+    // Имитационная проливка сохранена и может быть перечитана обработкой.
+    // Событие добавлено в конец для сохранения ordinal существующих значений.
+    ewtSimulationMeasurementResultsSaved
   );
   TWorkTableEvent = EEventWorkTable;
 
@@ -520,6 +524,24 @@ type
 type
   TChannel = class;
   TWorkTable = class;
+
+  TChannelAveragingPeriod = (capOff, cap2Seconds, cap4Seconds);
+  TChannelSignalKind = (cskFrequency, cskCurrent, cskVoltage);
+
+  TChannelSignalSample = record
+    TimeMs: Int64;
+    Value: Double;
+  end;
+
+  TChannelSignalStatistics = record
+    HasValue: Boolean;
+    HasStatistics: Boolean;
+    HasPercentDeviation: Boolean;
+    Value: Double;
+    StdDeviationPercent: Double;
+    Deviation: Double;
+    LastMeasurementMs: Int64;
+  end;
 
   TDeviceCreateMode = (
     dcmUserCreated,
@@ -600,6 +622,25 @@ type
     FQMinWork: Double;
     FVMaxWork: Double;
     FVMinWork: Double;
+    FFrequencyAveraging: TChannelAveragingPeriod;
+    FCurrentAveraging: TChannelAveragingPeriod;
+    FVoltageAveraging: TChannelAveragingPeriod;
+    FCurrentOutputRange: Integer;
+    FVoltageOutputRange: Integer;
+    FFrequencySamples: TList<TChannelSignalSample>;
+    FCurrentSamples: TList<TChannelSignalSample>;
+    FVoltageSamples: TList<TChannelSignalSample>;
+    FLastFrequencyMeasurementMs: Int64;
+    FLastCurrentMeasurementMs: Int64;
+    FLastVoltageMeasurementMs: Int64;
+    FFrequencyMeasurementPending: Boolean;
+    FCurrentMeasurementPending: Boolean;
+    FVoltageMeasurementPending: Boolean;
+    FHasStatisticsLog: array[TChannelSignalKind] of Boolean;
+    FLastStatisticsLogMeasurementMs: array[TChannelSignalKind] of Int64;
+    FLastStatisticsLogPeriod: array[TChannelSignalKind] of TChannelAveragingPeriod;
+    FSignalSampleVersion: array[TChannelSignalKind] of Int64;
+    FLastStatisticsLogSampleVersion: array[TChannelSignalKind] of Int64;
 
     // --- proxies for FlowMeter fields ---
     function GetDeviceNameProxy: string;
@@ -641,6 +682,14 @@ type
     procedure SetRepoDeviceUUIDProxy(const AValue: string);
 
     procedure Init;
+    procedure SetEnabled(const AValue: Boolean);
+    procedure SetFrequencyAveraging(const AValue: TChannelAveragingPeriod);
+    procedure SetCurrentAveraging(const AValue: TChannelAveragingPeriod);
+    procedure SetVoltageAveraging(const AValue: TChannelAveragingPeriod);
+    function GetSamples(const AKind: TChannelSignalKind): TList<TChannelSignalSample>;
+    function GetAveragingPeriod(const AKind: TChannelSignalKind): TChannelAveragingPeriod;
+    procedure AddSignalMeasurement(const AKind: TChannelSignalKind;
+      const ARawValue, APhysicalValue: Double; const ASource: string);
 
     // --- regular getters/setters for channel fields ---
     function GetImpSecProxy: Double;
@@ -681,7 +730,7 @@ type
 
     property FlowMeter: TFlowMeter read FFlowMeter;
 
-    property Enabled: Boolean read FEnabled write FEnabled;
+    property Enabled: Boolean read FEnabled write SetEnabled;
     property Name: string read FName write FName;
     property Text: string read FText write FText;
     property WorkTabeID: Integer read FWorkTabeID write FWorkTabeID;
@@ -711,6 +760,11 @@ type
     property QMinWork: Double read FQMinWork write FQMinWork;
     property VMaxWork: Double read FVMaxWork write FVMaxWork;
     property VMinWork: Double read FVMinWork write FVMinWork;
+    property FrequencyAveraging: TChannelAveragingPeriod read FFrequencyAveraging write SetFrequencyAveraging;
+    property CurrentAveraging: TChannelAveragingPeriod read FCurrentAveraging write SetCurrentAveraging;
+    property VoltageAveraging: TChannelAveragingPeriod read FVoltageAveraging write SetVoltageAveraging;
+    property CurrentOutputRange: Integer read FCurrentOutputRange write FCurrentOutputRange;
+    property VoltageOutputRange: Integer read FVoltageOutputRange write FVoltageOutputRange;
 
     // Channel fields (internal variables)
     property ImpSec: Double read GetImpSecProxy write SetImpSecProxy;
@@ -742,6 +796,12 @@ type
     procedure AssignFlowMeterFrom(const ASource: TChannel; const AWorkTable: TWorkTable;
       const ACloneDeviceToRepo: Boolean = True);
     procedure SetValues;
+    procedure RecordFrequencyMeasurement(const ARawValue: Double; const ASource: string);
+    procedure RecordCurrentMeasurement(const ARawValue: Double; const ASource: string);
+    procedure RecordVoltageMeasurement(const ARawValue: Double; const ASource: string);
+    procedure RecordPendingMeasurements(const ASource: string);
+    procedure ClearRuntimeMeasurements;
+    function GetSignalStatistics(const AKind: TChannelSignalKind): TChannelSignalStatistics;
     procedure CreateDevice;
     procedure InitWorkRangesFromFlowMeter;
 
@@ -799,6 +859,10 @@ type
     FQuantityUnitName: string;
 
     FTableFlow: TFlowMeter;
+    FCurrentAggregateSignature: string;
+    FLastLoggedAggregateSignature: string;
+    FCurrentAggregateGroup: Integer;
+    FCurrentEnabledEtalonCount: Integer;
 
     FNextClimateChangeAt: TDateTime;
     FNextPressChangeAt: TDateTime;
@@ -948,6 +1012,7 @@ type
     Чтение и изменение выполняются под блокировкой
     FHydraulicStateLock. }
   FHydraulicTargetFlow: Double;
+  FResolvedEtalonType: EPointEtalonType;
 
   { Сохранённый результат выбора гидравлической конфигурации.
 
@@ -1232,6 +1297,7 @@ type
 
   property ActivePump: TPump read FActivePump write SetActivePumpObject;
   property ActiveScale: TWeight read FActiveScale write SetActiveScaleObject;
+  property ResolvedEtalonType: EPointEtalonType read FResolvedEtalonType;
   property FlowRate: TFlowRate read FFlowRate write FFlowRate;
 
     property ID: Integer read FID write FID;
@@ -1341,7 +1407,10 @@ type
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
     procedure UpdateAggregateMeterValues;
-    function SelectEtalons(const AFlowRate: Double; out AError: TErrorInfo): Boolean;
+    function SelectEtalons(const AFlowRate: Double; out AError: TErrorInfo): Boolean; overload;
+    function SelectEtalons(APoint: TDevicePoint;
+      out AResolvedEtalonType: EPointEtalonType;
+      out AError: TErrorInfo): Boolean; overload;
     procedure DisableAllEtalons;
     function SetEtalonsByNames(const AEtalonNames: TArray<string>;
       out AError: TErrorInfo): Boolean;
@@ -1513,6 +1582,7 @@ type
     FWorkTables: TObjectList<TWorkTable>;
     FIsSimulationMode :Boolean;
     FActiveWorkTable  :TWorkTable;
+    procedure SetIsSimulationMode(const AValue: Boolean);
 
   public
     constructor Create(const AIniFileName: string);
@@ -1540,7 +1610,7 @@ type
     property WorkTables: TObjectList<TWorkTable> read FWorkTables;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
     property IniFileName: string read FIniFileName write FIniFileName;
-    property IsSimulationMode:Boolean read FIsSimulationMode  write FIsSimulationMode;
+    property IsSimulationMode: Boolean read FIsSimulationMode write SetIsSimulationMode;
     procedure UpdateSimulation;
 
 
@@ -2040,7 +2110,7 @@ begin
   ValueImpTotal := TMeterValue.GetExistedMeterValueBool(FHashValueImpTotal, IsExisted, UUID, Name);
   if IsExisted = 0 then
   begin
-    FValueImp.Description:='Импульсы накопительный итог';
+    FValueImpTotal.Description := 'Импульсы накопительный итог';
     FValueImpTotal.DependenceType := INDEPENDENT;
     FValueImpTotal.UpdateType := ONLINE_TYPE;
   end;
@@ -2052,10 +2122,10 @@ begin
   if IsExisted = 0 then
   begin
     FValueCurrent.SetAsCurrent;
-    FValueImp.Description:='Ток текущий';
     FValueCurrent.DependenceType := INDEPENDENT;
     FValueCurrent.UpdateType := ONLINE_TYPE;
   end;
+  FValueCurrent.Description := 'Ток текущий';
   FValueCurrent.SetToSave(True);
 
   ValueInterface := TMeterValue.GetExistedMeterValueBool(FHashValueInterface, IsExisted, UUID, Name);
@@ -2063,10 +2133,10 @@ begin
   begin
     FValueInterface.Name := 'Интерфейс';
     FValueInterface.ShrtName := 'Интерфейс';
-    FValueImp.Description:='Значение расхода';
     FValueInterface.DependenceType := INDEPENDENT;
     FValueInterface.UpdateType := ONLINE_TYPE;
   end;
+  FValueInterface.Description := 'Напряжение текущее';
   FValueInterface.SetToSave(True);
 
 end;
@@ -2138,6 +2208,8 @@ begin
   FReadinessBaseFlow := 0;
   FHasReadinessBaseFlow := False;
   FCurResult := 0;
+  FVolSec := 0;
+  FVolResult := 0;
   FValueSec := 0;
   FValueResult := 0;
   FGroup := 0;
@@ -2147,6 +2219,15 @@ begin
   FQMinWork := 0;
   FVMaxWork := 0;
   FVMinWork := 0;
+  FFrequencyAveraging := capOff;
+  FCurrentAveraging := capOff;
+  FVoltageAveraging := capOff;
+  FCurrentOutputRange := 0;
+  FVoltageOutputRange := 0;
+  FFrequencySamples := TList<TChannelSignalSample>.Create;
+  FCurrentSamples := TList<TChannelSignalSample>.Create;
+  FVoltageSamples := TList<TChannelSignalSample>.Create;
+  ClearRuntimeMeasurements;
 
   FFlowMeter.Name := 'Прибор ' + FName;
 end;
@@ -2154,6 +2235,9 @@ end;
 { Releases channel-owned resources and removes linked values from shared storage. }
 destructor TChannel.Destroy;
 begin
+  FreeAndNil(FFrequencySamples);
+  FreeAndNil(FCurrentSamples);
+  FreeAndNil(FVoltageSamples);
   FreeAndNil(FOutputSet);
   FreeAndNil(FSyncMode);
   FreeAndNil(FNoiseFilter);
@@ -2202,7 +2286,7 @@ begin
   FFlowMeter.ValueImp := FValueImp;
   FFlowMeter.ValueImpTotal := ValueImpResult;
   FFlowMeter.ValueCurrent := FValueCurrent;
-  //Интерфейс тоже.
+  FFlowMeter.ValueInterface := FValueInterface;
 
   if AWorkTable <> nil then
   begin
@@ -2573,6 +2657,8 @@ procedure TChannel.SetDeviceUUIDProxy(const AValue: string);
 begin
   if Assigned(FFlowMeter) then
   begin
+    if not SameText(FFlowMeter.DeviceUUID, AValue) then
+      ClearRuntimeMeasurements;
     FFlowMeter.DeviceUUID := AValue;
   end;
 end;
@@ -2661,6 +2747,7 @@ end;
 procedure TChannel.SetImpSecProxy(const AValue: Double);
 begin
   FImpSec := AValue;
+  FFrequencyMeasurementPending := True;
 end;
 
 { Returns channel pulse result value. }
@@ -2685,6 +2772,7 @@ end;
 procedure TChannel.SetCurSecProxy(const AValue: Double);
 begin
   FCurSec := AValue;
+  FCurrentMeasurementPending := True;
 end;
 
 { Returns channel current result value. }
@@ -2699,16 +2787,16 @@ begin
   FCurResult := AValue;
 end;
 
-{ Returns channel current result value. }
+{ Returns channel voltage result value. }
 function TChannel.GetVolResultProxy: Double;
 begin
-  Result := FCurResult;
+  Result := FVolResult;
 end;
 
-{ Stores channel current result value. }
+{ Stores channel voltage result value. }
 procedure TChannel.SetVolResultProxy(const AValue: Double);
 begin
-  FCurResult := AValue;
+  FVolResult := AValue;
 end;
 
 { Returns channel secondary runtime value. }
@@ -2721,6 +2809,7 @@ end;
 procedure TChannel.SetValueSecProxy(const AValue: Double);
 begin
   FValueSec := AValue;
+  FVoltageMeasurementPending := True;
 end;
 
 { Returns channel secondary runtime value. }
@@ -2745,6 +2834,260 @@ end;
 procedure TChannel.SetValueResultProxy(const AValue: Double);
 begin
   FValueResult := AValue;
+end;
+
+{ Clears live samples when a channel is disabled. }
+procedure TChannel.SetEnabled(const AValue: Boolean);
+begin
+  if FEnabled = AValue then
+    Exit;
+  FEnabled := AValue;
+  if not FEnabled then
+    ClearRuntimeMeasurements;
+end;
+
+function TChannel.GetSamples(const AKind: TChannelSignalKind): TList<TChannelSignalSample>;
+begin
+  case AKind of
+    cskFrequency: Result := FFrequencySamples;
+    cskCurrent: Result := FCurrentSamples;
+  else
+    Result := FVoltageSamples;
+  end;
+end;
+
+function TChannel.GetAveragingPeriod(const AKind: TChannelSignalKind): TChannelAveragingPeriod;
+begin
+  case AKind of
+    cskFrequency: Result := FFrequencyAveraging;
+    cskCurrent: Result := FCurrentAveraging;
+  else
+    Result := FVoltageAveraging;
+  end;
+end;
+
+{ Changes only presentation averaging; the common four-second history is retained. }
+procedure TChannel.SetFrequencyAveraging(const AValue: TChannelAveragingPeriod);
+begin
+  if FFrequencyAveraging = AValue then Exit;
+  FFrequencyAveraging := AValue;
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'ChannelAveragingChanged',
+    'Изменено усреднение частоты', Format('UUID=%s; Channel=%s; Period=%d',
+    [UUID, Name, Ord(AValue)]));
+end;
+
+{ Changes only presentation averaging; current samples remain available immediately. }
+procedure TChannel.SetCurrentAveraging(const AValue: TChannelAveragingPeriod);
+begin
+  if FCurrentAveraging = AValue then Exit;
+  FCurrentAveraging := AValue;
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'ChannelAveragingChanged',
+    'Изменено усреднение тока', Format('UUID=%s; Channel=%s; Period=%d',
+    [UUID, Name, Ord(AValue)]));
+end;
+
+{ Changes only presentation averaging; voltage history is not mixed with other signals. }
+procedure TChannel.SetVoltageAveraging(const AValue: TChannelAveragingPeriod);
+begin
+  if FVoltageAveraging = AValue then Exit;
+  FVoltageAveraging := AValue;
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'ChannelAveragingChanged',
+    'Изменено усреднение напряжения', Format('UUID=%s; Channel=%s; Period=%d',
+    [UUID, Name, Ord(AValue)]));
+end;
+
+{ Removes all non-persistent measurement state from this channel. }
+procedure TChannel.ClearRuntimeMeasurements;
+var
+  Kind: TChannelSignalKind;
+begin
+  if FFrequencySamples <> nil then FFrequencySamples.Clear;
+  if FCurrentSamples <> nil then FCurrentSamples.Clear;
+  if FVoltageSamples <> nil then FVoltageSamples.Clear;
+  FLastFrequencyMeasurementMs := 0;
+  FLastCurrentMeasurementMs := 0;
+  FLastVoltageMeasurementMs := 0;
+  FFrequencyMeasurementPending := False;
+  FCurrentMeasurementPending := False;
+  FVoltageMeasurementPending := False;
+  for Kind := Low(TChannelSignalKind) to High(TChannelSignalKind) do
+  begin
+    FHasStatisticsLog[Kind] := False;
+    FSignalSampleVersion[Kind] := 0;
+    FLastStatisticsLogSampleVersion[Kind] := 0;
+  end;
+end;
+
+{ Stores one valid physical sample and writes it to the matching meter value. }
+procedure TChannel.AddSignalMeasurement(const AKind: TChannelSignalKind;
+  const ARawValue, APhysicalValue: Double; const ASource: string);
+var
+  Sample: TChannelSignalSample;
+  Samples: TList<TChannelSignalSample>;
+  SignalName: string;
+  MeterValue: TMeterValue;
+begin
+  if IsNan(APhysicalValue) or IsInfinite(APhysicalValue) then
+  begin
+    ProtocolManager.AddMessage(pcError, psWorkTable, 'ChannelSignalSample',
+      'Получен невалидный отсчёт канала', Format(
+      'UUID=%s; Channel=%s; Source=%s; Raw=%g; Valid=False',
+      [UUID, Name, ASource, ARawValue]));
+    Exit;
+  end;
+
+  Sample.TimeMs := TMeterValue.GetMonotonicTimeMs;
+  Sample.Value := APhysicalValue;
+  Samples := GetSamples(AKind);
+  Samples.Add(Sample);
+  Inc(FSignalSampleVersion[AKind]);
+  while (Samples.Count > 0) and
+        (Samples[0].TimeMs < Sample.TimeMs - 4000) do
+    Samples.Delete(0);
+
+  MeterValue := nil;
+  case AKind of
+    cskFrequency:
+      begin SignalName := 'Frequency'; MeterValue := FValueImp;
+        FLastFrequencyMeasurementMs := Sample.TimeMs; end;
+    cskCurrent:
+      begin SignalName := 'Current'; MeterValue := FValueCurrent;
+        FLastCurrentMeasurementMs := Sample.TimeMs; end;
+  else
+    begin SignalName := 'Voltage'; MeterValue := FValueInterface;
+      FLastVoltageMeasurementMs := Sample.TimeMs; end;
+  end;
+  if MeterValue <> nil then
+    MeterValue.SetValue(APhysicalValue);
+
+  ProtocolManager.AddMessage(pcProc, psWorkTable, 'ChannelSignalSample',
+    'Получен отсчёт канала', Format(
+    'UUID=%s; Channel=%s; Source=%s; Raw=%g; Physical=%g; Signal=%s; Period=%d; Valid=True',
+    [UUID, Name, ASource, ARawValue, APhysicalValue, SignalName,
+     Ord(GetAveragingPeriod(AKind))]));
+end;
+
+procedure TChannel.RecordFrequencyMeasurement(const ARawValue: Double; const ASource: string);
+begin
+  AddSignalMeasurement(cskFrequency, ARawValue, ARawValue, ASource);
+end;
+
+procedure TChannel.RecordCurrentMeasurement(const ARawValue: Double; const ASource: string);
+begin
+  { Runtime providers already expose physical mA; range is configuration metadata. }
+  AddSignalMeasurement(cskCurrent, ARawValue, ARawValue, ASource);
+end;
+
+procedure TChannel.RecordVoltageMeasurement(const ARawValue: Double; const ASource: string);
+begin
+  { Runtime providers already expose physical V; do not scale a second time. }
+  AddSignalMeasurement(cskVoltage, ARawValue, ARawValue, ASource);
+end;
+
+{ Commits only values actually written by the acquisition provider since last cycle. }
+procedure TChannel.RecordPendingMeasurements(const ASource: string);
+begin
+  case Signal of
+    Ord(otFrequency), Ord(otImpulse):
+      if FFrequencyMeasurementPending then
+        RecordFrequencyMeasurement(FImpSec, ASource);
+    Ord(otCurrent):
+      if FCurrentMeasurementPending then
+        RecordCurrentMeasurement(FCurSec, ASource);
+    Ord(otVoltage):
+      if FVoltageMeasurementPending then
+        RecordVoltageMeasurement(FValueSec, ASource);
+  end;
+  FFrequencyMeasurementPending := False;
+  FCurrentMeasurementPending := False;
+  FVoltageMeasurementPending := False;
+end;
+
+{ Separates the displayed value from statistics calculated over the selected window. }
+function TChannel.GetSignalStatistics(const AKind: TChannelSignalKind): TChannelSignalStatistics;
+var
+  Samples: TList<TChannelSignalSample>;
+  I, Count: Integer;
+  Cutoff, LastMs, WindowMs: Int64;
+  Sum, Mean, SumSquares, StdDeviation, MinValue, MaxValue: Double;
+  Period: TChannelAveragingPeriod;
+  SignalName: string;
+begin
+  Result := Default(TChannelSignalStatistics);
+  Samples := GetSamples(AKind);
+  if (Samples = nil) or (Samples.Count = 0) then Exit;
+  LastMs := Samples[Samples.Count - 1].TimeMs;
+  Period := GetAveragingPeriod(AKind);
+  case Period of
+    cap2Seconds: WindowMs := 2000;
+  else
+    { capOff disables only display averaging; its statistics still use 4 seconds. }
+    WindowMs := 4000;
+  end;
+  Cutoff := LastMs - WindowMs;
+  Sum := 0; Count := 0;
+  MinValue := MaxDouble; MaxValue := -MaxDouble;
+  for I := 0 to Samples.Count - 1 do
+    if Samples[I].TimeMs >= Cutoff then
+    begin
+      Sum := Sum + Samples[I].Value; Inc(Count);
+      MinValue := Min(MinValue, Samples[I].Value);
+      MaxValue := Max(MaxValue, Samples[I].Value);
+    end;
+  if Count = 0 then Exit;
+  Mean := Sum / Count; SumSquares := 0;
+  for I := 0 to Samples.Count - 1 do
+    if Samples[I].TimeMs >= Cutoff then
+      SumSquares := SumSquares + Sqr(Samples[I].Value - Mean);
+
+  Result.HasValue := True;
+  Result.LastMeasurementMs := LastMs;
+  { Off shows the last raw sample; timed modes show the mean of the same samples
+    that are used for their statistics. }
+  if Period = capOff then
+    Result.Value := Samples[Samples.Count - 1].Value
+  else
+    Result.Value := Mean;
+  { Two samples are required to distinguish a real zero deviation from missing
+    statistical information. }
+  Result.HasStatistics := Count >= 2;
+  if Result.HasStatistics then
+  begin
+    StdDeviation := Sqrt(SumSquares / Count);
+    Result.Deviation := MaxValue - MinValue;
+    Result.HasPercentDeviation := not SameValue(Mean, 0.0, 1E-12);
+    if Result.HasPercentDeviation then
+      Result.StdDeviationPercent := StdDeviation / Abs(Mean) * 100;
+  end;
+
+  { Log once per new sample or mode change, never once per UI repaint. }
+  if (not FHasStatisticsLog[AKind]) or
+     (FLastStatisticsLogSampleVersion[AKind] <> FSignalSampleVersion[AKind]) or
+     (FLastStatisticsLogMeasurementMs[AKind] <> LastMs) or
+     (FLastStatisticsLogPeriod[AKind] <> Period) then
+  begin
+    case AKind of
+      cskFrequency: SignalName := 'Frequency';
+      cskCurrent: SignalName := 'Current';
+    else
+      SignalName := 'Voltage';
+    end;
+    ProtocolManager.AddMessage(pcProc, psWorkTable, 'ChannelSignalStatistics',
+      'Рассчитана статистика сигнала канала', Format(
+      'UUID=%s; Channel=%s; Signal=%s; Period=%d; Count=%d; WindowMs=%d; ' +
+      'Last=%g; Display=%g; Average=%g; StdDeviationPercent=%g; Deviation=%g; ' +
+      'HasValue=%s; HasStatistics=%s; HasPercentDeviation=%s',
+      [UUID, Name, SignalName, Ord(Period), Count, WindowMs,
+       Samples[Samples.Count - 1].Value, Result.Value, Mean,
+       Result.StdDeviationPercent, Result.Deviation,
+       BoolToStr(Result.HasValue, 'True', 'False'),
+       BoolToStr(Result.HasStatistics, 'True', 'False'),
+       BoolToStr(Result.HasPercentDeviation, 'True', 'False')]));
+    FHasStatisticsLog[AKind] := True;
+    FLastStatisticsLogMeasurementMs[AKind] := LastMs;
+    FLastStatisticsLogPeriod[AKind] := Period;
+    FLastStatisticsLogSampleVersion[AKind] := FSignalSampleVersion[AKind];
+  end;
 end;
 
 procedure TChannel.SetValues;
@@ -2815,6 +3158,10 @@ begin
   FSimulationTargetFlowBase := 0;
   FDeviceSimulationFlowRate := 0;
   FHasDeviceSimulationFlowRate := False;
+  FCurrentAggregateSignature := '';
+  FLastLoggedAggregateSignature := '';
+  FCurrentAggregateGroup := -1;
+  FCurrentEnabledEtalonCount := 0;
   FCurrentPoint := TDevicePoint.Create(0);
   ResetCurrentPoint;
 
@@ -3152,30 +3499,34 @@ begin
   end;
 
 
-  // Настраиваем вычислительные связи для всех инициализированных значений.
+  // Эти значения формируются суммированием выбранных эталонных расходомеров.
   FTableFlow.ValueMassFlow.ValueCorrection := nil;
-  FTableFlow.ValueMassFlow.ValueBaseMultiplier := FTableFlow.ValueImp;
-  FTableFlow.ValueMassFlow.ValueBaseDevider := FTableFlow.ValueMassCoef;
+  FTableFlow.ValueMassFlow.ValueBaseMultiplier := nil;
+  FTableFlow.ValueMassFlow.ValueBaseDevider := nil;
   FTableFlow.ValueMassFlow.ValueRate := nil;
   FTableFlow.ValueMassFlow.ValueEtalon := nil;
+  FTableFlow.ValueMassFlow.ValueType := AGGREGATE_TYPE;
 
   FTableFlow.ValueVolumeFlow.ValueCorrection := nil;
-  FTableFlow.ValueVolumeFlow.ValueBaseMultiplier := FTableFlow.ValueImp;
-  FTableFlow.ValueVolumeFlow.ValueBaseDevider := FTableFlow.ValueVolumeCoef;
+  FTableFlow.ValueVolumeFlow.ValueBaseMultiplier := nil;
+  FTableFlow.ValueVolumeFlow.ValueBaseDevider := nil;
   FTableFlow.ValueVolumeFlow.ValueRate := nil;
   FTableFlow.ValueVolumeFlow.ValueEtalon := nil;
+  FTableFlow.ValueVolumeFlow.ValueType := AGGREGATE_TYPE;
 
-  FTableFlow.ValueVolume.ValueCorrection := FTableFlow.ValueVolumeFlow;
-  FTableFlow.ValueVolume.ValueBaseMultiplier := FTableFlow.ValueImpTotal;
-  FTableFlow.ValueVolume.ValueBaseDevider := FTableFlow.ValueVolumeCoef;
+  FTableFlow.ValueVolume.ValueCorrection := nil;
+  FTableFlow.ValueVolume.ValueBaseMultiplier := nil;
+  FTableFlow.ValueVolume.ValueBaseDevider := nil;
   FTableFlow.ValueVolume.ValueRate := nil;
   FTableFlow.ValueVolume.ValueEtalon := nil;
+  FTableFlow.ValueVolume.ValueType := AGGREGATE_TYPE;
 
-  FTableFlow.ValueMass.ValueCorrection := FTableFlow.ValueMassFlow;
-  FTableFlow.ValueMass.ValueBaseMultiplier := FTableFlow.ValueImpTotal;
-  FTableFlow.ValueMass.ValueBaseDevider := FTableFlow.ValueMassCoef;
+  FTableFlow.ValueMass.ValueCorrection := nil;
+  FTableFlow.ValueMass.ValueBaseMultiplier := nil;
+  FTableFlow.ValueMass.ValueBaseDevider := nil;
   FTableFlow.ValueMass.ValueRate := nil;
   FTableFlow.ValueMass.ValueEtalon := nil;
+  FTableFlow.ValueMass.ValueType := AGGREGATE_TYPE;
 
   FTableFlow.ValueVolumeError.ValueBaseMultiplier := FTableFlow.ValueVolume;
   FTableFlow.ValueMassError.ValueBaseMultiplier := FTableFlow.ValueMass;
@@ -3795,6 +4146,21 @@ var
       ADestination.Add(SourceChannel);
   end;
 
+  function GetSelectedChannelNames(const AChannels: TChannelList): string;
+  var
+    SelectedChannel: TChannel;
+  begin
+    Result := '';
+
+    for SelectedChannel in AChannels do
+    begin
+      if Result <> '' then
+        Result := Result + '; ';
+
+      Result := Result + SelectedChannel.Name;
+    end;
+  end;
+
   procedure ApplySelectedChannels(const AChannels: TChannelList);
   var
     J: Integer;
@@ -4044,7 +4410,7 @@ begin
           'TargetInsideRange=%s',
           [
             I,
-            Channel.FlowMeter.Name,
+            Channel.Name,
             BoolToStr(Channel.Enabled,'True','False'),
             Channel.Group,
             FlowMin,
@@ -4083,7 +4449,7 @@ begin
               'QMinWork=%.6f; QMaxWork=%.6f; Policy=MinimumQMax',
               [
                 I,
-                Channel.FlowMeter.Name,
+                Channel.Name,
                 Channel.Group,
                 FlowMin,
                 FlowMax
@@ -4100,9 +4466,9 @@ begin
               'BestName="%s"; BestQMax=%.6f; Reason=CandidateQMaxNotLess',
               [
                 I,
-                Channel.FlowMeter.Name,
+                Channel.Name,
                 FlowMax,
-                BestSingle.FlowMeter.Name,
+                BestSingle.Name,
                 GetChannelFlowMax(BestSingle)
               ]
             )
@@ -4180,10 +4546,11 @@ begin
       'Success',
       'Предварительный выбор эталонов успешно завершён',
       Format(
-        'Selection="%s"; SelectedCount=%d; ',
+        'Selection="%s"; SelectedCount=%d; SelectedChannels="%s"',
         [
           SelectionDescription,
-          SelectedChannels.Count
+          SelectedChannels.Count,
+          GetSelectedChannelNames(SelectedChannels)
         ]
       )
     );
@@ -4224,6 +4591,148 @@ begin
   end;
 end;
 
+
+
+function TWorkTable.SelectEtalons(APoint: TDevicePoint;
+  out AResolvedEtalonType: EPointEtalonType;
+  out AError: TErrorInfo): Boolean;
+var
+  Channel: TChannel;
+  DeviceAccuracy, RequiredAccuracy, EtalonAccuracy: Double;
+  EnabledDeviceCount: Integer;
+  SelectedNames, FailedNames, ScaleNames: string;
+  RatioValid: Boolean;
+  procedure SetError(const ACode: Integer; const AMessage: string);
+  begin
+    AError := TErrorInfo.Empty(Integer(FState));
+    AError.Code := ACode; AError.Msg := AMessage; AError.Time := Now;
+  end;
+  procedure Log(const AEvent, AText: string);
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcProc, psWorkTable, AEvent, AText, '');
+  end;
+begin
+  Result := False;
+  AResolvedEtalonType := etAuto;
+  FResolvedEtalonType := etAuto;
+  AError := TErrorInfo.Empty(Integer(FState));
+  if APoint = nil then
+  begin
+    SetError(1100, 'Не задана точка для предварительного выбора эталонов');
+    Exit;
+  end;
+
+  EnabledDeviceCount := 0;
+  for Channel in FDeviceChannels do
+    if (Channel <> nil) and Channel.Enabled and (Channel.State <> osDeleted) then
+      Inc(EnabledDeviceCount);
+  Log('SelectEtalons.Begin', Format(
+    'PointUUID=%s | TargetFlow=%.6f | RequestedEtalonType=%s | EnabledDeviceCount=%d',
+    [APoint.UUID, APoint.Q, GetEnumName(TypeInfo(EPointEtalonType), APoint.EtalonType),
+     EnabledDeviceCount]));
+
+  { Keep the established range and grouping algorithm as the first stage. }
+  if not SelectEtalons(APoint.Q, AError) then
+    Exit;
+
+  SelectedNames := '';
+  EtalonAccuracy := 0;
+  for Channel in FEtalonChannels do
+    if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) then
+    begin
+      if SelectedNames <> '' then SelectedNames := SelectedNames + '; ';
+      SelectedNames := SelectedNames + Channel.Name;
+      { For a group the least accurate selected meter is the safe bound. }
+      if (EtalonAccuracy = 0) or (Channel.FlowMeter.Error > EtalonAccuracy) then
+        EtalonAccuracy := Channel.FlowMeter.Error;
+    end;
+
+  ActiveScale := nil;
+  case EPointEtalonType(APoint.EtalonType) of
+    etCompare: AResolvedEtalonType := etCompare;
+    etWeight: AResolvedEtalonType := etWeight;
+    etAuto:
+      begin
+        if FIsSimulationMode then
+        begin
+          { Simulation uses the already selected comparison channels and must
+            not require real metrological accuracy or configured scales. }
+          AResolvedEtalonType := etCompare;
+          Log('SelectEtalons.MethodResolved',
+            'RequestedEtalonType=etAuto | ResolvedEtalonType=etCompare | Reason=SimulationMode');
+        end
+        else
+        begin
+          FailedNames := '';
+          { APoint.Error is the existing permissible device error at this point;
+            TFlowMeter.Error is the etalon metrological characteristic. Calculated
+            ValueError is a measurement result and is intentionally not used. }
+          for Channel in FDeviceChannels do
+            if (Channel <> nil) and Channel.Enabled and (Channel.State <> osDeleted) then
+            begin
+              DeviceAccuracy := APoint.Error;
+              RequiredAccuracy := DeviceAccuracy / 2;
+              RatioValid := (DeviceAccuracy > 0) and (EtalonAccuracy > 0) and
+                (EtalonAccuracy <= RequiredAccuracy);
+              Log('SelectEtalons.AccuracyCheck', Format(
+                'DeviceChannel="%s" | DeviceAccuracy=%.6f | RequiredEtalonAccuracy=%.6f | EtalonChannels="%s" | EtalonAccuracy=%.6f | RatioValid=%s',
+                [Channel.Name, DeviceAccuracy, RequiredAccuracy, SelectedNames,
+                 EtalonAccuracy, BoolToStr(RatioValid, 'True', 'False')]));
+              if not RatioValid then
+              begin
+                if FailedNames <> '' then FailedNames := FailedNames + '; ';
+                FailedNames := FailedNames + Channel.Name;
+              end;
+            end;
+          if FailedNames = '' then
+          begin
+            AResolvedEtalonType := etCompare;
+            Log('SelectEtalons.MethodResolved',
+              'RequestedEtalonType=etAuto | ResolvedEtalonType=etCompare | Reason=AllDevicesMeetAccuracyRatio');
+          end
+          else
+          begin
+            AResolvedEtalonType := etWeight;
+            Log('SelectEtalons.MethodResolved', Format(
+              'RequestedEtalonType=etAuto | ResolvedEtalonType=etWeight | Reason=AccuracyRatioFailed | FailedDevices="%s"',
+              [FailedNames]));
+          end;
+        end;
+      end;
+  else
+    SetError(1105, Format('Неизвестный тип эталона точки: %d', [APoint.EtalonType]));
+    Exit;
+  end;
+
+  if AResolvedEtalonType = etWeight then
+  begin
+    { TWeight currently exposes no capacity/availability range. Membership in
+      WorkTable.Scales is the existing selection rule; do not invent limits. }
+    if (FScales = nil) or (FScales.Count = 0) or (FScales[0] = nil) then
+    begin
+      SetError(1106, 'Весовой метод необходим, но подходящие весы отсутствуют');
+      Log('SelectEtalons.Error', AError.Msg);
+      Exit;
+    end;
+    ActiveScale := FScales[0];
+    ScaleNames := ActiveScale.Name;
+  end
+  else
+    ScaleNames := '';
+
+  if AResolvedEtalonType = etAuto then
+  begin
+    SetError(1206, 'Автоматический тип эталона не разрешён предварительным выбором');
+    Exit;
+  end;
+  FResolvedEtalonType := AResolvedEtalonType;
+  Log('SelectEtalons.Success', Format(
+    'ResolvedEtalonType=%s | SelectedChannels="%s" | SelectedScales="%s"',
+    [GetEnumName(TypeInfo(EPointEtalonType), Ord(AResolvedEtalonType)),
+     SelectedNames, ScaleNames]));
+  Result := True;
+end;
 
 
 procedure TWorkTable.DisableAllEtalons;
@@ -4301,12 +4810,12 @@ var
     NormalizedName: string;
   begin
     Result := False;
-    NormalizedName := Trim(AName);
+    NormalizedName := NormalizeChannelName(AName);
     if NormalizedName = '' then
       Exit;
 
     for NameIndex := Low(ANames) to High(ANames) do
-      if SameText(NormalizedName, Trim(ANames[NameIndex])) then
+      if NormalizedName = NormalizeChannelName(ANames[NameIndex]) then
         Exit(True);
   end;
 
@@ -4337,7 +4846,7 @@ begin
   { Validate every requested name before changing any channel. }
   for J := Low(ANames) to High(ANames) do
   begin
-    RequestedName := Trim(ANames[J]);
+    RequestedName := NormalizeChannelName(ANames[J]);
     if RequestedName = '' then
     begin
       AError := BuildWorkTableError(1103,
@@ -4352,8 +4861,8 @@ begin
       if not IsRequiredChannelType(Channel) then
         Continue;
 
-      ChannelName := Trim(Channel.FlowMeter.Name);
-      if SameText(ChannelName, RequestedName) then
+      ChannelName := NormalizeChannelName(Channel.Name);
+      if ChannelName = RequestedName then
       begin
         NameFound := True;
         Break;
@@ -4365,11 +4874,11 @@ begin
       if AWeightsOnly then
         AError := BuildWorkTableError(1104,
           Format('В рабочем столе не найден весовой канал "%s"',
-            [RequestedName]))
+            [ANames[J]]))
       else
         AError := BuildWorkTableError(1105,
           Format('В рабочем столе не найден эталонный прибор "%s"',
-            [RequestedName]));
+            [ANames[J]]));
       Exit;
     end;
   end;
@@ -4381,7 +4890,7 @@ begin
     if not IsRequiredChannelType(Channel) then
       Continue;
 
-    ChannelName := Trim(Channel.FlowMeter.Name);
+    ChannelName := Channel.Name;
     NeedEnabled := NameInList(ChannelName);
     if NeedEnabled and not Channel.Enabled then
     begin
@@ -4427,8 +4936,13 @@ var
   Pair: TPair<Integer, Double>;
   IsQuantityTemplateSet: Boolean;
   IsFlowTemplateSet: Boolean;
+  IsVolumeFlowTemplateSet: Boolean;
+  IsMassFlowTemplateSet: Boolean;
+  IsVolumeTemplateSet: Boolean;
+  IsMassTemplateSet: Boolean;
   IsImpTemplateSet: Boolean;
   IsImpTotalTemplateSet: Boolean;
+  AggregateSignature: string;
 
   function GetAggregateGroupKey(const AIndex: Integer; const AChannel: TChannel): Integer;
   begin
@@ -4442,13 +4956,32 @@ begin
     FTableFlow.ValueQuantity.ClearMeterValues;
   if FTableFlow.ValueFlowRate <> nil then
     FTableFlow.ValueFlowRate.ClearMeterValues;
+  if (FTableFlow.ValueVolumeFlow <> nil) and
+     (FTableFlow.ValueVolumeFlow <> FTableFlow.ValueFlowRate) then
+    FTableFlow.ValueVolumeFlow.ClearMeterValues;
+  if (FTableFlow.ValueMassFlow <> nil) and
+     (FTableFlow.ValueMassFlow <> FTableFlow.ValueFlowRate) then
+    FTableFlow.ValueMassFlow.ClearMeterValues;
+  if (FTableFlow.ValueVolume <> nil) and
+     (FTableFlow.ValueVolume <> FTableFlow.ValueQuantity) then
+    FTableFlow.ValueVolume.ClearMeterValues;
+  if (FTableFlow.ValueMass <> nil) and
+     (FTableFlow.ValueMass <> FTableFlow.ValueQuantity) then
+    FTableFlow.ValueMass.ClearMeterValues;
 
   IsQuantityTemplateSet := False;
   IsFlowTemplateSet := False;
+  IsVolumeFlowTemplateSet := False;
+  IsMassFlowTemplateSet := False;
+  IsVolumeTemplateSet := False;
+  IsMassTemplateSet := False;
   IsImpTemplateSet := False;
   IsImpTotalTemplateSet := False;
   AggregateGroup := 0;
   MaxGroupFlow := -1;
+  AggregateSignature := '';
+  FCurrentAggregateGroup := -1;
+  FCurrentEnabledEtalonCount := 0;
 
   GroupFlows := TDictionary<Integer, Double>.Create;
   try
@@ -4478,7 +5011,12 @@ begin
   end;
 
   if MaxGroupFlow < 0 then
+  begin
+    FCurrentAggregateSignature := '-1|';
     Exit;
+  end;
+
+  FCurrentAggregateGroup := AggregateGroup;
 
   for I := 0 to FEtalonChannels.Count - 1 do
   begin
@@ -4488,6 +5026,64 @@ begin
 
     if GetAggregateGroupKey(I, Channel) <> AggregateGroup then
       Continue;
+
+    if Channel.FlowMeter.MeterFlowCategory <> mftWeightsType then
+    begin
+      Inc(FCurrentEnabledEtalonCount);
+      AggregateSignature := AggregateSignature + IntToStr(I) + ';';
+
+      if (FTableFlow.ValueVolumeFlow <> nil) and
+         (FTableFlow.ValueVolumeFlow <> FTableFlow.ValueFlowRate) and
+         (Channel.FlowMeter.ValueVolumeFlow <> nil) then
+      begin
+        if not IsVolumeFlowTemplateSet then
+        begin
+          FTableFlow.ValueVolumeFlow.SetAs(Channel.FlowMeter.ValueVolumeFlow);
+          FTableFlow.ValueVolumeFlow.ValueType := AGGREGATE_TYPE;
+          IsVolumeFlowTemplateSet := True;
+        end;
+        FTableFlow.ValueVolumeFlow.AddMeterValue(Channel.FlowMeter.ValueVolumeFlow);
+      end;
+
+      if (FTableFlow.ValueMassFlow <> nil) and
+         (FTableFlow.ValueMassFlow <> FTableFlow.ValueFlowRate) and
+         (Channel.FlowMeter.ValueMassFlow <> nil) then
+      begin
+        if not IsMassFlowTemplateSet then
+        begin
+          FTableFlow.ValueMassFlow.SetAs(Channel.FlowMeter.ValueMassFlow);
+          FTableFlow.ValueMassFlow.ValueType := AGGREGATE_TYPE;
+          IsMassFlowTemplateSet := True;
+        end;
+        FTableFlow.ValueMassFlow.AddMeterValue(Channel.FlowMeter.ValueMassFlow);
+      end;
+
+      if (FTableFlow.ValueVolume <> nil) and
+         (FTableFlow.ValueVolume <> FTableFlow.ValueQuantity) and
+         (Channel.FlowMeter.ValueVolume <> nil) then
+      begin
+        if not IsVolumeTemplateSet then
+        begin
+          FTableFlow.ValueVolume.SetAs(Channel.FlowMeter.ValueVolume);
+          FTableFlow.ValueVolume.ValueType := AGGREGATE_TYPE;
+          IsVolumeTemplateSet := True;
+        end;
+        FTableFlow.ValueVolume.AddMeterValue(Channel.FlowMeter.ValueVolume);
+      end;
+
+      if (FTableFlow.ValueMass <> nil) and
+         (FTableFlow.ValueMass <> FTableFlow.ValueQuantity) and
+         (Channel.FlowMeter.ValueMass <> nil) then
+      begin
+        if not IsMassTemplateSet then
+        begin
+          FTableFlow.ValueMass.SetAs(Channel.FlowMeter.ValueMass);
+          FTableFlow.ValueMass.ValueType := AGGREGATE_TYPE;
+          IsMassTemplateSet := True;
+        end;
+        FTableFlow.ValueMass.AddMeterValue(Channel.FlowMeter.ValueMass);
+      end;
+    end;
 
     if (FTableFlow.ValueQuantity <> nil) and (Channel.FlowMeter.ValueQuantity <> nil) then
     begin
@@ -4515,6 +5111,8 @@ begin
       FTableFlow.ValueFlowRate.AddMeterValue(Channel.FlowMeter.ValueFlow);
     end;
   end;
+
+  FCurrentAggregateSignature := IntToStr(AggregateGroup) + '|' + AggregateSignature;
 
 
  // Агрегация импульсов поверяемых приборов.
@@ -5033,6 +5631,13 @@ begin
 end;
 
 procedure TWorkTable.SetValues;
+  function MeterValueOrZero(const AMeterValue: TMeterValue): Double;
+  begin
+    if AMeterValue <> nil then
+      Result := AMeterValue.GetDoubleValue
+    else
+      Result := 0;
+  end;
 
 begin
 
@@ -5043,6 +5648,33 @@ if FTableFlow<>nil then
       if FTableFlow.ValueTime <> nil then FTableFlow.ValueTime.SetValue();
       if FTableFlow.ValueQuantity <> nil then FTableFlow.ValueQuantity.SetValue();
       if FTableFlow.ValueFlowRate <> nil then FTableFlow.ValueFlowRate.SetValue();
+      if (FTableFlow.ValueVolumeFlow <> nil) and
+         (FTableFlow.ValueVolumeFlow <> FTableFlow.ValueFlowRate) then
+        FTableFlow.ValueVolumeFlow.SetValue();
+      if (FTableFlow.ValueMassFlow <> nil) and
+         (FTableFlow.ValueMassFlow <> FTableFlow.ValueFlowRate) then
+        FTableFlow.ValueMassFlow.SetValue();
+      if (FTableFlow.ValueVolume <> nil) and
+         (FTableFlow.ValueVolume <> FTableFlow.ValueQuantity) then
+        FTableFlow.ValueVolume.SetValue();
+      if (FTableFlow.ValueMass <> nil) and
+         (FTableFlow.ValueMass <> FTableFlow.ValueQuantity) then
+        FTableFlow.ValueMass.SetValue();
+
+      if (FCurrentAggregateSignature <> FLastLoggedAggregateSignature) and
+         (ProtocolManager <> nil) then
+      begin
+        ProtocolManager.AddMessage(pcState, psWorkTable,
+          'AggregateMeterValuesChanged', 'Пересчитаны агрегаты эталонов',
+          Format('WorkTable="%s"; AggregateGroup=%d; EnabledEtalonCount=%d; ' +
+            'VolumeFlow=%.6f; MassFlow=%.6f; Volume=%.6f; Mass=%.6f',
+            [Name, FCurrentAggregateGroup, FCurrentEnabledEtalonCount,
+             MeterValueOrZero(FTableFlow.ValueVolumeFlow),
+             MeterValueOrZero(FTableFlow.ValueMassFlow),
+             MeterValueOrZero(FTableFlow.ValueVolume),
+             MeterValueOrZero(FTableFlow.ValueMass)]));
+        FLastLoggedAggregateSignature := FCurrentAggregateSignature;
+      end;
 
 
       if FTableFlow.ValueTemperture <> nil then FTableFlow.ValueTemperture.SetValue();
@@ -5110,15 +5742,12 @@ begin
   UpdateFlowRateLimitsByEtalons;
 end;
 
-{ Сохраняет рабочие столы и их значения в setting.fpp. }
+{ Сохраняет рабочие столы и их значения в выбранный файл проекта *.fpp. }
 class procedure TWorkTable.Save(const AIniFileName: string;
   AWorkTables: TObjectList<TWorkTable>);
 var
-  Ini: TCustomIniFile;
-  ValuesIni: TCustomIniFile;
-  I: Integer;
-  WorkTable: TWorkTable;
-  Section: string;
+  Ini: TProjectSettingsIni;
+  ValuesIni: TProjectSettingsIni;
 
   procedure ClearOldWorkTableSections(AIni: TCustomIniFile);
   var
@@ -5132,143 +5761,241 @@ var
     Sections := TStringList.Create;
     try
       AIni.ReadSections(Sections);
-
       for J := Sections.Count - 1 downto 0 do
       begin
         SectionName := Trim(Sections[J]);
-
         if StartsText('WorkTable.', SectionName) or
-           (StartsText('WorkTable_', SectionName) and EndsText('_Sync', SectionName)) then
+           (StartsText('WorkTable_', SectionName) and
+            EndsText('_Sync', SectionName)) then
           AIni.EraseSection(SectionName);
       end;
     finally
       Sections.Free;
     end;
   end;
+
+  procedure SaveRuntimeValues;
+  var
+    I: Integer;
+    WorkTable: TWorkTable;
+    Section: string;
+  begin
+    ValuesIni.BeginUpdate;
+    try
+      ClearOldWorkTableSections(ValuesIni);
+
+      if ValuesIni.ReadFloat('Common', 'InitDensity', 0) = 0 then
+        ValuesIni.WriteFloat('Common', 'InitDensity', 0.9982);
+
+      for I := 0 to AWorkTables.Count - 1 do
+      begin
+        WorkTable := AWorkTables[I];
+        Section := 'WorkTable.' + IntToStr(I);
+
+        ValuesIni.WriteString(Section, 'HashValueTempertureBefore',
+          WorkTable.ValueTempertureBefore.Hash);
+        ValuesIni.WriteString(Section, 'HashValueTempertureAfter',
+          WorkTable.ValueTempertureAfter.Hash);
+        ValuesIni.WriteString(Section, 'HashValueTempertureDelta',
+          WorkTable.ValueTempertureDelta.Hash);
+        ValuesIni.WriteString(Section, 'HashValueTemperture',
+          WorkTable.ValueTemperture.Hash);
+        ValuesIni.WriteString(Section, 'HashValuePressureBefore',
+          WorkTable.ValuePressureBefore.Hash);
+        ValuesIni.WriteString(Section, 'HashValuePressureAfter',
+          WorkTable.ValuePressureAfter.Hash);
+        ValuesIni.WriteString(Section, 'HashValuePressureDelta',
+          WorkTable.ValuePressureDelta.Hash);
+        ValuesIni.WriteString(Section, 'HashValuePressure',
+          WorkTable.ValuePressure.Hash);
+        ValuesIni.WriteString(Section, 'HashValueDensity',
+          WorkTable.ValueDensity.Hash);
+        ValuesIni.WriteString(Section, 'HashValueAirPressure',
+          WorkTable.ValueAirPressure.Hash);
+        ValuesIni.WriteString(Section, 'HashValueAirTemperture',
+          WorkTable.ValueAirTemperture.Hash);
+        ValuesIni.WriteString(Section, 'HashValueHumidity',
+          WorkTable.ValueHumidity.Hash);
+        ValuesIni.WriteString(Section, 'HashValueTime',
+          WorkTable.ValueTime.Hash);
+        ValuesIni.WriteString(Section, 'HashValueQuantity',
+          WorkTable.ValueQuantity.Hash);
+        ValuesIni.WriteString(Section, 'HashValueFlowRate',
+          WorkTable.ValueFlowRate.Hash);
+
+        ValuesIni.WriteFloat(Section, 'ValueTempertureBefore',
+          WorkTable.ValueTempertureBefore.GetDoubleValue);
+        ValuesIni.WriteFloat(Section, 'ValueTempertureAfter',
+          WorkTable.ValueTempertureAfter.GetDoubleValue);
+        ValuesIni.WriteFloat(Section, 'ValueTempertureDelta',
+          WorkTable.ValueTempertureDelta.GetDoubleValue);
+        ValuesIni.WriteFloat(Section, 'ValueTemperture',
+          WorkTable.ValueTemperture.GetDoubleValue);
+        ValuesIni.WriteFloat(Section, 'ValuePressureBefore',
+          WorkTable.ValuePressureBefore.GetDoubleValue);
+        ValuesIni.WriteFloat(Section, 'ValuePressureAfter',
+          WorkTable.ValuePressureAfter.GetDoubleValue);
+        ValuesIni.WriteFloat(Section, 'ValuePressureDelta',
+          WorkTable.ValuePressureDelta.GetDoubleValue);
+        ValuesIni.WriteFloat(Section, 'ValuePressure',
+          WorkTable.ValuePressure.GetDoubleValue);
+        ValuesIni.WriteFloat(Section, 'ValueDensity',
+          WorkTable.ValueDensity.GetDoubleValue);
+        ValuesIni.WriteFloat(Section, 'ValueAirPressure',
+          WorkTable.ValueAirPressure.GetDoubleValue);
+        ValuesIni.WriteFloat(Section, 'ValueAirTemperture',
+          WorkTable.ValueAirTemperture.GetDoubleValue);
+        ValuesIni.WriteFloat(Section, 'ValueHumidity',
+          WorkTable.ValueHumidity.GetDoubleValue);
+        ValuesIni.WriteFloat(Section, 'ValueTime',
+          WorkTable.ValueTime.GetDoubleValue);
+        ValuesIni.WriteFloat(Section, 'ValueQuantity',
+          WorkTable.ValueQuantity.GetDoubleValue);
+        ValuesIni.WriteFloat(Section, 'ValueFlowRate',
+          WorkTable.ValueFlowRate.GetDoubleValue);
+      end;
+
+      ValuesIni.EndUpdate;
+    except
+      ValuesIni.CancelUpdate;
+      raise;
+    end;
+  end;
+
+  procedure SaveConfiguration;
+  var
+    I: Integer;
+    WorkTable: TWorkTable;
+    Section: string;
+  begin
+    Ini.BeginUpdate;
+    try
+      ClearOldWorkTableSections(Ini);
+      Ini.WriteInteger('WorkTables', 'Count', AWorkTables.Count);
+
+      for I := 0 to AWorkTables.Count - 1 do
+      begin
+        WorkTable := AWorkTables[I];
+        Section := 'WorkTable.' + IntToStr(I);
+
+        Ini.WriteInteger(Section, 'ID', WorkTable.ID);
+        Ini.WriteString(Section, 'UUID', WorkTable.UUID);
+        Ini.WriteString(Section, 'Name', WorkTable.Name);
+        Ini.WriteString(Section, 'Text', WorkTable.Text);
+        Ini.WriteFloat(Section, 'Temp', WorkTable.FluidTemp.Value.Value);
+        Ini.WriteFloat(Section, 'TempDelta', WorkTable.TempDelta);
+        Ini.WriteFloat(Section, 'PressDelta', WorkTable.PressDelta);
+        Ini.WriteFloat(Section, 'FlowRate', WorkTable.FlowRate.Value.Value);
+        Ini.WriteFloat(Section, 'PressureMin', WorkTable.FluidPress.Min);
+        Ini.WriteFloat(Section, 'PressureMax', WorkTable.FluidPress.Max);
+        Ini.WriteFloat(Section, 'TempMin', WorkTable.FluidTemp.Min);
+        Ini.WriteFloat(Section, 'TempMax', WorkTable.FluidTemp.Max);
+        Ini.WriteFloat(Section, 'FlowRateMin', WorkTable.FlowRate.Min);
+        Ini.WriteFloat(Section, 'FlowRateMax', WorkTable.FlowRate.Max);
+        Ini.WriteFloat(Section, 'QuantityMin', WorkTable.TableFlow.QuantityMin);
+        Ini.WriteFloat(Section, 'QuantityMax', WorkTable.TableFlow.QuantityMax);
+        Ini.WriteFloat(Section, 'Time', WorkTable.Time);
+        Ini.WriteFloat(Section, 'TimeResult', WorkTable.TimeResult);
+        Ini.WriteFloat(Section, 'CurrentWeight', WorkTable.CurrentWeight);
+        Ini.WriteFloat(Section, 'ScaleTareWeight', WorkTable.ScaleTareWeight);
+        if WorkTable.ActiveScale <> nil then
+          Ini.WriteString(Section, 'ActiveScaleUUID', WorkTable.ActiveScale.UUID)
+        else
+          Ini.WriteString(Section, 'ActiveScaleUUID', '');
+
+        if WorkTable.CurrentPoint <> nil then
+        begin
+          Ini.WriteInteger(Section, 'TimeSet',
+            Round(WorkTable.CurrentPoint.LimitTime));
+          Ini.WriteInteger(Section, 'LimitImpSet',
+            WorkTable.CurrentPoint.LimitImp);
+          Ini.WriteFloat(Section, 'LimitVolumeSet',
+            WorkTable.CurrentPoint.LimitVolume);
+          Ini.WriteInteger(Section, 'StopCriteria',
+            CriteriaToInt(WorkTable.CurrentPoint.StopCriteria));
+        end
+        else
+        begin
+          Ini.WriteInteger(Section, 'TimeSet', -1);
+          Ini.WriteInteger(Section, 'LimitImpSet', -1);
+          Ini.WriteFloat(Section, 'LimitVolumeSet', -1);
+          Ini.WriteInteger(Section, 'StopCriteria', 0);
+        end;
+
+        Ini.WriteString(Section, 'Status',
+          WorkTableStateToString(WorkTable.State));
+        Ini.WriteString(Section, 'MeasurementState',
+          WorkTableStateToString(WorkTable.State));
+        Ini.WriteBool(Section, 'TableClamped', WorkTable.TableClamped);
+        Ini.WriteString(Section, 'FlowUnitName', WorkTable.FlowUnitName);
+        Ini.WriteString(Section, 'QuantityUnitName', WorkTable.QuantityUnitName);
+        Ini.WriteBool(Section, 'LayoutFlowRateVisible',
+          WorkTable.LayoutFlowRateVisible);
+        Ini.WriteBool(Section, 'LayoutPumpVisible',
+          WorkTable.LayoutPumpVisible);
+        Ini.WriteBool(Section, 'LayoutMainVisible',
+          WorkTable.LayoutMainVisible);
+        Ini.WriteBool(Section, 'LayoutMesureVisible',
+          WorkTable.LayoutMesureVisible);
+        Ini.WriteBool(Section, 'LayoutConditionsVisible',
+          WorkTable.LayoutConditionsVisible);
+        Ini.WriteBool(Section, 'LayoutProceduresVisible',
+          WorkTable.LayoutProceduresVisible);
+        Ini.WriteString(Section, 'InstrumentalLayoutOrder',
+          WorkTable.InstrumentalLayoutOrder);
+        Ini.WriteBool(Section, 'MergeMeasurementPoints',
+          WorkTable.MergeMeasurementPoints);
+
+        SaveScaleList(Ini, Section + '.Scales', WorkTable.Weights);
+        SaveChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
+        SaveChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
+        SaveGridColumns(Ini, Section + '.EtalonGrid',
+          WorkTable.EtalonsGridColumns);
+        SaveGridColumns(Ini, Section + '.DeviceGrid',
+          WorkTable.DevicesGridColumns);
+        SaveGridColumns(Ini, Section + '.DataPointsGrid',
+          WorkTable.DataPointsGridColumns);
+        SaveGridColumns(Ini, Section + '.ResultsGrid',
+          WorkTable.ResultsGridColumns);
+        WorkTable.SyncSetup.SaveToIni(Ini, 'WorkTable_' + WorkTable.UUID);
+      end;
+
+      Ini.EndUpdate;
+    except
+      Ini.CancelUpdate;
+      raise;
+    end;
+  end;
+
 begin
   if (AIniFileName = '') or (AWorkTables = nil) then
     Exit;
 
-  Ini := TProjectSettingsIni.Create(AIniFileName, STORAGE_TABLE_SETTINGS);
-  ValuesIni := TProjectSettingsIni.Create(AIniFileName, STORAGE_WORK_TABLE_VALUES);
+  BeginProjectSettingsWrite;
   try
-    ClearOldWorkTableSections(Ini);
-    ClearOldWorkTableSections(ValuesIni);
+    Ini := nil;
+    ValuesIni := nil;
+    try
+      Ini := TProjectSettingsIni.Create(
+        AIniFileName, STORAGE_TABLE_SETTINGS);
+      ValuesIni := TProjectSettingsIni.Create(
+        AIniFileName, STORAGE_WORK_TABLE_VALUES);
 
-    Ini.WriteInteger('WorkTables', 'Count', AWorkTables.Count);
-
-     if ValuesIni.ReadFloat('Common', 'InitDensity', 0) = 0 then
-          ValuesIni.WriteFloat('Common', 'InitDensity', 0.9982);
-
-    for I := 0 to AWorkTables.Count - 1 do
-    begin
-      WorkTable := AWorkTables[I];
-      Section := 'WorkTable.' + IntToStr(I);
-
-
-      Ini.WriteInteger(Section, 'ID', WorkTable.ID);
-      Ini.WriteString(Section, 'UUID', WorkTable.UUID);
-      Ini.WriteString(Section, 'Name', WorkTable.Name);
-      Ini.WriteString(Section, 'Text', WorkTable.Text);
-      Ini.WriteFloat(Section, 'Temp', WorkTable.FluidTemp.Value.Value);
-      Ini.WriteFloat(Section, 'TempDelta', WorkTable.TempDelta);
-     // Ini.WriteFloat(Section, 'Press', WorkTable.Press);
-      Ini.WriteFloat(Section, 'PressDelta', WorkTable.PressDelta);
-      Ini.WriteFloat(Section, 'FlowRate', WorkTable.FlowRate.Value.Value);
-      Ini.WriteFloat(Section, 'PressureMin', WorkTable.FluidPress.Min);
-      Ini.WriteFloat(Section, 'PressureMax', WorkTable.FluidPress.Max);
-      Ini.WriteFloat(Section, 'TempMin', WorkTable.FluidTemp.Min);
-      Ini.WriteFloat(Section, 'TempMax', WorkTable.FluidTemp.Max);
-      Ini.WriteFloat(Section, 'FlowRateMin', WorkTable.FlowRate.Min);
-      Ini.WriteFloat(Section, 'FlowRateMax', WorkTable.FlowRate.Max);
-      Ini.WriteFloat(Section, 'QuantityMin', WorkTable.TableFlow.QuantityMin);
-      Ini.WriteFloat(Section, 'QuantityMax', WorkTable.TableFlow.QuantityMax);
-      Ini.WriteFloat(Section, 'Time', WorkTable.Time);
-      Ini.WriteFloat(Section, 'TimeResult', WorkTable.TimeResult);
-      Ini.WriteFloat(Section, 'CurrentWeight', WorkTable.CurrentWeight);
-      Ini.WriteFloat(Section, 'ScaleTareWeight', WorkTable.ScaleTareWeight);
-      if WorkTable.ActiveScale <> nil then
-        Ini.WriteString(Section, 'ActiveScaleUUID', WorkTable.ActiveScale.UUID)
-      else
-        Ini.WriteString(Section, 'ActiveScaleUUID', '');
-      if WorkTable.CurrentPoint <> nil then
-      begin
-        Ini.WriteInteger(Section, 'TimeSet', Round(WorkTable.CurrentPoint.LimitTime));
-        Ini.WriteInteger(Section, 'LimitImpSet', WorkTable.CurrentPoint.LimitImp);
-        Ini.WriteFloat(Section, 'LimitVolumeSet', WorkTable.CurrentPoint.LimitVolume);
-        Ini.WriteInteger(Section, 'StopCriteria', CriteriaToInt(WorkTable.CurrentPoint.StopCriteria));
-      end
-      else
-      begin
-        Ini.WriteInteger(Section, 'TimeSet', -1);
-        Ini.WriteInteger(Section, 'LimitImpSet', -1);
-        Ini.WriteFloat(Section, 'LimitVolumeSet', -1);
-        Ini.WriteInteger(Section, 'StopCriteria', 0);
-      end;
-      Ini.WriteString(Section, 'Status', WorkTableStateToString(WorkTable.State));
-      Ini.WriteString(Section, 'MeasurementState', WorkTableStateToString(WorkTable.State));
-      Ini.WriteBool(Section, 'TableClamped', WorkTable.TableClamped);
-      Ini.WriteString(Section, 'FlowUnitName', WorkTable.FlowUnitName);
-      Ini.WriteString(Section, 'QuantityUnitName', WorkTable.QuantityUnitName);
-      Ini.WriteBool(Section, 'LayoutFlowRateVisible', WorkTable.LayoutFlowRateVisible);
-      Ini.WriteBool(Section, 'LayoutPumpVisible', WorkTable.LayoutPumpVisible);
-      Ini.WriteBool(Section, 'LayoutMainVisible', WorkTable.LayoutMainVisible);
-      Ini.WriteBool(Section, 'LayoutMesureVisible', WorkTable.LayoutMesureVisible);
-      Ini.WriteBool(Section, 'LayoutConditionsVisible', WorkTable.LayoutConditionsVisible);
-      Ini.WriteBool(Section, 'LayoutProceduresVisible', WorkTable.LayoutProceduresVisible);
-      Ini.WriteString(Section, 'InstrumentalLayoutOrder', WorkTable.InstrumentalLayoutOrder);
-      Ini.WriteBool(Section, 'MergeMeasurementPoints', WorkTable.MergeMeasurementPoints);
-
-      ValuesIni.WriteString(Section, 'HashValueTempertureBefore', WorkTable.ValueTempertureBefore.Hash);
-      ValuesIni.WriteString(Section, 'HashValueTempertureAfter', WorkTable.ValueTempertureAfter.Hash);
-      ValuesIni.WriteString(Section, 'HashValueTempertureDelta', WorkTable.ValueTempertureDelta.Hash);
-      ValuesIni.WriteString(Section, 'HashValueTemperture', WorkTable.ValueTemperture.Hash);
-      ValuesIni.WriteString(Section, 'HashValuePressureBefore', WorkTable.ValuePressureBefore.Hash);
-      ValuesIni.WriteString(Section, 'HashValuePressureAfter', WorkTable.ValuePressureAfter.Hash);
-      ValuesIni.WriteString(Section, 'HashValuePressureDelta', WorkTable.ValuePressureDelta.Hash);
-      ValuesIni.WriteString(Section, 'HashValuePressure', WorkTable.ValuePressure.Hash);
-      ValuesIni.WriteString(Section, 'HashValueDensity', WorkTable.ValueDensity.Hash);
-      ValuesIni.WriteString(Section, 'HashValueAirPressure', WorkTable.ValueAirPressure.Hash);
-      ValuesIni.WriteString(Section, 'HashValueAirTemperture', WorkTable.ValueAirTemperture.Hash);
-      ValuesIni.WriteString(Section, 'HashValueHumidity', WorkTable.ValueHumidity.Hash);
-      ValuesIni.WriteString(Section, 'HashValueTime', WorkTable.ValueTime.Hash);
-      ValuesIni.WriteString(Section, 'HashValueQuantity', WorkTable.ValueQuantity.Hash);
-      ValuesIni.WriteString(Section, 'HashValueFlowRate', WorkTable.ValueFlowRate.Hash);
-
-      ValuesIni.WriteFloat(Section, 'ValueTempertureBefore', WorkTable.ValueTempertureBefore.GetDoubleValue);
-      ValuesIni.WriteFloat(Section, 'ValueTempertureAfter', WorkTable.ValueTempertureAfter.GetDoubleValue);
-      ValuesIni.WriteFloat(Section, 'ValueTempertureDelta', WorkTable.ValueTempertureDelta.GetDoubleValue);
-      ValuesIni.WriteFloat(Section, 'ValueTemperture', WorkTable.ValueTemperture.GetDoubleValue);
-      ValuesIni.WriteFloat(Section, 'ValuePressureBefore', WorkTable.ValuePressureBefore.GetDoubleValue);
-      ValuesIni.WriteFloat(Section, 'ValuePressureAfter', WorkTable.ValuePressureAfter.GetDoubleValue);
-      ValuesIni.WriteFloat(Section, 'ValuePressureDelta', WorkTable.ValuePressureDelta.GetDoubleValue);
-      ValuesIni.WriteFloat(Section, 'ValuePressure', WorkTable.ValuePressure.GetDoubleValue);
-      ValuesIni.WriteFloat(Section, 'ValueDensity', WorkTable.ValueDensity.GetDoubleValue);
-      ValuesIni.WriteFloat(Section, 'ValueAirPressure', WorkTable.ValueAirPressure.GetDoubleValue);
-      ValuesIni.WriteFloat(Section, 'ValueAirTemperture', WorkTable.ValueAirTemperture.GetDoubleValue);
-      ValuesIni.WriteFloat(Section, 'ValueHumidity', WorkTable.ValueHumidity.GetDoubleValue);
-      ValuesIni.WriteFloat(Section, 'ValueTime', WorkTable.ValueTime.GetDoubleValue);
-      ValuesIni.WriteFloat(Section, 'ValueQuantity', WorkTable.ValueQuantity.GetDoubleValue);
-      ValuesIni.WriteFloat(Section, 'ValueFlowRate', WorkTable.ValueFlowRate.GetDoubleValue);
-
-      SaveScaleList(Ini, Section + '.Scales', WorkTable.Weights);
-      SaveChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
-      SaveChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
-      SaveGridColumns(Ini, Section + '.EtalonGrid', WorkTable.EtalonsGridColumns);
-      SaveGridColumns(Ini, Section + '.DeviceGrid', WorkTable.DevicesGridColumns);
-      SaveGridColumns(Ini, Section + '.DataPointsGrid', WorkTable.DataPointsGridColumns);
-      SaveGridColumns(Ini, Section + '.ResultsGrid', WorkTable.ResultsGridColumns);
-      WorkTable.SyncSetup.SaveToIni(Ini, 'WorkTable_' + WorkTable.UUID);
+      { Runtime values are committed first. The channel configuration is
+        committed last, so a failure cannot replace a valid configuration
+        with a partially rewritten one. }
+      SaveRuntimeValues;
+      SaveConfiguration;
+    finally
+      ValuesIni.Free;
+      Ini.Free;
     end;
-    Ini.UpdateFile;
-    ValuesIni.UpdateFile;
   finally
-    ValuesIni.Free;
-    Ini.Free;
+    EndProjectSettingsWrite;
   end;
 end;
 
-{ Загружает рабочие столы и их значения из setting.fpp. }
+{ Загружает рабочие столы и их значения из выбранного файла проекта *.fpp. }
 class procedure TWorkTable.Load(const AIniFileName: string;
   AWorkTables: TObjectList<TWorkTable>);
 var
@@ -5557,6 +6284,11 @@ begin
     AIni.WriteFloat(Section, 'QMinWork', Channel.QMinWork);
     AIni.WriteFloat(Section, 'VMaxWork', Channel.VMaxWork);
     AIni.WriteFloat(Section, 'VMinWork', Channel.VMinWork);
+    AIni.WriteInteger(Section, 'FrequencyAveraging', Ord(Channel.FrequencyAveraging));
+    AIni.WriteInteger(Section, 'CurrentAveraging', Ord(Channel.CurrentAveraging));
+    AIni.WriteInteger(Section, 'VoltageAveraging', Ord(Channel.VoltageAveraging));
+    AIni.WriteInteger(Section, 'CurrentOutputRange', Channel.CurrentOutputRange);
+    AIni.WriteInteger(Section, 'VoltageOutputRange', Channel.VoltageOutputRange);
 
     AIni.WriteFloat(Section, 'ImpSec', Channel.ImpSec);
     AIni.WriteFloat(Section, 'ImpResult', Channel.ImpResult);
@@ -5564,6 +6296,8 @@ begin
     AIni.WriteFloat(Section, 'CurResult', Channel.CurResult);
     AIni.WriteFloat(Section, 'ValueSec', Channel.ValueSec);
     AIni.WriteFloat(Section, 'ValueResult', Channel.ValueResult);
+    AIni.WriteFloat(Section, 'VolSec', Channel.VolSec);
+    AIni.WriteFloat(Section, 'VolResult', Channel.VolResult);
 
     if (Channel<>nil) then
     begin
@@ -5647,6 +6381,19 @@ begin
       Channel.VMaxWork := S2F(AIni.ReadString(Section, 'VMaxWork', '0'));
       Channel.VMinWork := S2F(AIni.ReadString(Section, 'VMinWork', '0'));
     end;
+    Channel.FFrequencyAveraging := TChannelAveragingPeriod(EnsureRange(
+      AIni.ReadInteger(Section, 'FrequencyAveraging', Ord(capOff)),
+      Ord(Low(TChannelAveragingPeriod)), Ord(High(TChannelAveragingPeriod))));
+    Channel.FCurrentAveraging := TChannelAveragingPeriod(EnsureRange(
+      AIni.ReadInteger(Section, 'CurrentAveraging', Ord(capOff)),
+      Ord(Low(TChannelAveragingPeriod)), Ord(High(TChannelAveragingPeriod))));
+    Channel.FVoltageAveraging := TChannelAveragingPeriod(EnsureRange(
+      AIni.ReadInteger(Section, 'VoltageAveraging', Ord(capOff)),
+      Ord(Low(TChannelAveragingPeriod)), Ord(High(TChannelAveragingPeriod))));
+    Channel.CurrentOutputRange := EnsureRange(AIni.ReadInteger(Section,
+      'CurrentOutputRange', 0), 0, 2);
+    Channel.VoltageOutputRange := EnsureRange(AIni.ReadInteger(Section,
+      'VoltageOutputRange', 0), 0, 2);
 
     Channel.ImpSec := S2F(AIni.ReadString(Section, 'ImpSec', '0'));
     Channel.ImpResult :=0; //AIni.ReadFloat(Section, 'ImpResult', 0);
@@ -5654,6 +6401,8 @@ begin
     Channel.CurResult := S2F(AIni.ReadString(Section, 'CurResult', '0'));
     Channel.ValueSec := S2F(AIni.ReadString(Section, 'ValueSec', '0'));
     Channel.ValueResult := S2F(AIni.ReadString(Section, 'ValueResult', '0'));
+    Channel.VolSec := S2F(AIni.ReadString(Section, 'VolSec', '0'));
+    Channel.VolResult := S2F(AIni.ReadString(Section, 'VolResult', '0'));
 
     Channel.FHashValueImp := AIni.ReadString(Section, 'HashValueImp', Channel.FHashValueImp);
     Channel.FHashValueImpTotal := AIni.ReadString(Section, 'HashValueImpTotal', Channel.FHashValueImpTotal);
@@ -5677,6 +6426,9 @@ begin
     Channel.Init;
     if not AIni.ValueExists(Section, 'QMaxWork') then
       Channel.InitWorkRangesFromFlowMeter;
+
+    { Persisted runtime fields are configuration snapshots, not fresh samples. }
+    Channel.ClearRuntimeMeasurements;
 
     AChannels.Add(Channel);
   end;
@@ -6056,6 +6808,37 @@ begin
         if (ActionNotification.Action < Ord(Low(EActionParameter))) or
            (ActionNotification.Action > Ord(High(EActionParameter))) then
           Exit;
+
+        { В режиме имитации ответ физического контроллера насоса отсутствует.
+          Поэтому состояние и текущее значение насоса подтверждаются локально.
+          В реальном режиме эта ветка не выполняется. }
+        if FIsSimulationMode and (AParameter is TPump) then
+        begin
+          case EActionParameter(ActionNotification.Action) of
+            apStart:
+              begin
+                TPump(AParameter).Value.SetValue(TPump(AParameter).ValueSet.Value);
+                TPump(AParameter).PumpSetState(spStarted);
+              end;
+            apStop:
+              begin
+                TPump(AParameter).Value.SetValue(0);
+                TPump(AParameter).PumpSetState(spStopped);
+              end;
+            apSet:
+              if TPump(AParameter).IsRunning then
+                TPump(AParameter).Value.SetValue(TPump(AParameter).ValueSet.Value);
+          end;
+
+          ProtocolManager.AddMessage(pcState, psWorkTable,
+            'SimulationPumpActionApplied',
+            'Команда насоса применена в режиме имитации',
+            Format('Pump=%s; Action=%d; State=%s; Value=%.4f; ValueSet=%.4f',
+              [TPump(AParameter).Name, ActionNotification.Action,
+               TPump(AParameter).GetStateAsString,
+               TPump(AParameter).Value.Value,
+               TPump(AParameter).ValueSet.Value]));
+        end;
        // AEvent := ResolveParameterActionEvent(AParameter, EActionParameter(ActionNotification.Action));
       {  NotifyOwned(AEvent, TActionNotification.Create(ActionNotification.Action));   }
       end;
@@ -6265,6 +7048,20 @@ begin
     Exit;
   end;
 
+  if IsSimulationMode then
+  begin
+    { Apply only the logical channel selection. Physical pumps and valves
+      must not be touched by the simulation scenario. }
+    Result := ApplyHydraulicConfiguration(AError);
+    if Result and (ProtocolManager <> nil) then
+      ProtocolManager.AddMessage(pcAction, psWorkTable,
+        'SetupHydraulicLineSimulation',
+        'Гидравлическая конфигурация применена без команд оборудованию',
+        Format('OperationID=%d; PointUUID=%s; PointIndex=%d; TargetFlow=%.6f',
+          [OperationID, PointUUID, PointIndex, TargetFlow]));
+    Exit;
+  end;
+
   FireAction(awtSetupHydraulicLine, 'SetupHydraulicLine', Format(
     'OperationID=%d; PointUUID=%s; PointIndex=%d; TargetFlow=%.6f',
     [OperationID, PointUUID, PointIndex, TargetFlow]));
@@ -6389,10 +7186,27 @@ begin
 
   // Publish the selected automatic measurement point as the current
   // work-table task. CurrentPoint remains owned by TWorkTable.
-    FCurrentPoint.Assign(APoint, True);
+  FCurrentPoint.Assign(APoint, True);
+  { TDevicePoint.Assign copies measurement fields but intentionally does not
+    copy TObjectClass.UUID. The automatic operation and CurrentPoint must
+    identify the same session point. }
+  FCurrentPoint.UUID := APoint.UUID;
 
  // Notify(notifyStateChanged, APoint);
   DoProcNextStep(Format('Point %d', [APointIndex + 1]));
+
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(
+      pcState,
+      psWorkTable,
+      'MeasurementRunPointChanged',
+      'Синхронизация текущей точки измерения',
+      Format(
+        'Index=%d; SourceUUID=%s; CurrentPointUUID=%s; InstalledUUID=%s; Q=%f',
+        [APointIndex, APoint.UUID, FCurrentPoint.UUID,
+         FInstalledMeasurementPointUUID, APoint.Q]
+      )
+    );
 end;
 
 procedure TWorkTable.ResetCurrentPoint;
@@ -6560,6 +7374,7 @@ var
   BeforePointUUIDs: string;
   ValueTimeSnapshot: Double;
   SavedPointTime: Double;
+  SelectedTimeSource: string;
   ProcessedDeviceCount: Integer;
   BindingReason: string;
   BindingValid: Boolean;
@@ -6838,18 +7653,6 @@ begin
       )
     );
 
-  if IsSimulationMode then
-  begin
-    ProtocolManager.AddMessage(
-      pcProc,
-      psWorkTable,
-      'SaveMeasurementResults',
-      'Сценарный тест: рабочее сохранение результатов заблокировано',
-      Name
-    );
-    Exit;
-  end;
-
   DeviceRepo := nil;
 
   if DataManager <> nil then
@@ -7112,6 +7915,11 @@ begin
       else
         ValueTimeSnapshot := 0.0;
 
+      if IsSimulationMode then
+        SelectedTimeSource := 'SimulationMax(Time,TimeResult,ValueTime)'
+      else
+        SelectedTimeSource := 'TimeResult';
+
       ProtocolManager.AddMessage(
         pcProc,
         psWorkTable,
@@ -7121,7 +7929,7 @@ begin
           'WorkTable=%s; Device=%s; DeviceUUID=%s; Channel=%s; ' +
           'WorkTable.Time=%.9f; WorkTable.TimeResult=%.9f; ' +
           'ValueTime=%.9f; ValueTimeAssigned=%s; ' +
-          'SelectedSource=TimeResult',
+          'SelectedSource=%s',
           [
             Name,
             Device.Name,
@@ -7130,13 +7938,23 @@ begin
             Time,
             TimeResult,
             ValueTimeSnapshot,
-            BoolText(ValueTime <> nil)
+            BoolText(ValueTime <> nil),
+            SelectedTimeSource
           ]
         )
       );
 
-      Point.SpillTime := TimeResult;
-      SavedPointTime := Point.SpillTime;
+      if IsSimulationMode then
+      begin
+        { Simulation advances Time directly. Use the newest final snapshot
+          and synchronize TimeResult before validation and persistence. }
+        SavedPointTime := Max(Time, Max(TimeResult, ValueTimeSnapshot));
+        TimeResult := SavedPointTime;
+      end
+      else
+        SavedPointTime := TimeResult;
+
+      Point.SpillTime := SavedPointTime;
 
       ProtocolManager.AddMessage(
         pcProc,
@@ -7743,7 +8561,17 @@ begin
       ]
     )
   );
-end;procedure TWorkTable.StartTest;
+
+  { Обновление обработки запускается только после фактического сохранения
+    имитационной проливки. Производственный путь реальных проливок не меняется. }
+  if IsSimulationMode and (ProcessedDeviceCount > 0) then
+    FireEvent(
+      ewtSimulationMeasurementResultsSaved,
+      'Имитационные результаты измерения сохранены'
+    );
+end;
+
+procedure TWorkTable.StartTest;
 begin
   if IsSimulationMode then
   begin
@@ -8852,6 +9680,7 @@ constructor TWorkTableManager.Create(const AIniFileName: string);
 begin
   inherited Create;
   FIniFileName := AIniFileName;
+  FIsSimulationMode := False;
   FWorkTables := TObjectList<TWorkTable>.Create(True);
   TPump.Pumps := TObjectList<TPump>.Create(True);
   TWeight.Weights := TObjectList<TWeight>.Create(True);
@@ -8876,6 +9705,12 @@ var
   WorkTable: TWorkTable;
 begin
   TWorkTable.Load(FIniFileName, FWorkTables);
+
+  { The UI owns the manager flag, while measurement logic reads the flag
+    from each work table. Keep newly loaded tables in the same mode. }
+  for I := 0 to FWorkTables.Count - 1 do
+    if FWorkTables[I] <> nil then
+      FWorkTables[I].IsSimulationMode := FIsSimulationMode;
 
   WorkTable := nil;
   ActiveUUID := '';
@@ -8967,6 +9802,7 @@ begin
   WorkTable.ID := NextID;
   WorkTable.Name := TWorkTable.BuildWorkTableServiceName(WorkTable.ID);
   WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
+  WorkTable.IsSimulationMode := FIsSimulationMode;
   WorkTables.Add(WorkTable);
   WorkTable.Rebind;
 end;
@@ -8988,9 +9824,35 @@ begin
 
   FActiveWorkTable := AWorkTable;
 
+  if FActiveWorkTable <> nil then
+    FActiveWorkTable.IsSimulationMode := FIsSimulationMode;
+
   if (FActiveWorkTable <> nil) and
      ((FWorkTables = nil) or (FWorkTables.IndexOf(FActiveWorkTable) >= 0)) then
     FActiveWorkTable.IsActive := True;
+end;
+
+procedure TWorkTableManager.SetIsSimulationMode(const AValue: Boolean);
+var
+  WorkTable: TWorkTable;
+  WorkTableCount: Integer;
+begin
+  FIsSimulationMode := AValue;
+  WorkTableCount := 0;
+
+  if FWorkTables <> nil then
+  begin
+    WorkTableCount := FWorkTables.Count;
+    for WorkTable in FWorkTables do
+      if WorkTable <> nil then
+        WorkTable.IsSimulationMode := AValue;
+  end;
+
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcState, psWorkTable,
+      'SimulationModeChanged', 'Изменён режим имитации рабочего стола',
+      Format('ManagerMode=%s; WorkTableCount=%d',
+        [BoolText(FIsSimulationMode), WorkTableCount]));
 end;
 
 function TWorkTableManager.DeleteWorkTableByName(
@@ -9340,17 +10202,17 @@ begin
     Exit;
 
   if AWorkTable.FSimulationStateInitialized then
-    PreviousText := IfThen(AWorkTable.FLastEffectiveSimulationActive, 'True', 'False')
+    PreviousText := System.StrUtils.IfThen(AWorkTable.FLastEffectiveSimulationActive, 'True', 'False')
   else
     PreviousText := 'Unknown';
   if ProtocolManager <> nil then
     ProtocolManager.AddMessage(pcState, psWorkTable,
       'SimulationStateChanged', 'Simulation state changed',
       Format('Version=%s; Previous=%s; Current=%s; Source=%s; ChannelSimulationEnabled=%s; IsSimulationMode=%s; EffectiveSimulationActive=%s',
-        [APP_VERSION, PreviousText, IfThen(CurrentActive, 'True', 'False'),
-         ASource, IfThen(CurrentActive, 'True', 'False'),
-         IfThen(AWorkTable.IsSimulationMode, 'True', 'False'),
-         IfThen(CurrentActive, 'True', 'False')]));
+        [APP_VERSION, PreviousText, System.StrUtils.IfThen(CurrentActive, 'True', 'False'),
+         ASource, System.StrUtils.IfThen(CurrentActive, 'True', 'False'),
+         System.StrUtils.IfThen(AWorkTable.IsSimulationMode, 'True', 'False'),
+         System.StrUtils.IfThen(CurrentActive, 'True', 'False')]));
   AWorkTable.FSimulationStateInitialized := True;
   AWorkTable.FLastEffectiveSimulationActive := CurrentActive;
   AWorkTable.FLastDiagnosticIsSimulationMode := AWorkTable.IsSimulationMode;
@@ -9736,7 +10598,7 @@ begin
       ProtocolManager.AddMessage(pcError, psWorkTable,
         'SimulationStateMismatch', 'Simulation noise state mismatch',
         Format('Version=%s; EffectiveSimulationActive=False; IsSimulationMode=%s',
-          [APP_VERSION, IfThen((AWorkTable <> nil) and AWorkTable.IsSimulationMode,
+          [APP_VERSION, System.StrUtils.IfThen((AWorkTable <> nil) and AWorkTable.IsSimulationMode,
             'True', 'False')]));
     Exit;
   end;
@@ -9762,7 +10624,7 @@ begin
     ProtocolManager.AddMessage(pcState, psWorkTable, 'SimulationNoise',
       'Simple channel simulation noise',
       Format('ChannelKind=%s ChannelIndex=%d DeviceReady=%s TargetImpSec=%.6f BeforeImpSec=%.6f RandomStep=%.6f AllowedDelta=%.6f AfterImpSec=%.6f',
-        [AChannelKind, AChannelIndex, IfThen(ADeviceReady, 'True', 'False'),
+        [AChannelKind, AChannelIndex, System.StrUtils.IfThen(ADeviceReady, 'True', 'False'),
          TargetImpSec, BeforeImpSec, RandomStep, AllowedDelta, AfterImpSec]));
   end;
 end;
@@ -9823,7 +10685,7 @@ begin
     UpdateChannelRamp(Channel, 'Etalon', AWorkTable.EtalonChannels.IndexOf(Channel),
       ATargetImpSecValues[I], ACurrentTimeMs,
       Format('Reason=WorkTableTargetChanged TargetSource=WorkTableSetFlow TargetFlowBaseLS=%.6f OldTargetFlowBaseLS=%.6f PointUUID= DeviceReady=%s',
-        [ATargetFlow, AOldTargetFlow, IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
+        [ATargetFlow, AOldTargetFlow, System.StrUtils.IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
     ApplySimpleSimulationNoise(AWorkTable, Channel, 'Etalon', AWorkTable.EtalonChannels.IndexOf(Channel),
       ACurrentTimeMs, 1.0, AWorkTable.DeviceReady);
     UpdateChannelCurSec(Channel, 0.03);
@@ -9938,8 +10800,8 @@ begin
     ProtocolManager.AddMessage(pcState, psWorkTable, 'SimulationFlowApplyEnter',
       'Simulation flow apply entered',
       Format('Version=%s; IsSimulationMode=%s; EffectiveSimulationActive=%s; WorkTablePtr=%s; FlowRatePtr=%s; FlowValuePtr=%s; EnabledEtalonCount=%d; CurrentStage=%s; StabilityDataStartMs=%d',
-        [APP_VERSION, IfThen(AWorkTable.IsSimulationMode, 'True', 'False'),
-         IfThen(AWorkTable.SimulationActive, 'True', 'False'),
+        [APP_VERSION, System.StrUtils.IfThen(AWorkTable.IsSimulationMode, 'True', 'False'),
+         System.StrUtils.IfThen(AWorkTable.SimulationActive, 'True', 'False'),
          PointerText(AWorkTable), PointerText(FlowRatePtr), PointerText(TargetValue),
          ASourceChannelCount, CurrentStage, StabilityDataStartMs]));
 
@@ -10051,7 +10913,7 @@ begin
         [APP_VERSION, AGeneratedValue, CurrentTargetValue.GetDoubleValue,
          SampleTimeMs, PointerText(CurrentTargetValue), Length(SamplesAfter),
          FirstSampleMs, LastSampleMs, CurrentStage, StabilityDataStartMs,
-         IfThen(LastSampleMs > StabilityDataStartMs, 'True', 'False')]));
+         System.StrUtils.IfThen(LastSampleMs > StabilityDataStartMs, 'True', 'False')]));
 end;
 
 function GetChannelDeviceNameForLog(const AChannel: TChannel): string;
@@ -10184,7 +11046,7 @@ begin
       UpdateChannelRamp(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
         TargetImpSec, ACurrentTimeMs,
         Format('Reason=WorkTableTargetChanged TargetSource=WorkTableSetFlow TargetFlowBaseLS=%.6f OldTargetFlowBaseLS=%.6f PointUUID= DeviceReady=%s',
-          [TargetDeviceFlow, AOldTargetFlow, IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
+          [TargetDeviceFlow, AOldTargetFlow, System.StrUtils.IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
       ApplySimpleSimulationNoise(AWorkTable, Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
         ACurrentTimeMs, 1.0, AWorkTable.DeviceReady);
       UpdateChannelCurSec(Channel, 0.3);
@@ -10358,6 +11220,13 @@ begin
   AccumulateSimulationChannelImpResult(AWorkTable.EtalonChannels, DeltaTimeSec);
   AccumulateSimulationChannelImpResult(AWorkTable.DeviceChannels, DeltaTimeSec);
   ResetDisabledSimulationChannels(AWorkTable);
+
+  { The simulation stop criterion uses WorkTable.Time. Keep the persisted
+    result timer and its UI meter on the same clock so a completed time-based
+    measurement cannot be saved with a shorter duration. }
+  AWorkTable.TimeResult := AWorkTable.Time;
+  if AWorkTable.ValueTime <> nil then
+    AWorkTable.ValueTime.SetValue(AWorkTable.Time);
 end;
 
 procedure ResetDisabledChannelSignals(const AWorkTable: TWorkTable);

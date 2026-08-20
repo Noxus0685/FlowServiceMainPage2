@@ -4,7 +4,6 @@ interface
 
 uses
   frmProceed,
-  FmxFPDevices,
   frmMainTable,
   UnitBaseProcedures,
   UnitWorkTable,
@@ -259,12 +258,6 @@ procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   Self.WindowState := TWindowState.wsMinimized;
 
-  if Assigned(MainDeviceManager) then
-    MainDeviceManager.ModuleManager.StopAndWait;
-  if Assigned(DigitalDeviceManager) and
-     (DigitalDeviceManager <> MainDeviceManager) then
-    DigitalDeviceManager.ModuleManager.StopAndWait;
-
   if FFrameMainTable <> nil then
     FFrameMainTable.SaveLayoutSettingsToWorkTable;
 
@@ -319,6 +312,9 @@ begin
   FFrameProceed.Align := TAlignLayout.Client;
   FFrameProceed.Initialize(FWorkTableManager);
 
+  { TFrameMainTable is initialized before TFrameProceed exists.  Connect the
+    visible results frame now, after both frames have been created. }
+  FFrameMainTable.ConnectResultsProcessing(FFrameProceed);
 
 end;
 
@@ -798,7 +794,10 @@ begin
         Break;
       end;
 
-    AWorkTable.Time := AWorkTable.Time + 1;
+    // Локальный счёт времени допустим только в явно включённом режиме симуляции.
+    // В рабочем режиме источник времени — контроллер измерения.
+    if AWorkTable.IsSimulationMode then
+      AWorkTable.Time := AWorkTable.Time + 1;
 
   for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
   begin

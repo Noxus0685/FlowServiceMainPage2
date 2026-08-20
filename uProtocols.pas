@@ -231,13 +231,22 @@ type
 
   TProtocolListener = reference to procedure(Msg: TProtocolMessage);
 
+  TProtocolMessageContent = record
+    Description: string;
+    Params: string;
+  end;
+
   TProtocolManager = class(TObservableObject)
   private const
     CQueueCapacity = 10000;
+    CRecentMessageCapacity = 10000;
   private
     FQueue: TThreadedQueue<TProtocolMessage>;
     FListeners: TList<TProtocolListener>;
     FListenersLock: TObject;
+    FRecentMessages: TDictionary<string, TProtocolMessageContent>;
+    FRecentMessageKeys: TQueue<string>;
+    FRecentMessagesLock: TCriticalSection;
     FPaused: Boolean;
     FWorkerThread: TThread;
     FShuttingDown: Boolean;
@@ -250,6 +259,10 @@ type
     procedure StopWorker;
     procedure WorkerProc;
     procedure FreeMessage(var Msg: TProtocolMessage);
+    function ShouldPublishMessage(ACategory: EProtocolCategory;
+      ASource: TProtocolSource; const AName, ADescription,
+      AParams: string): Boolean;
+    procedure ClearRecentMessages;
   public
     constructor Create;
     destructor Destroy; override;
@@ -308,6 +321,9 @@ begin
   FQueue := TThreadedQueue<TProtocolMessage>.Create(CQueueCapacity, 50, 50);
   FListeners := TList<TProtocolListener>.Create;
   FListenersLock := TObject.Create;
+  FRecentMessages := TDictionary<string, TProtocolMessageContent>.Create;
+  FRecentMessageKeys := TQueue<string>.Create;
+  FRecentMessagesLock := TCriticalSection.Create;
   FPaused := False;
   StartWorker;
 end;
@@ -325,6 +341,9 @@ begin
   end;
   FreeAndNil(FListeners);
   FreeAndNil(FListenersLock);
+  FreeAndNil(FRecentMessages);
+  FreeAndNil(FRecentMessageKeys);
+  FreeAndNil(FRecentMessagesLock);
   FreeAndNil(FQueue);
   inherited;
 end;
@@ -398,7 +417,12 @@ var
   PushResult: TWaitResult;
   OldMsg: TProtocolMessage;
 begin
-  if FShuttingDown or (FQueue = nil) then Exit;
+  if FShuttingDown then Exit;
+  if (FQueue = nil) then Exit;
+  if not ShouldPublishMessage(ACategory, ASource, AName, ADescription,
+    AParams) then
+    Exit;
+
   Msg := TProtocolMessage.Create;
   try
     Msg.TimeStamp := Now;
@@ -426,6 +450,67 @@ begin
       Notify(Integer(pmeMessageQueued));
   finally
     Msg.Free;
+  end;
+end;
+
+function TProtocolManager.ShouldPublishMessage(ACategory: EProtocolCategory;
+  ASource: TProtocolSource; const AName, ADescription,
+  AParams: string): Boolean;
+var
+  Key, OldestKey: string;
+  Content: TProtocolMessageContent;
+begin
+  Result := False;
+  if FRecentMessagesLock = nil then
+    Exit;
+
+  Key := IntToStr(Ord(ACategory)) + ':' + IntToStr(Ord(ASource)) + ':' +
+    IntToStr(Length(AName)) + ':' + AName;
+
+  FRecentMessagesLock.Acquire;
+  try
+    if FShuttingDown or (FRecentMessages = nil) or
+       (FRecentMessageKeys = nil) then
+      Exit;
+
+    if FRecentMessages.TryGetValue(Key, Content) then
+    begin
+      if (Content.Description = ADescription) and
+         (Content.Params = AParams) then
+        Exit;
+    end
+    else
+    begin
+      if FRecentMessages.Count >= CRecentMessageCapacity then
+      begin
+        OldestKey := FRecentMessageKeys.Dequeue;
+        FRecentMessages.Remove(OldestKey);
+      end;
+      FRecentMessageKeys.Enqueue(Key);
+    end;
+
+    Content.Description := ADescription;
+    Content.Params := AParams;
+    FRecentMessages.AddOrSetValue(Key, Content);
+    Result := True;
+  finally
+    FRecentMessagesLock.Release;
+  end;
+end;
+
+procedure TProtocolManager.ClearRecentMessages;
+begin
+  if FRecentMessagesLock = nil then
+    Exit;
+
+  FRecentMessagesLock.Acquire;
+  try
+    if FRecentMessages <> nil then
+      FRecentMessages.Clear;
+    if FRecentMessageKeys <> nil then
+      FRecentMessageKeys.Clear;
+  finally
+    FRecentMessagesLock.Release;
   end;
 end;
 
@@ -509,10 +594,12 @@ var
   Msg: TProtocolMessage;
 begin
   Msg := nil;
-  if FQueue = nil then Exit;
-  while FQueue.QueueSize > 0 do
-    if FQueue.PopItem(Msg) = wrSignaled then
-      FreeMessage(Msg);
+  if FQueue <> nil then
+    while FQueue.QueueSize > 0 do
+      if FQueue.PopItem(Msg) = wrSignaled then
+        FreeMessage(Msg);
+
+  ClearRecentMessages;
 
   if not FShuttingDown then
     Notify(Integer(pmeCleared));

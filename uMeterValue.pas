@@ -359,9 +359,9 @@ type
     procedure SetCalcValue;
 
     function GetNewUUID: string;
-    // Сохраняет значения в логическое хранилище MeterValues файла setting.fpp.
+    // Сохраняет значения в логическое хранилище MeterValues выбранного файла проекта *.fpp.
     class procedure SaveToStorage; static;
-    // Загружает значения из логического хранилища MeterValues файла setting.fpp.
+    // Загружает значения из логического хранилища MeterValues выбранного файла проекта *.fpp.
     class procedure LoadFromStorage; static;
     // Удаляет указанные значения/владельцев и перезаписывает хранилище MeterValues.
     class procedure DeleteFromStorage(const AHashes: TStrings;
@@ -3826,7 +3826,7 @@ begin
   Result := TGUID.NewGuid.ToString;
 end;
 
-{ Сохраняет все значения в логическое хранилище MeterValues файла setting.fpp. }
+{ Сохраняет все значения в логическое хранилище MeterValues выбранного файла проекта *.fpp. }
 class procedure TMeterValue.SaveToStorage;
 var
   Ini: TProjectSettingsIni;
@@ -4035,7 +4035,7 @@ begin
   SaveToStorage;
 end;
 
-{ Загружает значения из логического хранилища MeterValues файла setting.fpp. }
+{ Загружает значения из логического хранилища MeterValues выбранного файла проекта *.fpp. }
 class procedure TMeterValue.LoadFromStorage;
 var
   Ini: TCustomIniFile;

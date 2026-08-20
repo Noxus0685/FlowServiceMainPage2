@@ -1,9 +1,0 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<BorlandProject>
-	<Transactions>
-    <Transaction>2024.01.24 18:33:45.000.241,C:\DelphiComp\ics\Packages\IcsCommonCBNewDesign.cbproj=C:\DelphiComp\ics\Packages\IcsCommonCB110Design.cbproj</Transaction>
-    <Transaction>2024.01.24 18:33:58.000.726,C:\DelphiComp\ics\Packages\IcsCommonCBNewDesign.cbproj=C:\DelphiComp\ics\Packages\IcsCommonCBNewDesign.cbproj</Transaction>
-    <Transaction>2024.01.24 18:35:04.000.147,=C:\DelphiComp\ics\Packages\IcsCommonCBNewDesign.res</Transaction>
-    <Transaction>2024.01.24 18:45:52.000.764,C:\DelphiComp\ics\Source\OverbyteIcsReg.pas=</Transaction>
-  </Transactions>
-</BorlandProject>

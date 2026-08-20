@@ -135,7 +135,7 @@ type
     procedure ApplyWeightsOutputRestriction;
     procedure SetPropertyRowVisible(ALabel: TLabel; AVisible: Boolean);
     function ValidPositive(AValue: Double): Boolean;
-    function DisplayedCoef: Double;
+    procedure UpdateImpulseCoefText;
 
     function GetOutputTypeIndex(AOutputType: Integer): Integer;
     function GetOutputTypeByIndex(AIndex: Integer): Integer;
@@ -633,15 +633,22 @@ begin
   Result := (AValue > 0) and (not IsNan(AValue)) and (not IsInfinite(AValue));
 end;
 
-function TFrameFlowMeterProperties.DisplayedCoef: Double;
+procedure TFrameFlowMeterProperties.UpdateImpulseCoefText;
+var
+  PreviousDim: Integer;
 begin
-  Result := 0;
-  if (FDevice = nil) or (not ValidPositive(FDevice.Coef)) then
+  EditImpulseCoef.Text := '';
+  if (FDevice = nil) or (FFlowMeter = nil) or
+     (FFlowMeter.ValueCoef = nil) or
+     (not ValidPositive(FDevice.Coef)) then
     Exit;
-  case FDevice.DimensionCoef of
-    1: Result := 1 / FDevice.Coef;
-  else
-    Result := FDevice.Coef;
+
+  PreviousDim := FFlowMeter.ValueCoef.GetDim;
+  try
+    if FFlowMeter.ValueCoef.SetDim(FDevice.DimensionCoef) then
+      EditImpulseCoef.Text := FFlowMeter.ValueCoef.GetStrNum(FDevice.Coef);
+  finally
+    FFlowMeter.ValueCoef.SetDim(PreviousDim);
   end;
 end;
 
@@ -683,7 +690,7 @@ begin
   ComboBoxFrequencyView.ItemIndex := FDevice.DimensionCoef;
   ComboBoxImpulseCoefView.ItemIndex := FDevice.DimensionCoef;
   if FDevice.FreqFlowRate > 0 then EditFrequencyFlowRate.Text := FloatToStr(FDevice.FreqFlowRate) else EditFrequencyFlowRate.Text := '';
-  if DisplayedCoef > 0 then EditImpulseCoef.Text := FormatFloat('0.########', DisplayedCoef) else EditImpulseCoef.Text := '';
+  UpdateImpulseCoefText;
   if (FDevice.VoltageRange >= 0) and (FDevice.VoltageRange < ComboBoxVoltageRange.Items.Count) then
     ComboBoxVoltageRange.ItemIndex := FDevice.VoltageRange
   else
@@ -781,11 +788,20 @@ var InputValue, NewStoredCoef: Double;
 begin
   if FIsLoading or (FDevice = nil) then Exit;
   InputValue := NormalizeFloatInput(EditImpulseCoef.Text);
-  if not ValidPositive(InputValue) then begin EditImpulseCoef.Text := FormatFloat('0.########', DisplayedCoef); Exit; end;
+  if not ValidPositive(InputValue) then
+  begin
+    UpdateImpulseCoefText;
+    Exit;
+  end;
   if FDevice.DimensionCoef = 1 then NewStoredCoef := 1 / InputValue else NewStoredCoef := InputValue;
-  if not ValidPositive(NewStoredCoef) then begin EditImpulseCoef.Text := FormatFloat('0.########', DisplayedCoef); Exit; end;
+  if not ValidPositive(NewStoredCoef) then
+  begin
+    UpdateImpulseCoefText;
+    Exit;
+  end;
   FDevice.Coef := NewStoredCoef;
   if ValidPositive(FDevice.FreqFlowRate) then FDevice.Freq := Round(FDevice.Coef * FDevice.FreqFlowRate / 3.6);
+  UpdateImpulseCoefText;
   NotifyChanged;
 end;
 

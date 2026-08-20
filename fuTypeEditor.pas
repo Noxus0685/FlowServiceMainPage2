@@ -27,6 +27,7 @@ uses
   FMX.Types,
   System.Classes,
   System.DateUtils,
+  System.Diagnostics,
   System.Generics.Collections,
   System.Generics.Defaults,
   System.IOUtils,
@@ -984,7 +985,7 @@ procedure TFormTypeEditor.RecalcQRowFromKnown(const ANewD: TDiameter; const Know
 var
   DCoef: TDiameter;
   QmaxForCoef: Double;
-  K1, K2,K2tr, Qmax, Qmin, Q2,Q2tr, QOver: Double;
+  K1, K2, K2tr, KNom, Qmax, Qmin, Q2, Q2tr, QNom: Double;
 begin
   if (ANewD = nil) or (KnownValue <= 0) then
     Exit;
@@ -993,15 +994,18 @@ begin
   if DCoef = nil then
     DCoef := ANewD;
 
+  K1 := 0;
+  K2 := 0;
+  K2tr := 0;
+  KNom := 0;
   QmaxForCoef := DCoef.Qmax;
-  if (QmaxForCoef <= 0) and (DCoef.Qnom > 0) then
-    QmaxForCoef := DCoef.Qmax * 1.25;
 
   if QmaxForCoef > 0 then
   begin
     K1 := DCoef.Qmin / QmaxForCoef;
     K2 := DCoef.Qtr / QmaxForCoef;
     K2tr := DCoef.Q2tr / QmaxForCoef;
+    KNom := DCoef.Qnom / QmaxForCoef;
   end;
 
   if (KnownCol = StringColumnDNQTr.Index) or (KnownCol = StringColumnDNQ2Tr.Index) then
@@ -1010,8 +1014,8 @@ begin
     Qmax := KnownValue / K1
   else if KnownCol = StringColumnDNQmax.Index then
     Qmax := KnownValue
-  else if KnownCol = StringColumnDNQnom.Index then
-    Qmax := KnownValue * 1.25
+  else if (KnownCol = StringColumnDNQnom.Index) and (KNom > 0) then
+    Qmax := KnownValue / KNom
   else
     Exit;
 
@@ -1021,7 +1025,10 @@ begin
   Q2 := Qmax * K2;
   Q2tr := Qmax * K2tr;
   Qmin := Qmax * K1;
-  QOver := Qmax / 1.25;
+  if KNom > 0 then
+    QNom := Qmax * KNom
+  else
+    QNom := ANewD.Qnom;
 
   if FType.FreqFlowRate > 0 then
     ANewD.QFmax := Qmax * FType.FreqFlowRate
@@ -1032,9 +1039,9 @@ begin
   ANewD.Qtr := Q2;
   ANewD.Q2tr :=Q2tr;
   ANewD.Qmin := Qmin;
-  ANewD.Qnom := QOver;
+  ANewD.Qnom := QNom;
   SetQValue(FDiameterQ2, ANewD.ID, Q2);
-  SetQValue(FDiameterQ4, ANewD.ID, QOver);
+  SetQValue(FDiameterQ4, ANewD.ID, QNom);
 end;
 
 procedure TFormTypeEditor.InitCoefsTab;
@@ -1470,23 +1477,6 @@ begin
   for D in FDiametersLocal do
     if (D <> nil) and (D.State <> osDeleted) then
     begin
-     { if D.Qnom <= 0 then
-      begin
-        if D.Qmax > 0 then
-          D.Qnom := D.Qmax / 1.25
-        else
-          D.Qnom := 0;
-      end;
-    }
-      // Не подставляем Qtr автоматически, если он отсутствует в источнике.
-      // Иначе при импорте (например, из DeepSeek) null/0 превращается в вычисленное значение,
-      // что визуально выглядит как будто Qt был найден в таблице.
-
-      if (D.State <> osNew) and (D.Qmax > 0) then
-      begin
-        //D.Qnom := D.Qmax / 1.25;
-        RecalcQRowFromKnown(D, StringColumnDNQmax.Index, D.Qmax);
-      end;
       Inc(VisibleCount);
     end;
 
@@ -2562,32 +2552,56 @@ begin
   SelectFileToLayoutEdit('Layout52');
 end;
 
-// Выбирает подготовленный XLSX-шаблон и назначает его редактируемому типу прибора.
+// Загружает XLSX из любой папки, подготавливает его и назначает типу прибора.
 procedure TFormTypeEditor.sbReportingFormClick(Sender: TObject);
 var
   Dialog: TOpenDialog;
-  FileName, TemplatesRoot: string;
+  PreparedTemplate: TPreparedReportTemplate;
+  PreviousReportingForm: string;
+  Stopwatch: TStopwatch;
 begin
   if FType = nil then
     Exit;
+
   Dialog := TOpenDialog.Create(Self);
   try
-    TemplatesRoot := IncludeTrailingPathDelimiter(
-      TPath.GetFullPath(TReportTemplateService.TemplatesPath));
     Dialog.InitialDir := TReportTemplateService.TemplatesPath;
     Dialog.Filter := 'Excel Workbook (*.xlsx)|*.xlsx';
     Dialog.DefaultExt := 'xlsx';
     if not Dialog.Execute then
       Exit;
-    FileName := TPath.GetFullPath(Dialog.FileName);
-    if not StartsText(TemplatesRoot, FileName) then
-      raise EArgumentException.Create(
-        'Шаблон отчёта должен находиться в папке ReportTemplates.');
-    FType.ReportingForm :=
-      TReportTemplateService.NormalizeTemplateFileName(FileName);
-    TReportTemplateService.ResolveDeviceTypeTemplate(FType);
-    EditReportingForm.Text := FType.ReportingForm;
-    SetModified;
+
+    PreviousReportingForm := FType.ReportingForm;
+    Stopwatch := TStopwatch.StartNew;
+    try
+      { PrepareTemplate copies and validates the selected workbook inside
+        ReportTemplates; the external source file is never assigned directly. }
+      PreparedTemplate :=
+        TReportTemplateService.PrepareTemplate(Dialog.FileName);
+      FType.ReportingForm :=
+        TReportTemplateService.NormalizeTemplateFileName(
+          PreparedTemplate.FileName);
+      { PrepareTemplate has already validated the final workbook.  Do not
+        unpack and validate the same XLSX for a second time here. }
+      EditReportingForm.Text := FType.ReportingForm;
+      SetModified;
+      WriteTypeEditActionLog('Назначен шаблон отчёта', FType, Format(
+        'Source=%s; Prepared=%s; DurationMs=%d; PreparedSize=%d',
+        [TPath.GetFullPath(Dialog.FileName),
+         TPath.GetFullPath(PreparedTemplate.FileName),
+         Stopwatch.ElapsedMilliseconds,
+         PreparedTemplate.ValidationResult.FileSize]));
+    except
+      on E: Exception do
+      begin
+        FType.ReportingForm := PreviousReportingForm;
+        EditReportingForm.Text := PreviousReportingForm;
+        WriteTypeEditActionLog('Не удалось назначить шаблон отчёта', FType,
+          Format('Source=%s; DurationMs=%d; Message=%s',
+            [Dialog.FileName, Stopwatch.ElapsedMilliseconds, E.Message]));
+        MessageDlg(E.Message, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
+      end;
+    end;
   finally
     Dialog.Free;
   end;
@@ -5608,26 +5622,17 @@ begin
 
     if Trim(EditFlowRate.Text) = '' then
     begin
-      // Если скорость потока не задана, меняем редактируемое поле.
-      // Для пары Qnom/Qmax сохраняем взаимосвязь по формулам 1.25.
+      // Если скорость потока не задана, меняем только редактируемое поле.
       if (ACol = StringColumnDNQTr.Index)  then
         D.Qtr := QValueBase
       else  if (ACol = StringColumnDNQ2Tr.Index) then
         D.Q2tr := QValueBase
       else if ACol = StringColumnDNQmax.Index then
-      begin
-        D.Qmax := QValueBase;
-        if D.Qmax > 0 then
-          D.Qnom := D.Qmax / 1.25;
-      end
+        D.Qmax := QValueBase
       else if ACol = StringColumnDNQmin.Index then
         D.Qmin := QValueBase
       else if ACol = StringColumnDNQnom.Index then
-      begin
         D.Qnom := QValueBase;
-        if D.Qnom > 0 then
-          D.Qmax := D.Qnom * 1.25;
-      end;
 
 
     end

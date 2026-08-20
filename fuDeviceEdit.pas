@@ -1213,6 +1213,8 @@ var
   OldUUID: string;
   MeasurementsSnapshot: TDevice;
   Repo: TDeviceRepository;
+  CandidateRepo: TDeviceRepository;
+  RegisteredDevice: TDevice;
 begin
   CanClose := True;
   FlushPendingChanges;
@@ -1229,7 +1231,36 @@ begin
         { редактирование существующего }
         OldUUID := FOriginalDevice.UUID;
         MeasurementsSnapshot := nil;
-        Repo := AppServices.DataManager.ActiveDeviceRepo;
+        Repo := nil;
+
+        { The active repository can change while the editor is open
+          (for example after selecting a device type). Save the device
+          to the repository that actually owns the original object. }
+        for CandidateRepo in AppServices.DataManager.DeviceRepositories do
+        begin
+          if (CandidateRepo = nil) or (CandidateRepo.Devices = nil) then
+            Continue;
+
+          for RegisteredDevice in CandidateRepo.Devices do
+            if RegisteredDevice = FOriginalDevice then
+            begin
+              Repo := CandidateRepo;
+              Break;
+            end;
+
+          if Repo <> nil then
+            Break;
+        end;
+
+        { Compatibility fallback for a device that was not registered
+          in an in-memory repository list. }
+        if Repo = nil then
+          AppServices.DataManager.FindDevice(OldUUID, Repo);
+
+        if Repo = nil then
+          raise Exception.CreateFmt(
+            'Не найдена база прибора UUID=%s', [OldUUID]);
+
         try
           if ((FOriginalDevice.Sessions = nil) or (FOriginalDevice.Sessions.Count = 0)) and
              ((FOriginalDevice.Spillages = nil) or (FOriginalDevice.Spillages.Count = 0)) then
@@ -1380,7 +1411,11 @@ begin
     cbCoefViewType.Items.EndUpdate;
   end;
 
-  if cbCoefViewType.ItemIndex < 0 then
+  if (FDevice <> nil) and
+     (FDevice.DimensionCoef >= 0) and
+     (FDevice.DimensionCoef < cbCoefViewType.Items.Count) then
+    cbCoefViewType.ItemIndex := FDevice.DimensionCoef
+  else
     cbCoefViewType.ItemIndex := 0;
 end;
 
@@ -1395,7 +1430,11 @@ begin
     cbCoefViewType.Items.EndUpdate;
   end;
 
-  if cbCoefViewType.ItemIndex < 0 then
+  if (FDevice <> nil) and
+     (FDevice.DimensionCoef >= 0) and
+     (FDevice.DimensionCoef < cbCoefViewType.Items.Count) then
+    cbCoefViewType.ItemIndex := FDevice.DimensionCoef
+  else
     cbCoefViewType.ItemIndex := 0;
 end;
 
@@ -2227,21 +2266,21 @@ var
   Frm: TFormTypeSelect;
   CurrentType, NewType: TDeviceType;
   FoundRepo: TTypeRepository;
-  NeedFill, IsTypeChanged: Boolean;
+  NeedFill: Boolean;
   RepoName: string;
-  OldTypeUUID : string;
+  OldTypeUUID: string;
 
-function AskFillFromType: Boolean;
-begin
-  Result :=
-    MessageDlg(
-      'Тип прибора изменён.' + sLineBreak +
-      'Заполнить данные прибора на основании выбранного типа?',
-      TMsgDlgType.mtConfirmation,
-      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
-      0
-    ) = mrYes;
-end;
+  function AskFillFromType: Boolean;
+  begin
+    Result :=
+      MessageDlg(
+        'Тип прибора изменён.' + sLineBreak +
+        'Заполнить данные прибора на основании выбранного типа?',
+        TMsgDlgType.mtConfirmation,
+        [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+        0
+      ) = mrYes;
+  end;
 
 begin
   if (FDevice = nil) or (AppServices.DataManager = nil) then
@@ -2253,8 +2292,15 @@ begin
   if (CurrentType <> nil) and (FoundRepo <> nil) then
     AppServices.DataManager.ActiveTypeRepo := FoundRepo;
 
+  OldTypeUUID := string(FDevice.DeviceTypeUUID);
+
   Frm := TFormTypeSelect.Create(Self);
   try
+    { Конструктор TFormTypeSelect перезагружает ActiveRepo.Types,
+      поэтому полученная до Create ссылка CurrentType уже недействительна. }
+    CurrentType := ResolveDeviceType(FoundRepo);
+    FDeviceType := CurrentType;
+
     {----------------------------------------------------}
     { 1. Предвыбор текущего типа }
     {----------------------------------------------------}
@@ -2269,66 +2315,44 @@ begin
     if Frm.ShowModal <> mrOk then
       Exit;
 
-    OldTypeUUID := FDevice.DeviceTypeUUID;
     NewType := Frm.SelectedType;
     if NewType = nil then
       Exit;
 
     FoundRepo := AppServices.DataManager.ActiveTypeRepo;
+    NeedFill := AskFillFromType;
 
     {----------------------------------------------------}
-    { 3. Проверяем смену типа }
-    {----------------------------------------------------}
-    IsTypeChanged := True;
-
-    if CurrentType <> nil then
-    begin
-      if (CurrentType = NewType) then
-        IsTypeChanged := False
-      else if (CurrentType.UUID <> '') and (NewType.UUID <> '') then
-        IsTypeChanged := not SameText(CurrentType.UUID, NewType.UUID)
-      else
-        IsTypeChanged :=
-          (CurrentType.ID <> NewType.ID) or
-          (not SameText(CurrentType.Name, NewType.Name)) or
-          (not SameText(CurrentType.Modification, NewType.Modification));
-    end;
-
-    //NeedFill := IsTypeChanged;
-
-    //if NeedFill then
-      NeedFill := AskFillFromType;
-
-    {----------------------------------------------------}
-    { 4. Привязываем тип }
+    { 3. Привязываем тип }
     {----------------------------------------------------}
     if FoundRepo <> nil then
       RepoName := FoundRepo.Name
     else
       RepoName := '';
 
-  if NeedFill then
-  begin
-    FDevice.AttachType(NewType, RepoName);
-    FDeviceType := NewType;
-    FTypeChangedDuringEdit := not SameText(OldTypeUUID, string(FDevice.DeviceTypeUUID));
+    if NeedFill then
+    begin
+      FDevice.AttachType(NewType, RepoName);
+      FDeviceType := NewType;
+      FTypeChangedDuringEdit :=
+        not SameText(OldTypeUUID, string(FDevice.DeviceTypeUUID));
 
-    WriteDeviceEditActionLog('Изменён тип прибора', FDevice,
-      'OldTypeUUID=' + OldTypeUUID + '; NewTypeUUID=' + string(FDevice.DeviceTypeUUID));
-  end;
-
-
-
+      WriteDeviceEditActionLog(
+        'Изменён тип прибора',
+        FDevice,
+        'OldTypeUUID=' + OldTypeUUID +
+        '; NewTypeUUID=' + string(FDevice.DeviceTypeUUID)
+      );
+    end;
 
     {----------------------------------------------------}
-    { 6. Обновляем UI }
+    { 4. Обновляем UI }
     {----------------------------------------------------}
     UpdateUIFromDevice;
-
     SetModified;
-
   finally
     Frm.Free;
+    RefreshDeviceTypeReference;
   end;
 end;
 
@@ -2508,6 +2532,8 @@ end;
 end;
 
 procedure TFormDeviceEditor.UpdateUICoef;
+var
+  DisplayCoef: Double;
 begin
     // =====================================================
     // == Представление коэффициента
@@ -2521,8 +2547,9 @@ begin
     // =====================================================
     // == Коэффициент
     // =====================================================
-    if FDevice.Coef > 0 then
-      EditCoef.Text := FormatByBaseError(FDevice.Coef, FDevice.Error)
+    DisplayCoef := GetDisplayedCoef;
+    if DisplayCoef > 0 then
+      EditCoef.Text := FormatByBaseError(DisplayCoef, FDevice.Error)
     else
       EditCoef.Text := '';
 end;

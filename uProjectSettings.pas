@@ -9,10 +9,10 @@ uses
   System.Classes,
   System.IniFiles,
   System.IOUtils,
+  System.SyncObjs,
   System.SysUtils;
 
 const
-  PROJECT_SETTINGS_FILE_NAME = 'setting.fpp';
   STORAGE_TABLE_SETTINGS = 'TableSettings';
   STORAGE_WORK_TABLE_VALUES = 'WorkTableValues';
   STORAGE_METER_VALUES = 'MeterValues';
@@ -23,10 +23,11 @@ type
   private
     FConnection: TFDConnection;
     FStorageName: string;
+    FWriteLockHeld: Boolean;
     procedure EnsureSchema;
     function CreateQuery: TFDQuery;
   public
-    // Открывает логическое INI-хранилище внутри общей SQLite-базы setting.fpp.
+    // Открывает логическое INI-хранилище внутри выбранного файла проекта *.fpp.
     constructor Create(const ADatabaseFileName, AStorageName: string);
     destructor Destroy; override;
 
@@ -44,20 +45,55 @@ type
     procedure CancelUpdate;
   end;
 
-// Возвращает путь DATA\Projects\setting.fpp относительно исполняемого файла.
+// Устанавливает выбранный файл проекта, внутри которого хранятся настройки.
+procedure SetProjectSettingsFileName(const ADatabaseFileName: string);
+
+// Возвращает путь к выбранному файлу проекта *.fpp.
 function GetProjectSettingsFileName: string;
 
-// Создаёт адаптер указанного логического хранилища в setting.fpp.
+// Без исключения проверяет, выбран ли файл проекта *.fpp.
+function TryGetProjectSettingsFileName(out ADatabaseFileName: string): Boolean;
+
+// Создаёт адаптер указанного логического хранилища в выбранном проекте.
 function OpenProjectSettings(const AStorageName: string): TProjectSettingsIni;
+
+// Сериализует составные операции записи в общий файл проекта.
+procedure BeginProjectSettingsWrite;
+procedure EndProjectSettingsWrite;
 
 implementation
 
+var
+  GProjectSettingsFileName: string;
+  GProjectSettingsWriteLock: TCriticalSection;
+
+procedure BeginProjectSettingsWrite;
+begin
+  GProjectSettingsWriteLock.Acquire;
+end;
+
+procedure EndProjectSettingsWrite;
+begin
+  GProjectSettingsWriteLock.Release;
+end;
+
+procedure SetProjectSettingsFileName(const ADatabaseFileName: string);
+begin
+  GProjectSettingsFileName := Trim(ADatabaseFileName);
+end;
+
+function TryGetProjectSettingsFileName(
+  out ADatabaseFileName: string): Boolean;
+begin
+  ADatabaseFileName := GProjectSettingsFileName;
+  Result := ADatabaseFileName <> '';
+end;
+
 function GetProjectSettingsFileName: string;
 begin
-  Result := TPath.Combine(
-    TPath.Combine(ExtractFilePath(ParamStr(0)), 'DATA\Projects'),
-    PROJECT_SETTINGS_FILE_NAME
-  );
+  Result := GProjectSettingsFileName;
+  if Result = '' then
+    raise EArgumentException.Create('Не задан выбранный файл проекта *.fpp');
 end;
 
 function OpenProjectSettings(const AStorageName: string): TProjectSettingsIni;
@@ -76,6 +112,7 @@ begin
   ForceDirectories(ExtractFilePath(ADatabaseFileName));
   inherited Create(ADatabaseFileName);
   FStorageName := AStorageName;
+  FWriteLockHeld := False;
 
   FConnection := TFDConnection.Create(nil);
   FConnection.LoginPrompt := False;
@@ -84,11 +121,24 @@ begin
   FConnection.Params.Add('Database=' + ADatabaseFileName);
   FConnection.Params.Add('LockingMode=Normal');
   FConnection.Connected := True;
-  EnsureSchema;
+  FConnection.ExecSQL('PRAGMA busy_timeout = 5000');
+  BeginProjectSettingsWrite;
+  try
+    EnsureSchema;
+  finally
+    EndProjectSettingsWrite;
+  end;
 end;
 
 destructor TProjectSettingsIni.Destroy;
 begin
+  if (FConnection <> nil) and FConnection.InTransaction then
+    CancelUpdate
+  else if FWriteLockHeld then
+  begin
+    FWriteLockHeld := False;
+    EndProjectSettingsWrite;
+  end;
   FreeAndNil(FConnection);
   inherited;
 end;
@@ -139,10 +189,12 @@ procedure TProjectSettingsIni.WriteString(const Section, Ident,
 var
   Query: TFDQuery;
 begin
-  Query := CreateQuery;
+  BeginProjectSettingsWrite;
   try
-    Query.SQL.Text :=
-      'UPDATE FlowServiceIniSettings SET KeyValue = :KeyValue ' +
+    Query := CreateQuery;
+    try
+      Query.SQL.Text :=
+        'UPDATE FlowServiceIniSettings SET KeyValue = :KeyValue ' +
       'WHERE StorageName = :StorageName AND SectionName = :SectionName ' +
       'AND KeyName = :KeyName';
     Query.ParamByName('KeyValue').AsString := Value;
@@ -162,9 +214,12 @@ begin
       Query.ParamByName('KeyName').AsString := Ident;
       Query.ParamByName('KeyValue').AsString := Value;
       Query.ExecSQL;
+      end;
+    finally
+      Query.Free;
     end;
   finally
-    Query.Free;
+    EndProjectSettingsWrite;
   end;
 end;
 
@@ -259,16 +314,21 @@ procedure TProjectSettingsIni.EraseSection(const Section: string);
 var
   Query: TFDQuery;
 begin
-  Query := CreateQuery;
+  BeginProjectSettingsWrite;
   try
-    Query.SQL.Text :=
-      'DELETE FROM FlowServiceIniSettings ' +
-      'WHERE StorageName = :StorageName AND SectionName = :SectionName';
-    Query.ParamByName('StorageName').AsString := FStorageName;
-    Query.ParamByName('SectionName').AsString := Section;
-    Query.ExecSQL;
+    Query := CreateQuery;
+    try
+      Query.SQL.Text :=
+        'DELETE FROM FlowServiceIniSettings ' +
+        'WHERE StorageName = :StorageName AND SectionName = :SectionName';
+      Query.ParamByName('StorageName').AsString := FStorageName;
+      Query.ParamByName('SectionName').AsString := Section;
+      Query.ExecSQL;
+    finally
+      Query.Free;
+    end;
   finally
-    Query.Free;
+    EndProjectSettingsWrite;
   end;
 end;
 
@@ -276,18 +336,23 @@ procedure TProjectSettingsIni.DeleteKey(const Section, Ident: string);
 var
   Query: TFDQuery;
 begin
-  Query := CreateQuery;
+  BeginProjectSettingsWrite;
   try
-    Query.SQL.Text :=
-      'DELETE FROM FlowServiceIniSettings ' +
-      'WHERE StorageName = :StorageName AND SectionName = :SectionName ' +
-      'AND KeyName = :KeyName';
-    Query.ParamByName('StorageName').AsString := FStorageName;
-    Query.ParamByName('SectionName').AsString := Section;
-    Query.ParamByName('KeyName').AsString := Ident;
-    Query.ExecSQL;
+    Query := CreateQuery;
+    try
+      Query.SQL.Text :=
+        'DELETE FROM FlowServiceIniSettings ' +
+        'WHERE StorageName = :StorageName AND SectionName = :SectionName ' +
+        'AND KeyName = :KeyName';
+      Query.ParamByName('StorageName').AsString := FStorageName;
+      Query.ParamByName('SectionName').AsString := Section;
+      Query.ParamByName('KeyName').AsString := Ident;
+      Query.ExecSQL;
+    finally
+      Query.Free;
+    end;
   finally
-    Query.Free;
+    EndProjectSettingsWrite;
   end;
 end;
 
@@ -300,33 +365,77 @@ procedure TProjectSettingsIni.Clear;
 var
   Query: TFDQuery;
 begin
-  Query := CreateQuery;
+  BeginProjectSettingsWrite;
   try
-    Query.SQL.Text :=
-      'DELETE FROM FlowServiceIniSettings WHERE StorageName = :StorageName';
-    Query.ParamByName('StorageName').AsString := FStorageName;
-    Query.ExecSQL;
+    Query := CreateQuery;
+    try
+      Query.SQL.Text :=
+        'DELETE FROM FlowServiceIniSettings WHERE StorageName = :StorageName';
+      Query.ParamByName('StorageName').AsString := FStorageName;
+      Query.ExecSQL;
+    finally
+      Query.Free;
+    end;
   finally
-    Query.Free;
+    EndProjectSettingsWrite;
   end;
 end;
 
 procedure TProjectSettingsIni.BeginUpdate;
 begin
-  if not FConnection.InTransaction then
+  if FConnection.InTransaction then
+    Exit;
+
+  BeginProjectSettingsWrite;
+  try
     FConnection.StartTransaction;
+    FWriteLockHeld := True;
+  except
+    EndProjectSettingsWrite;
+    raise;
+  end;
 end;
 
 procedure TProjectSettingsIni.EndUpdate;
 begin
-  if FConnection.InTransaction then
-    FConnection.Commit;
+  if not FConnection.InTransaction then
+    Exit;
+
+  try
+    try
+      FConnection.Commit;
+    except
+      if FConnection.InTransaction then
+        FConnection.Rollback;
+      raise;
+    end;
+  finally
+    if FWriteLockHeld then
+    begin
+      FWriteLockHeld := False;
+      EndProjectSettingsWrite;
+    end;
+  end;
 end;
 
 procedure TProjectSettingsIni.CancelUpdate;
 begin
-  if FConnection.InTransaction then
-    FConnection.Rollback;
+  try
+    if FConnection.InTransaction then
+      FConnection.Rollback;
+  finally
+    if FWriteLockHeld then
+    begin
+      FWriteLockHeld := False;
+      EndProjectSettingsWrite;
+    end;
+  end;
 end;
+
+initialization
+  GProjectSettingsWriteLock := TCriticalSection.Create;
+
+finalization
+  FreeAndNil(GProjectSettingsWriteLock);
 
 end.

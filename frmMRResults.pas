@@ -108,8 +108,7 @@ type
     function FormatErrorValue(const AValue: Double): string;
     function FormatActualErrorValue(const AValue: Double): string;
     function FormatSpillageErrors(ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): string;
-    function BuildErrorsListText(ADevice: TDevice; ADevicePoint: TDevicePoint;
-      const ACurrentError: Double; const AIncludeCurrent: Boolean): string;
+    function BuildSavedErrorText(ASpillage: TPointSpillage): string;
 
     function IsCellRunning(AChannel: TChannel; AGroup: TDisplayPointGroup): Boolean;
     function GetCellState(AChannel: TChannel; AGroup: TDisplayPointGroup; out ADevicePoint: TDevicePoint;
@@ -117,6 +116,7 @@ type
     function GetCellText(AChannel: TChannel; AGroup: TDisplayPointGroup): string;
     function GetCellColor(AChannel: TChannel; AGroup: TDisplayPointGroup): TAlphaColor;
 
+    function GetCurrentResultStatus(AChannel: TChannel): Integer;
     function GetResultText(AChannel: TChannel): string;
     function GetResultColor(AChannel: TChannel): TAlphaColor;
     function HasExportableResults: Boolean;
@@ -202,7 +202,8 @@ begin
   FDisplayPoints := TObjectList<TDisplayPointGroup>.Create(True);
   FRows := TList<TChannel>.Create;
   GridMRResults.OnGetValue := GridMRResultsGetValue;
-  GridMRResults.OnDrawColumnCell := GridMRResultsDrawColumnCell;
+  GridMRResults.OnDrawColumnCell := nil;
+  GridMRResults.OnDrawColumnBackground := GridMRResultsDrawColumnCell;
   GridMRResults.OnSetValue := nil;
   GridMRResults.OnSelChanged := GridMRResultsSelChanged;
   SetGridReadOnly(GridMRResults);
@@ -910,6 +911,7 @@ end;
 function TFrameMRResults.FindPointSpillage(ADevice: TDevice;
   ADevicePoint: TDevicePoint): TPointSpillage;
 var
+  I: Integer;
   S: TPointSpillage;
   Session: TSessionSpillage;
   MatchedPoint: TDevicePoint;
@@ -920,19 +922,19 @@ begin
 
   Session := ADevice.GetActiveSessionSpillage;
   if Session = nil then
-  begin
-    if FProceed is TFrameProceed then
-      Result := TFrameProceed(FProceed).FindResultSpillageForPoint(ADevice, ADevicePoint);
     Exit;
-  end;
 
-  for S in ADevice.Spillages do
-    if (S <> nil) and (S.SessionID = Session.ID) then
-    begin
-      MatchedPoint := ADevice.FindMatchedDevicePointForSpillage(S);
-      if MatchedPoint = ADevicePoint then
-        Exit(S);
-    end;
+  { Repeated measurements are appended to Device.Spillages.  The visible
+    current result must use the newest saved repeat from the active session. }
+  for I := ADevice.Spillages.Count - 1 downto 0 do
+  begin
+    S := ADevice.Spillages[I];
+    if (S = nil) or (S.SessionID <> Session.ID) then
+      Continue;
+    MatchedPoint := ADevice.FindMatchedDevicePointForSpillage(S);
+    if MatchedPoint = ADevicePoint then
+      Exit(S);
+  end;
 end;
 
 function TFrameMRResults.FormatPointHeader(APoint: TDevicePoint): string;
@@ -1018,50 +1020,14 @@ begin
     Result := FormatMRActualErrorValue(ASpillage.Error);
 end;
 
-function TFrameMRResults.BuildErrorsListText(ADevice: TDevice;
-  ADevicePoint: TDevicePoint; const ACurrentError: Double;
-  const AIncludeCurrent: Boolean): string;
-var
-  S: TPointSpillage;
-  Session: TSessionSpillage;
-  Items: TArray<string>;
-  Cnt: Integer;
-  MatchedPoint: TDevicePoint;
+function TFrameMRResults.BuildSavedErrorText(ASpillage: TPointSpillage): string;
 begin
   Result := '';
-  if (ADevice = nil) or (ADevice.Spillages = nil) or (ADevicePoint = nil) then
-    Exit;
 
-  Session := ADevice.GetActiveSessionSpillage;
-  SetLength(Items, 0);
-  Cnt := 0;
-
-  for S in ADevice.Spillages do
-  begin
-    if (S = nil) or ((Session <> nil) and (S.SessionID <> Session.ID)) then
-      Continue;
-    // The list contains only spillages which the production device matcher
-    // assigns to this concrete physical device point.
-    MatchedPoint := ADevice.FindMatchedDevicePointForSpillage(S);
-    if MatchedPoint <> ADevicePoint then
-      Continue;
-
-    SetLength(Items, Cnt + 1);
-    Items[Cnt] := FormatMRActualErrorValue(S.Error);
-    Inc(Cnt);
-  end;
-
-  if AIncludeCurrent then
-  begin
-    SetLength(Items, Cnt + 1);
-    Items[Cnt] := FormatMRActualErrorValue(ACurrentError);
-    Inc(Cnt);
-  end;
-
-  if Cnt = 0 then
-    Exit('');
-
-  Result := '[' + string.Join(', ', Items) + ']';
+  { Results must contain only the value from the saved spillage of the
+    current run. Never copy the live channel error while switching points. }
+  if ASpillage <> nil then
+    Result := '[' + FormatMRActualErrorValue(ASpillage.Error) + ']';
 end;
 
 function TFrameMRResults.IsCellRunning(AChannel: TChannel;
@@ -1111,11 +1077,17 @@ begin
   if ADevicePoint = nil then
     Exit(csEmpty);
 
-  ASpillage := FindPointSpillage(Device, ADevicePoint);
-
-  if (ASpillage = nil) and IsCellRunning(AChannel, AGroup) then
+  { Status belongs to MeasurementRun.Points and is reset for a newly prepared
+    run. Check it before looking at the persistent session history, otherwise
+    an older spillage for the same physical point is shown as the current one. }
+  if IsCellRunning(AChannel, AGroup) then
     Exit(csRunning);
 
+  if (AGroup = nil) or (AGroup.ScenarioPoint = nil) or
+     (AGroup.ScenarioPoint.Status <> mptsSaved) then
+    Exit(csPending);
+
+  ASpillage := FindPointSpillage(Device, ADevicePoint);
   if ASpillage = nil then
     Exit(csPending);
 
@@ -1129,7 +1101,6 @@ var
   DevicePoint: TDevicePoint;
   Spillage: TPointSpillage;
   CellState: TMRResultCellState;
-  CurrentError: Double;
   ErrorsText: string;
 begin
   Result := '';
@@ -1150,20 +1121,13 @@ begin
       Result := FormatErrorValue(DevicePoint.Error);
 
     csRunning:
-      begin
-        CurrentError := 0.0;
-        if (AChannel.FlowMeter.ValueError <> nil) then
-          CurrentError := AChannel.FlowMeter.ValueError.GetDoubleValue;
-
-        ErrorsText := BuildErrorsListText(Device, DevicePoint, CurrentError, True);
-        if ErrorsText = '' then
-          ErrorsText := '[' + FormatMRActualErrorValue(CurrentError) + ']';
-        Result := FormatErrorValue(DevicePoint.Error) + ' / ' + ErrorsText;
-      end;
+      { While the point is running, show only its allowed error. The actual
+        error is added only after the spillage has been saved. }
+      Result := FormatErrorValue(DevicePoint.Error);
 
     csDone:
       begin
-        ErrorsText := BuildErrorsListText(Device, DevicePoint, 0.0, False);
+        ErrorsText := BuildSavedErrorText(Spillage);
         if ErrorsText <> '' then
           Result := FormatErrorValue(DevicePoint.Error) + ' / ' + ErrorsText
         else
@@ -1191,38 +1155,76 @@ begin
   end;
 end;
 
-function TFrameMRResults.GetResultText(AChannel: TChannel): string;
+function TFrameMRResults.GetCurrentResultStatus(
+  AChannel: TChannel): Integer;
 var
   Device: TDevice;
+  DisplayPoint: TDisplayPointGroup;
+  DevicePoint: TDevicePoint;
+  Spillage: TPointSpillage;
+  RequiredCount, SavedCount, InvalidCount: Integer;
 begin
-  Result := '';
-
-  if (AChannel = nil) or (AChannel.FlowMeter = nil) then
+  Result := 2;
+  if not HasCurrentMeasurementPoints or (AChannel = nil) or
+     (AChannel.FlowMeter = nil) then
     Exit;
 
   Device := AChannel.FlowMeter.Device;
   if Device = nil then
     Exit;
 
-  if FProceed is TFrameProceed then
-    Result := TFrameProceed(FProceed).GetDeviceResultText(Device);
+  RequiredCount := 0;
+  SavedCount := 0;
+  InvalidCount := 0;
+
+  for DisplayPoint in FDisplayPoints do
+  begin
+    DevicePoint := FindDevicePoint(Device, DisplayPoint);
+    if DevicePoint = nil then
+      Continue;
+
+    Inc(RequiredCount);
+
+    { A spillage from an earlier run in the same active session must not make
+      a newly prepared measurement point complete. }
+    if (DisplayPoint.ScenarioPoint = nil) or
+       (DisplayPoint.ScenarioPoint.Status <> mptsSaved) then
+      Continue;
+
+    Spillage := FindPointSpillage(Device, DevicePoint);
+    if Spillage = nil then
+      Continue;
+
+    Inc(SavedCount);
+    if (not Spillage.Valid) or (Spillage.Validation = vsInvalid) then
+      Inc(InvalidCount);
+  end;
+
+  if (RequiredCount = 0) or (SavedCount < RequiredCount) then
+    Exit(2);
+  if InvalidCount > 0 then
+    Exit(4);
+  Result := 5;
+end;
+
+function TFrameMRResults.GetResultText(AChannel: TChannel): string;
+begin
+  case GetCurrentResultStatus(AChannel) of
+    4: Result := 'Не годен';
+    5: Result := 'Годен';
+  else
+    Result := #$2014;
+  end;
 end;
 
 function TFrameMRResults.GetResultColor(AChannel: TChannel): TAlphaColor;
-var
-  Device: TDevice;
 begin
-  Result := TAlphaColors.Null;
-
-  if (AChannel = nil) or (AChannel.FlowMeter = nil) then
-    Exit;
-
-  Device := AChannel.FlowMeter.Device;
-  if Device = nil then
-    Exit;
-
-  if FProceed is TFrameProceed then
-    Result := TFrameProceed(FProceed).GetDeviceResultColor(Device);
+  case GetCurrentResultStatus(AChannel) of
+    4: Result := COLOR_WARNING;
+    5: Result := COLOR_COMPLETED;
+  else
+    Result := TAlphaColors.Null;
+  end;
 end;
 
 procedure TFrameMRResults.GridMRResultsGetValue(Sender: TObject; const ACol,
@@ -1273,16 +1275,17 @@ begin
     C := GetCellColor(Channel, DisplayPoint);
   end;
 
+  if C = TAlphaColors.Null then
+    Exit;
+
+  { This handler is connected to OnDrawColumnBackground.  Drawing the
+    background here leaves the standard FMX cell text and selection rendering
+    intact instead of immediately painting over the result colour. }
   SavedState := Canvas.SaveState;
   try
-    if C <> TAlphaColors.Null then
-    begin
-      Canvas.Fill.Kind := TBrushKind.Solid;
-      Canvas.Fill.Color := C;
-      Canvas.FillRect(Bounds, 0, 0, [], 1);
-    end;
-
-    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+    Canvas.Fill.Kind := TBrushKind.Solid;
+    Canvas.Fill.Color := C;
+    Canvas.FillRect(Bounds, 0, 0, [], 1);
   finally
     Canvas.RestoreState(SavedState);
   end;

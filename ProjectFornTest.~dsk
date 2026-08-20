@@ -9,23 +9,42 @@ File_6=TSourceModule,'D:\Projects\FlowServiceX\FMXFP\FlowPlantFMX\fuHydraulicCha
 File_7=TSourceModule,'D:\Projects\FlowServiceX\FlowServiceMainPage\uAppServices.pas',0,1,63,1,82,0,0,,
 
 [Modules]
-Module0=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTable_Main.pas
-Module1=D:\Projects\FlowServiceX\FlowServiceMainPage\frmMainTable.pas
-Module2=D:\Projects\FlowServiceX\FlowServiceMainPage\frmChannelProperties.pas
-Module3=D:\Projects\FlowServiceX\FlowServiceMainPage\fuDeviceEdit.pas
-Module4=D:\Projects\FlowServiceX\FlowServiceMainPage\uDeviceClass.pas
-Module5=D:\Projects\FlowServiceX\FlowServiceMainPage\uWorkTable.pas
-Module6=D:\Projects\FlowServiceX\FlowServiceMainPage\uObservable.pas
-Module7=D:\Projects\FlowServiceX\FlowServiceMainPage\uMeterValue.pas
-Module8=D:\Projects\FlowServiceX\FlowServiceMainPage\uParameter.pas
-Module9=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeEditor.pas
-Module10=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeSelect.pas
-Module11=D:\Projects\FlowServiceX\FlowServiceMainPage\uMeasurementRun.pas
-Module12=D:\Projects\FlowServiceX\FlowServiceMainPage\frmMeasurementRun.pas
-Module13=D:\Projects\FlowServiceX\FlowServiceMainPage\frmProceed.pas
-Module14=D:\Projects\FlowServiceX\FlowServiceMainPage\uRepositories.pas
-Count=15
+Module0=D:\Projects\FlowServiceX\FlowServiceMainPage\frmMeterValueEditFrame.pas
+Module1=D:\Projects\FlowServiceX\FlowServiceMainPage\FmxHelper.pas
+Module2=D:\Projects\FlowServiceX\FlowServiceMainPage\uMeterValue.pas
+Module3=D:\Projects\FlowServiceX\FlowServiceMainPage\ProjectFornTest.dproj
+Module4=D:\Projects\FlowServiceX\FlowServiceMainPage\uSyncSetup.pas
+Module5=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTable_Main.pas
+Module6=D:\Projects\FlowServiceX\FlowServiceMainPage\frmMainTable.pas
+Module7=D:\Projects\FlowServiceX\FlowServiceMainPage\frmChannelProperties.pas
+Module8=D:\Projects\FlowServiceX\FlowServiceMainPage\fuDeviceEdit.pas
+Module9=D:\Projects\FlowServiceX\FlowServiceMainPage\uDeviceClass.pas
+Module10=D:\Projects\FlowServiceX\FlowServiceMainPage\uWorkTable.pas
+Module11=D:\Projects\FlowServiceX\FlowServiceMainPage\uObservable.pas
+Module12=D:\Projects\FlowServiceX\FlowServiceMainPage\uParameter.pas
+Module13=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeEditor.pas
+Module14=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeSelect.pas
+Module15=D:\Projects\FlowServiceX\FlowServiceMainPage\uMeasurementRun.pas
+Module16=D:\Projects\FlowServiceX\FlowServiceMainPage\frmMeasurementRun.pas
+Module17=D:\Projects\FlowServiceX\FlowServiceMainPage\frmProceed.pas
+Module18=D:\Projects\FlowServiceX\FlowServiceMainPage\uRepositories.pas
+Count=19
 EditWindowCount=1
+
+[D:\Projects\FlowServiceX\FlowServiceMainPage\frmMeterValueEditFrame.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceX\FlowServiceMainPage\FmxHelper.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceX\FlowServiceMainPage\uMeterValue.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceX\FlowServiceMainPage\ProjectFornTest.dproj]
+ModuleType=TBaseProject
+
+[D:\Projects\FlowServiceX\FlowServiceMainPage\uSyncSetup.pas]
+ModuleType=TSourceModule
 
 [D:\Projects\FlowServiceX\FlowServiceMainPage\fuTable_Main.pas]
 ModuleType=TSourceModule
@@ -46,9 +65,6 @@ ModuleType=TSourceModule
 ModuleType=TSourceModule
 
 [D:\Projects\FlowServiceX\FlowServiceMainPage\uObservable.pas]
-ModuleType=TSourceModule
-
-[D:\Projects\FlowServiceX\FlowServiceMainPage\uMeterValue.pas]
 ModuleType=TSourceModule
 
 [D:\Projects\FlowServiceX\FlowServiceMainPage\uParameter.pas]
@@ -73,8 +89,8 @@ ModuleType=TSourceModule
 ModuleType=TSourceModule
 
 [EditWindow0]
-ViewCount=15
-CurrentEditView=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTable_Main.pas
+ViewCount=19
+CurrentEditView=D:\Projects\FlowServiceX\FlowServiceMainPage\frmMeterValueEditFrame.pas
 View0=0
 View1=1
 View2=2
@@ -90,6 +106,10 @@ View11=11
 View12=12
 View13=13
 View14=14
+View15=15
+View16=16
+View17=17
+View18=18
 PercentageSizes=1
 Create=1
 Visible=1
@@ -112,13 +132,13 @@ BorlandEditorCodeExplorer=BorlandEditorCodeExplorer@EditWindow0
 TopPanelSize=0
 LeftPanelSize=1896
 LeftPanelClients=PropertyInspector,DockSite3
-LeftPanelData=00000800010100000000A5130000000000000168070000000000000100000000570E000009000000446F636B53697465330100000000EC2200001100000050726F7065727479496E73706563746F72FFFFFFFF
+LeftPanelData=0000080001010000000044100000000000000168070000000000000100000000570E000009000000446F636B53697465330100000000EB1C00001100000050726F7065727479496E73706563746F72FFFFFFFF
 RightPanelSize=1997
 RightPanelClients=DockSite2,DockSite4
-RightPanelData=00000800010100000000A51300000000000001CD0700000000000001000000004912000009000000446F636B53697465320100000000EC22000009000000446F636B5369746534FFFFFFFF
-BottomPanelSize=0
+RightPanelData=00000800010100000000441000000000000001CD0700000000000001000000004912000009000000446F636B53697465320100000000EB1C000009000000446F636B5369746534FFFFFFFF
+BottomPanelSize=1481
 BottomPanelClients=MessageView,DockSite1
-BottomPanelData=000008000102020000000F0000004D65737361676556696577466F726D09000000446F636B53697465311534000000000000022606000000000000FFFFFFFF
+BottomPanelData=0000080001020100000009000000446F636B5369746531034500000000000002C9050000000000000100000000034500000F0000004D65737361676556696577466F726DFFFFFFFF
 BottomMiddlePanelSize=0
 BottomMiddlePanelClients=DockSite0,GraphDrawingModel
 BottomMiddelPanelData=0000080001020200000009000000446F636B536974653010000000477261706844726177696E67566965779B1D00000000000002F206000000000000FFFFFFFF
@@ -136,6 +156,28 @@ EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTable_Main.pas
 
 [View1]
 CustomEditViewType=TEditView
+Module=D:\Projects\FlowServiceX\FlowServiceMainPage\ProjectFornTest.dpr
+CursorX=26
+CursorY=5
+TopLine=1
+LeftCol=1
+Elisions=
+Bookmarks=
+EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\ProjectFornTest.dpr
+
+[View2]
+CustomEditViewType=TEditView
+Module=D:\Projects\FlowServiceX\FlowServiceMainPage\uSyncSetup.pas
+CursorX=1
+CursorY=1
+TopLine=22
+LeftCol=1
+Elisions=
+Bookmarks=
+EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\uSyncSetup.pas
+
+[View3]
+CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeSelect.pas
 CursorX=1
 CursorY=1
@@ -145,7 +187,7 @@ Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeSelect.pas
 
-[View2]
+[View4]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceX\FlowServiceMainPage\frmMainTable.pas
 CursorX=1
@@ -156,7 +198,7 @@ Elisions=
 Bookmarks=
 EditViewName=Borland.FormDesignerView
 
-[View3]
+[View5]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceX\FlowServiceMainPage\frmChannelProperties.pas
 CursorX=92
@@ -167,7 +209,7 @@ Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\frmChannelProperties.pas
 
-[View4]
+[View6]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceX\FlowServiceMainPage\uWorkTable.pas
 CursorX=66
@@ -175,10 +217,10 @@ CursorY=1201
 TopLine=1182
 LeftCol=1
 Elisions=
-Bookmarks={0,2491,19}
+Bookmarks={0,2491,1}
 EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\uWorkTable.pas
 
-[View5]
+[View7]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceX\FlowServiceMainPage\uDeviceClass.pas
 CursorX=19
@@ -189,7 +231,7 @@ Elisions={{205,38},{341,6},{''}}{{343,25},{359,6},{''}}{{361,26},{379,6},{''}}
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\uDeviceClass.pas
 
-[View6]
+[View8]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceX\FlowServiceMainPage\fuDeviceEdit.pas
 CursorX=1
@@ -200,18 +242,40 @@ Elisions=
 Bookmarks=
 EditViewName=Borland.FormDesignerView
 
-[View7]
+[View9]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceX\FlowServiceMainPage\uMeterValue.pas
-CursorX=1
-CursorY=1014
-TopLine=1005
+CursorX=11
+CursorY=362
+TopLine=342
 LeftCol=1
 Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\uMeterValue.pas
 
-[View8]
+[View10]
+CustomEditViewType=TEditView
+Module=D:\Projects\FlowServiceX\FlowServiceMainPage\FmxHelper.pas
+CursorX=1
+CursorY=1
+TopLine=1
+LeftCol=1
+Elisions=
+Bookmarks=
+EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\FmxHelper.pas
+
+[View11]
+CustomEditViewType=TEditView
+Module=D:\Projects\FlowServiceX\FlowServiceMainPage\frmMeterValueEditFrame.pas
+CursorX=51
+CursorY=31
+TopLine=13
+LeftCol=1
+Elisions=
+Bookmarks=
+EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\frmMeterValueEditFrame.pas
+
+[View12]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceX\FlowServiceMainPage\uParameter.pas
 CursorX=1
@@ -222,7 +286,7 @@ Elisions={{139,27},{164,6},{''}}{{166,31},{185,6},{''}}{{187,32},{193,6},{''}}{{
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\uParameter.pas
 
-[View9]
+[View13]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceX\FlowServiceMainPage\uObservable.pas
 CursorX=16
@@ -233,7 +297,7 @@ Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\uObservable.pas
 
-[View10]
+[View14]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceX\FlowServiceMainPage\frmProceed.pas
 CursorX=29
@@ -244,7 +308,7 @@ Elisions=
 Bookmarks=
 EditViewName=Borland.FormDesignerView
 
-[View11]
+[View15]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceX\FlowServiceMainPage\frmMeasurementRun.pas
 CursorX=23
@@ -255,7 +319,7 @@ Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\frmMeasurementRun.pas
 
-[View12]
+[View16]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceX\FlowServiceMainPage\uMeasurementRun.pas
 CursorX=1
@@ -266,7 +330,7 @@ Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\uMeasurementRun.pas
 
-[View13]
+[View17]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeEditor.pas
 CursorX=72
@@ -277,7 +341,7 @@ Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeEditor.pas
 
-[View14]
+[View18]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceX\FlowServiceMainPage\uRepositories.pas
 CursorX=1
@@ -384,18 +448,18 @@ StayOnTop=0
 [MessageView]
 PercentageSizes=1
 Create=1
-Visible=0
+Visible=1
 Docked=1
 State=0
 Left=0
 Top=40
-Width=2771
-Height=1418
+Width=9938
+Height=1341
 MaxLeft=-1
 MaxTop=-1
-ClientWidth=2771
-ClientHeight=1418
-TBDockHeight=1418
+ClientWidth=9938
+ClientHeight=1341
+TBDockHeight=1341
 LRDockWidth=2771
 Dockable=1
 StayOnTop=0
@@ -409,11 +473,11 @@ State=0
 Left=0
 Top=0
 Width=1997
-Height=4215
+Height=2625
 MaxLeft=-1
 MaxTop=-1
 ClientWidth=1997
-ClientHeight=4215
+ClientHeight=2625
 TBDockHeight=7155
 LRDockWidth=1997
 Dockable=1
@@ -428,11 +492,11 @@ State=0
 Left=0
 Top=833
 Width=1896
-Height=5259
+Height=3669
 MaxLeft=-1
 MaxTop=-1
 ClientWidth=1896
-ClientHeight=5259
+ClientHeight=3669
 PixelsPerInch=144
 MonitorNum=1
 TBDockHeight=9057
@@ -835,8 +899,8 @@ Create=1
 Visible=0
 Docked=1
 State=0
-Left=0
-Top=40
+Left=8
+Top=8
 Width=2339
 Height=1475
 MaxLeft=-1
@@ -942,11 +1006,11 @@ State=0
 Left=0
 Top=1051
 Width=1997
-Height=4215
+Height=2625
 MaxLeft=-1
 MaxTop=-1
 ClientWidth=1997
-ClientHeight=4215
+ClientHeight=2625
 PixelsPerInch=144
 MonitorNum=1
 TBDockHeight=9057

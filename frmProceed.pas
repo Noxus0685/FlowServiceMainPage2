@@ -9,6 +9,7 @@ uses
   FMX.Controls.Presentation,
   FMX.Colors,
   FMX.Dialogs,
+  FMX.Edit,
   FMX.Forms,
   FMX.Graphics,
   FMX.Grid,
@@ -186,6 +187,8 @@ type
     TabItemCalibrCoefs: TTabItem;
     TabItemReport: TTabItem;
     LayoutReportToolbar: TLayout;
+    LabelCurrentReportTemplate: TLabel;
+    EditCurrentReportTemplate: TEdit;
     ButtonLoadReportTemplate: TButton;
     ButtonExportReportTemplate: TButton;
     LayoutTop: TLayout;
@@ -408,6 +411,8 @@ type
       X, Y: Single);
     procedure GridDataPointsMouseMove(Sender: TObject; Shift: TShiftState;
       X, Y: Single);
+    // Сбрасывает текст и координаты hint до изменения списка измерений.
+    procedure ResetDataPointsHintState;
     procedure GridColumnLayoutMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
     procedure LogProceedGridContext(const AContext: string; ADevice: TDevice;
@@ -435,6 +440,7 @@ type
     FResultsPointColumnSignature: string;
     FResultsGridInitialized: Boolean;
     FResultsGridUpdateCount: Int64;
+    FResultsGridValueTraceUpdate: Int64;
     FActiveWorkTable: TWorkTable;
     FSessionDevice: TFlowMeter;
     FSessionEtalon: TFlowMeter;
@@ -447,6 +453,10 @@ type
     FReportExportInProgress: Boolean;
     FReportExportOperationId: Int64;
     FReportExportButtonText: string;
+    FSelectedReportTemplateFileName: string;
+    FSelectedReportTemplateDeviceUUID: string;
+    FCurrentReportTemplateFileName: string;
+    FCurrentReportTemplateSource: string;
     // Переводит элементы отчётной вкладки в состояние выполняющейся выгрузки.
 
     FLastResultsHintRow: Integer;
@@ -460,15 +470,29 @@ type
     FChartPointColors: TDictionary<string, TAlphaColor>;
     FChartLineColors: TDictionary<string, TAlphaColor>;
     FChartDeviceVisibility: TDictionary<string, Boolean>;
+    // UUID прибора, выбор которого установил начальную видимость графика.
+    FChartFocusedDeviceUUID: string;
     FChartAverageLineMode: TChartAverageLineMode;
     FChartFlowScale: TChartFlowScale;
+    FMenuItemGridDataPointsDeleteSelected: TMenuItem;
+    // Возвращает количество отмеченных измерений в текущем гриде.
+    function GetCheckedDataPointCount: Integer;
+    // Удаляет все измерения, отмеченные в колонке «Вкл».
+    procedure DeleteCheckedDataPointsClick(Sender: TObject);
+    // Возвращает прибор, на котором сейчас находится фокус дерева или грида.
+    function ResolveChartFocusedDevice: TDevice;
     // Перестраивает зависимости погрешности от расхода для текущих сессий приборов.
     procedure UpdateSessionErrorChart;
     function GetChartDeviceColor(ADevice: TDevice; const ALineColor: Boolean;
       const ADefaultIndex: Integer): TAlphaColor;
     // Возвращает сохранённую видимость прибора на графике.
     function IsChartDeviceVisible(ADevice: TDevice): Boolean;
-    // Обновляет доступность действий вкладки отчётов по наличию загруженных шаблонов.
+    // Выбирает пользовательский шаблон или шаблон типа выбранного прибора.
+    function ResolveCurrentReportTemplate(ADevice: TDevice;
+      ADeviceType: TDeviceType; out ATemplateSource: string): string;
+    // Обновляет имя и источник фактически выбранного шаблона в интерфейсе.
+    procedure UpdateCurrentReportTemplate;
+    // Обновляет доступность действий вкладки отчётов по наличию текущего шаблона.
     procedure UpdateReportTemplateControls;
     procedure BeginReportExportUi;
     // Возвращает элементы отчётной вкладки в обычное состояние.
@@ -564,9 +588,12 @@ end;
 function ResolveManagerWorkTable(AWorkTableManager: TWorkTableManager): TWorkTable;
 begin
   Result := nil;
-  if (AWorkTableManager = nil) or (AWorkTableManager.WorkTables = nil) or
-     (AWorkTableManager.WorkTables.Count = 0) then
-    Exit;
+  if (AWorkTableManager = nil)   then
+       Exit;
+  if  (AWorkTableManager.WorkTables = nil)  then
+       Exit;
+   if  (AWorkTableManager.WorkTables.Count = 0) then
+      Exit;
 
   Result := AWorkTableManager.ActiveWorkTable;
 end;
@@ -587,6 +614,10 @@ begin
     TThread.RemoveQueuedEvents(FReportExportQueueThread);
   FReportExportQueueThread := nil;
   FReportExportTask := nil;
+  FSelectedReportTemplateFileName := '';
+  FSelectedReportTemplateDeviceUUID := '';
+  FCurrentReportTemplateFileName := '';
+  FCurrentReportTemplateSource := '';
 
   FreeAndNil(FFrameCalibrCoefs);
   FreeAndNil(FSessionDevice);
@@ -652,7 +683,8 @@ begin
 
   if GridResults <> nil then
   begin
-    GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
+    GridResults.OnDrawColumnCell := nil;
+    GridResults.OnDrawColumnBackground := GridResultsDrawColumnCell;
     GridResults.OnMouseDown := GridResultsMouseDown;
     // Подключаем существующий обработчик Hint для ячеек таблицы результатов.
     GridResults.OnMouseMove := GridResultsMouseMove;
@@ -668,6 +700,19 @@ begin
     GridDataPoints.OnMouseMove := GridDataPointsMouseMove;
     GridDataPoints.OnMouseUp := GridColumnLayoutMouseUp;
     GridDataPoints.OnHeaderClick := GridDataPointsHeaderClick;
+  end;
+
+  if (PopupMenuGridDataPoints <> nil) and
+     (FMenuItemGridDataPointsDeleteSelected = nil) then
+  begin
+    FMenuItemGridDataPointsDeleteSelected :=
+      TMenuItem.Create(PopupMenuGridDataPoints);
+    FMenuItemGridDataPointsDeleteSelected.Text :=
+      'Удалить все выбранные измерения';
+    FMenuItemGridDataPointsDeleteSelected.OnClick :=
+      DeleteCheckedDataPointsClick;
+    PopupMenuGridDataPoints.AddObject(
+      FMenuItemGridDataPointsDeleteSelected);
   end;
 
   // FMX popup contents must be stable while the native menu is open.
@@ -707,11 +752,16 @@ begin
 
   LoadProcessingDevices;
   LoadManualProcessingDevices;
-  SyncProcessingDevicesWithNewPoints;
+  // При каждом открытии обработки добавляем приборы со всех рабочих столов.
+  // Сопоставление выполняется в AddProcessingDevice по UUID, поэтому приборы,
+  // уже загруженные из настроек или добавленные вручную, не дублируются.
+  SyncProcessingDevicesFromAllTables(False);
+  SaveProcessingDevices;
   InitCalibrCoefsFrame;
   RefreshResultsTab;
   UpdateSessionErrorChart;
   UpdateActionHints;
+  UpdateCurrentReportTemplate;
   UpdateReportTemplateControls;
 end;
 
@@ -1533,13 +1583,14 @@ begin
     // TColumn.Index is updated by the standard FMX drag operation and is the
     // visual position. Columns[I] remains the grid's column collection lookup.
     AColumns[I].Position := Column.Index;
+    AColumns[I].Width := Column.Width;
     AColumns[I].Visible := Column.Visible;
     if Assigned(ProtocolManager) then
       ProtocolManager.AddMessage(pcProc, psForm, 'GridLayoutSaved',
         'Сохранена раскладка столбца',
-        Format('GridName=%s; ColumnName=%s; ColumnsIndex=%d; VisualIndex=%d; Position=%d; Visible=%s',
+        Format('GridName=%s; ColumnName=%s; ColumnsIndex=%d; VisualIndex=%d; Position=%d; Width=%.2f; Visible=%s',
           [AGrid.Name, Column.Name, I, Column.Index, AColumns[I].Position,
-           BoolToStr(Column.Visible, True)]));
+           AColumns[I].Width, BoolToStr(Column.Visible, True)]));
   end;
 end;
 
@@ -1547,7 +1598,7 @@ end;
 procedure TFrameProceed.ApplyGridColumnsLayout(AGrid: TGrid;
   const AColumns: TArray<TGridColumnLayout>);
 var
-  I, J, TargetIndex, IndexChanged, VisibleChanged: Integer;
+  I, J, TargetIndex, IndexChanged, WidthChanged, VisibleChanged: Integer;
   Column: TColumn;
   SortedColumns: TArray<TGridColumnLayout>;
   Temp: TGridColumnLayout;
@@ -1579,6 +1630,7 @@ begin
   end;
 
   IndexChanged := 0;
+  WidthChanged := 0;
   VisibleChanged := 0;
   for I := 0 to High(SortedColumns) do
   begin
@@ -1589,10 +1641,14 @@ begin
       AGrid.ColumnCount - 1);
     if Column.Index <> TargetIndex then
       Inc(IndexChanged);
+    if (SortedColumns[I].Width > 0) and
+       (Abs(Column.Width - SortedColumns[I].Width) > 0.5) then
+      Inc(WidthChanged);
     if Column.Visible <> SortedColumns[I].Visible then
       Inc(VisibleChanged);
   end;
-  if (IndexChanged = 0) and (VisibleChanged = 0) then
+  if (IndexChanged = 0) and (WidthChanged = 0) and
+     (VisibleChanged = 0) then
     Exit;
 
   FApplyingGridColumnsLayout := True;
@@ -1609,14 +1665,18 @@ begin
         AGrid.ColumnCount - 1);
       if Column.Index <> TargetIndex then
         Column.Index := TargetIndex;
+      if (SortedColumns[I].Width > 0) and
+         (Abs(Column.Width - SortedColumns[I].Width) > 0.5) then
+        Column.Width := SortedColumns[I].Width;
     end;
   finally
     AGrid.EndUpdate;
     FApplyingGridColumnsLayout := False;
   end;
   AGrid.Repaint;
-  OutputDebugMessage(Format('GridStructuralRefresh Grid="%s" Reason="saved-layout" Rows=%d->%d OldSignature="" NewSignature="" IndexChanged=%d VisibleChanged=%d ContentChanged=False',
-    [AGrid.Name, AGrid.RowCount, AGrid.RowCount, IndexChanged, VisibleChanged]));
+  OutputDebugMessage(Format('GridStructuralRefresh Grid="%s" Reason="saved-layout" Rows=%d->%d OldSignature="" NewSignature="" IndexChanged=%d WidthChanged=%d VisibleChanged=%d ContentChanged=False',
+    [AGrid.Name, AGrid.RowCount, AGrid.RowCount, IndexChanged, WidthChanged,
+     VisibleChanged]));
 end;
 
 procedure TFrameProceed.SaveLayoutSettingsToWorkTable;
@@ -2022,7 +2082,7 @@ begin
       Device := nil;
       Repo := nil;
       if AppServices.DataManager <> nil then
-        Device := AppServices.DataManager.FindDevice(DeviceUUID, Repo);
+        Device := AppServices.DataManager.FindAndLoadDevice(DeviceUUID, Repo);
 
       if Device <> nil then
       begin
@@ -2122,13 +2182,39 @@ begin
   end;
 end;
 
+function TFrameProceed.ResolveChartFocusedDevice: TDevice;
+begin
+  Result := nil;
+
+  if (GridResults <> nil) and GridResults.IsFocused then
+    Result := GetSelectedResultDevice;
+
+  if (Result = nil) and (GridDataPoints <> nil) and
+     GridDataPoints.IsFocused then
+    Result := ResolveSelectedDevice;
+
+  if (Result = nil) and (TreeViewDevices <> nil) and
+     (TreeViewDevices.Selected <> nil) and
+     ((TreeViewDevices.Selected.TagObject is TDevice) or
+      (TreeViewDevices.Selected.TagObject is TSessionSpillage)) then
+    Result := ResolveSelectedDevice;
+
+  // После перехода фокуса на сам график сохраняется последний выбранный
+  // прибор, чтобы ручное включение дополнительных серий не снимало фильтр.
+  if (Result = nil) and (Trim(FChartFocusedDeviceUUID) <> '') and
+     ((TreeViewDevices = nil) or not TreeViewDevices.IsFocused) then
+    Result := FindProcessingDeviceByUUID(FChartFocusedDeviceUUID);
+end;
+
 // Перестраивает график: все проливки остаются маркерами, общая точка получает
 // единый средний X для всех приборов, а линии строятся без экстраполяции.
 procedure TFrameProceed.UpdateSessionErrorChart;
 const
   CChartCurvePointsPerInterval = 24;
+  // Продолжение линии за крайние средние точки: 20% крайнего интервала.
+  CChartLineExtension = 0.2;
 var
-  Device, SelectedDevice: TDevice;
+  Device, SelectedDevice, CurrentSessionDevice: TDevice;
   Session: TSessionSpillage;
   Spillage: TPointSpillage;
   RawPoints, AveragePoints: TList<TPointF>;
@@ -2146,8 +2232,86 @@ var
   I, J, DeviceIndex: Integer;
   SumX, SumY: Double;
   FlowValue, SharedFlowValue: Double;
-  ChartMinX, ChartMaxX, ChartPaddingX, LogPaddingX: Double;
+  ChartMinX, ChartMaxX: Double;
+  ChartMinY, ChartMaxY, ChartPaddingY: Double;
+  ChartLeftBaseX, ChartRightBaseX, ChartLineMinX, ChartLineMaxX: Double;
+  ChartPointMinX, ChartPointMaxX, DevicePointMinX, DevicePointMaxX: Double;
   UseVolumeFlow: Boolean;
+
+  // Определяет прибор, которому принадлежит текущая выбранная сессия,
+  // не изменяя состояние формы и объектов расчёта.
+  function ResolveCurrentSessionDevice: TDevice;
+  var
+    Item: TTreeViewItem;
+  begin
+    Result := nil;
+    if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+      Exit;
+
+    Item := TreeViewDevices.Selected;
+    if Item.TagObject is TDevice then
+      Result := TDevice(Item.TagObject)
+    else if (Item.TagObject is TSessionSpillage) and
+            (Item.ParentItem <> nil) and
+            (Item.ParentItem.TagObject is TDevice) then
+      Result := TDevice(Item.ParentItem.TagObject);
+  end;
+
+  // Ограничивает график текущим узлом дерева или выбранной строкой
+  // результатов. Для пустого группового узла серии не строятся.
+  function IsDeviceInCurrentChartScope(ADevice: TDevice): Boolean;
+  var
+    RowIndex: Integer;
+  begin
+    Result := False;
+    if ADevice = nil then
+      Exit;
+
+    if SelectedDevice <> nil then
+    begin
+      // Начальный выбор задаётся через FChartDeviceVisibility, после чего
+      // пользователь может вручную включить дополнительные приборы.
+      Result := True;
+      Exit;
+    end;
+
+    for RowIndex := 0 to High(FCurrentResultRows) do
+      if (FCurrentResultRows[RowIndex].Device = ADevice) or
+         ((Trim(FCurrentResultRows[RowIndex].DeviceUUID) <> '') and
+          SameText(Trim(FCurrentResultRows[RowIndex].DeviceUUID),
+            Trim(ADevice.UUID))) then
+      begin
+        Result := True;
+        Exit;
+      end;
+  end;
+
+  // Qmin и Qmax внутри TDevice хранятся в базовой единице
+  // (л/с либо кг/с), независимо от единицы отображения в редакторе.
+  procedure GetDeviceFlowRange(ADevice: TDevice;
+    out AMinFlow, AMaxFlow: Double);
+  begin
+    AMinFlow := MaxDouble;
+    AMaxFlow := 0;
+    if ADevice = nil then
+      Exit;
+
+    if not IsNan(ADevice.Qmax) and not IsInfinite(ADevice.Qmax) and
+       (ADevice.Qmax > 0) then
+    begin
+      AMaxFlow := ConvertBaseFlowToUnit(ADevice.Qmax, FlowUnitName);
+      if IsNan(AMaxFlow) or IsInfinite(AMaxFlow) or (AMaxFlow <= 0) then
+        AMaxFlow := 0;
+    end;
+
+    if not IsNan(ADevice.Qmin) and not IsInfinite(ADevice.Qmin) and
+       (ADevice.Qmin > 0) then
+    begin
+      AMinFlow := ConvertBaseFlowToUnit(ADevice.Qmin, FlowUnitName);
+      if IsNan(AMinFlow) or IsInfinite(AMinFlow) or (AMinFlow <= 0) then
+        AMinFlow := MaxDouble;
+    end;
+  end;
 
   // Возвращает ключ общей merged-точки Summary, рассчитанной для таблицы
   // обработки; при отсутствии подходящей колонки сохраняет исходный ключ.
@@ -2167,44 +2331,159 @@ var
         Exit('MERGED:' + IntToStr(ColumnIndex));
   end;
 
-  // Возвращает фактический расход проливки и ключ её общей точки графика.
-  function TryGetSpillageChartFlow(APoint: TPointSpillage;
-    out AFlowValue: Double; out AGroupKey: string): Boolean;
+  // Однозначно сопоставляет сохранённую проливку существующей точке
+  // прибора. По расходу принадлежность не определяется.
+  function TryResolveSpillageDevicePoint(ADevice: TDevice;
+    ASpillage: TPointSpillage; out ADevicePoint: TDevicePoint): Boolean;
+  var
+    Candidate, MatchedPoint: TDevicePoint;
+    SpillagePointUUID, SpillagePointName: string;
+    MatchCount: Integer;
+
+    procedure ResetMatches;
+    begin
+      MatchedPoint := nil;
+      MatchCount := 0;
+    end;
+
+    procedure AddMatch(APoint: TDevicePoint);
+    begin
+      MatchedPoint := APoint;
+      Inc(MatchCount);
+    end;
+  begin
+    Result := False;
+    ADevicePoint := nil;
+    if (ADevice = nil) or (ASpillage = nil) or
+       (ADevice.Points = nil) then
+      Exit;
+    if (Trim(ASpillage.DeviceUUID) <> '') and
+       (Trim(ADevice.UUID) <> '') and
+       not SameText(Trim(ASpillage.DeviceUUID), Trim(ADevice.UUID)) then
+      Exit;
+
+    SpillagePointUUID := Trim(ASpillage.DeviceTypeUUID);
+    if SpillagePointUUID <> '' then
+    begin
+      ResetMatches;
+      for Candidate in ADevice.Points do
+        if (Candidate <> nil) and (Candidate.State <> osDeleted) and
+           (SameText(Trim(Candidate.DeviceTypeUUID), SpillagePointUUID) or
+            SameText(Trim(Candidate.UUID), SpillagePointUUID)) then
+          AddMatch(Candidate);
+      if MatchCount = 1 then
+      begin
+        ADevicePoint := MatchedPoint;
+        Exit(True);
+      end;
+      Exit;
+    end;
+
+    { Legacy spillages can be linked only by an exact point name or number.
+      A missing/placeholder name is never treated as a device point. }
+    SpillagePointName := Trim(ASpillage.Name);
+    if (SpillagePointName <> '') and (SpillagePointName <> '-') then
+    begin
+      ResetMatches;
+      for Candidate in ADevice.Points do
+        if (Candidate <> nil) and (Candidate.State <> osDeleted) and
+           SameText(Trim(Candidate.Name), SpillagePointName) then
+          AddMatch(Candidate);
+      if MatchCount = 1 then
+      begin
+        ADevicePoint := MatchedPoint;
+        Exit(True);
+      end;
+      if (MatchCount > 1) and (ASpillage.Num > 0) then
+      begin
+        ResetMatches;
+        for Candidate in ADevice.Points do
+          if (Candidate <> nil) and (Candidate.State <> osDeleted) and
+             SameText(Trim(Candidate.Name), SpillagePointName) and
+             (Candidate.Num = ASpillage.Num) then
+            AddMatch(Candidate);
+        if MatchCount = 1 then
+        begin
+          ADevicePoint := MatchedPoint;
+          Exit(True);
+        end;
+      end;
+      Exit;
+    end;
+
+    if ASpillage.Num > 0 then
+    begin
+      ResetMatches;
+      for Candidate in ADevice.Points do
+        if (Candidate <> nil) and (Candidate.State <> osDeleted) and
+           (Candidate.Num = ASpillage.Num) then
+          AddMatch(Candidate);
+      if MatchCount = 1 then
+      begin
+        ADevicePoint := MatchedPoint;
+        Exit(True);
+      end;
+    end;
+  end;
+
+  // Возвращает фактический расход только для проливки, которая однозначно
+  // относится к существующей точке прибора.
+  function TryGetSpillageChartFlow(ADevice: TDevice;
+    APoint: TPointSpillage; out AFlowValue: Double;
+    out AGroupKey: string): Boolean;
   var
     BaseFlowValue: Double;
+    PointIdentity, DeviceIdentity: string;
+    DevicePoint: TDevicePoint;
   begin
     Result := False;
     AFlowValue := 0;
     AGroupKey := '';
     if (APoint = nil) or (APoint.State = osDeleted) or not APoint.Enabled or
-       not IsResultErrorValid(APoint.Error) then
+       not IsResultErrorValid(APoint.Error) or
+       not TryResolveSpillageDevicePoint(ADevice, APoint, DevicePoint) then
       Exit;
 
     if UseVolumeFlow then
     begin
-      BaseFlowValue := APoint.EtalonVolumeFlow;
-      if (BaseFlowValue <= 0) and (APoint.SpillTime > 0) then
-        BaseFlowValue := APoint.EtalonVolume / APoint.SpillTime;
+      // Грид вычисляет EtalonVolumeFlow только во время отрисовки строки.
+      // График рассчитывает тот же расход самостоятельно и поэтому
+      // корректно строится уже при первом выборе прибора.
+      if APoint.SpillTime > 0 then
+        BaseFlowValue := APoint.EtalonVolume / APoint.SpillTime
+      else
+        BaseFlowValue := APoint.EtalonVolumeFlow;
     end
     else
     begin
-      BaseFlowValue := APoint.EtalonMassFlow;
-      if (BaseFlowValue <= 0) and (APoint.SpillTime > 0) then
-        BaseFlowValue := APoint.EtalonMass / APoint.SpillTime;
+      if APoint.SpillTime > 0 then
+        BaseFlowValue := APoint.EtalonMass / APoint.SpillTime
+      else
+        BaseFlowValue := APoint.EtalonMassFlow;
     end;
 
-    if BaseFlowValue <= 0 then
-      BaseFlowValue := APoint.QavgEtalon;
     AFlowValue := ConvertBaseFlowToUnit(BaseFlowValue, FlowUnitName);
     if IsNan(AFlowValue) or IsInfinite(AFlowValue) or (AFlowValue <= 0) then
       Exit;
 
-    AGroupKey := Trim(APoint.DeviceTypeUUID);
-    if AGroupKey = '' then
-      AGroupKey := Trim(APoint.Name);
-    if AGroupKey = '' then
-      AGroupKey := FormatFloat('0.############', AFlowValue);
-    AGroupKey := ResolveChartMergedGroupKey(APoint, AGroupKey);
+    { Repeated spillages of one physical measurement point must form one
+      average chart point. Actual flow is averaged inside that group instead
+      of creating a separate chart point for every small flow fluctuation. }
+    DeviceIdentity := AnsiUpperCase(Trim(ADevice.UUID));
+    if Trim(DevicePoint.DeviceTypeUUID) <> '' then
+      PointIdentity := 'UUID:' +
+        AnsiUpperCase(Trim(DevicePoint.DeviceTypeUUID))
+    else if Trim(DevicePoint.UUID) <> '' then
+      PointIdentity := 'UUID:' +
+        AnsiUpperCase(Trim(DevicePoint.UUID))
+    else if Trim(DevicePoint.Name) <> '' then
+      PointIdentity := 'POINT:' +
+        AnsiUpperCase(Trim(DevicePoint.Name))
+    else
+      PointIdentity := 'NUM:' + IntToStr(DevicePoint.Num);
+
+    AGroupKey := ResolveChartMergedGroupKey(APoint,
+      'DEVICE:' + DeviceIdentity + '|' + PointIdentity);
     Result := True;
   end;
 
@@ -2220,7 +2499,7 @@ var
 
     procedure AddPoint(APoint: TPointSpillage);
     begin
-      if not TryGetSpillageChartFlow(APoint, PointFlow, PointKey) then
+      if not TryGetSpillageChartFlow(ADevice, APoint, PointFlow, PointKey) then
         Exit;
       if not AGroups.TryGetValue(PointKey, Values) then
       begin
@@ -2337,19 +2616,100 @@ var
 
   procedure AddSpillagePoint(APoint: TPointSpillage);
   begin
-    if not TryGetSpillageChartFlow(APoint, FlowValue, GroupKey) then
+    if not TryGetSpillageChartFlow(Device, APoint, FlowValue, GroupKey) then
       Exit;
 
     P1 := PointF(FlowValue, APoint.Error);
     RawPoints.Add(P1);
     ChartMinX := Min(ChartMinX, FlowValue);
     ChartMaxX := Max(ChartMaxX, FlowValue);
+    ChartMinY := Min(ChartMinY, APoint.Error);
+    ChartMaxY := Max(ChartMaxY, APoint.Error);
     if not Groups.TryGetValue(GroupKey, GroupPoints) then
     begin
       GroupPoints := TList<TPointF>.Create;
       Groups.Add(GroupKey, GroupPoints);
     end;
     GroupPoints.Add(P1);
+  end;
+
+  // Для единственной средней точки строит горизонтальную линию
+  // на всю ширину диапазона расхода.
+  procedure AddSinglePointLine(const APoint: TPointF;
+    ASeries: TChartSeries; const ADeviceMinX, ADeviceMaxX: Double);
+  var
+    LineMinX, LineMaxX: Double;
+  begin
+    if ASeries = nil then
+      Exit;
+
+    LineMaxX := Max(ADeviceMaxX, APoint.X);
+    if LineMaxX <= 0 then
+      LineMaxX := APoint.X;
+
+    if FChartFlowScale = cfsLogarithmic then
+    begin
+      LineMinX := ADeviceMinX;
+      if (LineMinX = MaxDouble) or (LineMinX <= 0) or
+         SameValue(LineMinX, LineMaxX) then
+        LineMinX := LineMaxX / 1000;
+    end
+    else
+      LineMinX := 0;
+
+    ASeries.AddPoint(LineMinX, APoint.Y);
+    ASeries.AddPoint(LineMaxX, APoint.Y);
+  end;
+
+  // Продлевает линию на 20% крайних интервалов между средними точками.
+  // Для логарифмической шкалы доля откладывается в координате log10(Q).
+  procedure ExtendAverageLine(ASeries: TChartSeries);
+  var
+    FirstPoint, SecondPoint, PenultimatePoint, LastPoint: TPointF;
+    StartPoint, EndPoint: TPointF;
+  begin
+    if (ASeries = nil) or (AveragePoints = nil) or
+       (AveragePoints.Count < 2) then
+      Exit;
+
+    FirstPoint := AveragePoints[0];
+    SecondPoint := AveragePoints[1];
+    PenultimatePoint := AveragePoints[AveragePoints.Count - 2];
+    LastPoint := AveragePoints[AveragePoints.Count - 1];
+
+    if (FChartFlowScale = cfsLogarithmic) and
+       (FirstPoint.X > 0) and (SecondPoint.X > 0) then
+      StartPoint.X := Power(10, Log10(FirstPoint.X) -
+        CChartLineExtension *
+        (Log10(SecondPoint.X) - Log10(FirstPoint.X)))
+    else
+      StartPoint.X := FirstPoint.X -
+        CChartLineExtension * (SecondPoint.X - FirstPoint.X);
+    if StartPoint.X <= 0 then
+      StartPoint.X := FirstPoint.X;
+    StartPoint.Y := FirstPoint.Y -
+      CChartLineExtension * (SecondPoint.Y - FirstPoint.Y);
+
+    if (FChartFlowScale = cfsLogarithmic) and
+       (PenultimatePoint.X > 0) and (LastPoint.X > 0) then
+      EndPoint.X := Power(10, Log10(LastPoint.X) +
+        CChartLineExtension *
+        (Log10(LastPoint.X) - Log10(PenultimatePoint.X)))
+    else
+      EndPoint.X := LastPoint.X +
+        CChartLineExtension * (LastPoint.X - PenultimatePoint.X);
+    EndPoint.Y := LastPoint.Y +
+      CChartLineExtension * (LastPoint.Y - PenultimatePoint.Y);
+
+    if StartPoint.X < FirstPoint.X then
+      ASeries.Points.Insert(0, StartPoint);
+    if EndPoint.X > LastPoint.X then
+      ASeries.AddPoint(EndPoint.X, EndPoint.Y);
+
+    ChartLineMinX := Min(ChartLineMinX, StartPoint.X);
+    ChartLineMaxX := Max(ChartLineMaxX, EndPoint.X);
+    ChartMinY := Min(ChartMinY, Min(StartPoint.Y, EndPoint.Y));
+    ChartMaxY := Max(ChartMaxY, Max(StartPoint.Y, EndPoint.Y));
   end;
 
 begin
@@ -2367,6 +2727,12 @@ begin
   UseVolumeFlow := IsVolumeFlowUnit(FlowUnitName);
   ChartMinX := MaxDouble;
   ChartMaxX := -MaxDouble;
+  ChartMinY := MaxDouble;
+  ChartMaxY := -MaxDouble;
+  ChartPointMinX := MaxDouble;
+  ChartPointMaxX := 0;
+  ChartLineMinX := MaxDouble;
+  ChartLineMaxX := 0;
   Chart1.XTitle := 'Расход, ' + FlowUnitName;
   Chart1.LogarithmicX := FChartFlowScale = cfsLogarithmic;
   // Внешние подписи координат размещаются в увеличенных полях осей.
@@ -2377,7 +2743,35 @@ begin
   SharedXByGroup := TDictionary<string, Double>.Create;
   try
     Chart1.ClearAllSeries;
-    SelectedDevice := ResolveSelectedDevice;
+    SelectedDevice := ResolveChartFocusedDevice;
+
+    // Новый выбор прибора сначала оставляет на графике только его. После
+    // этого галки ПКМ могут независимо включать дополнительные приборы.
+    if SelectedDevice <> nil then
+    begin
+      if not SameText(Trim(FChartFocusedDeviceUUID),
+          Trim(SelectedDevice.UUID)) then
+      begin
+        FChartFocusedDeviceUUID := Trim(SelectedDevice.UUID);
+        if FProcessingDevices <> nil then
+          for Device in FProcessingDevices do
+            if (Device <> nil) and (Trim(Device.UUID) <> '') then
+              FChartDeviceVisibility.AddOrSetValue(Device.UUID,
+                Device = SelectedDevice);
+      end;
+    end
+    else if Trim(FChartFocusedDeviceUUID) <> '' then
+    begin
+      // Для рабочего стола, общего узла и "прочее" исходно разрешены все
+      // приборы; фактический состав дополнительно ограничивает текущий узел.
+      FChartFocusedDeviceUUID := '';
+      if FProcessingDevices <> nil then
+        for Device in FProcessingDevices do
+          if (Device <> nil) and (Trim(Device.UUID) <> '') then
+            FChartDeviceVisibility.AddOrSetValue(Device.UUID, True);
+    end;
+
+    CurrentSessionDevice := ResolveCurrentSessionDevice;
     DeviceIndex := 0;
     Sorter := TComparer<TPointF>.Construct(
       function(const Left, Right: TPointF): Integer
@@ -2397,14 +2791,22 @@ begin
       begin
         if (Device = nil) or (Device.State = osDeleted) or
            IsProcessingDevicePendingRemoved(Device) or
+           not IsDeviceInCurrentChartScope(Device) or
            not IsChartDeviceVisible(Device) then
           Continue;
-        if (Device = SelectedDevice) and (FCurrentSession <> nil) then
+        if (Device = CurrentSessionDevice) and (FCurrentSession <> nil) then
           Session := FCurrentSession
         else
           Session := GetActiveVisibleSession(Device);
         if Session = nil then
           Continue;
+
+        GetDeviceFlowRange(Device, DevicePointMinX, DevicePointMaxX);
+        if DevicePointMaxX > 0 then
+        begin
+          ChartPointMinX := Min(ChartPointMinX, DevicePointMinX);
+          ChartPointMaxX := Max(ChartPointMaxX, DevicePointMaxX);
+        end;
 
         DeviceXGroups := TObjectDictionary<string, TList<Double>>.Create([doOwnsValues]);
         try
@@ -2442,7 +2844,8 @@ begin
       for Device in FProcessingDevices do
       begin
         if (Device = nil) or (Device.State = osDeleted) or
-           IsProcessingDevicePendingRemoved(Device) then
+           IsProcessingDevicePendingRemoved(Device) or
+           not IsDeviceInCurrentChartScope(Device) then
           Continue;
 
         if not IsChartDeviceVisible(Device) then
@@ -2451,7 +2854,7 @@ begin
           Continue;
         end;
 
-        if (Device = SelectedDevice) and (FCurrentSession <> nil) then
+        if (Device = CurrentSessionDevice) and (FCurrentSession <> nil) then
           Session := FCurrentSession
         else
           Session := GetActiveVisibleSession(Device);
@@ -2515,7 +2918,9 @@ begin
 
           // Проекции и подписи координат отображаются только для средних точек.
           AverageSeries := Chart1.AddSeries('');
-          AverageSeries.Color := GetChartDeviceColor(Device, True, DeviceIndex);
+          // Средняя точка является маркером и использует цвет точек.
+          // Цвет линии применяется только к LineSeries.
+          AverageSeries.Color := GetChartDeviceColor(Device, False, DeviceIndex);
           AverageSeries.ShowLine := False;
           AverageSeries.ShowMarkers := True;
           AverageSeries.ShowPointGuides := True;
@@ -2529,7 +2934,14 @@ begin
           LineSeries.ShowMarkers := False;
           LineSeries.Thickness := 2;
 
-          if FChartAverageLineMode = calmPchipLogQ then
+          if AveragePoints.Count = 1 then
+          begin
+            LineSeries.LegendName := LegendBase + ' — линия';
+            GetDeviceFlowRange(Device, DevicePointMinX, DevicePointMaxX);
+            AddSinglePointLine(AveragePoints[0], LineSeries,
+              DevicePointMinX, DevicePointMaxX);
+          end
+          else if FChartAverageLineMode = calmPchipLogQ then
           begin
             LineSeries.LegendName := LegendBase + ' — PCHIP log(Q)';
             if not AddPchipLogLine(AveragePoints, LineSeries) then
@@ -2546,6 +2958,7 @@ begin
             for I := 0 to AveragePoints.Count - 1 do
               LineSeries.AddPoint(AveragePoints[I].X, AveragePoints[I].Y);
           end;
+          ExtendAverageLine(LineSeries);
           Inc(DeviceIndex);
         finally
           Groups.Free;
@@ -2556,35 +2969,52 @@ begin
   finally
     SharedXByGroup.Free;
     SharedXGroups.Free;
-    if (ChartMinX <> MaxDouble) and (ChartMaxX <> -MaxDouble) then
+    // Диапазон учитывает Qmax, измерения и продолжение линии.
+    ChartRightBaseX := ChartPointMaxX;
+    if ChartMaxX <> -MaxDouble then
+      ChartRightBaseX := Max(ChartRightBaseX, ChartMaxX);
+    if ChartLineMaxX > 0 then
+      ChartRightBaseX := Max(ChartRightBaseX, ChartLineMaxX);
+
+    Chart1.ShowXAxisHighlight := False;
+    if ChartRightBaseX > 0 then
     begin
       Chart1.AutoRangeX := False;
+      Chart1.XMax := ChartRightBaseX * 1.1;
       if FChartFlowScale = cfsLogarithmic then
       begin
-        if SameValue(ChartMinX, ChartMaxX) then
-        begin
-          Chart1.XMin := ChartMinX / 1.1;
-          Chart1.XMax := ChartMaxX * 1.1;
-        end
-        else
-        begin
-          LogPaddingX := (Log10(ChartMaxX) - Log10(ChartMinX)) * 0.05;
-          Chart1.XMin := Power(10, Log10(ChartMinX) - LogPaddingX);
-          Chart1.XMax := Power(10, Log10(ChartMaxX) + LogPaddingX);
-        end;
+        ChartLeftBaseX := Min(ChartPointMinX, ChartMinX);
+        if ChartLineMinX <> MaxDouble then
+          ChartLeftBaseX := Min(ChartLeftBaseX, ChartLineMinX);
+        Chart1.XMin := ChartLeftBaseX;
+        if (Chart1.XMin = MaxDouble) or (Chart1.XMin <= 0) or
+           SameValue(Chart1.XMin, Chart1.XMax) then
+          Chart1.XMin := Chart1.XMax / 1000;
       end
       else
-      begin
-        if SameValue(ChartMinX, ChartMaxX) then
-          ChartPaddingX := Max(Abs(ChartMaxX) * 0.1, 1.0)
-        else
-          ChartPaddingX := (ChartMaxX - ChartMinX) * 0.1;
-        Chart1.XMin := ChartMinX;
-        Chart1.XMax := ChartMaxX + ChartPaddingX;
-      end;
+        Chart1.XMin := 0;
+
     end
     else
       Chart1.AutoRangeX := True;
+
+    // Сверху оставляется 10% от значения самой верхней точки.
+    if (ChartMinY <> MaxDouble) and (ChartMaxY <> -MaxDouble) then
+    begin
+      Chart1.AutoRangeY := False;
+      ChartPaddingY := Max(Abs(ChartMaxY) * 0.1,
+        Abs(ChartMaxY - ChartMinY) * 0.1);
+      if SameValue(ChartPaddingY, 0.0) then
+        ChartPaddingY := 0.1;
+
+      if SameValue(ChartMinY, ChartMaxY) then
+        Chart1.YMin := ChartMinY - ChartPaddingY
+      else
+        Chart1.YMin := ChartMinY;
+      Chart1.YMax := ChartMaxY + ChartPaddingY;
+    end
+    else
+      Chart1.AutoRangeY := True;
     Chart1.EndUpdate;
   end;
 end;
@@ -3100,13 +3530,20 @@ begin
   if ASpillage = nil then
     Exit;
 
-  case ASpillage.ValidationReason of
-    svrErrorWithinTolerance:
+  { The final validation state is authoritative for result colouring.
+    ValidationReason remains explanatory text and may be absent in old data. }
+  case ASpillage.Validation of
+    vsValid:
       Result := COLOR_COMPLETED;
-    svrErrorExceeded:
+    vsInvalid:
       Result := COLOR_WARNING;
   else
-    Result := TAlphaColors.Null;
+    { Старые записи и часть имитационных результатов сохраняют итог только
+      в совместимом поле Valid, не заполняя расширенный Validation. }
+    if ASpillage.Valid then
+      Result := COLOR_COMPLETED
+    else
+      Result := COLOR_WARNING;
   end;
 end;
 
@@ -3154,14 +3591,21 @@ end;
 
 function TFrameProceed.GetDeviceResultText(ADevice: TDevice): string;
 begin
-  if ADevice = nil then Exit('-');
-  Result := ADevice.GetShortStateText;
+  if ADevice = nil then
+    Exit('-');
+
+  { The visible Results frame is refreshed independently from the processing
+    tree.  Device.Validation may therefore still contain the persisted state
+    while all spillages for the current session are already available. }
+  Result := BuildResultTextByStatus(ResolveDeviceSummaryStatus(ADevice));
 end;
 
 function TFrameProceed.GetDeviceResultColor(ADevice: TDevice): TAlphaColor;
 begin
-  if ADevice = nil then Exit(TAlphaColors.Null);
-  Result := GetDeviceValidationColor(ADevice.Validation, ADevice.ValidationReason);
+  if ADevice = nil then
+    Exit(TAlphaColors.Null);
+
+  Result := GetStatusColor(ResolveDeviceSummaryStatus(ADevice));
 end;
 function TFrameProceed.BuildResultTextByStatus(const AStatus: Integer): string;
 begin
@@ -3178,7 +3622,7 @@ function TFrameProceed.BuildResultComment(ADevice: TDevice;
   const AStatus: Integer): string;
 var
   Spillage: TPointSpillage;
-  DevicePoint:tDevicePoint;
+  DevicePoint: TDevicePoint;
 begin
   Result := '';
   if (ADevice = nil) or (ADevice.Points = nil) then
@@ -3189,17 +3633,42 @@ begin
     for DevicePoint in ADevice.Points do
     begin
       Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
-      if (Spillage <> nil) and (Spillage.ValidationReason = svrErrorWithinTolerance) then
+      if (Spillage <> nil) and
+         (Spillage.ValidationReason = svrErrorWithinTolerance) then
         Exit(SpillageValidationReasonToText(Spillage.ValidationReason));
     end;
     Exit;
   end;
 
+  { For a failed device, report the failed point before any successful point.
+    Otherwise the first within-tolerance measurement can hide a later
+    out-of-tolerance result in the summary comment. }
   for DevicePoint in ADevice.Points do
   begin
     Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
-    if (Spillage <> nil) and (Spillage.ValidationReason <> svrNone) and
-       (Spillage.ValidationReason <> svrNotAnalyzed) then
+    if (Spillage <> nil) and
+       (Spillage.ValidationReason = svrErrorExceeded) then
+      Exit(SpillageValidationReasonToText(Spillage.ValidationReason));
+  end;
+
+  for DevicePoint in ADevice.Points do
+  begin
+    Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
+    if (Spillage <> nil) and
+       (Spillage.Validation = vsInvalid) and
+       (Spillage.ValidationReason <> svrNone) and
+       (Spillage.ValidationReason <> svrNotAnalyzed) and
+       (Spillage.ValidationReason <> svrErrorWithinTolerance) then
+      Exit(SpillageValidationReasonToText(Spillage.ValidationReason));
+  end;
+
+  for DevicePoint in ADevice.Points do
+  begin
+    Spillage := FindResultSpillageForPoint(ADevice, DevicePoint);
+    if (Spillage <> nil) and
+       (Spillage.ValidationReason <> svrNone) and
+       (Spillage.ValidationReason <> svrNotAnalyzed) and
+       (Spillage.ValidationReason <> svrErrorWithinTolerance) then
       Exit(SpillageValidationReasonToText(Spillage.ValidationReason));
   end;
 end;
@@ -3317,7 +3786,7 @@ begin
     ASkipReason := 'DisabledSpillage';
     Exit;
   end;
-  if (not ASpillage.Valid) or (ASpillage.Validation <> vsValid) then
+  if not (ASpillage.Validation in [vsValid, vsInvalid]) then
   begin
     ASkipReason := 'MeasurementNotCompleted';
     Exit;
@@ -3568,7 +4037,8 @@ var
   function IsUsableSummarySpillage(ASpillage: TPointSpillage): Boolean;
   begin
     Result := (ASpillage <> nil) and (ASpillage.State <> osDeleted) and
-      ASpillage.Enabled and (ASpillage.Validation = vsValid) and
+      ASpillage.Enabled and
+      (ASpillage.Validation in [vsValid, vsInvalid]) and
       IsResultErrorValid(ASpillage.Error) and
       (not IsNan(ASpillage.QavgEtalon)) and (not IsInfinite(ASpillage.QavgEtalon));
   end;
@@ -3776,7 +4246,8 @@ var
   function IsUsableSummarySpillage(ASpillage: TPointSpillage): Boolean;
   begin
     Result := (ASpillage <> nil) and (ASpillage.State <> osDeleted) and
-      ASpillage.Enabled and (ASpillage.Validation = vsValid) and
+      ASpillage.Enabled and
+      (ASpillage.Validation in [vsValid, vsInvalid]) and
       IsResultErrorValid(ASpillage.Error) and
       (not IsNan(ASpillage.QavgEtalon)) and (not IsInfinite(ASpillage.QavgEtalon));
   end;
@@ -4144,6 +4615,15 @@ begin
   end;
   SetGridReadOnly(GridResults);
   SetGridReadOnly(GridDataPoints);
+  if GridResults <> nil then
+  begin
+    { Не полагаемся только на привязку события из FMX: динамическая
+      перестройка колонок не должна отключать вывод текста и окраску. }
+    GridResults.DefaultDrawing := True;
+    GridResults.OnGetValue := GridResultsGetValue;
+    GridResults.OnDrawColumnCell := nil;
+    GridResults.OnDrawColumnBackground := GridResultsDrawColumnCell;
+  end;
   if FActiveWorkTable <> nil then
   begin
     ApplyGridColumnsLayout(GridResults, FActiveWorkTable.ResultsGridColumns);
@@ -4181,6 +4661,11 @@ begin
   if NewSignature = FResultsPointColumnSignature then
     Exit;
 
+  { Не допускаем вызова FMX-отрисовки со ссылкой на удаляемую
+    динамическую колонку во время структурного обновления. }
+  GridResults.OnGetValue := nil;
+  GridResults.OnDrawColumnCell := nil;
+  GridResults.OnDrawColumnBackground := nil;
   GridResults.BeginUpdate;
   try
     if FResultsPointColumns <> nil then
@@ -4210,6 +4695,15 @@ begin
   finally
     GridResults.EndUpdate;
   end;
+
+  { FMX может пересоздать presentation при структурном обновлении колонок.
+    Явно сохраняем обработчики виртуальных значений и пользовательской отрисовки. }
+  GridResults.OnGetValue := GridResultsGetValue;
+  GridResults.OnDrawColumnCell := nil;
+  GridResults.OnDrawColumnBackground := GridResultsDrawColumnCell;
+  RefreshGridValues(GridResults, 'results-columns');
+  GridResults.Repaint;
+
   OutputDebugMessage(Format('GridStructuralRefresh Grid="%s" Reason="point-signature" Rows=%d->%d OldSignature="changed" NewSignature="%s" IndexChanged=0 VisibleChanged=0 ContentChanged=False',
     [GridResults.Name, GridResults.RowCount, GridResults.RowCount, NewSignature]));
 end;
@@ -4588,10 +5082,20 @@ var
   ModeChanged, SelectionChanged: Boolean;
 begin
   { Refreshes result rows and values without touching grid presentation or columns. }
+  if GridResults = nil then
+    Exit;
+
+  { Повторно закрепляем виртуальные обработчики при каждом обновлении.
+    Это покрывает случай смены FMX presentation без изменения сигнатуры колонок. }
+  GridResults.OnGetValue := GridResultsGetValue;
+  GridResults.OnDrawColumnCell := nil;
+  GridResults.OnDrawColumnBackground := GridResultsDrawColumnCell;
+
   Inc(FResultsGridUpdateCount);
   PreviousRow := GridResults.Row;
   RefreshGridRowCount(GridResults, Length(FCurrentResultRows), 'results-data');
   RefreshGridValues(GridResults, 'results-data');
+  GridResults.Repaint;
   ButtonExportExcel.Enabled := GridResults.RowCount > 0;
   if Length(FCurrentResultRows) = 0 then
     NewRow := -1
@@ -4621,10 +5125,24 @@ begin
     nil, nil, GridResults.RowCount, VisibleColumnCount);
 end;
 
+procedure TFrameProceed.ResetDataPointsHintState;
+begin
+  FLastDataPointsHintRow := -1;
+  FLastDataPointsHintCol := -1;
+  if GridDataPoints = nil then
+    Exit;
+
+  { Не вызываем Application.CancelHint: в FMX синхронное уничтожение
+    hint-окна из OnMouseMove может обращаться к уже освобождённому окну. }
+  GridDataPoints.ShowHint := False;
+  GridDataPoints.Hint := '';
+end;
+
 procedure TFrameProceed.UpdateGridDataPoints;
 var
   I, Count: Integer;
 begin
+  ResetDataPointsHintState;
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
 //  UpdateGridDataPointsHeaders(FActiveWorkTable.TableFlow.ValueVolume.GetDimName, FActiveWorkTable.TableFlow.ValueVolumeFlow.GetDimName);
   Count := 0;
@@ -4926,6 +5444,9 @@ begin
   begin
     Grid := GridDataPoints;
     ColumnsMenu := MenuItemGridDataPointsColumns;
+    if FMenuItemGridDataPointsDeleteSelected <> nil then
+      FMenuItemGridDataPointsDeleteSelected.Enabled :=
+        GetCheckedDataPointCount > 0;
   end
   else if Sender = PopupMenuGridResults then
   begin
@@ -5059,23 +5580,146 @@ begin
   end;
 end;
 
-// Обновляет доступность загрузки и выгрузки без общего списка шаблонов.
-procedure TFrameProceed.UpdateReportTemplateControls;
+{ Selects the user override only for the device that owns it; otherwise
+  the template configured on the device type remains the default. }
+function TFrameProceed.ResolveCurrentReportTemplate(ADevice: TDevice;
+  ADeviceType: TDeviceType; out ATemplateSource: string): string;
 begin
+  Result := '';
+  ATemplateSource := '';
+  if ADevice = nil then
+    raise EInvalidOpException.Create(
+      'Выберите прибор или его сессию в дереве обработки');
+  if ADeviceType = nil then
+    raise EInvalidOpException.Create(
+      'Не найден тип выбранного прибора. Невозможно определить шаблон отчёта.');
+
+  if (Trim(FSelectedReportTemplateFileName) <> '') and
+     SameText(FSelectedReportTemplateDeviceUUID, ADevice.UUID) then
+  begin
+    Result := TPath.GetFullPath(FSelectedReportTemplateFileName);
+    if TFile.Exists(Result) then
+    begin
+      ATemplateSource := 'UserSelected';
+      Exit;
+    end;
+
+    FSelectedReportTemplateFileName := '';
+    FSelectedReportTemplateDeviceUUID := '';
+  end;
+
+  Result := TReportTemplateService.ResolveDeviceTypeTemplate(ADeviceType);
+  ATemplateSource := 'DeviceTypeDefault';
+end;
+
+{ Updates the edit without showing modal errors while the selection is changing. }
+procedure TFrameProceed.UpdateCurrentReportTemplate;
+var
+  Device: TDevice;
+  DeviceType: TDeviceType;
+  TypeRepo: TTypeRepository;
+  TemplateFileName, TemplateSource, TemplateError: string;
+begin
+  if EditCurrentReportTemplate = nil then
+    Exit;
+
+  FCurrentReportTemplateFileName := '';
+  FCurrentReportTemplateSource := '';
+  EditCurrentReportTemplate.Text := '—';
+  EditCurrentReportTemplate.Hint := 'Для выбранного объекта шаблон отчёта не определён.';
+  Device := ResolveSelectedDevice;
+  if Device = nil then
+  begin
+    EditCurrentReportTemplate.Hint :=
+      'Выберите прибор или его сессию в дереве обработки.';
+    Exit;
+  end;
+
+  DeviceType := nil;
+  TypeRepo := nil;
+  if (AppServices <> nil) and (AppServices.DataManager <> nil) then
+    DeviceType := AppServices.DataManager.FindType(Device.DeviceTypeUUID,
+      Device.DeviceTypeName, TypeRepo);
+  TemplateFileName := '';
+  TemplateSource := '';
+  if (Trim(FSelectedReportTemplateFileName) <> '') and
+     SameText(FSelectedReportTemplateDeviceUUID, Device.UUID) then
+  begin
+    TemplateFileName := TPath.GetFullPath(FSelectedReportTemplateFileName);
+    if TFile.Exists(TemplateFileName) then
+      TemplateSource := 'UserSelected'
+    else
+    begin
+      FSelectedReportTemplateFileName := '';
+      FSelectedReportTemplateDeviceUUID := '';
+      TemplateFileName := '';
+    end;
+  end;
+
+  if TemplateSource = '' then
+  begin
+    if DeviceType = nil then
+    begin
+      EditCurrentReportTemplate.Hint :=
+        'Не найден тип выбранного прибора. Невозможно определить шаблон отчёта.';
+      Exit;
+    end;
+    if not TReportTemplateService.TryLocateDeviceTypeTemplate(DeviceType,
+      TemplateFileName, TemplateError) then
+    begin
+      EditCurrentReportTemplate.Hint := TemplateError;
+      Exit;
+    end;
+    TemplateSource := 'DeviceTypeDefault';
+  end;
+
+  FCurrentReportTemplateFileName := TemplateFileName;
+  FCurrentReportTemplateSource := TemplateSource;
+  EditCurrentReportTemplate.Text := TPath.GetFileName(TemplateFileName);
+  if SameText(TemplateSource, 'UserSelected') then
+    EditCurrentReportTemplate.Hint :=
+      'Шаблон выбран во вкладке отчётов: ' + TemplateFileName
+  else
+    EditCurrentReportTemplate.Hint :=
+      'Шаблон типа прибора: ' + TemplateFileName;
+end;
+
+// Обновляет доступность выбора и выгрузки по уже разрешённому шаблону.
+procedure TFrameProceed.UpdateReportTemplateControls;
+var
+  Device: TDevice;
+  HasTemplate: Boolean;
+begin
+  Device := ResolveSelectedDevice;
+  HasTemplate := (Device <> nil) and
+    (Trim(FCurrentReportTemplateFileName) <> '') and
+    TFile.Exists(FCurrentReportTemplateFileName);
+
   if ButtonLoadReportTemplate <> nil then
-    ButtonLoadReportTemplate.Enabled := not FReportExportInProgress;
+    ButtonLoadReportTemplate.Enabled :=
+      (not FReportExportInProgress) and (Device <> nil);
   if ButtonExportReportTemplate <> nil then
-    ButtonExportReportTemplate.Enabled := not FReportExportInProgress;
+    ButtonExportReportTemplate.Enabled :=
+      (not FReportExportInProgress) and HasTemplate;
 end;
 
 procedure TFrameProceed.ButtonLoadReportTemplateClick(Sender: TObject);
 var
+  Device: TDevice;
   Dialog: TOpenDialog;
-  ImportedFileName, ImportStage: string;
+  SourceFileName, ImportStage: string;
   Stopwatch: TStopwatch;
   ImportResult: TReportExportResult;
   PreparedTemplate: TPreparedReportTemplate;
 begin
+  Device := ResolveSelectedDevice;
+  if Device = nil then
+  begin
+    MessageDlg('Выберите прибор или его сессию в дереве обработки',
+      TMsgDlgType.mtInformation, [TMsgDlgBtn.mbOK], 0);
+    Exit;
+  end;
+
   ImportStage := 'выбор файла';
   Dialog := TOpenDialog.Create(Self);
   try
@@ -5085,43 +5729,59 @@ begin
       if not Dialog.Execute then
         Exit;
 
+      SourceFileName := Dialog.FileName;
       Stopwatch := TStopwatch.StartNew;
       ImportStage := 'подготовка XLSX';
       ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateImportStarted',
-        'Запущена подготовка шаблона отчёта', Dialog.FileName);
-      PreparedTemplate := TReportTemplateService.PrepareTemplate(Dialog.FileName);
-      ImportedFileName := PreparedTemplate.FileName;
+        'Запущена подготовка пользовательского шаблона отчёта', Format(
+        'DeviceUUID=%s; DeviceSerialNumber=%s; DeviceTypeUUID=%s; Source=%s',
+        [Device.UUID, Device.SerialNumber, Device.DeviceTypeUUID,
+         SourceFileName]));
+
+      { The prepared file is a temporary override for this device only and does
+        not replace DeviceType.ReportingForm. }
+      PreparedTemplate := TReportTemplateService.PrepareTemplate(SourceFileName);
       ImportResult := PreparedTemplate.ValidationResult;
+      FSelectedReportTemplateFileName :=
+        TPath.GetFullPath(PreparedTemplate.FileName);
+      FSelectedReportTemplateDeviceUUID := Device.UUID;
+      UpdateCurrentReportTemplate;
       UpdateReportTemplateControls;
+
       ProtocolManager.AddMessage(pcAction, psForm, 'ReportTemplateImport',
-        'Загружен шаблон отчёта', Format(
-          'Output=%s; FileSize=%d; FileHashSHA256=%s; LastWriteTimeUtc=%s; ' +
-          'CalcPrCount=%d; CalcMode=%s; FullCalcOnLoad=%s; ForceFullCalc=%s; ' +
-          'CalcOnSave=%s; CalcId=%s; CalcChainEntryExists=%s; ' +
-          'CalcChainRelationshipExists=%s; CalcChainOverrideExists=%s; ' +
-          'CalcChainRemoved=%s; DurationMs=%d; Stage=FinalOutputValidation',
-          [ImportResult.OutputFileName, ImportResult.FileSize,
-           ImportResult.FileHashSHA256,
-           DateToISO8601(ImportResult.LastWriteTimeUtc, True),
-           ImportResult.CalculationState.CalcPrCount,
-           ImportResult.CalculationState.CalcMode,
-           BoolToStr(ImportResult.CalculationState.FullCalcOnLoad, True),
-           BoolToStr(ImportResult.CalculationState.ForceFullCalc, True),
-           BoolToStr(ImportResult.CalculationState.CalcOnSave, True),
-           ImportResult.CalculationState.CalcId,
-           BoolToStr(ImportResult.CalculationState.CalcChainEntryExists, True),
-           BoolToStr(ImportResult.CalculationState.CalcChainRelationshipExists, True),
-           BoolToStr(ImportResult.CalculationState.CalcChainOverrideExists, True),
-           BoolToStr(not ImportResult.CalculationState.CalcChainEntryExists and
-             not ImportResult.CalculationState.CalcChainRelationshipExists and
-             not ImportResult.CalculationState.CalcChainOverrideExists, True),
-           Stopwatch.ElapsedMilliseconds]));
+        'Выбран пользовательский шаблон отчёта', Format(
+        'DeviceUUID=%s; DeviceSerialNumber=%s; DeviceTypeUUID=%s; ' +
+        'SourceFile=%s; PreparedFile=%s; FileSize=%d; FileHashSHA256=%s; ' +
+        'LastWriteTimeUtc=%s; TemplateSource=UserSelected; ' +
+        'CalcPrCount=%d; CalcMode=%s; FullCalcOnLoad=%s; ForceFullCalc=%s; ' +
+        'CalcOnSave=%s; CalcId=%s; CalcChainEntryExists=%s; ' +
+        'CalcChainRelationshipExists=%s; CalcChainOverrideExists=%s; ' +
+        'CalcChainRemoved=%s; DurationMs=%d; Stage=FinalOutputValidation',
+        [Device.UUID, Device.SerialNumber, Device.DeviceTypeUUID,
+         TPath.GetFullPath(SourceFileName),
+         FSelectedReportTemplateFileName, ImportResult.FileSize,
+         ImportResult.FileHashSHA256,
+         DateToISO8601(ImportResult.LastWriteTimeUtc, True),
+         ImportResult.CalculationState.CalcPrCount,
+         ImportResult.CalculationState.CalcMode,
+         BoolToStr(ImportResult.CalculationState.FullCalcOnLoad, True),
+         BoolToStr(ImportResult.CalculationState.ForceFullCalc, True),
+         BoolToStr(ImportResult.CalculationState.CalcOnSave, True),
+         ImportResult.CalculationState.CalcId,
+         BoolToStr(ImportResult.CalculationState.CalcChainEntryExists, True),
+         BoolToStr(ImportResult.CalculationState.CalcChainRelationshipExists, True),
+         BoolToStr(ImportResult.CalculationState.CalcChainOverrideExists, True),
+         BoolToStr(not ImportResult.CalculationState.CalcChainEntryExists and
+           not ImportResult.CalculationState.CalcChainRelationshipExists and
+           not ImportResult.CalculationState.CalcChainOverrideExists, True),
+         Stopwatch.ElapsedMilliseconds]));
     except
       on E: Exception do
       begin
         ProtocolManager.AddMessage(pcError, psForm, 'ReportTemplateImport',
-          'Не удалось загрузить шаблон отчёта', Format('Stage=%s; Message=%s',
-            [ImportStage, E.Message]));
+          'Не удалось выбрать пользовательский шаблон отчёта', Format(
+          'DeviceUUID=%s; Stage=%s; Message=%s',
+          [Device.UUID, ImportStage, E.Message]));
         MessageDlg(E.Message, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
       end;
     end;
@@ -5149,6 +5809,7 @@ begin
   begin
     ButtonExportReportTemplate.Text := FReportExportButtonText;
   end;
+  UpdateCurrentReportTemplate;
   UpdateReportTemplateControls;
 end;
 
@@ -5205,7 +5866,7 @@ var
   MeterValueError: TMeterValue;
   Stopwatch: TStopwatch;
   TemplateFileName, SuggestedName, OutputFileName, ReportJson,
-    ReportingForm: string;
+    ReportingForm, TemplateSource: string;
   OperationId, SnapshotMs: Int64;
 begin
   if FReportExportInProgress then Exit;
@@ -5227,8 +5888,8 @@ begin
     if DeviceType = nil then
       raise EInvalidOpException.Create(
         'Не найден тип выбранного прибора. Невозможно определить шаблон отчёта.');
-    TemplateFileName :=
-      TReportTemplateService.ResolveDeviceTypeTemplate(DeviceType);
+    TemplateFileName := ResolveCurrentReportTemplate(Device, DeviceType,
+      TemplateSource);
   except
     on E: Exception do
     begin
@@ -5236,7 +5897,7 @@ begin
         'Не удалось определить шаблон отчёта', Format(
           'DeviceUUID=%s; DeviceSerialNumber=%s; DeviceTypeUUID=%s; ' +
           'DeviceTypeName=%s; ReportingForm=%s; ' +
-          'Stage=ResolveDeviceTypeTemplate; Message=%s',
+          'Stage=ResolveCurrentReportTemplate; Message=%s',
           [Device.UUID, Device.SerialNumber, Device.DeviceTypeUUID,
            Device.DeviceTypeName, ReportingForm, E.Message]));
       MessageDlg(E.Message, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
@@ -5272,10 +5933,10 @@ begin
     'Запущена фоновая выгрузка отчёта', Format(
       'OperationId=%d; DeviceUUID=%s; DeviceSerialNumber=%s; ' +
       'DeviceTypeUUID=%s; DeviceTypeName=%s; ReportingForm=%s; ' +
-      'Template=%s; TemplateSize=%d; TemplateHashSHA256=%s; ' +
+      'TemplateSource=%s; Template=%s; TemplateSize=%d; TemplateHashSHA256=%s; ' +
       'Output=%s; SnapshotMs=%d; Stage=ExportStarted',
       [OperationId, Device.UUID, Device.SerialNumber, Device.DeviceTypeUUID,
-       Device.DeviceTypeName, DeviceType.ReportingForm,
+       Device.DeviceTypeName, DeviceType.ReportingForm, TemplateSource,
        TPath.GetFullPath(TemplateFileName), TFile.GetSize(TemplateFileName),
        THashSHA2.GetHashStringFromFile(TemplateFileName),
        TPath.GetFullPath(OutputFileName), SnapshotMs]));
@@ -6240,6 +6901,8 @@ begin
   UpdateSessionItems;
   UpdateCalibrCoefsFrame;
   UpdateActionHints;
+  UpdateCurrentReportTemplate;
+  UpdateReportTemplateControls;
 end;
 
 procedure TFrameProceed.TreeViewDevicesMouseDown(Sender: TObject;
@@ -6430,6 +7093,8 @@ begin
   if GridDataPoints.Row + 1 < Length(FCurrentSpillages) then
     NextPoint := FCurrentSpillages[GridDataPoints.Row + 1];
 
+  { Сначала отключаем hint старой строки, затем меняем список измерений. }
+  ResetDataPointsHintState;
   Point.State := osDeleted;
   if (Session <> nil) and (Device.Spillages <> nil) and (Point.ID > 0) then
     for I := 0 to Device.Spillages.Count - 1 do
@@ -6652,35 +7317,74 @@ procedure TFrameProceed.GridResultsGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
   Row: TResultGridRow;
+  Grid: TGrid;
+  Column: TColumn;
   PointIndex: Integer;
+  I: Integer;
+  ColumnsDebug: string;
 begin
-  { Возвращает значение для постоянной либо одной из фиксированных point-колонок. }
   Value := '';
+  if not (Sender is TGrid) then
+    Exit;
+
+  Grid := TGrid(Sender);
   if (ARow < 0) or (ARow >= Length(FCurrentResultRows)) then
     Exit;
-  if (ACol < 0) or (ACol >= GridResults.ColumnCount) or
-     (not GridResults.Columns[ACol].Visible) then
+  if (ACol < 0) or (ACol >= Grid.ColumnCount) then
+    Exit;
+
+  { OnGetValue передаёт model-индекс. ColumnByIndex является штатным
+    способом FMX получить соответствующий объект колонки. }
+  Column := Grid.ColumnByIndex(ACol);
+  if Column = nil then
     Exit;
 
   Row := FCurrentResultRows[ARow];
-  PointIndex := GetResultsPointColumnIndex(GridResults.Columns[ACol]);
 
-  if GridResults.Columns[ACol] = StringColumnResultName then
-    Value := Row.Name
-  else if GridResults.Columns[ACol] = StringColumnResultType then
-    Value := Row.DeviceType
-  else if GridResults.Columns[ACol] = StringColumnResultSerial then
-    Value := Row.Serial
-  else if PointIndex >= 0 then
+  { Один диагностический снимок на обновление. Он показывает фактическое
+    соответствие model-индекса имени колонки без спама на каждую ячейку. }
+  if FResultsGridValueTraceUpdate <> FResultsGridUpdateCount then
   begin
-    if (PointIndex < Length(FResultPointColumns)) and
-       (PointIndex < Length(Row.PointValues)) then
-      Value := Row.PointValues[PointIndex];
-  end
-  else if GridResults.Columns[ACol] = StringColumnResult then
+    FResultsGridValueTraceUpdate := FResultsGridUpdateCount;
+    ColumnsDebug := '';
+    for I := 0 to Grid.ColumnCount - 1 do
+    begin
+      if ColumnsDebug <> '' then
+        ColumnsDebug := ColumnsDebug + '; ';
+      if Grid.ColumnByIndex(I) <> nil then
+        ColumnsDebug := ColumnsDebug + Format(
+          '#%d(Name=%s;Header=%s;Visible=%s)',
+          [I, Grid.ColumnByIndex(I).Name, Grid.ColumnByIndex(I).Header,
+           BoolToStr(Grid.ColumnByIndex(I).Visible, True)])
+      else
+        ColumnsDebug := ColumnsDebug + Format('#%d(nil)', [I]);
+    end;
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcProc, psForm, 'ResultsGridValueMap',
+        'Карта model-индексов виртуальной таблицы результатов',
+        Format('Update=%d; CallbackCol=%d; CallbackColumn=%s; CallbackRow=%d; ResultText=%s; Columns=[%s]',
+          [FResultsGridUpdateCount, ACol, Column.Name, ARow,
+           Row.ResultText, ColumnsDebug]));
+  end;
+
+  { Постоянные столбцы определяются по стабильному Name. Заголовок может
+    меняться пользовательской раскладкой, поэтому Header не используется. }
+  if SameText(Column.Name, 'StringColumnResultName') then
+    Value := Row.Name
+  else if SameText(Column.Name, 'StringColumnResultType') then
+    Value := Row.DeviceType
+  else if SameText(Column.Name, 'StringColumnResultSerial') then
+    Value := Row.Serial
+  else if SameText(Column.Name, 'StringColumnResult') then
     Value := Row.ResultText
-  else if GridResults.Columns[ACol] = StringColumnResultComment then
-    Value := Row.ResultComment;
+  else if SameText(Column.Name, 'StringColumnResultComment') then
+    Value := Row.ResultComment
+  else
+  begin
+    PointIndex := GetResultsPointColumnIndex(Column);
+    if (PointIndex >= 0) and (PointIndex < Length(Row.PointValues)) then
+      Value := Row.PointValues[PointIndex];
+  end;
 end;
 
 
@@ -6693,10 +7397,13 @@ var
   PointIdx: Integer;
   SavedState: TCanvasSaveState;
 begin
-  { Окрашивает фиксированную point-колонку цветом результата той же точки. }
-  if (Row < 0) or (Row >= Length(FCurrentResultRows)) then
+  { Обработчик подключён к OnDrawColumnBackground. Он меняет только фон:
+    текст и состояние ячейки рисует штатная FMX presentation. Не обращаемся
+    к свойствам Column, потому что при перестроении динамических колонок
+    presentation может завершать отложенный цикл отрисовки. }
+  if Column = nil then
     Exit;
-  if (Column = nil) or (not Column.Visible) then
+  if (Row < 0) or (Row >= Length(FCurrentResultRows)) then
     Exit;
 
   GridRow := FCurrentResultRows[Row];
@@ -6707,20 +7414,18 @@ begin
   else
   begin
     PointIdx := GetResultsPointColumnIndex(Column);
-
     if (PointIdx >= 0) and (PointIdx < Length(GridRow.PointColors)) then
       Color := GridRow.PointColors[PointIdx];
   end;
 
+  if Color = TAlphaColors.Null then
+    Exit;
+
   SavedState := Canvas.SaveState;
   try
-    if Color <> TAlphaColors.Null then
-    begin
-      Canvas.Fill.Kind := TBrushKind.Solid;
-      Canvas.Fill.Color := Color;
-      Canvas.FillRect(Bounds, 0, 0, [], 1);
-      Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
-    end;
+    Canvas.Fill.Kind := TBrushKind.Solid;
+    Canvas.Fill.Color := Color;
+    Canvas.FillRect(Bounds, 0, 0, [], 1);
   finally
     Canvas.RestoreState(SavedState);
   end;
@@ -6750,6 +7455,7 @@ var Col, Row, PointIndex: Integer; Device: TDevice;
 begin
   { Показывает подсказку результата для соответствующей фиксированной point-колонки. }
   if not GridResults.CellByPoint(X, Y, Col, Row) or
+     (Col < 0) or (Col >= GridResults.ColumnCount) or
      (Row < 0) or (Row >= Length(FCurrentResultRows)) then
   begin
     FLastResultsHintRow := -1;
@@ -6763,7 +7469,7 @@ begin
   // При смене строки или ячейки переоткрываем Hint с текстом нового результата.
   FLastResultsHintRow := Row;
   FLastResultsHintCol := Col;
-  Application.CancelHint;
+  { Не закрываем FMX hint синхронно из OnMouseMove. }
   GridResults.ShowHint := False;
   GridResults.Hint := '';
   HintText := '';
@@ -6817,6 +7523,7 @@ begin
   end;
 
   UpdateCalibrCoefsFrame;
+  UpdateSessionErrorChart;
 end;
 procedure TFrameProceed.GridDataPointsGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
@@ -7078,29 +7785,123 @@ begin
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageArchivedData then
     Value := P.ArchivedData;
 end;
+function TFrameProceed.GetCheckedDataPointCount: Integer;
+var
+  Point: TPointSpillage;
+begin
+  Result := 0;
+  for Point in FCurrentSpillages do
+    if (Point <> nil) and (Point.State <> osDeleted) and Point.Enabled then
+      Inc(Result);
+end;
+
+procedure TFrameProceed.DeleteCheckedDataPointsClick(Sender: TObject);
+var
+  Device: TDevice;
+  Session: TSessionSpillage;
+  Point, StoredPoint: TPointSpillage;
+  I, DeletedCount: Integer;
+begin
+  DeletedCount := GetCheckedDataPointCount;
+  if (GridDataPoints = nil) or not GridDataPoints.Visible or
+     (DeletedCount = 0) then
+    Exit;
+
+  Device := ResolveSelectedDevice;
+  Session := FCurrentSession;
+  if Device = nil then
+    Exit;
+
+  if MessageDlg(Format('Удалить выбранные измерения: %d?',
+      [DeletedCount]), TMsgDlgType.mtConfirmation,
+      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
+    Exit;
+
+  ResetDataPointsHintState;
+  for Point in FCurrentSpillages do
+    if (Point <> nil) and (Point.State <> osDeleted) and Point.Enabled then
+    begin
+      Point.State := osDeleted;
+
+      if Device.Spillages <> nil then
+        for I := 0 to Device.Spillages.Count - 1 do
+        begin
+          StoredPoint := Device.Spillages[I];
+          if (StoredPoint = Point) or
+             ((Point.ID > 0) and (StoredPoint <> nil) and
+              (StoredPoint.ID = Point.ID)) then
+          begin
+            StoredPoint.State := osDeleted;
+            Break;
+          end;
+        end;
+
+      if (Session <> nil) and (Session.Spillages <> nil) then
+        for I := 0 to Session.Spillages.Count - 1 do
+        begin
+          StoredPoint := Session.Spillages[I];
+          if (StoredPoint = Point) or
+             ((Point.ID > 0) and (StoredPoint <> nil) and
+              (StoredPoint.ID = Point.ID)) then
+          begin
+            StoredPoint.State := osDeleted;
+            Break;
+          end;
+        end;
+    end;
+
+  if Device.State = osClean then
+    Device.State := osModified;
+  if Session <> nil then
+    Session.State := osModified;
+
+  if Session <> nil then
+    RefreshMeasurementsAfterSessionAction(nil, Session)
+  else
+    RefreshMeasurementsAfterSessionAction(Device, nil);
+end;
+
 procedure TFrameProceed.GridDataPointsCellClick(const Column: TColumn;
   const Row: Integer);
+var
+  Point: TPointSpillage;
+  Device: TDevice;
 begin
-  // The measurement grid is a viewer.  In particular, a click on its
-  // TCheckColumn must select the row without changing the underlying point.
+  if (Column = CheckColumnSpillageEnable) and
+     (Row >= 0) and (Row < Length(FCurrentSpillages)) then
+  begin
+    Point := FCurrentSpillages[Row];
+    if (Point <> nil) and (Point.State <> osDeleted) then
+    begin
+      Point.Enabled := not Point.Enabled;
+      Device := ResolveSelectedDevice;
+      if (Device <> nil) and (Device.State = osClean) then
+        Device.State := osModified;
+      if FCurrentSession <> nil then
+        FCurrentSession.State := osModified;
+
+      RefreshGridValues(GridDataPoints, 'measurement-enabled');
+      UpdateSessionErrorChart;
+      if Assigned(FOnResultsSynchronized) then
+        FOnResultsSynchronized(Self);
+    end;
+  end;
+
   UpdateActionHints;
 end;
 procedure TFrameProceed.GridDataPointsColumnMoved(Column: TColumn; FromIndex,
   ToIndex: Integer);
 begin
-  if not FApplyingGridColumnsLayout then
-    SaveLayoutSettingsToWorkTable;
+  { FMX может вызывать OnColumnMoved не только после завершённого
+    перемещения. Не сохраняем *.fpp синхронно из этого события.
+    Текущая раскладка будет сохранена при закрытии формы. }
 end;
 
 procedure TFrameProceed.GridColumnLayoutMouseUp(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 begin
-  if FApplyingGridColumnsLayout then
-    Exit;
-
-  { Persists functional column order and visibility after an FMX interaction. }
-  if (Sender = GridResults) or (Sender = GridDataPoints) then
-    SaveLayoutSettingsToWorkTable;
+  { Обычный MouseUp в гриде не изменяет раскладку столбцов и не должен
+    запускать синхронное сохранение настроек рабочего стола. }
 end;
 
 procedure TFrameProceed.GridDataPointsDrawColumnCell(Sender: TObject;
@@ -7160,11 +7961,10 @@ procedure TFrameProceed.GridDataPointsMouseMove(Sender: TObject;
 var Col, Row: Integer; Device: TDevice; HintText: string;
 begin
   if not GridDataPoints.CellByPoint(X, Y, Col, Row) or
+     (Col < 0) or (Col >= GridDataPoints.ColumnCount) or
      (Row < 0) or (Row >= Length(FCurrentSpillages)) then
   begin
-    FLastDataPointsHintRow := -1;
-    FLastDataPointsHintCol := -1;
-    GridDataPoints.ShowHint := False;
+    ResetDataPointsHintState;
     Exit;
   end;
   if (Row = FLastDataPointsHintRow) and (Col = FLastDataPointsHintCol) then
@@ -7173,7 +7973,6 @@ begin
   // При смене строки или ячейки переоткрываем Hint с текстом нового измерения.
   FLastDataPointsHintRow := Row;
   FLastDataPointsHintCol := Col;
-  Application.CancelHint;
   GridDataPoints.ShowHint := False;
   GridDataPoints.Hint := '';
   HintText := '';

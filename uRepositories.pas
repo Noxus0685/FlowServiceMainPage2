@@ -234,6 +234,9 @@ type
 
     { Все приборы, загруженные из БД }
     FDevices: TObjectList<TDevice>;
+    FHeadersLoaded: Boolean;
+    { UUID приборов, для которых загружены все связанные данные. }
+    FFullyLoadedDeviceUUIDs: TDictionary<string, Boolean>;
 
     { Генераторы ID }
     FNextDeviceID: Integer;
@@ -352,6 +355,12 @@ type
 
     function LoadDevice(ADevice: TDevice): TDevice; overload;
     function LoadDevice(ADeviceUUID: String): TDevice; overload;
+    // Совместимый вызов: выбранный прибор всегда загружается полностью.
+    function LoadDeviceRuntimeData(const ADeviceUUID: string): TDevice;
+    // Проверяет наличие прибора коротким запросом без загрузки содержимого БД.
+    function ContainsDeviceUUID(const ADeviceUUID: string): Boolean;
+    // Возвращает True, если прибор и все связанные данные уже загружены.
+    function IsDeviceFullyLoaded(const ADeviceUUID: string): Boolean;
     function LoadSpillageSessionsByDevice(const ADeviceUUID: string): Boolean;
     function LoadSpillagesByDevice(const ADeviceUUID: string): Boolean;
     function SaveDevice(ADevice: TDevice): Boolean;
@@ -3236,8 +3245,9 @@ begin
   {--------------------------------------------------}
   { Хранилища }
   {--------------------------------------------------}
-  FDevices   := TObjectList<TDevice>.Create(True);
-
+  FDevices := TObjectList<TDevice>.Create(True);
+  FHeadersLoaded := False;
+  FFullyLoadedDeviceUUIDs := TDictionary<string, Boolean>.Create;
 
   {--------------------------------------------------}
   { Генераторы ID }
@@ -3249,9 +3259,8 @@ end;
 
 destructor TDeviceRepository.Destroy;
 begin
-
+  FreeAndNil(FFullyLoadedDeviceUUIDs);
   FreeAndNil(FDevices);
-
   inherited;
 end;
 
@@ -3261,6 +3270,8 @@ begin
   { Очистка текущего состояния }
   {--------------------------------------------------}
   FDevices.Clear;
+  FFullyLoadedDeviceUUIDs.Clear;
+  FHeadersLoaded := False;
 
   FNextDeviceID := 1;
   FNextPointID := 1;
@@ -3578,24 +3589,16 @@ begin
       WorkTableManager.ActiveWorkTable.InitChannels;
 
     {==================================================}
-    { 2. ПРИБОРЫ }
+    { 2. КРАТКИЙ СПИСОК ПРИБОРОВ }
     {==================================================}
 
+    { При запуске читаются только карточки приборов. Точки, коэффициенты
+      и история загружаются отдельно по UUID, когда прибор действительно нужен. }
     if not LoadDevices then
-     begin
-      //ShowMessage('Не удалось загрузить приборы');
-     end;
-
-   // raise Exception.Create('Не удалось загрузить приборы');
+      raise Exception.Create('Не удалось загрузить список приборов');
 
     {==================================================}
-    { 3. ЗАВИСИМЫЕ ДАННЫЕ }
-    {==================================================}
-
-
-
-    {==================================================}
-    { 4. ИТОГ }
+    { 3. ИТОГ }
     {==================================================}
 
     FState := osClean;
@@ -4165,125 +4168,109 @@ begin
 end;
 
 function TDeviceRepository.LoadDevice(ADevice: TDevice): TDevice;
-var
-  Q: TFDQuery;
 begin
   Result := nil;
-
-  if (ADevice = nil) or (Trim(ADevice.UUID) = '') or (FDM = nil) then
+  if ADevice = nil then
     Exit;
+  Result := LoadDevice(ADevice.UUID);
+end;
 
-  Q := FDM.CreateQuery;
-  try
-    // Выполняем запрос для поиска устройства по UUID
-    Q.SQL.Text := 'select * from Devices where UUID = :UUID';
-    SetStrParam(Q, 'UUID', Trim(ADevice.UUID));
-    Q.Open;
+function TDeviceRepository.LoadDeviceRuntimeData(
+  const ADeviceUUID: string
+): TDevice;
+begin
+  Result := LoadDevice(ADeviceUUID);
+end;
 
-    // Если запись найдена
-    if not Q.Eof then
-    begin
-      // Преобразуем данные из Query в объект TDevice
-      Result := MapDeviceFromQuery(Q);
+function TDeviceRepository.ContainsDeviceUUID(
+  const ADeviceUUID: string
+): Boolean;
+begin
+  Result := DeviceExistsInDB(ADeviceUUID);
+end;
 
-      // Загружаем связанные данные для устройства
-      LoadDevicePointsByDevice(Result.UUID);
-      LoadSpillageSessionsByDevice(Result.UUID);
-      LoadSpillagesByDevice(Result.UUID);
-      LoadCalibrCoefByDevice(Result.UUID);
-    end;
-
-  finally
-    Q.Free;
-  end;
+function TDeviceRepository.IsDeviceFullyLoaded(
+  const ADeviceUUID: string
+): Boolean;
+var
+  Loaded: Boolean;
+begin
+  Loaded := False;
+  Result := FFullyLoadedDeviceUUIDs.TryGetValue(
+    LowerCase(Trim(ADeviceUUID)), Loaded) and Loaded;
 end;
 
 function TDeviceRepository.LoadDevice(ADeviceUUID: String): TDevice;
 var
   Q: TFDQuery;
-  NewD: TDevice;
   Device: TDevice;
   LoadErrors: TStringList;
-
+  DeviceUUID: string;
 begin
   Result := nil;
-
-  if FDM = nil then
+  DeviceUUID := Trim(ADeviceUUID);
+  if (FDM = nil) or (DeviceUUID = '') then
     Exit;
 
-  FState := osLoading;
+  Device := FindDeviceByUUID(DeviceUUID);
+  if (Device <> nil) and (Device.State = osDeleted) then
+    Exit;
+  if (Device <> nil) and IsDeviceFullyLoaded(DeviceUUID) then
+    Exit(Device);
 
+  FState := osLoading;
   if FDevices = nil then
     FDevices := TObjectList<TDevice>.Create(True);
-  LoadErrors := TStringList.Create;
 
-  Q := FDM.CreateQuery;
+  Q := nil;
+  LoadErrors := TStringList.Create;
   try
     try
-      Q.SQL.Text := 'select * from Devices Where UUID = :UUID order by Name';
-       SetStrParam(Q, 'UUID', Trim(ADeviceUUID));
-      Q.Open;
-
-      if Q.Eof then
-        exit;
-     // while not Q.Eof do
-     // begin
-        NewD := MapDeviceFromQuery(Q);
-
-        Device := FindDeviceByUUID(NewD.UUID);
-        if Device <> nil then
-        begin
-          Device.Assign(NewD, True);
-
-            NewD.Free;
-        end
-        else
-        begin
-          FDevices.Add(NewD);
-          Device := NewD;
-        end;
-
-
-        if Trim(Device.UUID) = '' then
-        begin
-          Device.UUID := TGUID.NewGuid.ToString;
-          Device.State := osModified;
-          LoadErrors.Add(Format('У прибора "%s" в БД отсутствовал UUID. Присвоен новый UUID.', [Device.Name]));
-        end
-        else
-        begin
-          if not LoadDevicePointsByDevice(Device.UUID) then
-            LoadErrors.Add(Format('Не удалось загрузить точки прибора "%s".', [Device.Name]));
-
-          if not LoadSpillageSessionsByDevice(Device.UUID) then
-            LoadErrors.Add(Format('Не удалось загрузить проливы прибора "%s".', [Device.Name]));
-
-          if not LoadSpillagesByDevice(Device.UUID) then
-            LoadErrors.Add(Format('Не удалось загрузить результаты проливов прибора "%s".', [Device.Name]));
-
-          if not LoadCalibrCoefByDevice(Device.UUID) then
-            LoadErrors.Add(Format('Не удалось загрузить таблицу калибровочных коэффициентов прибора "%s".', [Device.Name]));
-        end;
-
-
-    //    Q.Next;
-     // end;
-
-      if LoadErrors.Count > 0 then
+      { Если карточка ещё не загружена, читаем только выбранный прибор. }
+      if Device = nil then
       begin
+        Q := FDM.CreateQuery;
+        Q.SQL.Text := 'select * from Devices where UUID = :UUID';
+        SetStrParam(Q, 'UUID', DeviceUUID);
+        Q.Open;
+        if Q.Eof then
+        begin
+          FState := osClean;
+          Exit;
+        end;
 
-        ShowMessage('Часть данных приборов не загружена:' + sLineBreak + LoadErrors.Text);
+        Device := MapDeviceFromQuery(Q);
+        FDevices.Add(Device);
       end;
 
+      { Выбранный прибор загружается сразу полностью. Карточку существующего
+        объекта повторно не присваиваем, чтобы не затереть рабочие изменения. }
+      if not LoadDevicePointsByDevice(Device.UUID) then
+        LoadErrors.Add(Format('Не удалось загрузить точки прибора "%s".', [Device.Name]));
+
+      if not LoadCalibrCoefByDevice(Device.UUID) then
+        LoadErrors.Add(Format(
+          'Не удалось загрузить таблицу коэффициентов прибора "%s".', [Device.Name]));
+
+      if not LoadSpillageSessionsByDevice(Device.UUID) then
+        LoadErrors.Add(Format('Не удалось загрузить сессии прибора "%s".', [Device.Name]));
+
+      if not LoadSpillagesByDevice(Device.UUID) then
+        LoadErrors.Add(Format(
+          'Не удалось загрузить результаты измерений прибора "%s".', [Device.Name]));
+
+      if LoadErrors.Count > 0 then
+        raise Exception.Create(
+          'Часть данных прибора не загружена:' + sLineBreak + LoadErrors.Text);
+
+      FFullyLoadedDeviceUUIDs.AddOrSetValue(
+        LowerCase(Trim(Device.UUID)), True);
       FState := osClean;
-
       Result := Device;
-
     except
       FState := osError;
       raise;
     end;
-
   finally
     Q.Free;
     LoadErrors.Free;
@@ -4295,19 +4282,17 @@ var
   Q: TFDQuery;
   NewD: TDevice;
   Device: TDevice;
-  LoadErrors: TStringList;
-
 begin
-  Result := False;
+  if FHeadersLoaded then
+    Exit(True);
 
+  Result := False;
   if FDM = nil then
     Exit;
 
   FState := osLoading;
-
   if FDevices = nil then
     FDevices := TObjectList<TDevice>.Create(True);
-  LoadErrors := TStringList.Create;
 
   Q := FDM.CreateQuery;
   try
@@ -4318,13 +4303,14 @@ begin
       while not Q.Eof do
       begin
         NewD := MapDeviceFromQuery(Q);
-
         Device := FindDeviceByUUID(NewD.UUID);
+
         if Device <> nil then
         begin
-          Device.Assign(NewD, True);
-
-            NewD.Free;
+          { Полностью загруженный прибор не перезаписываем краткой карточкой. }
+          if not IsDeviceFullyLoaded(NewD.UUID) then
+            Device.Assign(NewD, True);
+          NewD.Free;
         end
         else
         begin
@@ -4336,45 +4322,20 @@ begin
         begin
           Device.UUID := TGUID.NewGuid.ToString;
           Device.State := osModified;
-          LoadErrors.Add(Format('У прибора "%s" в БД отсутствовал UUID. Присвоен новый UUID.', [Device.Name]));
-        end
-        else
-        begin
-          if not LoadDevicePointsByDevice(Device.UUID) then
-            LoadErrors.Add(Format('Не удалось загрузить точки прибора "%s".', [Device.Name]));
-
-          if not LoadSpillageSessionsByDevice(Device.UUID) then
-            LoadErrors.Add(Format('Не удалось загрузить проливы прибора "%s".', [Device.Name]));
-
-          if not LoadSpillagesByDevice(Device.UUID) then
-            LoadErrors.Add(Format('Не удалось загрузить результаты проливов прибора "%s".', [Device.Name]));
-
-          if not LoadCalibrCoefByDevice(Device.UUID) then
-            LoadErrors.Add(Format('Не удалось загрузить таблицу калибровочных коэффициентов прибора "%s".', [Device.Name]));
         end;
-
 
         Q.Next;
       end;
 
-      if LoadErrors.Count > 0 then
-      begin
-        FState := osClean;
-        ShowMessage('Часть данных приборов не загружена:' + sLineBreak + LoadErrors.Text);
-      end
-      else
-        FState := osClean;
-
+      FHeadersLoaded := True;
+      FState := osClean;
       Result := True;
-
     except
       FState := osError;
       raise;
     end;
-
   finally
     Q.Free;
-    LoadErrors.Free;
   end;
 end;
 

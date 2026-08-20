@@ -35,6 +35,7 @@ uses
   System.Generics.Collections,
   System.Generics.Defaults,
   System.JSON,
+  System.IOUtils,
   System.Net.HttpClient,
   System.Net.HttpClientComponent,
   System.Net.URLClient,
@@ -1964,7 +1965,7 @@ begin
     Dlg.Filter := 'SQLite database (*.db)|*.db|Все файлы (*.*)|*.*';
     Dlg.DefaultExt := 'db';
     Dlg.FileName := RepoName + '.db';
-    Dlg.InitialDir := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'Types';
+    Dlg.InitialDir := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'Types');
 
     ForceDirectories(Dlg.InitialDir);
 
@@ -2076,7 +2077,7 @@ begin
     Dlg.Title := 'Открыть файл репозитория';
     Dlg.Filter := 'SQLite database (*.db)|*.db|Все файлы (*.*)|*.*';
     Dlg.Options := [TOpenOption.ofFileMustExist];
-    Dlg.InitialDir := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'Types';
+    Dlg.InitialDir := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'Types');
 
     ForceDirectories(Dlg.InitialDir);
 
@@ -2821,3 +2822,4 @@ end;
 
 
 end.
+

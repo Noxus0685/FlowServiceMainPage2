@@ -844,13 +844,61 @@ begin
 end;
 
 procedure TFrameMeasurementRun.UpdateCurrentPointIndicator;
-var UUID: string;
+var
+  UUID: string;
+  PointRow: Integer;
 begin
   UUID := FCurrentPointUUID;
-  if UUID = FLastIndicatorUUID then Exit;
+  if UUID = FLastIndicatorUUID then
+    Exit;
   FLastIndicatorUUID := UUID;
-  if UUID = '' then ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementCurrentPointIndicatorCleared', 'Индикатор текущей точки очищен', '')
-  else ProtocolManager.AddMessage(pcProc, psForm, 'MeasurementCurrentPointIndicatorUpdated', 'Индикатор текущей точки обновлён', 'PointUUID=' + UUID);
+
+  if UUID = '' then
+  begin
+    ProtocolManager.AddMessage(pcProc, psForm,
+      'MeasurementCurrentPointIndicatorCleared',
+      'Индикатор текущей точки очищен', '');
+    Exit;
+  end;
+
+  PointRow := ResolvePointRow(UUID, FCurrentPoint, -1);
+  ProtocolManager.AddMessage(pcProc, psForm,
+    'MeasurementCurrentPointIndicatorUpdated',
+    'Индикатор текущей точки обновлён',
+    Format('PointUUID=%s; PointRow=%d', [UUID, PointRow]));
+
+  if PointRow < 0 then
+    Exit;
+
+  { Фокус и выделение таблицы следуют только за фактическим mePointChanged.
+    Изменение строки здесь не отправляет команду MeasurementRun. }
+  TThread.Queue(nil,
+    procedure
+    begin
+      if not SameText(UUID, FCurrentPointUUID) then
+        Exit;
+      if (GridMeasurmentRun = nil) or
+         (PointRow < 0) or (PointRow >= GridMeasurmentRun.RowCount) then
+        Exit;
+
+      FRestoringGridState := True;
+      try
+        GridMeasurmentRun.Row := PointRow;
+        GridMeasurmentRun.Selected := PointRow;
+        GridMeasurmentRun.ScrollToSelectedCell;
+        if GridMeasurmentRun.CanFocus then
+          GridMeasurmentRun.SetFocus;
+      finally
+        FRestoringGridState := False;
+      end;
+
+      UpdatePointOrderControls;
+      ProtocolManager.AddMessage(pcProc, psForm,
+        'MeasurementCurrentPointFocusUpdated',
+        'Фокус таблицы установлен на текущую точку',
+        Format('PointUUID=%s; PointRow=%d; Focused=%s',
+          [UUID, PointRow, BoolToStr(GridMeasurmentRun.IsFocused, True)]));
+    end);
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointPrevClick(Sender: TObject);

@@ -46,7 +46,7 @@ type
   end;
 
   TGraphSegmentStartReason = (gssrNone, gssrRunStarted,
-    gssrPointChanged);
+    gssrPointChanged, gssrMonitorStarted);
 
   TGraphSourceEvent = procedure(Sender: TObject; const AGraphIndex: Integer) of object;
 
@@ -75,6 +75,11 @@ type
     DurationSec: Integer;
   end;
 
+  TGraphLayoutMenuItem = class(TMenuItem)
+  public
+    ColumnCount: Integer;
+  end;
+
   TGraphHistoryLoadMode = (ghlmCurrentSegmentHistory, ghlmAfterLocalReset);
 
   TGraphToleranceResolveState = (gtrsNotResolved, gtrsPendingPoint,
@@ -88,6 +93,7 @@ type
     MeterValueKey: string;
     GraphIndex: Integer;
     ChartSeries: TChartSeries;
+    AverageLineSeries: TChartSeries;
     LastSampleTimeMs: Int64;
     LastSampleIndex: Integer;
     WaitingForFirstSample: Boolean;
@@ -120,6 +126,12 @@ type
     RootLayout: TLayout;
     HeaderLayout: TLayout;
     TitleLabel: TLabel;
+    ScaleLayout: TLayout;
+    ScaleTrack: TTrackBar;
+    ScaleLabel: TLabel;
+    TimeScrollLayout: TLayout;
+    TimeScrollTrack: TTrackBar;
+    TimeScrollLabel: TLabel;
     Chart: TSimpleChart;
     HitControl: TRectangle;
     TargetSeries: TChartSeries;
@@ -140,13 +152,21 @@ type
     MenuItemDevices: TMenuItem;
     MenuItemOther: TMenuItem;
     MenuItemSettings: TMenuItem;
+    MenuItemVisibilitySettings: TMenuItem;
     MenuItemSeriesColors: TMenuItem;
     MenuItemGraphLength: TMenuItem;
     MenuItemFlowUnits: TMenuItem;
+    MenuItemAverageLine: TMenuItem;
+    MenuItemAverageLinePchip: TMenuItem;
+    MenuItemAverageLineSegments: TMenuItem;
+    MenuItemValueMode: TMenuItem;
+    MenuItemValueFlow: TMenuItem;
+    MenuItemValueError: TMenuItem;
     MenuItemShowLegend: TMenuItem;
     MenuItemShowTargetLine: TMenuItem;
     MenuItemShowToleranceLines: TMenuItem;
     MenuItemShowToleranceInLegend: TMenuItem;
+    MenuItemLayout: TMenuItem;
     MenuItemAddGraph: TMenuItem;
     MenuItemDeleteGraph: TMenuItem;
     MenuItemClearGraphValues: TMenuItem;
@@ -160,6 +180,11 @@ type
     procedure ClearGraphClick(Sender: TObject);
     procedure SeriesColorClick(Sender: TObject);
     procedure GraphDurationClick(Sender: TObject);
+    procedure GraphScaleTrackChange(Sender: TObject);
+    procedure GraphTimeScrollTrackChange(Sender: TObject);
+    procedure GraphLayoutClick(Sender: TObject);
+    procedure AverageLineModeClick(Sender: TObject);
+    procedure ValueModeClick(Sender: TObject);
     procedure ShowLegendClick(Sender: TObject);
     procedure ToleranceVisibilityClick(Sender: TObject);
     procedure AddGraphClick(Sender: TObject);
@@ -172,6 +197,7 @@ type
     FContextGraphIndex: Integer;
     FSeriesRuntime: TObjectDictionary<TGraphSeriesConfig, TGraphSeriesRuntime>;
     FLastRunActive: Boolean;
+    FLastMonitorActive: Boolean;
     FSharedSegmentStartMs: Int64;
     FSharedCurrentTimeSec: Double;
     FSharedAxisMinX: Double;
@@ -199,10 +225,13 @@ type
     FLastLayoutGraphCount: Integer;
     FLastGraphCellWidth: Single;
     FLastGraphCellHeight: Single;
+    FUpdatingScaleTrack: Boolean;
+    FUpdatingTimeScrollTrack: Boolean;
     function CreateGraphSlot(const AGraphIndex: Integer): TGraphVisualSlot;
     procedure DestroyGraphSlot(const AGraphIndex: Integer);
     procedure EnsureGraphSlotCount(const ACount: Integer);
     procedure ReindexGraphSlots;
+    procedure UpdateTimeScrollControl(const AGraphIndex: Integer);
     function GraphSlotByIndex(const AIndex: Integer): TGraphVisualSlot;
     function ChartByIndex(const AIndex: Integer): TSimpleChart;
     procedure CalculateDynamicGrid(const AGraphCount: Integer;
@@ -215,6 +244,12 @@ type
     procedure AddEnvironmentMenuItem(AParent: TMenuItem;
       const AKind: TGraphSourceKind; const ACaption, AKey: string);
     procedure UpdateGraphHeader(const AGraphIndex: Integer);
+    function IsGraphErrorMode(const AGraphIndex: Integer): Boolean;
+    procedure BuildPchipTimeLine(const APoints: TList<TPointF>;
+      ASeries: TChartSeries);
+    procedure RebuildAverageLine(const AGraphIndex: Integer;
+      ARuntime: TGraphSeriesRuntime);
+    procedure RebuildGraphAverageLines(const AGraphIndex: Integer);
     procedure BuildSeriesColorsMenu;
     function ResolveGraphLayoutMenu: TMenuItem;
     procedure UpdateGraphSettingsMenu;
@@ -270,6 +305,13 @@ type
     procedure EnsureLimitSeries(const AGraphIndex: Integer);
     procedure UpdateToleranceLines;
     procedure UpdateToleranceLinesForGraph(const AGraphIndex: Integer);
+    function IsMonitorToleranceMode: Boolean;
+    function FindMonitorTolerancePoint(ADevice: TDevice;
+      const ACurrentFlow: Double; out APointIndex: Integer): TDevicePoint;
+    procedure UpdateMonitorToleranceLinesForGraph(
+      const AGraphIndex: Integer);
+    procedure HideSeriesToleranceLinesForGraph(
+      const AGraphIndex: Integer);
     function ResolveGraphTolerance(const AGraphIndex: Integer;
       out ATargetQ, AErrorPercent, ALowerQ, AUpperQ: Double;
       out ASourceKind, AReason: string): Boolean;
@@ -285,7 +327,7 @@ type
     function GraphHasVisibleSources(const AGraphIndex: Integer): Boolean;
     procedure HideGraphToleranceLines(const AGraphIndex: Integer);
     procedure UpdateGraphToleranceVisual(const AGraphIndex: Integer;
-      const ATargetQ, ALowerQ, AUpperQ: Double);
+      const ATargetQ, AErrorPercent, ALowerQ, AUpperQ: Double);
     function ResolveSeriesTolerance(const AGraphIndex: Integer;
       ASeriesConfig: TGraphSeriesConfig; out AInfo: TGraphSeriesToleranceInfo;
       out AReason: string): Boolean;
@@ -489,6 +531,55 @@ begin
   Result.TitleLabel.Tag := AGraphIndex;
   Result.TitleLabel.OnMouseDown := GraphControlMouseDown;
 
+  Result.ScaleLayout := TLayout.Create(Result.HeaderLayout);
+  Result.ScaleLayout.Parent := Result.HeaderLayout;
+  Result.ScaleLayout.Align := TAlignLayout.Right;
+  Result.ScaleLayout.Width := 230;
+  Result.ScaleLabel := TLabel.Create(Result.ScaleLayout);
+  Result.ScaleLabel.Parent := Result.ScaleLayout;
+  Result.ScaleLabel.Align := TAlignLayout.Right;
+  Result.ScaleLabel.Width := 100;
+  Result.ScaleLabel.TextSettings.HorzAlign := TTextAlign.Center;
+  Result.ScaleTrack := TTrackBar.Create(Result.ScaleLayout);
+  Result.ScaleTrack.Parent := Result.ScaleLayout;
+  Result.ScaleTrack.Align := TAlignLayout.Client;
+  Result.ScaleTrack.CanParentFocus := True;
+  Result.ScaleTrack.Min := 50;
+  Result.ScaleTrack.Max := 200;
+  Result.ScaleTrack.Frequency := 25;
+  Result.ScaleTrack.Orientation := TOrientation.Horizontal;
+  Result.ScaleTrack.Tag := AGraphIndex;
+  if (FConfig <> nil) and (AGraphIndex < FConfig.Panels.Count) then
+    Result.ScaleTrack.Value :=
+      EnsureRange(FConfig.Panels[AGraphIndex].DataScalePercent, 50, 200)
+  else
+    Result.ScaleTrack.Value := 100;
+  Result.ScaleLabel.Text :=
+    Format('Масштаб: %.0f %%', [Result.ScaleTrack.Value]);
+  Result.ScaleTrack.OnChange := GraphScaleTrackChange;
+
+  Result.TimeScrollLayout := TLayout.Create(Result.RootLayout);
+  Result.TimeScrollLayout.Parent := Result.RootLayout;
+  Result.TimeScrollLayout.Align := TAlignLayout.Bottom;
+  Result.TimeScrollLayout.Height := 26;
+  Result.TimeScrollLabel := TLabel.Create(Result.TimeScrollLayout);
+  Result.TimeScrollLabel.Parent := Result.TimeScrollLayout;
+  Result.TimeScrollLabel.Align := TAlignLayout.Left;
+  Result.TimeScrollLabel.Width := 150;
+  Result.TimeScrollLabel.Text := 'Прокрутка времени';
+  Result.TimeScrollLabel.TextSettings.HorzAlign := TTextAlign.Center;
+  Result.TimeScrollTrack := TTrackBar.Create(Result.TimeScrollLayout);
+  Result.TimeScrollTrack.Parent := Result.TimeScrollLayout;
+  Result.TimeScrollTrack.Align := TAlignLayout.Client;
+  Result.TimeScrollTrack.CanParentFocus := True;
+  Result.TimeScrollTrack.Min := 0;
+  Result.TimeScrollTrack.Max := 100;
+  Result.TimeScrollTrack.Frequency := 5;
+  Result.TimeScrollTrack.Orientation := TOrientation.Horizontal;
+  Result.TimeScrollTrack.Tag := AGraphIndex;
+  Result.TimeScrollTrack.Value := 100;
+  Result.TimeScrollTrack.OnChange := GraphTimeScrollTrackChange;
+
   Result.Chart := TSimpleChart.Create(Result.RootLayout);
   Result.Chart.Parent := Result.RootLayout;
   Result.Chart.Align := TAlignLayout.Client;
@@ -502,6 +593,7 @@ begin
     receives right clicks directly. }
   Result.HitControl := nil;
   FGraphSlots.Add(Result);
+  UpdateTimeScrollControl(AGraphIndex);
   EnsureLimitSeries(AGraphIndex);
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphSlotCreated',
@@ -541,12 +633,63 @@ begin
     Slot.RootLayout.Tag := I;
     Slot.TitleLabel.Tag := I;
     Slot.Chart.Tag := I;
+    if Slot.ScaleTrack <> nil then
+    begin
+      Slot.ScaleTrack.Tag := I;
+      FUpdatingScaleTrack := True;
+      try
+        Slot.ScaleTrack.Value :=
+          EnsureRange(FConfig.Panels[I].DataScalePercent, 50, 200);
+        if Slot.ScaleLabel <> nil then
+          Slot.ScaleLabel.Text :=
+            Format('Масштаб: %.0f %%', [Slot.ScaleTrack.Value]);
+      finally
+        FUpdatingScaleTrack := False;
+      end;
+    end;
+    if Slot.TimeScrollTrack <> nil then
+      Slot.TimeScrollTrack.Tag := I;
+    UpdateTimeScrollControl(I);
     if Slot.HitControl <> nil then Slot.HitControl.Tag := I;
     UpdateGraphHeader(I);
   end;
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphSlotsReindexed',
       'Переиндексированы слоты графиков', Format('GraphCount=%d', [FGraphSlots.Count]));
+end;
+
+procedure TFrameGraphsWorkspace.UpdateTimeScrollControl(
+  const AGraphIndex: Integer);
+var
+  Slot: TGraphVisualSlot;
+  Panel: TGraphPanelConfig;
+  ScalePercent, ScrollPercent: Integer;
+begin
+  if (FConfig = nil) or (AGraphIndex < 0) or
+     (AGraphIndex >= FConfig.Panels.Count) then Exit;
+  Slot := GraphSlotByIndex(AGraphIndex);
+  if Slot = nil then Exit;
+  Panel := FConfig.Panels[AGraphIndex];
+  ScalePercent := EnsureRange(Panel.DataScalePercent, 50, 200);
+  ScrollPercent := EnsureRange(Panel.TimeScrollPercent, 0, 100);
+  Panel.TimeScrollPercent := ScrollPercent;
+  if Slot.TimeScrollLayout <> nil then
+    Slot.TimeScrollLayout.Visible := ScalePercent > 100;
+  if Slot.TimeScrollTrack <> nil then
+  begin
+    Slot.TimeScrollTrack.Enabled := ScalePercent > 100;
+    FUpdatingTimeScrollTrack := True;
+    try
+      Slot.TimeScrollTrack.Value := ScrollPercent;
+    finally
+      FUpdatingTimeScrollTrack := False;
+    end;
+  end;
+  if Slot.TimeScrollLabel <> nil then
+    if ScrollPercent = 100 then
+      Slot.TimeScrollLabel.Text := 'Время: последние данные'
+    else
+      Slot.TimeScrollLabel.Text := Format('Время: %d %%', [ScrollPercent]);
 end;
 
 function TFrameGraphsWorkspace.GraphSlotByIndex(
@@ -577,7 +720,9 @@ begin
   if FConfig.AutoGrid or (FConfig.PreferredColumnCount <= 0) then
     AColumns := Min(MaxColumnsByWidth, AGraphCount)
   else
-    AColumns := Min(Min(FConfig.PreferredColumnCount, MaxColumnsByWidth), AGraphCount);
+    { An explicit layout selection is authoritative.  MinimumGraphWidth is
+      used only by the automatic layout. }
+    AColumns := Min(FConfig.PreferredColumnCount, AGraphCount);
   AColumns := Max(1, AColumns);
   ARows := (AGraphCount + AColumns - 1) div AColumns;
 end;
@@ -597,7 +742,8 @@ begin
     AvailableHeight := Max(0, ScrollBoxGraphs.Height - VerticalPadding * 2);
     CalculateDynamicGrid(FGraphSlots.Count, AvailableWidth, Columns, Rows);
     if Columns = 0 then Exit;
-    GraphWidth := Max(1, (AvailableWidth - Max(0, Columns - 1) * HorizontalSpacing) / Columns);
+    GraphWidth := Max(1,
+      (AvailableWidth - Max(0, Columns - 1) * HorizontalSpacing) / Columns);
     GraphHeight := Max(FConfig.MinimumGraphHeight,
       (AvailableHeight - Max(0, Rows - 1) * VerticalSpacing) / Max(1, Rows));
     ContentHeight := VerticalPadding * 2 + Rows * GraphHeight +
@@ -622,12 +768,14 @@ begin
       ProtocolManager.AddMessage(pcProc, psForm, 'GraphDynamicLayoutCalculated',
         'Рассчитана динамическая сетка графиков', Format(
         'GraphCount=%d; AvailableWidth=%g; AvailableHeight=%g; AutoGrid=%s; PreferredColumnCount=%d; CalculatedColumns=%d; CalculatedRows=%d; GraphWidth=%g; GraphHeight=%g',
-        [FGraphSlots.Count, AvailableWidth, AvailableHeight, BoolToStr(FConfig.AutoGrid, True),
-         FConfig.PreferredColumnCount, Columns, Rows, GraphWidth, GraphHeight]));
+        [FGraphSlots.Count, AvailableWidth, AvailableHeight,
+         BoolToStr(FConfig.AutoGrid, True), FConfig.PreferredColumnCount,
+         Columns, Rows, GraphWidth, GraphHeight]));
       ProtocolManager.AddMessage(pcProc, psForm, 'GraphDynamicLayoutApplied',
         'Применена динамическая сетка графиков', Format(
         'GraphCount=%d; Columns=%d; Rows=%d; ContentHeight=%g; ScrollRequired=%s',
-        [FGraphSlots.Count, Columns, Rows, ContentHeight, BoolToStr(ScrollRequired, True)]));
+        [FGraphSlots.Count, Columns, Rows, ContentHeight,
+         BoolToStr(ScrollRequired, True)]));
     end;
     FLastLayoutColumns := Columns; FLastLayoutRows := Rows;
     FLastLayoutGraphCount := FGraphSlots.Count;
@@ -936,6 +1084,13 @@ begin
   Runtime.ChartSeries := Chart.AddSeries(ASeriesConfig.Caption);
   Runtime.ChartSeries.Color := ASeriesConfig.Color;
   Runtime.ChartSeries.Visible := ASeriesConfig.Visible;
+  Runtime.ChartSeries.ShowLine := False;
+  Runtime.ChartSeries.ShowMarkers := True;
+  Runtime.AverageLineSeries := Chart.AddSeries('');
+  Runtime.AverageLineSeries.Color := ASeriesConfig.Color;
+  Runtime.AverageLineSeries.Visible := ASeriesConfig.Visible;
+  Runtime.AverageLineSeries.ShowLine := True;
+  Runtime.AverageLineSeries.ShowMarkers := False;
   Runtime.LastSampleIndex := -1;
   Runtime.WaitingForFirstSample := True;
   Runtime.HistoryLoadMode := ghlmCurrentSegmentHistory;
@@ -1008,6 +1163,153 @@ begin
   Result := Palette[FConfig.Panels[AGraphIndex].Series.Count mod Length(Palette)];
 end;
 
+
+function TFrameGraphsWorkspace.IsGraphErrorMode(
+  const AGraphIndex: Integer): Boolean;
+begin
+  Result := (FConfig <> nil) and (AGraphIndex >= 0) and
+    (AGraphIndex < FConfig.Panels.Count) and
+    (FConfig.Panels[AGraphIndex].ValueMode = gvmError);
+end;
+
+procedure TFrameGraphsWorkspace.BuildPchipTimeLine(
+  const APoints: TList<TPointF>; ASeries: TChartSeries);
+const
+  CSamplesPerInterval = 12;
+var
+  PointX, PointY, H, Delta, Derivative: TArray<Double>;
+  PointCount, PointIndex, SegmentIndex, SampleIndex: Integer;
+  T, H00, H10, H01, H11, CurveX, CurveY: Double;
+
+  function SameNonZeroSign(const A, B: Double): Boolean;
+  begin
+    Result := not SameValue(A, 0.0) and not SameValue(B, 0.0) and
+      ((A > 0) = (B > 0));
+  end;
+
+  function EndpointDerivative(const H0, H1, Delta0,
+    Delta1: Double): Double;
+  begin
+    Result := ((2 * H0 + H1) * Delta0 - H0 * Delta1) / (H0 + H1);
+    if not SameNonZeroSign(Result, Delta0) then
+      Result := 0
+    else if not SameNonZeroSign(Delta0, Delta1) and
+            (Abs(Result) > 3 * Abs(Delta0)) then
+      Result := 3 * Delta0;
+  end;
+
+  procedure CopyPoints;
+  var
+    P: TPointF;
+  begin
+    ASeries.ClearPoints;
+    for P in APoints do
+      ASeries.AddPoint(P.X, P.Y);
+  end;
+begin
+  if (APoints = nil) or (ASeries = nil) then Exit;
+  if APoints.Count < 3 then
+  begin
+    CopyPoints;
+    Exit;
+  end;
+  PointCount := APoints.Count;
+  SetLength(PointX, PointCount);
+  SetLength(PointY, PointCount);
+  SetLength(H, PointCount - 1);
+  SetLength(Delta, PointCount - 1);
+  SetLength(Derivative, PointCount);
+  for PointIndex := 0 to PointCount - 1 do
+  begin
+    PointX[PointIndex] := APoints[PointIndex].X;
+    PointY[PointIndex] := APoints[PointIndex].Y;
+    if (PointIndex > 0) and
+       (PointX[PointIndex] <= PointX[PointIndex - 1]) then
+    begin
+      CopyPoints;
+      Exit;
+    end;
+  end;
+  for PointIndex := 0 to PointCount - 2 do
+  begin
+    H[PointIndex] := PointX[PointIndex + 1] - PointX[PointIndex];
+    Delta[PointIndex] :=
+      (PointY[PointIndex + 1] - PointY[PointIndex]) / H[PointIndex];
+  end;
+  Derivative[0] := EndpointDerivative(H[0], H[1], Delta[0], Delta[1]);
+  Derivative[PointCount - 1] := EndpointDerivative(
+    H[PointCount - 2], H[PointCount - 3], Delta[PointCount - 2],
+    Delta[PointCount - 3]);
+  for PointIndex := 1 to PointCount - 2 do
+    if SameNonZeroSign(Delta[PointIndex - 1], Delta[PointIndex]) then
+      Derivative[PointIndex] :=
+        (2 * H[PointIndex] + H[PointIndex - 1] + H[PointIndex] +
+         2 * H[PointIndex - 1]) /
+        ((2 * H[PointIndex] + H[PointIndex - 1]) /
+           Delta[PointIndex - 1] +
+         (H[PointIndex] + 2 * H[PointIndex - 1]) /
+           Delta[PointIndex])
+    else
+      Derivative[PointIndex] := 0;
+  ASeries.ClearPoints;
+  for SegmentIndex := 0 to PointCount - 2 do
+    for SampleIndex := 0 to CSamplesPerInterval do
+    begin
+      if (SegmentIndex > 0) and (SampleIndex = 0) then Continue;
+      T := SampleIndex / CSamplesPerInterval;
+      H00 := 2 * T * T * T - 3 * T * T + 1;
+      H10 := T * T * T - 2 * T * T + T;
+      H01 := -2 * T * T * T + 3 * T * T;
+      H11 := T * T * T - T * T;
+      CurveX := PointX[SegmentIndex] + H[SegmentIndex] * T;
+      CurveY := H00 * PointY[SegmentIndex] +
+        H10 * H[SegmentIndex] * Derivative[SegmentIndex] +
+        H01 * PointY[SegmentIndex + 1] +
+        H11 * H[SegmentIndex] * Derivative[SegmentIndex + 1];
+      if IsNan(CurveY) or IsInfinite(CurveY) then
+      begin
+        CopyPoints;
+        Exit;
+      end;
+      ASeries.AddPoint(CurveX, CurveY);
+    end;
+end;
+
+procedure TFrameGraphsWorkspace.RebuildAverageLine(
+  const AGraphIndex: Integer; ARuntime: TGraphSeriesRuntime);
+var
+  P: TPointF;
+begin
+  if (ARuntime = nil) or (ARuntime.ChartSeries = nil) or
+     (ARuntime.AverageLineSeries = nil) then Exit;
+  ARuntime.AverageLineSeries.Color := ARuntime.ChartSeries.Color;
+  ARuntime.AverageLineSeries.Visible := ARuntime.ChartSeries.Visible;
+  if (FConfig <> nil) and (AGraphIndex >= 0) and
+     (AGraphIndex < FConfig.Panels.Count) and
+     (FConfig.Panels[AGraphIndex].LineMode = glmPchipTime) then
+    BuildPchipTimeLine(ARuntime.ChartSeries.Points,
+      ARuntime.AverageLineSeries)
+  else
+  begin
+    ARuntime.AverageLineSeries.ClearPoints;
+    for P in ARuntime.ChartSeries.Points do
+      ARuntime.AverageLineSeries.AddPoint(P.X, P.Y);
+  end;
+end;
+
+procedure TFrameGraphsWorkspace.RebuildGraphAverageLines(
+  const AGraphIndex: Integer);
+var
+  Config: TGraphSeriesConfig;
+  Runtime: TGraphSeriesRuntime;
+begin
+  if (FConfig = nil) or (AGraphIndex < 0) or
+     (AGraphIndex >= FConfig.Panels.Count) then Exit;
+  for Config in FConfig.Panels[AGraphIndex].Series do
+    if FSeriesRuntime.TryGetValue(Config, Runtime) then
+      RebuildAverageLine(AGraphIndex, Runtime);
+end;
+
 procedure TFrameGraphsWorkspace.UpdateGraphHeader(const AGraphIndex: Integer);
 var
   Config, FirstVisible: TGraphSeriesConfig;
@@ -1033,7 +1335,10 @@ begin
       gskTemperature: DimensionText := 'Температура, °C';
       gskPressure: DimensionText := 'Давление, bar';
     else
-      DimensionText := 'Расход, ' + GetCurrentFlowUnitText;
+      if IsGraphErrorMode(AGraphIndex) then
+        DimensionText := 'Погрешность, %'
+      else
+        DimensionText := 'Расход, ' + GetCurrentFlowUnitText;
     end;
     { The former Y-axis caption is now part of the one visible graph header. }
     if (FirstVisible.SourceKind in [gskTemperature, gskPressure]) and
@@ -1123,7 +1428,8 @@ begin
     Result := TMenuItem(Component);
   if Result <> nil then Exit;
   if MenuItemSettings = nil then
-    raise EInvalidOperation.Create('MenuItemSettings не загружен из frmGraphsWorkspace.fmx');
+    raise EInvalidOperation.Create(
+      'MenuItemSettings не загружен из frmGraphsWorkspace.fmx');
   Result := TMenuItem.Create(Self);
   Result.Name := 'MenuItemLayout';
   Result.Text := 'Компоновка';
@@ -1141,21 +1447,21 @@ const
 var
   I: Integer;
   Item: TGraphDurationMenuItem;
-  LayoutItem: TMenuItem;
+  LayoutItem: TGraphLayoutMenuItem;
   LayoutMenu: TMenuItem;
 begin
   LayoutMenu := ResolveGraphLayoutMenu;
   ClearDynamicMenu(LayoutMenu);
   for I := 0 to 6 do
   begin
-    LayoutItem := TMenuItem.Create(nil);
-    LayoutItem.Tag := I;
+    LayoutItem := TGraphLayoutMenuItem.Create(nil);
+    LayoutItem.ColumnCount := I;
     if I = 0 then LayoutItem.Text := 'Автоматически'
     else if I = 1 then LayoutItem.Text := '1 столбец'
     else LayoutItem.Text := Format('%d столбца', [I]);
     LayoutItem.IsChecked := (FConfig.AutoGrid and (I = 0)) or
       ((not FConfig.AutoGrid) and (FConfig.PreferredColumnCount = I));
-    LayoutItem.OnClick := GraphDurationClick;
+    LayoutItem.OnClick := GraphLayoutClick;
     LayoutMenu.AddObject(LayoutItem);
   end;
   ClearDynamicMenu(MenuItemGraphLength);
@@ -1169,6 +1475,15 @@ begin
     MenuItemGraphLength.AddObject(Item);
   end;
   MenuItemFlowUnits.Text := 'Единицы расхода: ' + GetCurrentFlowUnitText;
+  MenuItemFlowUnits.Enabled := not IsGraphErrorMode(FContextGraphIndex);
+  MenuItemAverageLinePchip.IsChecked :=
+    FConfig.Panels[FContextGraphIndex].LineMode = glmPchipTime;
+  MenuItemAverageLineSegments.IsChecked :=
+    FConfig.Panels[FContextGraphIndex].LineMode = glmLinearSegments;
+  MenuItemValueFlow.IsChecked :=
+    FConfig.Panels[FContextGraphIndex].ValueMode = gvmFlow;
+  MenuItemValueError.IsChecked :=
+    FConfig.Panels[FContextGraphIndex].ValueMode = gvmError;
   MenuItemShowLegend.IsChecked := FConfig.Panels[FContextGraphIndex].ShowLegend;
   MenuItemShowTargetLine.IsChecked :=
     FConfig.Panels[FContextGraphIndex].ShowTargetLine;
@@ -1203,6 +1518,8 @@ begin
   if FSeriesRuntime.TryGetValue(S, Runtime) and (Runtime.ChartSeries <> nil) then
   begin
     Runtime.ChartSeries.Color := S.Color;
+    if Runtime.AverageLineSeries <> nil then
+      Runtime.AverageLineSeries.Color := S.Color;
   end;
   ChartByIndex(Item.GraphIndex).InvalidateChart;
   if Assigned(ProtocolManager) then
@@ -1215,26 +1532,8 @@ end;
 procedure TFrameGraphsWorkspace.GraphDurationClick(Sender: TObject);
 var
   Item: TGraphDurationMenuItem;
-  MenuItem: TMenuItem;
   OldValue: Integer;
 begin
-  { Layout entries are ordinary TMenuItem instances.  Keeping their column
-    count in Tag avoids a custom runtime menu class and works with all dcc32
-    versions used by this project. }
-  if (Sender is TMenuItem) and not (Sender is TGraphDurationMenuItem) then
-  begin
-    MenuItem := TMenuItem(Sender);
-    if MenuItem.Parent <> ResolveGraphLayoutMenu then Exit;
-    FConfig.AutoGrid := MenuItem.Tag = 0;
-    FConfig.PreferredColumnCount := MenuItem.Tag;
-    ApplyDynamicGridLayout;
-    if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(pcProc, psForm, 'GraphColumnModeChanged',
-        'Изменён режим колонок графиков', Format(
-        'AutoGrid=%s; PreferredColumnCount=%d',
-        [BoolToStr(FConfig.AutoGrid, True), FConfig.PreferredColumnCount]));
-    Exit;
-  end;
   if not (Sender is TGraphDurationMenuItem) then Exit;
   Item := TGraphDurationMenuItem(Sender);
   OldValue := FConfig.VisibleDurationSec;
@@ -1245,6 +1544,156 @@ begin
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphVisibleDurationChanged',
       'Изменена длина графика', Format('GraphIndex=%d; OldValue=%d; NewValue=%d',
       [FContextGraphIndex, OldValue, Item.DurationSec]));
+end;
+
+procedure TFrameGraphsWorkspace.GraphLayoutClick(Sender: TObject);
+var
+  Item: TGraphLayoutMenuItem;
+begin
+  if (FConfig = nil) or not (Sender is TGraphLayoutMenuItem) then Exit;
+  Item := TGraphLayoutMenuItem(Sender);
+  FConfig.AutoGrid := Item.ColumnCount = 0;
+  FConfig.PreferredColumnCount := Item.ColumnCount;
+  ApplyDynamicGridLayout;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphColumnModeChanged',
+      'Изменён режим колонок графиков', Format(
+      'AutoGrid=%s; PreferredColumnCount=%d',
+      [BoolToStr(FConfig.AutoGrid, True), FConfig.PreferredColumnCount]));
+end;
+
+procedure TFrameGraphsWorkspace.GraphScaleTrackChange(Sender: TObject);
+var
+  Track: TTrackBar;
+  Slot: TGraphVisualSlot;
+  Panel: TGraphPanelConfig;
+  GraphIndex, OldValue, NewValue: Integer;
+begin
+  if FUpdatingScaleTrack or (FConfig = nil) or
+     not (Sender is TTrackBar) then Exit;
+  Track := TTrackBar(Sender);
+  GraphIndex := Track.Tag;
+  if (GraphIndex < 0) or (GraphIndex >= FConfig.Panels.Count) then Exit;
+  Slot := GraphSlotByIndex(GraphIndex);
+  Panel := FConfig.Panels[GraphIndex];
+  NewValue := EnsureRange(Round(Track.Value / 25) * 25, 50, 200);
+  FUpdatingScaleTrack := True;
+  try
+    Track.Value := NewValue;
+    if (Slot <> nil) and (Slot.ScaleLabel <> nil) then
+      Slot.ScaleLabel.Text := Format('Масштаб: %d %%', [NewValue]);
+  finally
+    FUpdatingScaleTrack := False;
+  end;
+  OldValue := Panel.DataScalePercent;
+  if OldValue = NewValue then Exit;
+  Panel.DataScalePercent := NewValue;
+  UpdateTimeScrollControl(GraphIndex);
+  ApplySharedXAxis;
+  UpdateIndependentYAxis(GraphIndex);
+  if ChartByIndex(GraphIndex) <> nil then
+    ChartByIndex(GraphIndex).InvalidateChart;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphDataScaleChanged',
+      'Изменён масштаб данных графика', Format(
+      'GraphIndex=%d; OldValue=%d; NewValue=%d; Step=25; Control=TTrackBar',
+      [GraphIndex, OldValue, NewValue]));
+end;
+
+procedure TFrameGraphsWorkspace.GraphTimeScrollTrackChange(
+  Sender: TObject);
+var
+  Track: TTrackBar;
+  Slot: TGraphVisualSlot;
+  Panel: TGraphPanelConfig;
+  GraphIndex, OldValue, NewValue: Integer;
+begin
+  if FUpdatingTimeScrollTrack or (FConfig = nil) or
+     not (Sender is TTrackBar) then Exit;
+  Track := TTrackBar(Sender);
+  GraphIndex := Track.Tag;
+  if (GraphIndex < 0) or (GraphIndex >= FConfig.Panels.Count) then Exit;
+  Slot := GraphSlotByIndex(GraphIndex);
+  Panel := FConfig.Panels[GraphIndex];
+  if EnsureRange(Panel.DataScalePercent, 50, 200) <= 100 then Exit;
+  NewValue := EnsureRange(Round(Track.Value / 5) * 5, 0, 100);
+  FUpdatingTimeScrollTrack := True;
+  try
+    Track.Value := NewValue;
+  finally
+    FUpdatingTimeScrollTrack := False;
+  end;
+  OldValue := Panel.TimeScrollPercent;
+  Panel.TimeScrollPercent := NewValue;
+  if Slot <> nil then
+    UpdateTimeScrollControl(GraphIndex);
+  if OldValue = NewValue then Exit;
+  ApplySharedXAxis;
+  UpdateIndependentYAxis(GraphIndex);
+  if ChartByIndex(GraphIndex) <> nil then
+    ChartByIndex(GraphIndex).InvalidateChart;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphTimeScrollChanged',
+      'Изменено положение временного окна графика', Format(
+      'GraphIndex=%d; OldValue=%d; NewValue=%d; Latest=%s',
+      [GraphIndex, OldValue, NewValue, BoolToStr(NewValue = 100, True)]));
+end;
+
+procedure TFrameGraphsWorkspace.AverageLineModeClick(Sender: TObject);
+var
+  Panel: TGraphPanelConfig;
+  NewMode: TGraphLineMode;
+begin
+  if (FConfig = nil) or (FContextGraphIndex < 0) or
+     (FContextGraphIndex >= FConfig.Panels.Count) then Exit;
+  if Sender = MenuItemAverageLinePchip then
+    NewMode := glmPchipTime
+  else if Sender = MenuItemAverageLineSegments then
+    NewMode := glmLinearSegments
+  else
+    Exit;
+  Panel := FConfig.Panels[FContextGraphIndex];
+  if Panel.LineMode = NewMode then Exit;
+  Panel.LineMode := NewMode;
+  RebuildGraphAverageLines(FContextGraphIndex);
+  UpdateIndependentYAxis(FContextGraphIndex);
+  ChartByIndex(FContextGraphIndex).InvalidateChart;
+  UpdateGraphSettingsMenu;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphAverageLineModeChanged',
+      'Изменён режим линии средних значений', Format(
+      'GraphIndex=%d; LineMode=%d', [FContextGraphIndex, Ord(NewMode)]));
+end;
+
+procedure TFrameGraphsWorkspace.ValueModeClick(Sender: TObject);
+var
+  Panel: TGraphPanelConfig;
+  NewMode: TGraphValueMode;
+  Config: TGraphSeriesConfig;
+begin
+  if (FConfig = nil) or (FContextGraphIndex < 0) or
+     (FContextGraphIndex >= FConfig.Panels.Count) then Exit;
+  if Sender = MenuItemValueFlow then
+    NewMode := gvmFlow
+  else if Sender = MenuItemValueError then
+    NewMode := gvmError
+  else
+    Exit;
+  Panel := FConfig.Panels[FContextGraphIndex];
+  if Panel.ValueMode = NewMode then Exit;
+  Panel.ValueMode := NewMode;
+  for Config in Panel.Series do
+    RecreateSeriesRuntime(FContextGraphIndex, Config);
+  UpdateGraphHeader(FContextGraphIndex);
+  InvalidateToleranceForGraph(FContextGraphIndex);
+  UpdateToleranceLinesForGraph(FContextGraphIndex);
+  UpdateIndependentYAxis(FContextGraphIndex);
+  ChartByIndex(FContextGraphIndex).InvalidateChart;
+  UpdateGraphSettingsMenu;
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcProc, psForm, 'GraphValueModeChanged',
+      'Изменён отображаемый параметр графика', Format(
+      'GraphIndex=%d; ValueMode=%d', [FContextGraphIndex, Ord(NewMode)]));
 end;
 
 procedure TFrameGraphsWorkspace.ShowLegendClick(Sender: TObject);
@@ -1388,7 +1837,12 @@ var
     begin
       Inc(ExistingCount);
       if FSeriesRuntime.TryGetValue(Existing, Runtime) and
-         (Runtime.ChartSeries <> nil) then Runtime.ChartSeries.Visible := True;
+         (Runtime.ChartSeries <> nil) then
+      begin
+        Runtime.ChartSeries.Visible := True;
+        if Runtime.AverageLineSeries <> nil then
+          Runtime.AverageLineSeries.Visible := True;
+      end;
       Exit;
     end;
     Caption := Trim(AChannel.Name);
@@ -1437,9 +1891,10 @@ begin
         begin
           Channel := ResolveChannel(Existing);
           Runtime.ChartSeries.Visible := Existing.Visible and (Channel <> nil) and
-            Channel.Enabled and (Channel.FlowMeter <> nil) and
-            (Channel.FlowMeter.ValueFlow <> nil);
+            Channel.Enabled and (ResolveMeterValue(Existing, Channel) <> nil);
         end;
+        if Runtime.AverageLineSeries <> nil then
+          Runtime.AverageLineSeries.Visible := Runtime.ChartSeries.Visible;
       end;
   RemoveOrphanSeriesRuntime;
   for GraphIndex := 0 to FConfig.GraphCount - 1 do
@@ -1544,7 +1999,10 @@ begin
   begin
     if SameText(ASeries.MeterValueKey, 'ValueFlow') or
        SameText(ASeries.MeterValueKey, 'FlowRate') then
-      Result := FWorkTable.ValueFlowRate
+    begin
+      if not IsGraphErrorMode(ASeries.GraphIndex) then
+        Result := FWorkTable.ValueFlowRate;
+    end
     else if SameText(ASeries.MeterValueKey, 'ValueQuantity') then
       Result := FWorkTable.ValueQuantity
     else if SameText(ASeries.MeterValueKey, 'FluidTemp') and
@@ -1559,7 +2017,12 @@ begin
     Exit;
   if SameText(ASeries.MeterValueKey, 'ValueFlow') or
      SameText(ASeries.MeterValueKey, 'FlowRate') then
-    Result := AChannel.FlowMeter.ValueFlow
+  begin
+    if IsGraphErrorMode(ASeries.GraphIndex) then
+      Result := AChannel.FlowMeter.ValueError
+    else
+      Result := AChannel.FlowMeter.ValueFlow;
+  end
   else if SameText(ASeries.MeterValueKey, 'ValueQuantity') or
           SameText(ASeries.MeterValueKey, 'Volume') or
           SameText(ASeries.MeterValueKey, 'Mass') then
@@ -1671,9 +2134,9 @@ end;
 function TFrameGraphsWorkspace.SeriesSourceKey(
   const ASeries: TGraphSeriesConfig): string;
 begin
-  Result := Format('%d|%s|%s|%s', [Ord(ASeries.OwnerKind),
+  Result := Format('%d|%s|%s|%d|%s', [Ord(ASeries.OwnerKind),
     NormalizeUUID(ASeries.ChannelUUID), LowerCase(Trim(ASeries.MeterValueKey)),
-    FLastPointKey]);
+    Ord(FConfig.Panels[ASeries.GraphIndex].ValueMode), FLastPointKey]);
 end;
 
 procedure TFrameGraphsWorkspace.CaptureWorkspaceSample(const ASourceKey: string;
@@ -1759,8 +2222,9 @@ begin
     begin Inc(Skipped); Continue end;
     X := (Sample.TimeStampMs - FSharedSegmentStartMs) / 1000.0;
     Y := Sample.Value;
-    if SameText(ASeriesConfig.MeterValueKey, 'ValueFlow') or
-       SameText(ASeriesConfig.MeterValueKey, 'FlowRate') then
+    if (not IsGraphErrorMode(AGraphIndex)) and
+       (SameText(ASeriesConfig.MeterValueKey, 'ValueFlow') or
+        SameText(ASeriesConfig.MeterValueKey, 'FlowRate')) then
       Y := ConvertFlowToDisplayUnits(Y);
     ARuntime.ChartSeries.AddPoint(X, Y);
     if (Added = 0) and Assigned(ProtocolManager) then
@@ -1775,6 +2239,7 @@ begin
   end;
   ARuntime.HistoryLoaded := True;
   ARuntime.WaitingForFirstSample := Added = 0;
+  RebuildAverageLine(AGraphIndex, ARuntime);
   if Assigned(ProtocolManager) then ProtocolManager.AddMessage(pcProc, psForm,
     'GraphSeriesHistoryLoadDone', 'Загрузка истории серии завершена', Format(
     'GraphIndex=%d; ChannelUUID=%s; ReadCount=%d; AddedCount=%d; SkippedCount=%d; FirstSampleTimeMs=%d; LastSampleTimeMs=%d; FirstX=%g; LastX=%g; PointsCount=%d',
@@ -1872,8 +2337,9 @@ begin
       Continue;
     end;
     DisplayY := BaseY;
-    if SameText(ASeriesConfig.MeterValueKey, 'ValueFlow') or
-       SameText(ASeriesConfig.MeterValueKey, 'FlowRate') then
+    if (not IsGraphErrorMode(AGraphIndex)) and
+       (SameText(ASeriesConfig.MeterValueKey, 'ValueFlow') or
+        SameText(ASeriesConfig.MeterValueKey, 'FlowRate')) then
       DisplayY := ConvertFlowToDisplayUnits(BaseY);
     AChartSeries.AddPoint(X, DisplayY);
     Runtime.LastSampleTimeMs := Sample.TimeStampMs;
@@ -1940,9 +2406,10 @@ begin
     begin
       X := (ANowMs - FSharedSegmentStartMs) / 1000.0;
       DisplayY := BaseY;
-      if SameText(ASeriesConfig.MeterValueKey, 'ValueFlow') or
-         SameText(ASeriesConfig.MeterValueKey, 'FlowRate') then
-        DisplayY := ConvertFlowToDisplayUnits(BaseY);
+      if (not IsGraphErrorMode(AGraphIndex)) and
+       (SameText(ASeriesConfig.MeterValueKey, 'ValueFlow') or
+        SameText(ASeriesConfig.MeterValueKey, 'FlowRate')) then
+      DisplayY := ConvertFlowToDisplayUnits(BaseY);
       AChartSeries.AddPoint(X, DisplayY);
       Runtime.LastSampleTimeMs := ANowMs;
       Runtime.LastSampleIndex := -1;
@@ -1960,6 +2427,8 @@ begin
            AChartSeries.Points.Count, ANowMs]));
     end;
   end;
+  if Added > 0 then
+    RebuildAverageLine(AGraphIndex, Runtime);
   if (FallbackSkipReason <> '') and ADoFallback and
      Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphSeriesFallbackSkipped',
@@ -2016,6 +2485,8 @@ begin
       begin
         Inc(ClearedPoints, Pair.Value.ChartSeries.Points.Count);
         Pair.Value.ChartSeries.ClearPoints;
+        if Pair.Value.AverageLineSeries <> nil then
+          Pair.Value.AverageLineSeries.ClearPoints;
       end;
       Pair.Value.ToleranceResolveState := gtrsNotResolved;
       Pair.Value.TolerancePointKey := '';
@@ -2037,13 +2508,13 @@ begin
   if (AConfig = nil) or (FSeriesRuntime = nil) or
      not FSeriesRuntime.TryGetValue(AConfig, Runtime) then
     Exit;
-  if (AChart <> nil) and (Runtime.ChartSeries <> nil) then
+  if AChart <> nil then
     for I := AChart.SeriesCount - 1 downto 0 do
-      if AChart.Series[I] = Runtime.ChartSeries then
-      begin
+      if (AChart.Series[I] = Runtime.ChartSeries) or
+         (AChart.Series[I] = Runtime.AverageLineSeries) then
         AChart.RemoveSeries(I);
-        Break;
-      end;
+  Runtime.ChartSeries := nil;
+  Runtime.AverageLineSeries := nil;
   FSeriesRuntime.Remove(AConfig);
 end;
 
@@ -2103,6 +2574,8 @@ begin
   for Pair in FSeriesRuntime do
   begin
     Pair.Value.ChartSeries.ClearPoints;
+    if Pair.Value.AverageLineSeries <> nil then
+      Pair.Value.AverageLineSeries.ClearPoints;
     Pair.Value.LastSampleTimeMs := 0;
     Pair.Value.LastSampleIndex := -1;
     Pair.Value.HistoryLoaded := False;
@@ -2165,12 +2638,14 @@ procedure TFrameGraphsWorkspace.StartSharedSegment(
   const APointIndex: Integer);
 var
   StartMs: Int64;
+  I: Integer;
   ReasonText: string;
 begin
   StartMs := Max(TMeterValue.GetMonotonicTimeMs, FRuntimeResetTimeMs);
   case AReason of
     gssrRunStarted: ReasonText := 'RunStarted';
     gssrPointChanged: ReasonText := 'PointChanged';
+    gssrMonitorStarted: ReasonText := 'MonitorStarted';
   else
     Exit;
   end;
@@ -2185,6 +2660,12 @@ begin
   else
     FSharedAxisMaxX := 60;
   FLastPointKey := APointKey; FLastPointIndex := APointIndex;
+  { A new measurement or monitor segment always starts at the latest edge. }
+  for I := 0 to FConfig.Panels.Count - 1 do
+  begin
+    FConfig.Panels[I].TimeScrollPercent := 100;
+    UpdateTimeScrollControl(I);
+  end;
   ApplySharedXAxis;
   UpdateToleranceLines;
   if Assigned(ProtocolManager) then
@@ -2227,18 +2708,41 @@ begin
 end;
 
 procedure TFrameGraphsWorkspace.ApplySharedXAxis;
-var I: Integer; Chart: TSimpleChart;
+var
+  I, ScalePercent, ScrollPercent: Integer;
+  Chart: TSimpleChart;
+  BaseRange, VisibleRange, AvailablePan, ViewStart: Double;
 begin
+  if FConfig = nil then Exit;
+  BaseRange := Max(0.001, FSharedAxisMaxX - FSharedAxisMinX);
   for I := 0 to FConfig.GraphCount - 1 do
   begin
     Chart := ChartByIndex(I);
+    if Chart = nil then Continue;
+    ScalePercent := EnsureRange(FConfig.Panels[I].DataScalePercent, 50, 200);
+    FConfig.Panels[I].DataScalePercent := ScalePercent;
+    VisibleRange := BaseRange * 100 / ScalePercent;
     Chart.AutoRangeX := False;
-    Chart.XMin := FSharedAxisMinX; Chart.XMax := FSharedAxisMaxX;
+    if ScalePercent > 100 then
+    begin
+      ScrollPercent :=
+        EnsureRange(FConfig.Panels[I].TimeScrollPercent, 0, 100);
+      AvailablePan := Max(0, BaseRange - VisibleRange);
+      ViewStart := FSharedAxisMinX +
+        AvailablePan * ScrollPercent / 100;
+      Chart.XMin := Max(0, ViewStart);
+      Chart.XMax := Min(FSharedAxisMaxX, Chart.XMin + VisibleRange);
+    end
+    else
+    begin
+      Chart.XMax := FSharedAxisMaxX;
+      Chart.XMin := Max(0, FSharedAxisMaxX - VisibleRange);
+    end;
   end;
   if Assigned(ProtocolManager) and not FSharedTimeInitialized then
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphXAxisSynchronized',
-      'Оси времени графиков синхронизированы', Format(
-      'GraphCount=%d; AxisMinX=%g; AxisMaxX=%g',
+      'Базовая ось времени графиков рассчитана', Format(
+      'GraphCount=%d; BaseAxisMinX=%g; BaseAxisMaxX=%g',
       [FConfig.GraphCount, FSharedAxisMinX, FSharedAxisMaxX]));
 end;
 
@@ -2693,9 +3197,18 @@ begin
   ToleranceValue := Abs(AInfo.TargetQ) * Abs(AInfo.ErrorPercent) / 100.0;
   AInfo.LowerQ := AInfo.TargetQ - ToleranceValue;
   AInfo.UpperQ := AInfo.TargetQ + ToleranceValue;
-  AInfo.DisplayTarget := ConvertFlowToDisplayUnits(AInfo.TargetQ);
-  AInfo.DisplayLower := ConvertFlowToDisplayUnits(AInfo.LowerQ);
-  AInfo.DisplayUpper := ConvertFlowToDisplayUnits(AInfo.UpperQ);
+  if IsGraphErrorMode(AGraphIndex) then
+  begin
+    AInfo.DisplayTarget := 0;
+    AInfo.DisplayLower := -Abs(AInfo.ErrorPercent);
+    AInfo.DisplayUpper := Abs(AInfo.ErrorPercent);
+  end
+  else
+  begin
+    AInfo.DisplayTarget := ConvertFlowToDisplayUnits(AInfo.TargetQ);
+    AInfo.DisplayLower := ConvertFlowToDisplayUnits(AInfo.LowerQ);
+    AInfo.DisplayUpper := ConvertFlowToDisplayUnits(AInfo.UpperQ);
+  end;
   if ASeriesConfig.OwnerKind = gsokEtalon then
     LogToleranceEvent('GraphEtalonToleranceCalculated',
       Format('%d|%s|%s', [AGraphIndex, AInfo.ChannelUUID, AInfo.PointUUID]),
@@ -2874,7 +3387,10 @@ begin
   Visual.UpperSeries.Visible := Panel.ShowToleranceLines and MainSeriesVisible;
   if Panel.ShowToleranceInLegend then
   begin
-    Visual.TargetSeries.LegendName := ASeriesConfig.Caption + ' — целевой расход';
+    if IsGraphErrorMode(AGraphIndex) then
+      Visual.TargetSeries.LegendName := ASeriesConfig.Caption + ' — нулевая погрешность'
+    else
+      Visual.TargetSeries.LegendName := ASeriesConfig.Caption + ' — целевой расход';
     Visual.LowerSeries.LegendName := ASeriesConfig.Caption + ' — нижняя допустимая граница';
     Visual.UpperSeries.LegendName := ASeriesConfig.Caption + ' — верхняя допустимая граница';
   end else begin
@@ -3148,35 +3664,232 @@ begin
 end;
 
 procedure TFrameGraphsWorkspace.UpdateGraphToleranceVisual(
-  const AGraphIndex: Integer; const ATargetQ, ALowerQ, AUpperQ: Double);
+  const AGraphIndex: Integer;
+  const ATargetQ, AErrorPercent, ALowerQ, AUpperQ: Double);
 var
   Slot: TGraphVisualSlot;
   Panel: TGraphPanelConfig;
+  TargetValue, LowerValue, UpperValue: Double;
 begin
-  EnsureLimitSeries(AGraphIndex); Slot := GraphSlotByIndex(AGraphIndex);
+  EnsureLimitSeries(AGraphIndex);
+  Slot := GraphSlotByIndex(AGraphIndex);
   Panel := FConfig.Panels[AGraphIndex];
   if (Slot = nil) or (Panel = nil) then Exit;
-  Slot.TargetSeries.ClearPoints; Slot.LowerSeries.ClearPoints; Slot.UpperSeries.ClearPoints;
-  Slot.TargetSeries.AddPoint(FSharedAxisMinX, ConvertFlowToDisplayUnits(ATargetQ));
-  Slot.TargetSeries.AddPoint(FSharedAxisMaxX, ConvertFlowToDisplayUnits(ATargetQ));
-  Slot.LowerSeries.AddPoint(FSharedAxisMinX, ConvertFlowToDisplayUnits(ALowerQ));
-  Slot.LowerSeries.AddPoint(FSharedAxisMaxX, ConvertFlowToDisplayUnits(ALowerQ));
-  Slot.UpperSeries.AddPoint(FSharedAxisMinX, ConvertFlowToDisplayUnits(AUpperQ));
-  Slot.UpperSeries.AddPoint(FSharedAxisMaxX, ConvertFlowToDisplayUnits(AUpperQ));
+  if IsGraphErrorMode(AGraphIndex) then
+  begin
+    TargetValue := 0;
+    LowerValue := -Abs(AErrorPercent);
+    UpperValue := Abs(AErrorPercent);
+  end
+  else
+  begin
+    TargetValue := ConvertFlowToDisplayUnits(ATargetQ);
+    LowerValue := ConvertFlowToDisplayUnits(ALowerQ);
+    UpperValue := ConvertFlowToDisplayUnits(AUpperQ);
+  end;
+  Slot.TargetSeries.ClearPoints;
+  Slot.LowerSeries.ClearPoints;
+  Slot.UpperSeries.ClearPoints;
+  Slot.TargetSeries.AddPoint(FSharedAxisMinX, TargetValue);
+  Slot.TargetSeries.AddPoint(FSharedAxisMaxX, TargetValue);
+  Slot.LowerSeries.AddPoint(FSharedAxisMinX, LowerValue);
+  Slot.LowerSeries.AddPoint(FSharedAxisMaxX, LowerValue);
+  Slot.UpperSeries.AddPoint(FSharedAxisMinX, UpperValue);
+  Slot.UpperSeries.AddPoint(FSharedAxisMaxX, UpperValue);
   Slot.TargetSeries.Visible := Panel.ShowTargetLine;
   Slot.LowerSeries.Visible := Panel.ShowToleranceLines;
   Slot.UpperSeries.Visible := Panel.ShowToleranceLines;
-  if Panel.ShowToleranceInLegend then begin
-    Slot.TargetSeries.LegendName := 'Целевой расход';
+  if Panel.ShowToleranceInLegend then
+  begin
+    if IsGraphErrorMode(AGraphIndex) then
+      Slot.TargetSeries.LegendName := 'Нулевая погрешность'
+    else
+      Slot.TargetSeries.LegendName := 'Целевой расход';
     Slot.LowerSeries.LegendName := 'Нижняя допустимая граница';
     Slot.UpperSeries.LegendName := 'Верхняя допустимая граница';
-  end else begin Slot.TargetSeries.LegendName := ''; Slot.LowerSeries.LegendName := ''; Slot.UpperSeries.LegendName := '' end;
+  end
+  else
+  begin
+    Slot.TargetSeries.LegendName := '';
+    Slot.LowerSeries.LegendName := '';
+    Slot.UpperSeries.LegendName := '';
+  end;
   LogToleranceEvent('GraphToleranceVisualUpdated', Format('%d', [AGraphIndex]),
-    Format('GraphIndex=%d; TargetPointsCount=%d; LowerPointsCount=%d; UpperPointsCount=%d; TargetVisible=%s; LowerVisible=%s; UpperVisible=%s; AxisMinX=%g; AxisMaxX=%g',
-      [AGraphIndex, Slot.TargetSeries.Points.Count, Slot.LowerSeries.Points.Count,
-       Slot.UpperSeries.Points.Count, BoolToStr(Slot.TargetSeries.Visible, True),
-       BoolToStr(Slot.LowerSeries.Visible, True), BoolToStr(Slot.UpperSeries.Visible, True),
+    Format('GraphIndex=%d; ValueMode=%d; TargetPointsCount=%d; LowerPointsCount=%d; UpperPointsCount=%d; TargetVisible=%s; LowerVisible=%s; UpperVisible=%s; AxisMinX=%g; AxisMaxX=%g',
+      [AGraphIndex, Ord(Panel.ValueMode), Slot.TargetSeries.Points.Count,
+       Slot.LowerSeries.Points.Count, Slot.UpperSeries.Points.Count,
+       BoolToStr(Slot.TargetSeries.Visible, True),
+       BoolToStr(Slot.LowerSeries.Visible, True),
+       BoolToStr(Slot.UpperSeries.Visible, True),
        FSharedAxisMinX, FSharedAxisMaxX]));
+end;
+
+function TFrameGraphsWorkspace.IsMonitorToleranceMode: Boolean;
+begin
+  Result := (FWorkTable <> nil) and (FWorkTable.State in
+    [swtSTARTMONITOR, swtSTARTMONITORWAIT, swtMONITOR]);
+end;
+
+function TFrameGraphsWorkspace.FindMonitorTolerancePoint(
+  ADevice: TDevice; const ACurrentFlow: Double;
+  out APointIndex: Integer): TDevicePoint;
+var
+  Candidate: TDevicePoint;
+  I: Integer;
+  Difference, BestDifference: Double;
+begin
+  Result := nil;
+  APointIndex := -1;
+  BestDifference := MaxDouble;
+  if (ADevice = nil) or (ADevice.Points = nil) or
+     IsNan(ACurrentFlow) or IsInfinite(ACurrentFlow) then Exit;
+  for I := 0 to ADevice.Points.Count - 1 do
+  begin
+    Candidate := ADevice.Points[I];
+    if (Candidate = nil) or (Candidate.State = osDeleted) or
+       not Candidate.Enabled or not IsValidTolerancePoint(Candidate) or
+       not ADevice.IsFlowInPoint(ACurrentFlow, Candidate) then
+      Continue;
+    Difference := Abs(ACurrentFlow - Candidate.Q);
+    if (Result = nil) or (Difference < BestDifference) then
+    begin
+      Result := Candidate;
+      APointIndex := I;
+      BestDifference := Difference;
+    end;
+  end;
+end;
+
+procedure TFrameGraphsWorkspace.HideSeriesToleranceLinesForGraph(
+  const AGraphIndex: Integer);
+var
+  SeriesConfig: TGraphSeriesConfig;
+  Runtime: TGraphSeriesRuntime;
+begin
+  if (FConfig = nil) or (AGraphIndex < 0) or
+     (AGraphIndex >= FConfig.Panels.Count) then Exit;
+  for SeriesConfig in FConfig.Panels[AGraphIndex].Series do
+    if FSeriesRuntime.TryGetValue(SeriesConfig, Runtime) then
+      HideSeriesToleranceVisual(Runtime);
+end;
+
+procedure TFrameGraphsWorkspace.UpdateMonitorToleranceLinesForGraph(
+  const AGraphIndex: Integer);
+var
+  SeriesConfig: TGraphSeriesConfig;
+  Runtime: TGraphSeriesRuntime;
+  Channel: TChannel;
+  Device: TDevice;
+  Point: TDevicePoint;
+  Visual: TGraphToleranceVisual;
+  Panel: TGraphPanelConfig;
+  CurrentFlow, TargetQ, ErrorPercent, ToleranceValue: Double;
+  DisplayTarget, DisplayLower, DisplayUpper: Double;
+  PointIndex: Integer;
+  PointKey: string;
+  MainSeriesVisible: Boolean;
+begin
+  if (FConfig = nil) or (AGraphIndex < 0) or
+     (AGraphIndex >= FConfig.Panels.Count) then Exit;
+  Panel := FConfig.Panels[AGraphIndex];
+  HideGraphToleranceLines(AGraphIndex);
+  for SeriesConfig in Panel.Series do
+  begin
+    if not FSeriesRuntime.TryGetValue(SeriesConfig, Runtime) then
+      Continue;
+    if (not SeriesConfig.Visible) or
+       (SeriesConfig.SourceKind <> gskFlow) or
+       not (SeriesConfig.OwnerKind in [gsokEtalon, gsokDevice]) then
+    begin
+      HideSeriesToleranceVisual(Runtime);
+      Continue;
+    end;
+    Channel := ResolveChannel(SeriesConfig);
+    if (Channel = nil) or not Channel.Enabled or
+       (Channel.FlowMeter = nil) or
+       (Channel.FlowMeter.ValueFlow = nil) then
+    begin
+      HideSeriesToleranceVisual(Runtime);
+      Continue;
+    end;
+    Device := Channel.FlowMeter.Device;
+    CurrentFlow := Channel.FlowMeter.ValueFlow.GetDoubleValue;
+    Point := FindMonitorTolerancePoint(Device, CurrentFlow, PointIndex);
+    if Point = nil then
+    begin
+      HideSeriesToleranceVisual(Runtime);
+      Continue;
+    end;
+
+    TargetQ := Point.Q;
+    ErrorPercent := Abs(Point.Error);
+    ToleranceValue := Abs(TargetQ) * ErrorPercent / 100.0;
+    if IsGraphErrorMode(AGraphIndex) then
+    begin
+      DisplayTarget := 0;
+      DisplayLower := -ErrorPercent;
+      DisplayUpper := ErrorPercent;
+    end
+    else
+    begin
+      DisplayTarget := ConvertFlowToDisplayUnits(TargetQ);
+      DisplayLower := ConvertFlowToDisplayUnits(TargetQ - ToleranceValue);
+      DisplayUpper := ConvertFlowToDisplayUnits(TargetQ + ToleranceValue);
+    end;
+
+    Visual := EnsureSeriesToleranceVisual(AGraphIndex, SeriesConfig, Runtime);
+    if Visual = nil then Continue;
+    Visual.TargetSeries.ClearPoints;
+    Visual.LowerSeries.ClearPoints;
+    Visual.UpperSeries.ClearPoints;
+    Visual.TargetSeries.AddPoint(FSharedAxisMinX, DisplayTarget);
+    Visual.TargetSeries.AddPoint(FSharedAxisMaxX, DisplayTarget);
+    Visual.LowerSeries.AddPoint(FSharedAxisMinX, DisplayLower);
+    Visual.LowerSeries.AddPoint(FSharedAxisMaxX, DisplayLower);
+    Visual.UpperSeries.AddPoint(FSharedAxisMinX, DisplayUpper);
+    Visual.UpperSeries.AddPoint(FSharedAxisMaxX, DisplayUpper);
+
+    MainSeriesVisible := (Runtime.ChartSeries <> nil) and
+      Runtime.ChartSeries.Visible;
+    Visual.TargetSeries.Visible := Panel.ShowTargetLine and MainSeriesVisible;
+    Visual.LowerSeries.Visible := Panel.ShowToleranceLines and MainSeriesVisible;
+    Visual.UpperSeries.Visible := Panel.ShowToleranceLines and MainSeriesVisible;
+    if Panel.ShowToleranceInLegend then
+    begin
+      if IsGraphErrorMode(AGraphIndex) then
+        Visual.TargetSeries.LegendName :=
+          SeriesConfig.Caption + ' — нулевая погрешность'
+      else
+        Visual.TargetSeries.LegendName :=
+          SeriesConfig.Caption + ' — целевой расход';
+      Visual.LowerSeries.LegendName :=
+        SeriesConfig.Caption + ' — нижняя допустимая граница';
+      Visual.UpperSeries.LegendName :=
+        SeriesConfig.Caption + ' — верхняя допустимая граница';
+    end
+    else
+    begin
+      Visual.TargetSeries.LegendName := '';
+      Visual.LowerSeries.LegendName := '';
+      Visual.UpperSeries.LegendName := '';
+    end;
+
+    PointKey := Format('MONITOR|%s|%s|%d|%.12g|%.12g',
+      [NormalizeUUID(Device.UUID), NormalizeUUID(Point.UUID), PointIndex,
+       TargetQ, ErrorPercent]);
+    if not SameText(Runtime.TolerancePointKey, PointKey) then
+      LogToleranceEvent('GraphMonitorTolerancePointSelected', PointKey,
+        Format('GraphIndex=%d; ChannelUUID=%s; DeviceUUID=%s; PointIndex=%d; PointUUID=%s; PointName=%s; CurrentFlow=%g; TargetQ=%g; ErrorPercent=%g',
+          [AGraphIndex, SeriesConfig.ChannelUUID, Device.UUID, PointIndex,
+           Point.UUID, Point.Name, CurrentFlow, TargetQ, ErrorPercent]));
+    Runtime.ToleranceResolveState := gtrsResolved;
+    Runtime.TolerancePointKey := PointKey;
+    Runtime.LastToleranceReason := '';
+    Runtime.ToleranceTargetQ := TargetQ;
+    Runtime.ToleranceErrorPercent := ErrorPercent;
+    Visual.PointKey := PointKey;
+  end;
+  UpdateIndependentYAxis(AGraphIndex);
 end;
 
 procedure TFrameGraphsWorkspace.UpdateToleranceLinesForGraph(
@@ -3185,6 +3898,14 @@ var
   TargetQ, ErrorPercent, LowerQ, UpperQ: Double;
   SourceKind, Reason: string;
 begin
+  if IsMonitorToleranceMode then
+  begin
+    UpdateMonitorToleranceLinesForGraph(AGraphIndex);
+    Exit;
+  end;
+  { Monitor-only per-series limits must not remain visible after returning
+    to the unchanged MeasurementRun-based tolerance path. }
+  HideSeriesToleranceLinesForGraph(AGraphIndex);
   if not GraphHasVisibleSources(AGraphIndex) then
   begin
     HideGraphToleranceLines(AGraphIndex);
@@ -3202,7 +3923,7 @@ begin
       Format('GraphIndex=%d; Reason=%s', [AGraphIndex, Reason]));
     Exit;
   end;
-  UpdateGraphToleranceVisual(AGraphIndex, TargetQ, LowerQ, UpperQ);
+  UpdateGraphToleranceVisual(AGraphIndex, TargetQ, ErrorPercent, LowerQ, UpperQ);
   UpdateIndependentYAxis(AGraphIndex);
 end;
 
@@ -3225,6 +3946,8 @@ var
   begin
     if (ASeries = nil) or not ASeries.Visible then Exit;
     for K := 0 to ASeries.Points.Count - 1 do begin
+      if (ASeries.Points[K].X < Chart.XMin) or
+         (ASeries.Points[K].X > Chart.XMax) then Continue;
       V := ASeries.Points[K].Y;
       if not HasValue then begin Lo := V; Hi := V; HasValue := True end
       else begin Lo := Min(Lo, V); Hi := Max(Hi, V) end;
@@ -3239,8 +3962,23 @@ begin
       IncludeSeries(Chart.Series[I]);
   if Slot <> nil then begin IncludeSeries(Slot.TargetSeries); IncludeSeries(Slot.LowerSeries); IncludeSeries(Slot.UpperSeries) end;
   if not HasValue then begin Lo := 0; Hi := 1 end;
-  Pad := Hi - Lo; if Pad <= 0 then Pad := Max(Abs(Lo) * 0.01, 0.001) else Pad := Pad * 0.1;
-  Chart.AutoRangeY := False; Chart.YMin := Lo - Pad; Chart.YMax := Hi + Pad;
+  Pad := Hi - Lo;
+  if Pad <= 0 then Pad := Max(Abs(Lo) * 0.01, 0.001)
+  else Pad := Pad * 0.1;
+  Lo := Lo - Pad;
+  Hi := Hi + Pad;
+  if (FConfig <> nil) and (AGraphIndex >= 0) and
+     (AGraphIndex < FConfig.Panels.Count) then
+  begin
+    V := (Lo + Hi) / 2;
+    Pad := (Hi - Lo) * 50 /
+      EnsureRange(FConfig.Panels[AGraphIndex].DataScalePercent, 50, 200);
+    Lo := V - Pad;
+    Hi := V + Pad;
+  end;
+  Chart.AutoRangeY := False;
+  Chart.YMin := Lo;
+  Chart.YMax := Hi;
 end;
 
 procedure TFrameGraphsWorkspace.ResetGraphRuntimeData(
@@ -3262,6 +4000,8 @@ begin
         OldPointsCount := Runtime.ChartSeries.Points.Count;
         Inc(ClearedPointsCount, OldPointsCount);
         Runtime.ChartSeries.ClearPoints;
+        if Runtime.AverageLineSeries <> nil then
+          Runtime.AverageLineSeries.ClearPoints;
       end;
       Runtime.LastSampleTimeMs := ResetTimeMs;
       Runtime.HistoryLoadMode := ghlmAfterLocalReset;
@@ -3311,7 +4051,10 @@ begin
   for Pair in FSeriesRuntime do
   begin
     Inc(Count); Inc(Cleared, Pair.Value.ChartSeries.Points.Count);
-    Pair.Value.ChartSeries.ClearPoints; Pair.Value.LastSampleTimeMs := 0;
+    Pair.Value.ChartSeries.ClearPoints;
+    if Pair.Value.AverageLineSeries <> nil then
+      Pair.Value.AverageLineSeries.ClearPoints;
+    Pair.Value.LastSampleTimeMs := 0;
     Pair.Value.LastSampleIndex := -1; Pair.Value.WaitingForFirstSample := True;
     Pair.Value.RuntimeResetTimeMs := 0;
     Pair.Value.HistoryLoadMode := ghlmCurrentSegmentHistory;
@@ -3320,7 +4063,8 @@ begin
   end;
   FSharedSegmentStartMs := FRuntimeResetTimeMs;
   FSharedTimeInitialized := False; FSharedCurrentTimeSec := 0;
-  FSharedAxisMinX := 0; FSharedAxisMaxX := 60; FLastRunActive := False;
+  FSharedAxisMinX := 0; FSharedAxisMaxX := 60;
+  FLastRunActive := False; FLastMonitorActive := False;
   FLastPointKey := PointKey; FLastPointIndex := PointIndex;
   ApplySharedXAxis; UpdateToleranceLines;
   if Assigned(ProtocolManager) then
@@ -3339,14 +4083,16 @@ var
   Config: TGraphSeriesConfig; Runtime: TGraphSeriesRuntime;
   Channel: TChannel; MeterValue: TMeterValue;
   Chart: TSimpleChart; NowMs: Int64;
-  RunActive, SamplingActive, NewRunStarted, PointChanged, Changed,
-    SegmentStartRequired, PointStateStored, DoFallback: Boolean;
+  RunActive, MonitorActive, SamplingActive, NewRunStarted,
+    NewMonitorStarted, PointChanged, Changed, SegmentStartRequired,
+    PointStateStored, DoFallback: Boolean;
   PointKey, StoredPointKey, SelectedReason, Decision, ResolveReason: string;
   SegmentReason: TGraphSegmentStartReason;
   VisualSeries: TChartSeries;
   RuntimeLastSampleTimeMs: Int64;
   RuntimeLastSampleIndex: Integer;
   RuntimeWaitingForFirstSample: Boolean;
+  PruneMinX: Double;
 begin
   if (FConfig = nil) or (FSeriesRuntime = nil) then Exit;
   if FWorkTable = nil then
@@ -3362,6 +4108,7 @@ begin
   RunActive := (FWorkTable <> nil) and
     (FWorkTable.MeasurementRun is TMeasurementRun) and
     not (TMeasurementRun(FWorkTable.MeasurementRun).Stage in [msNone, msDone]);
+  MonitorActive := IsMonitorToleranceMode;
   SamplingActive := IsSamplingActive and not IsPointTransitionStage;
   DoFallback := SamplingActive and
     ((FLastFallbackSampleMs = 0) or
@@ -3376,31 +4123,39 @@ begin
        FRuntimeResetTimeMs, PointKey]));
   StoredPointKey := FLastPointKey;
   NewRunStarted := RunActive and not FLastRunActive;
+  NewMonitorStarted := MonitorActive and not FLastMonitorActive;
   PointChanged := (PointKey <> '') and
     (FLastPointKey <> '') and (PointKey <> FLastPointKey);
   SegmentReason := gssrNone;
   if NewRunStarted then
     SegmentReason := gssrRunStarted
+  else if NewMonitorStarted then
+    SegmentReason := gssrMonitorStarted
   else if PointChanged then
     SegmentReason := gssrPointChanged;
   SegmentStartRequired := SegmentReason <> gssrNone;
   case SegmentReason of
     gssrRunStarted: SelectedReason := 'RunStarted';
     gssrPointChanged: SelectedReason := 'PointChanged';
+    gssrMonitorStarted: SelectedReason := 'MonitorStarted';
   else
     SelectedReason := 'None';
   end;
-  Decision := Format('%s|%s|%s|%s|%s|%s|%s',
+  Decision := Format('%s|%s|%s|%s|%s|%s|%s|%s|%s|%s',
     [BoolToStr(RunActive, True), BoolToStr(FLastRunActive, True),
-     BoolToStr(NewRunStarted, True), PointKey, StoredPointKey,
+     BoolToStr(NewRunStarted, True), BoolToStr(MonitorActive, True),
+     BoolToStr(FLastMonitorActive, True),
+     BoolToStr(NewMonitorStarted, True), PointKey, StoredPointKey,
      BoolToStr(PointChanged, True), SelectedReason]);
   if (Decision <> FLastSegmentDecision) and Assigned(ProtocolManager) then
   begin
     ProtocolManager.AddMessage(pcProc, psForm, 'GraphSegmentDecision',
       'Принято решение о временном сегменте графиков', Format(
-      'RunActive=%s; LastRunActive=%s; NewRunStarted=%s; CurrentPointKey=%s; StoredPointKey=%s; PointChanged=%s; SelectedReason=%s; SegmentStartRequired=%s',
+      'RunActive=%s; LastRunActive=%s; NewRunStarted=%s; MonitorActive=%s; LastMonitorActive=%s; NewMonitorStarted=%s; CurrentPointKey=%s; StoredPointKey=%s; PointChanged=%s; SelectedReason=%s; SegmentStartRequired=%s',
       [BoolToStr(RunActive, True), BoolToStr(FLastRunActive, True),
-       BoolToStr(NewRunStarted, True), PointKey, StoredPointKey,
+       BoolToStr(NewRunStarted, True), BoolToStr(MonitorActive, True),
+       BoolToStr(FLastMonitorActive, True),
+       BoolToStr(NewMonitorStarted, True), PointKey, StoredPointKey,
        BoolToStr(PointChanged, True), SelectedReason,
        BoolToStr(SegmentStartRequired, True)]));
     FLastSegmentDecision := Decision;
@@ -3408,7 +4163,13 @@ begin
   PointStateStored := (PointKey <> '') and
     ((FLastPointKey <> PointKey) or (FLastPointIndex <> PointIndex));
   if SegmentStartRequired then
+  begin
     StartSharedSegment(SegmentReason, PointKey, PointIndex);
+    { The fallback decision was calculated before the new segment reset.
+      Allow the first monitor value to be plotted immediately. }
+    if SegmentReason = gssrMonitorStarted then
+      DoFallback := SamplingActive;
+  end;
   if PointKey <> '' then
   begin
     FLastPointKey := PointKey;
@@ -3474,6 +4235,8 @@ begin
         Continue;
       end;
       VisualSeries.Visible := Config.Visible;
+      if (Runtime <> nil) and (Runtime.AverageLineSeries <> nil) then
+        Runtime.AverageLineSeries.Visible := Config.Visible;
       if not Config.Visible then
       begin
         Inc(SeriesFailed);
@@ -3498,6 +4261,8 @@ begin
       if (Channel <> nil) and not Channel.Enabled then
       begin
         VisualSeries.Visible := False;
+        if (Runtime <> nil) and (Runtime.AverageLineSeries <> nil) then
+          Runtime.AverageLineSeries.Visible := False;
         Inc(SeriesFailed);
         if Assigned(ProtocolManager) then
           ProtocolManager.AddMessage(pcProc, psForm,
@@ -3507,6 +4272,8 @@ begin
         Continue;
       end;
       VisualSeries.Visible := Config.Visible;
+      if (Runtime <> nil) and (Runtime.AverageLineSeries <> nil) then
+        Runtime.AverageLineSeries.Visible := Config.Visible;
       if (Runtime <> nil) and not Runtime.HistoryLoaded then
       begin
         SeriesAddedBefore := VisualSeries.Points.Count;
@@ -3520,10 +4287,16 @@ begin
         NowMs, DoFallback, SamplingActive, PointsAdded);
       if PointsAdded > SeriesAddedBefore then
         Changed := True;
+      { Retain twice the base time window so that the 50% data scale can
+        immediately display the older half without rebuilding the segment. }
+      PruneMinX := FSharedAxisMinX -
+        Max(0, FSharedAxisMaxX - FSharedAxisMinX);
       while (FConfig.VisibleDurationSec > 0) and
         (VisualSeries.Points.Count > 0) and
-        (VisualSeries.Points[0].X < FSharedAxisMinX) do
+        (VisualSeries.Points[0].X < PruneMinX) do
         VisualSeries.Points.Delete(0);
+      if Runtime <> nil then
+        RebuildAverageLine(GraphIndex, Runtime);
     end;
     if Changed then
     begin
@@ -3544,6 +4317,7 @@ begin
       [SeriesProcessed, SeriesResolved, SeriesFailed, PointsAdded,
        GraphsInvalidated]));
   FLastRunActive := RunActive;
+  FLastMonitorActive := MonitorActive;
 end;
 
 end.

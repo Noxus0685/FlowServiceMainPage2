@@ -1180,7 +1180,10 @@ begin
     msSelectPoint:
       Result := ANewStage in [msHydraulicLineConfiguration, msSetupPoint, msDone, msNone];
     msHydraulicLineConfiguration:
-      Result := ANewStage in [msSetupHydraulicLine, msSelectPoint, msDone, msNone];
+      if (FWorkTable <> nil) and FWorkTable.IsSimulationMode then
+        Result := ANewStage in [msSetupHydraulicLine, msSetupPoint, msSelectPoint, msDone, msNone]
+      else
+        Result := ANewStage in [msSetupHydraulicLine, msSelectPoint, msDone, msNone];
     msSetupHydraulicLine:
       Result := ANewStage in [msSetupPoint, msSelectPoint, msDone, msNone];
     msSetupPoint:
@@ -1194,7 +1197,7 @@ begin
     msMeasure:
       Result := ANewStage in [msWaitMeasureStop, msSelectPoint, msDone, msNone];
     msWaitMeasureStop:
-      Result := ANewStage in [msResultsRead, msSelectPoint, msDone, msNone];
+      Result := ANewStage in [msResultsRead, msSave, msSelectPoint, msDone, msNone];
     msResultsRead:
       Result := ANewStage in [msSave, msSelectPoint, msDone, msNone];
     msSave:
@@ -1435,8 +1438,15 @@ var
   Error: TErrorInfo;
   PreviousIndex: Integer;
   ForcedSelection: Boolean;
+  Point: TDevicePoint;
+  PreviousStatus: EMeasurementPointStatus;
+  StatusResetReason: string;
 begin
   ResetPointSetupState;
+  { Новая точка не должна наследовать идентификатор гидравлической операции
+    предыдущей точки. Новая операция будет создана при входе в
+    msHydraulicLineConfiguration. }
+  FHydraulicOperationID := 0;
   PreviousIndex := FCurrentPointIndex;
   ForcedSelection := FForceNextPoint >= 0;
 
@@ -1500,13 +1510,45 @@ begin
   // - заполнить Error при невозможности выбора точки.
   if SetPoint(FCurrentPointIndex, Error) then
   begin
+    Point := GetCurrentPoint;
     if ForcedSelection then
+    begin
       ProtocolManager.AddMessage(pcAction, psMeasurement,
         'MeasurementPointNavigationApplied',
         'Запрошенная точка измерения назначена',
         Format('PreviousIndex=%d; NewIndex=%d; NewPointUUID=%s; Stage=%s; ForceNextPointAfter=%d',
-          [PreviousIndex, FCurrentPointIndex, GetCurrentPoint.UUID,
+          [PreviousIndex, FCurrentPointIndex, Point.UUID,
            MeasurementStateToString(FCurrentStage), FForceNextPoint]));
+
+      { Причина msrUserRollback относится к покидаемой точке. После назначения
+        новой точки она не должна влиять на её запуск и итоговый статус. }
+      FStopRequested := False;
+      FPhysicalStopRequested := False;
+      SetStopReason(msrNone);
+    end;
+
+    { При ручном выборе точка запускается заново независимо от прежнего
+      результата. Ранее пропущенная точка также должна быть восстановлена,
+      когда автоматический проход снова доходит до неё после возврата назад. }
+    if (Point.Status <> mptsNone) and
+       (ForcedSelection or (Point.Status = mptsSkipped)) then
+    begin
+      PreviousStatus := Point.Status;
+      if ForcedSelection then
+        StatusResetReason := 'ForcedSelection'
+      else
+        StatusResetReason := 'AutomaticRevisitSkipped';
+      Point.Status := mptsNone;
+      Point.RepeatsCompleted := 0;
+      ProtocolManager.AddMessage(pcState, psMeasurement,
+        'MeasurementPointStatusReset',
+        'Сброшен статус повторно выбранной точки',
+        Format('PointIndex=%d; PointUUID=%s; OldStatus=%s; NewStatus=%s; Reason=%s',
+          [FCurrentPointIndex, Point.UUID,
+           MeasurementPointStatusToString(PreviousStatus),
+           MeasurementPointStatusToString(Point.Status), StatusResetReason]));
+      Notify(Integer(meStateChanged), Point);
+    end;
     // Точка успешно выбрана.
     //
     // Устанавливаем ей статус, соответствующий стадии выбора точки.
@@ -1613,6 +1655,27 @@ begin
 
   if IsStopRequested then
     Exit;
+
+  { В режиме имитации физическая гидравлическая конфигурация не нужна.
+    Выбранного виртуального эталона достаточно для перехода к установке
+    точки и задания имитируемого расхода. Реальный режим сохраняет
+    прежний путь через поиск и физическую установку гидросхемы. }
+  if FWorkTable.IsSimulationMode then
+  begin
+    AddDiagnosticEvent(
+      'Simulation hydraulic configuration bypassed: PointUUID=' +
+      Point.UUID + '; TargetFlow=' + FloatToStr(Point.Q));
+
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(pcAction, psMeasurement,
+        'SimulationHydraulicSelectionBypassed',
+        'В имитации пропущен физический подбор гидравлической конфигурации',
+        Format('PointUUID=%s; PointIndex=%d; TargetFlow=%.6f; RealModeUnchanged=True',
+          [Point.UUID, FCurrentPointIndex, Point.Q]));
+
+    SetStage(msSetupPoint);
+    Exit;
+  end;
 
  { Второй этап: регистрация и запуск асинхронного поиска
     гидравлической конфигурации. }
@@ -3222,6 +3285,16 @@ begin
   FireEvent(AEvent, AError);
   FCurrentRepeat := 0;
 
+  { 1206 на этапе выбора гидравлики нельзя повторять через
+    msSetupPoint: такой переход недопустим и порождает вторичную 9001. }
+  if (AError.Code = 1206) and
+     (FCurrentStage = msHydraulicLineConfiguration) then
+  begin
+    SetStopReason(msrError);
+    SetStage(msDone);
+    Exit;
+  end;
+
   if (FMode = mrmAutomatic) and (AStatus = mptsSetupError) then
   begin
     if FAttempt < FMaxAttemptCount then
@@ -4607,7 +4680,8 @@ procedure TMeasurementRun.SetStopReason(AReason: TMeasurementStopReason);
 begin
   FCriticalSection.Acquire;
   try
-    if (FStopReason in [msrNone, msrNormalComplete, msrUserStop, msrLimitReached]) or
+    if (AReason = msrNone) or
+       (FStopReason in [msrNone, msrNormalComplete, msrUserStop, msrLimitReached]) or
        (AReason in [msrError, msrEmergency]) then
       FStopReason := AReason;
   finally
@@ -5166,6 +5240,8 @@ begin
 end;
 
 function TMeasurementRun.SelectEtalons(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
+var
+  ResolvedEtalonType: EPointEtalonType;
 begin
   AError := TErrorInfo.Empty(Integer(msHydraulicLineConfiguration));
   Result := False;
@@ -5176,18 +5252,9 @@ begin
     Exit;
   end;
 
-  Result := FWorkTable.SelectEtalons(APoint.Q, AError);
+  Result := FWorkTable.SelectEtalons(APoint, ResolvedEtalonType, AError);
   if not Result then
-  begin
-    if GetSelectedEtalonUUID <> '' then
-    begin
-      AddDiagnosticEvent('SelectEtalons warning suppressed: existing selected etalon is valid; SelectedEtalonUUID=' + GetSelectedEtalonUUID + '; Error=' + AError.Msg);
-      AError := TErrorInfo.Empty(Integer(msHydraulicLineConfiguration));
-      Result := True;
-    end
-    else
-      Exit;
-  end;
+    Exit;
 
   if Assigned(ProtocolManager) then
     ProtocolManager.AddMessage(pcAction, psMeasurement, 'EtalonSelected',
@@ -5847,6 +5914,13 @@ begin
     Exit;
   end;
 
+  { SetStage уведомляет наблюдателей до завершения DoEnterStage, поэтому
+    worker может увидеть msHydraulicLineConfiguration на несколько тактов
+    раньше, чем EnterHydraulicLineConfiguration создаст операцию. Это
+    нормальное ожидание входа в стадию, а не ошибка точки 1107. }
+  if FHydraulicOperationID <= 0 then
+    Exit;
+
   if not HydraulicSelection(Point, Completed, Error) then
   begin
     ContinueAfterPointError(
@@ -6037,6 +6111,12 @@ var
   FreshLog: string;
   Point: TDevicePoint;
 begin
+  { Во время навигации RequestPointNavigation уже назначил целевой индекс,
+    но текущая стадия может ещё обрабатываться worker-потоком. Не запускаем
+    повторную установку покидаемой точки по уже сброшенному setup-контексту. }
+  if FForceNextPoint >= 0 then
+    Exit;
+
   CurrentMs := TMeterValue.GetMonotonicTimeMs;
   Point := GetCurrentPoint;
   if FMode = mrmManual then

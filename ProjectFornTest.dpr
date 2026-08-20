@@ -17,6 +17,7 @@ uses
   fuTypeSelect in 'fuTypeSelect.pas' {FormTypeSelect},
   System.StartUpCopy,
   System.SysUtils,
+  System.IOUtils,
   uBaseProcedures in 'uBaseProcedures.pas',
   uClasses in 'uClasses.pas',
   uDataManager in 'uDataManager.pas',
@@ -58,7 +59,9 @@ begin
   Application.Initialize;
   InitDebugLog;
   AppServices := TAppServices.Create;
-  AppServices.Initialize;
+  AppServices.Initialize(
+    TPath.Combine(ExtractFilePath(ParamStr(0)), 'DATA\Projects\project.fpp')
+  );
 
 
   {--------------------------------------------------}

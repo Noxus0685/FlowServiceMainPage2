@@ -128,7 +128,10 @@ type
     class function TemplatesPath: string; static;
     // Нормализует сохранённое имя шаблона и запрещает выход за каталог ReportTemplates.
     class function NormalizeTemplateFileName(const AStoredValue: string): string; static;
-    // Возвращает полный путь к подготовленному шаблону, назначенному типу прибора.
+    // Быстро определяет путь к шаблону для интерфейса без чтения содержимого XLSX.
+    class function TryLocateDeviceTypeTemplate(ADeviceType: TDeviceType;
+      out AFileName, AErrorMessage: string): Boolean; static;
+    // Возвращает и полностью проверяет подготовленный шаблон перед выгрузкой отчёта.
     class function ResolveDeviceTypeTemplate(ADeviceType: TDeviceType): string; static;
     // Добавляет технические листы и именованные диапазоны в новый пользовательский XLSX-шаблон.
     class function PrepareTemplate(const ASourceFileName: string): TPreparedReportTemplate; static;
@@ -3386,7 +3389,64 @@ begin
     raise EArgumentException.Create('Некорректное имя шаблона отчёта.');
 end;
 
-// Возвращает полный путь к подготовленному шаблону, назначенному типу прибора.
+// Быстро проверяет настройку и наличие файла, не распаковывая XLSX.
+class function TReportTemplateService.TryLocateDeviceTypeTemplate(
+  ADeviceType: TDeviceType; out AFileName,
+  AErrorMessage: string): Boolean;
+var
+  FileName, RootPath, CandidatePath: string;
+begin
+  Result := False;
+  AFileName := '';
+  AErrorMessage := '';
+  if ADeviceType = nil then
+  begin
+    AErrorMessage := 'Не найден тип выбранного прибора. ' +
+      'Невозможно определить шаблон отчёта.';
+    Exit;
+  end;
+
+  if Trim(ADeviceType.ReportingForm) = '' then
+  begin
+    AErrorMessage := Format(
+      'Для типа прибора «%s» не назначен шаблон отчёта. ' +
+      'Укажите шаблон в поле «Отчётная форма» редактора типа прибора.',
+      [ADeviceType.Name]);
+    Exit;
+  end;
+
+  try
+    FileName := NormalizeTemplateFileName(ADeviceType.ReportingForm);
+    RootPath := IncludeTrailingPathDelimiter(TPath.GetFullPath(TemplatesPath));
+    CandidatePath := TPath.GetFullPath(TPath.Combine(RootPath, FileName));
+  except
+    on E: Exception do
+    begin
+      AErrorMessage := E.Message;
+      Exit;
+    end;
+  end;
+
+  if not StartsText(RootPath, CandidatePath) then
+  begin
+    AErrorMessage := Format(
+      'Для типа прибора «%s» указано некорректное имя шаблона отчёта.',
+      [ADeviceType.Name]);
+    Exit;
+  end;
+  if not FileExists(CandidatePath) then
+  begin
+    AErrorMessage := Format(
+      'Шаблон отчёта «%s», назначенный типу прибора «%s», ' +
+      'не найден в папке ReportTemplates.', [FileName, ADeviceType.Name]);
+    Exit;
+  end;
+
+  AFileName := CandidatePath;
+  Result := True;
+end;
+
+// Возвращает полный путь и полностью проверяет XLSX перед выгрузкой.
 class function TReportTemplateService.ResolveDeviceTypeTemplate(
   ADeviceType: TDeviceType): string;
 var

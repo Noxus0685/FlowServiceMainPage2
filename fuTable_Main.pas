@@ -578,20 +578,17 @@ end;
 
 procedure TTableMainForm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-  // Сохраняем через централизованный AppServices, а не локальными вызовами.
-  Self.WindowState := TWindowState.wsMinimized;
+  // Сохраняем данные до отключения наблюдателей и закрытия дочерних frame.
+  if FFrameMainTable <> nil then
+    FFrameMainTable.SaveLayoutSettingsToWorkTable;
 
-  if FWorkTableManager = nil then
-    Exit;
+  if AppServices <> nil then
+    AppServices.SaveAll
+  else if FWorkTableManager <> nil then
+    FWorkTableManager.Save;
 
   ClearWorkTableObservers;
-
-  if FFrameMainTable = nil then
-    Exit;
-
-  FFrameMainTable.SaveLayoutSettingsToWorkTable;
- // if AppServices <> nil then
-  //  AppServices.SaveAll;
+  Self.WindowState := TWindowState.wsMinimized;
 end;
 
 procedure TTableMainForm.FormCreate(Sender: TObject);
@@ -1298,6 +1295,8 @@ end;
      }
 procedure TTableMainForm.WorkTableEventHandler(Sender: TWorkTable;
   AEvent: ENotifyEvent; Data: TObject);
+var
+  Notification: TEventNotification;
 begin
   if Sender = nil then
     Exit;
@@ -1305,6 +1304,27 @@ begin
   if (Data is TPump) or (Data is TFlowRate) or (Data is TFluidTemp) or
      (Data is TFluidPress) then
     Exit;
+
+  { Эта форма владеет фактически отображаемым TFrameProceed. Обновляем его
+    здесь, не полагаясь на ссылку другого экземпляра TFrameMainTable. }
+  if Data is TEventNotification then
+  begin
+    Notification := TEventNotification(Data);
+    if Notification.Event = Ord(ewtSimulationMeasurementResultsSaved) then
+    begin
+      if FFrameProceed <> nil then
+        FFrameProceed.RefreshResultsTab;
+
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(
+          pcProc,
+          psForm,
+          'SimulationProceedFrameRefreshed',
+          'Отображаемая вкладка обработки обновлена после имитационной проливки',
+          Sender.Name
+        );
+    end;
+  end;
 
   HandleWorkTableNotify(Sender, AEvent, Data);
 end;

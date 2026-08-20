@@ -52,6 +52,10 @@ uses
   COLOR_COMPLETED = $FFEAF9EA; // Светло-зелёный: точка выполнена
   COLOR_WARNING   = $FFFFF8E6; // Светло-жёлтый
 
+  TEXT_COLOR_INFO    = $FF1E90FF; // DodgerBlue
+  TEXT_COLOR_WARNING = $FFFF8C00; // DarkOrange
+  TEXT_COLOR_ERROR   = $FFFF0000; // Red
+
   GRID_ALTERNATE_ROW_COLOR = $FFF2F2F2;
   GRID_DEVICE_GROUP_COLORS: array[0..2] of TAlphaColor = (
     $331E90FF, $4D1E90FF, $661E90FF);
@@ -476,6 +480,7 @@ type
 
 
 function NormalizeFloatInput(const S: string): Double;
+function NormalizeChannelName(const S: string): string;
 function FormatPercentPM(const Value: Double): string;
 function ExtractFirstFloat(const S: string): Double;
 function ParseAccuracyClass(const S: string): Double;
@@ -646,6 +651,18 @@ begin
     Result := LInt
   else
     Result := 0;
+end;
+
+function NormalizeChannelName(const S: string): string;
+var
+  C: Char;
+  LowerName: string;
+begin
+  Result := '';
+  LowerName := LowerCase(S);
+  for C in LowerName do
+    if not TCharacter.IsWhiteSpace(C) then
+      Result := Result + C;
 end;
 
 function NormalizeFloatInput(const S: string): Double;

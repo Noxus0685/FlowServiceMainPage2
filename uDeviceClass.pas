@@ -713,9 +713,10 @@ uses
 function IsDevicePointDisplayErrorCandidate(ASpillage: TPointSpillage): Boolean;
 begin
   Result := (ASpillage <> nil) and (ASpillage.State <> osDeleted) and
-    ASpillage.Enabled and ASpillage.Valid and
-    (ASpillage.Validation = vsValid) and not IsNan(ASpillage.Error) and
-    not IsInfinite(ASpillage.Error) and (Abs(ASpillage.Error) < MaxDouble);
+    ASpillage.Enabled and
+    (ASpillage.Validation in [vsValid, vsInvalid]) and
+    not IsNan(ASpillage.Error) and not IsInfinite(ASpillage.Error) and
+    (Abs(ASpillage.Error) < MaxDouble);
 end;
 
 function TrySelectDevicePointDisplaySpillage(

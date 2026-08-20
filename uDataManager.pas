@@ -115,6 +115,12 @@ type
 
   function FindType(const AUUID, AName: string; out ARepo: TTypeRepository): TDeviceType;
   function FindDevice(const AUUID: string; out ARepo: TDeviceRepository): TDevice;
+  // Находит UUID во всех подключённых БД и полностью загружает выбранный прибор.
+  function FindAndLoadDevice(const AUUID: string;
+    out ARepo: TDeviceRepository): TDevice;
+  // Совместимый вызов: выбранный прибор теперь загружается полностью.
+  function LoadDeviceRuntimeData(const AUUID, ARepoName: string;
+    out ARepo: TDeviceRepository): TDevice;
   function FindTypeRepositoryByName(const AName: string): TTypeRepository;
   function FindDeviceRepositoryByName(const AName: string): TDeviceRepository;
   // Копирование списка типов во внутренний буфер через Clone.
@@ -547,7 +553,7 @@ var
   TargetDir: string;
 begin
   // Файлы репозиториев остаются в прежних Settings\Types и Settings\Devices;
-  // в setting.fpp переносится только их конфигурация.
+  // в выбранном файле проекта *.fpp переносится только их конфигурация.
   BaseDir := IncludeTrailingPathDelimiter(
     TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings')
   );
@@ -877,13 +883,22 @@ begin
 
     rkDevice:
       begin
+        { При запуске загружаем краткий список только активной базы.
+          Остальные базы открыты, но приборы из них читаются по UUID по требованию. }
         for Repo in FDeviceRepositories do
         begin
           if Repo = nil then
             Continue;
 
-          if Repo.State <> osClean then
-            Repo.Load;
+          if Repo = ActiveDeviceRepo then
+          begin
+            if Repo.State <> osClean then
+              Repo.Load;
+          end
+          else
+            { Незагруженный репозиторий не является изменённым:
+              Save не должен перезаписать его пустым списком. }
+            Repo.State := osClean;
         end;
       end;
 
@@ -1633,6 +1648,76 @@ begin
   end;
 end;
 
+function TManagerTTableDM.FindAndLoadDevice(
+  const AUUID: string;
+  out ARepo: TDeviceRepository
+): TDevice;
+var
+  Repo: TDeviceRepository;
+  ExistingRepo: TDeviceRepository;
+  MatchedRepo: TDeviceRepository;
+  SearchUUID: string;
+  MatchedRepoNames: TStringList;
+begin
+  Result := nil;
+  ARepo := nil;
+  SearchUUID := Trim(AUUID);
+  if SearchUUID = '' then
+    Exit;
+
+  { Несохранённый или уже полностью загруженный прибор возвращаем
+    из памяти без проверочных SQL-запросов к репозиториям. }
+  Result := FindDevice(SearchUUID, ExistingRepo);
+  if Result <> nil then
+  begin
+    if Result.State = osNew then
+    begin
+      ARepo := ExistingRepo;
+      Exit;
+    end;
+
+    if (ExistingRepo <> nil) and
+       ExistingRepo.IsDeviceFullyLoaded(SearchUUID) then
+    begin
+      ARepo := ExistingRepo;
+      Exit;
+    end;
+  end;
+
+  MatchedRepo := nil;
+  MatchedRepoNames := TStringList.Create;
+  try
+    { Проверяем UUID коротким запросом, не загружая остальные приборы. }
+    for Repo in DeviceRepositories do
+    begin
+      if (Repo = nil) or (not Repo.ContainsDeviceUUID(SearchUUID)) then
+        Continue;
+
+      MatchedRepoNames.Add(Repo.Name);
+      if MatchedRepo = nil then
+        MatchedRepo := Repo;
+    end;
+
+    if MatchedRepoNames.Count = 0 then
+    begin
+      Result := nil;
+      Exit;
+    end;
+
+    if MatchedRepoNames.Count > 1 then
+      raise Exception.CreateFmt(
+        'Прибор UUID=%s найден в нескольких базах: %s',
+        [SearchUUID, StringReplace(Trim(MatchedRepoNames.Text), sLineBreak,
+          ', ', [rfReplaceAll])]);
+
+    Result := MatchedRepo.LoadDevice(SearchUUID);
+    if Result <> nil then
+      ARepo := MatchedRepo;
+  finally
+    MatchedRepoNames.Free;
+  end;
+end;
+
 
 function TManagerTTableDM.FindTypeRepositoryByName(
   const AName: string
@@ -1648,6 +1733,33 @@ begin
   for Repo in TypeRepositories do
     if SameText(Repo.Name, AName) then
       Exit(Repo);
+end;
+
+
+function TManagerTTableDM.LoadDeviceRuntimeData(
+  const AUUID, ARepoName: string;
+  out ARepo: TDeviceRepository
+): TDevice;
+var
+  PreferredRepo: TDeviceRepository;
+begin
+  Result := nil;
+  ARepo := nil;
+  if Trim(AUUID) = '' then
+    Exit;
+
+  PreferredRepo := FindDeviceRepositoryByName(Trim(ARepoName));
+  if (PreferredRepo <> nil) and PreferredRepo.ContainsDeviceUUID(AUUID) then
+  begin
+    Result := PreferredRepo.LoadDevice(AUUID);
+    if Result <> nil then
+    begin
+      ARepo := PreferredRepo;
+      Exit;
+    end;
+  end;
+
+  Result := FindAndLoadDevice(AUUID, ARepo);
 end;
 
 

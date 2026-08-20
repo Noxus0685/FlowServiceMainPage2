@@ -44,12 +44,27 @@ type
     ComboOutputSet: TComboBox;
     ComboSyncMode: TComboBox;
     ComboNoiseFilter: TComboBox;
+    ComboFrequencyAveraging: TComboBox;
+    ComboCurrentAveraging: TComboBox;
+    ComboVoltageAveraging: TComboBox;
+    ComboCurrentOutputType: TComboBox;
+    ComboVoltageOutputType: TComboBox;
     IndicatorOutputSet: TCircle;
     IndicatorSyncMode: TCircle;
     IndicatorNoiseFilter: TCircle;
     LabelChannelHash: TLabel;
     LabelQMaxWork: TLabel;
     LabelQMinWork: TLabel;
+    LabelFrequency: TLabel;
+    LabelPulseDuration: TLabel;
+    LabelFrequencyStdDeviation: TLabel;
+    LabelFrequencyDeviation: TLabel;
+    LabelCurrent: TLabel;
+    LabelCurrentStdDeviation: TLabel;
+    LabelCurrentDeviation: TLabel;
+    LabelVoltage: TLabel;
+    LabelVoltageStdDeviation: TLabel;
+    LabelVoltageDeviation: TLabel;
     FChannel: TChannel;
     FLoading: Boolean;
 
@@ -72,6 +87,11 @@ type
     procedure HandleOutputSetChange(Sender: TObject);
     procedure HandleSyncModeChange(Sender: TObject);
     procedure HandleNoiseFilterChange(Sender: TObject);
+    procedure HandleFrequencyAveragingChange(Sender: TObject);
+    procedure HandleCurrentAveragingChange(Sender: TObject);
+    procedure HandleVoltageAveragingChange(Sender: TObject);
+    procedure HandleCurrentOutputTypeChange(Sender: TObject);
+    procedure HandleVoltageOutputTypeChange(Sender: TObject);
     procedure NotifyWorkTableRefreshIfChanged(const AChanged: Boolean);
     function GetChannelWorkTable: TWorkTable;
     function GetFlowUnitName: string;
@@ -82,6 +102,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     procedure LoadFromChannel(AChannel: TChannel);
+    procedure UpdateDynamicValues;
     procedure UpdateFlowUnitPresentation;
   end;
 
@@ -371,6 +392,44 @@ begin
   RefreshRegisterColors;
 end;
 
+procedure TFrameChannelProperties.HandleFrequencyAveragingChange(Sender: TObject);
+begin
+  if FLoading or (FChannel = nil) or (ComboFrequencyAveraging.ItemIndex < 0) then Exit;
+  FChannel.FrequencyAveraging := TChannelAveragingPeriod(ComboFrequencyAveraging.ItemIndex);
+  UpdateDynamicValues;
+  NotifyWorkTableRefreshIfChanged(True);
+end;
+
+procedure TFrameChannelProperties.HandleCurrentAveragingChange(Sender: TObject);
+begin
+  if FLoading or (FChannel = nil) or (ComboCurrentAveraging.ItemIndex < 0) then Exit;
+  FChannel.CurrentAveraging := TChannelAveragingPeriod(ComboCurrentAveraging.ItemIndex);
+  UpdateDynamicValues;
+  NotifyWorkTableRefreshIfChanged(True);
+end;
+
+procedure TFrameChannelProperties.HandleVoltageAveragingChange(Sender: TObject);
+begin
+  if FLoading or (FChannel = nil) or (ComboVoltageAveraging.ItemIndex < 0) then Exit;
+  FChannel.VoltageAveraging := TChannelAveragingPeriod(ComboVoltageAveraging.ItemIndex);
+  UpdateDynamicValues;
+  NotifyWorkTableRefreshIfChanged(True);
+end;
+
+procedure TFrameChannelProperties.HandleCurrentOutputTypeChange(Sender: TObject);
+begin
+  if FLoading or (FChannel = nil) or (ComboCurrentOutputType.ItemIndex < 0) then Exit;
+  FChannel.CurrentOutputRange := ComboCurrentOutputType.ItemIndex;
+  NotifyWorkTableRefreshIfChanged(True);
+end;
+
+procedure TFrameChannelProperties.HandleVoltageOutputTypeChange(Sender: TObject);
+begin
+  if FLoading or (FChannel = nil) or (ComboVoltageOutputType.ItemIndex < 0) then Exit;
+  FChannel.VoltageOutputRange := ComboVoltageOutputType.ItemIndex;
+  NotifyWorkTableRefreshIfChanged(True);
+end;
+
 function TFrameChannelProperties.GetChannelWorkTable: TWorkTable;
 begin
   Result := nil;
@@ -489,12 +548,18 @@ begin
       ComboOutputSet.ItemIndex := -1;
       ComboSyncMode.ItemIndex := -1;
       ComboNoiseFilter.ItemIndex := -1;
+      ComboFrequencyAveraging.ItemIndex := -1;
+      ComboCurrentAveraging.ItemIndex := -1;
+      ComboVoltageAveraging.ItemIndex := -1;
+      ComboCurrentOutputType.ItemIndex := -1;
+      ComboVoltageOutputType.ItemIndex := -1;
       LabelChannelHash.Text := '';
       EditQMaxWork.Text := '';
       EditQMinWork.Text := '';
       UpdateFlowUnitPresentation;
       EditVMaxWork.Text := '';
       EditVMinWork.Text := '';
+      UpdateDynamicValues;
       Exit;
     end;
 
@@ -510,15 +575,100 @@ begin
     ComboOutputSet.ItemIndex := Ord(AChannel.OutputSet);
     ComboSyncMode.ItemIndex := Ord(AChannel.SyncMode);
     ComboNoiseFilter.ItemIndex := ComboNoiseFilter.Items.IndexOf(NoiseFilterToStr(AChannel.NoiseFilter));
+    ComboFrequencyAveraging.ItemIndex := Ord(AChannel.FrequencyAveraging);
+    ComboCurrentAveraging.ItemIndex := Ord(AChannel.CurrentAveraging);
+    ComboVoltageAveraging.ItemIndex := Ord(AChannel.VoltageAveraging);
+    ComboCurrentOutputType.ItemIndex := AChannel.CurrentOutputRange;
+    ComboVoltageOutputType.ItemIndex := AChannel.VoltageOutputRange;
 
     LabelChannelHash.Text := AChannel.UUID;
     UpdateFlowUnitPresentation;
     EditVMaxWork.Text := FloatToStr(AChannel.VMaxWork);
     EditVMinWork.Text := FloatToStr(AChannel.VMinWork);
+    UpdateDynamicValues;
   finally
     FLoading := False;
     RefreshRegisterColors;
   end;
+end;
+
+procedure TFrameChannelProperties.UpdateDynamicValues;
+const
+  NO_VALUE = '—';
+var
+  Statistics: TChannelSignalStatistics;
+
+  procedure ClearDynamicValues;
+  begin
+    LabelFrequency.Text := NO_VALUE;
+    LabelPulseDuration.Text := NO_VALUE;
+    LabelFrequencyStdDeviation.Text := NO_VALUE;
+    LabelFrequencyDeviation.Text := NO_VALUE;
+    LabelCurrent.Text := NO_VALUE;
+    LabelCurrentStdDeviation.Text := NO_VALUE;
+    LabelCurrentDeviation.Text := NO_VALUE;
+    LabelVoltage.Text := NO_VALUE;
+    LabelVoltageStdDeviation.Text := NO_VALUE;
+    LabelVoltageDeviation.Text := NO_VALUE;
+  end;
+
+  function FormatDynamicValue(const AValue: Double): string;
+  begin
+    Result := FormatFloat('0.###', AValue);
+  end;
+
+begin
+  ClearDynamicValues;
+  if FChannel = nil then
+    Exit;
+
+  Statistics := FChannel.GetSignalStatistics(cskFrequency);
+  if Statistics.HasValue then
+  begin
+    LabelFrequency.Text := FormatDynamicValue(Statistics.Value);
+    { With averaging disabled only the current raw value is presented.
+      Statistical fields remain unavailable in the channel settings UI. }
+    if (FChannel.FrequencyAveraging <> capOff) and
+       Statistics.HasStatistics then
+    begin
+      if Statistics.HasPercentDeviation then
+        LabelFrequencyStdDeviation.Text := FormatDynamicValue(
+          Statistics.StdDeviationPercent);
+      LabelFrequencyDeviation.Text := FormatDynamicValue(Statistics.Deviation);
+    end;
+  end;
+
+  Statistics := FChannel.GetSignalStatistics(cskCurrent);
+  if Statistics.HasValue then
+  begin
+    LabelCurrent.Text := FormatDynamicValue(Statistics.Value);
+    if (FChannel.CurrentAveraging <> capOff) and
+       Statistics.HasStatistics then
+    begin
+      if Statistics.HasPercentDeviation then
+        LabelCurrentStdDeviation.Text := FormatDynamicValue(
+          Statistics.StdDeviationPercent);
+      LabelCurrentDeviation.Text := FormatDynamicValue(Statistics.Deviation);
+    end;
+  end;
+
+  Statistics := FChannel.GetSignalStatistics(cskVoltage);
+  if Statistics.HasValue then
+  begin
+    LabelVoltage.Text := FormatDynamicValue(Statistics.Value);
+    if (FChannel.VoltageAveraging <> capOff) and
+       Statistics.HasStatistics then
+    begin
+      if Statistics.HasPercentDeviation then
+        LabelVoltageStdDeviation.Text := FormatDynamicValue(
+          Statistics.StdDeviationPercent);
+      LabelVoltageDeviation.Text := FormatDynamicValue(Statistics.Deviation);
+    end;
+  end;
+
+  { No independent pulse-duration value currently exists on TChannel.  Keep the
+    placeholder until that value has actually been received instead of deriving
+    a misleading value from the frequency. }
 end;
 
 procedure TFrameChannelProperties.BuildUI;
@@ -640,25 +790,47 @@ begin
   ComboNoiseFilter := CreateComboBox(['Выкл', 'Авто', '10 мс', '50 мс', '100 мс']);
   AddPropertyRow(CategoryFreqPulse, 'Фильтр помех', CreateComboWithIndicator(ComboNoiseFilter, IndicatorNoiseFilter));
   ComboNoiseFilter.OnChange := HandleNoiseFilterChange;
-  AddPropertyRow(CategoryFreqPulse, 'Усреднение', CreateComboBox(['Выкл', 'Авто', '2 сек', '4 сек']));
-  AddPropertyRow(CategoryFreqPulse, 'Текущая частота, Гц', TLabel.Create(Self));
-  AddPropertyRow(CategoryFreqPulse, 'Текущая длительность импульса', TLabel.Create(Self));
-  AddPropertyRow(CategoryFreqPulse, 'Квадратичное отклонение, %', TLabel.Create(Self));
-  AddPropertyRow(CategoryFreqPulse, 'Девиация, Гц', TLabel.Create(Self));
+  { There is no domain automatic-averaging mode, so only implemented modes are shown. }
+  ComboFrequencyAveraging := CreateComboBox(['Выкл', '2 сек', '4 сек']);
+  AddPropertyRow(CategoryFreqPulse, 'Усреднение', ComboFrequencyAveraging);
+  ComboFrequencyAveraging.OnChange := HandleFrequencyAveragingChange;
+  LabelFrequency := TLabel.Create(Self);
+  AddPropertyRow(CategoryFreqPulse, 'Текущая частота, Гц', LabelFrequency);
+  LabelPulseDuration := TLabel.Create(Self);
+  AddPropertyRow(CategoryFreqPulse, 'Текущая длительность импульса', LabelPulseDuration);
+  LabelFrequencyStdDeviation := TLabel.Create(Self);
+  AddPropertyRow(CategoryFreqPulse, 'Квадратичное отклонение частоты, %', LabelFrequencyStdDeviation);
+  LabelFrequencyDeviation := TLabel.Create(Self);
+  AddPropertyRow(CategoryFreqPulse, 'Девиация частоты, Гц', LabelFrequencyDeviation);
 
   CategoryAnalogCurrent := AddCategory('Аналоговый сигнал (ток)');
-  AddPropertyRow(CategoryAnalogCurrent, 'Тип выхода прибора', CreateComboBox(['0..20мА', '4..20мА', '-20мА..20мА']));
-  AddPropertyRow(CategoryAnalogCurrent, 'Усреднение', CreateComboBox(['Выкл', '2 сек', '4 сек']));
-  AddPropertyRow(CategoryAnalogCurrent, 'Текущий ток', TLabel.Create(Self));
-  AddPropertyRow(CategoryAnalogCurrent, 'Квадратичное отклонение, %', TLabel.Create(Self));
-  AddPropertyRow(CategoryAnalogCurrent, 'Девиация, мА', TLabel.Create(Self));
+  ComboCurrentOutputType := CreateComboBox(['0..20мА', '4..20мА', '-20мА..20мА']);
+  AddPropertyRow(CategoryAnalogCurrent, 'Тип выхода прибора', ComboCurrentOutputType);
+  ComboCurrentOutputType.OnChange := HandleCurrentOutputTypeChange;
+  ComboCurrentAveraging := CreateComboBox(['Выкл', '2 сек', '4 сек']);
+  AddPropertyRow(CategoryAnalogCurrent, 'Усреднение', ComboCurrentAveraging);
+  ComboCurrentAveraging.OnChange := HandleCurrentAveragingChange;
+  LabelCurrent := TLabel.Create(Self);
+  AddPropertyRow(CategoryAnalogCurrent, 'Текущий ток', LabelCurrent);
+  LabelCurrentStdDeviation := TLabel.Create(Self);
+  AddPropertyRow(CategoryAnalogCurrent, 'Квадратичное отклонение тока, %', LabelCurrentStdDeviation);
+  LabelCurrentDeviation := TLabel.Create(Self);
+  AddPropertyRow(CategoryAnalogCurrent, 'Девиация тока, мА', LabelCurrentDeviation);
 
   CategoryAnalogVoltage := AddCategory('Аналоговый сигнал (напряжение)');
-  AddPropertyRow(CategoryAnalogVoltage, 'Тип выхода прибора', CreateComboBox(['0..10В', '1..10В', '-10В..10В']));
-  AddPropertyRow(CategoryAnalogVoltage, 'Усреднение', CreateComboBox(['Выкл', '2 сек', '4 сек']));
-  AddPropertyRow(CategoryAnalogVoltage, 'Текущий ток', TLabel.Create(Self));
-  AddPropertyRow(CategoryAnalogVoltage, 'Квадратичное отклонение, %', TLabel.Create(Self));
-  AddPropertyRow(CategoryAnalogVoltage, 'Девиация, В', TLabel.Create(Self));
+  ComboVoltageOutputType := CreateComboBox(['0..10В', '1..10В', '-10В..10В']);
+  AddPropertyRow(CategoryAnalogVoltage, 'Тип выхода прибора', ComboVoltageOutputType);
+  ComboVoltageOutputType.OnChange := HandleVoltageOutputTypeChange;
+  ComboVoltageAveraging := CreateComboBox(['Выкл', '2 сек', '4 сек']);
+  AddPropertyRow(CategoryAnalogVoltage, 'Усреднение', ComboVoltageAveraging);
+  ComboVoltageAveraging.OnChange := HandleVoltageAveragingChange;
+  LabelVoltage := TLabel.Create(Self);
+  AddPropertyRow(CategoryAnalogVoltage, 'Текущее напряжение', LabelVoltage);
+  LabelVoltageStdDeviation := TLabel.Create(Self);
+  AddPropertyRow(CategoryAnalogVoltage, 'Квадратичное отклонение напряжения, %', LabelVoltageStdDeviation);
+  LabelVoltageDeviation := TLabel.Create(Self);
+  AddPropertyRow(CategoryAnalogVoltage, 'Девиация напряжения, В', LabelVoltageDeviation);
+  UpdateDynamicValues;
 end;
 
 end.

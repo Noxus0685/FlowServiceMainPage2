@@ -4,8 +4,9 @@ interface
 
 uses
   System.SysUtils,
-  System.IOUtils,
   uDataManager,
+  uDeviceClass,
+  uRepositories,
   uMeterValue,
   uParameter,
   uProjectSettings,
@@ -18,7 +19,7 @@ type
 
   TAppServices = class
   private
-    FBasePath: string;
+    FProjectFileName: string;
 
     FOwnsDataManager: Boolean;
     FOwnsProtocolManager: Boolean;
@@ -26,6 +27,7 @@ type
 
     FInitialized: Boolean;
     FOnBeforeShutdown: TAppShutdownEvent;
+    FShutdownPrepared: Boolean;
     FShuttingDown: Boolean;
 
     FDataManager: TManagerTTableDM;
@@ -36,23 +38,27 @@ type
     function GetDataManager: TManagerTTableDM;
     function GetWorkTableManager: TWorkTableManager;
 
-    function BuildSettingsDatabasePath: string;
-    procedure EnsureProjectSettingsDirectory;
+    function ResolveProjectFileName(const AProjectFileName: string): string;
     procedure LoadPersistentState;
+    // Догружает только приборы, которые сохранены в каналах рабочих столов.
+    procedure LoadWorkTableDeviceData;
     procedure ResetGlobalStatics;
 
   public
-    constructor Create(const ABasePath: string = '');
+    constructor Create(const AProjectFileName: string = '');
     destructor Destroy; override;
 
-    procedure Initialize;
+    procedure Initialize(const AProjectFileName: string = '');
     procedure SaveAll;
+    // Сохраняет состояние до уничтожения FMX-форм; повторный вызов безопасен.
+    procedure PrepareForShutdown;
     procedure Shutdown;
 
     property WorkTableManager: TWorkTableManager read GetWorkTableManager;
     property DataManager: TManagerTTableDM read GetDataManager;
     property ProtocolManagerRef: TProtocolManager read GetProtocolManager;
     property Initialized: Boolean read FInitialized;
+    property ProjectFileName: string read FProjectFileName;
     property OnBeforeShutdown: TAppShutdownEvent read FOnBeforeShutdown write FOnBeforeShutdown;
   end;
 
@@ -63,14 +69,11 @@ implementation
 
 { TAppServices }
 
-constructor TAppServices.Create(const ABasePath: string);
+constructor TAppServices.Create(const AProjectFileName: string);
 begin
   inherited Create;
 
-  if Trim(ABasePath) = '' then
-    FBasePath := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0)))
-  else
-    FBasePath := IncludeTrailingPathDelimiter(ABasePath);
+  FProjectFileName := Trim(AProjectFileName);
 
   FOwnsDataManager := False;
   FOwnsProtocolManager := False;
@@ -82,6 +85,7 @@ begin
 
   FInitialized := False;
   FOnBeforeShutdown := nil;
+  FShutdownPrepared := False;
   FShuttingDown := False;
 end;
 
@@ -91,12 +95,19 @@ begin
   inherited;
 end;
 
-function TAppServices.BuildSettingsDatabasePath: string;
+function TAppServices.ResolveProjectFileName(
+  const AProjectFileName: string): string;
 begin
-  Result := TPath.Combine(
-    TPath.Combine(FBasePath, 'DATA\Projects'),
-    PROJECT_SETTINGS_FILE_NAME
-  );
+  if Trim(AProjectFileName) <> '' then
+    Result := ExpandFileName(AProjectFileName)
+  else if Trim(FProjectFileName) <> '' then
+    Result := ExpandFileName(FProjectFileName)
+  else
+    raise EArgumentException.Create('Не задан выбранный файл проекта *.fpp');
+
+  if not SameText(ExtractFileExt(Result), '.fpp') then
+    raise EArgumentException.CreateFmt(
+      'Файл проекта должен иметь расширение .fpp: %s', [Result]);
 end;
 
 function TAppServices.GetProtocolManager: TProtocolManager;
@@ -114,27 +125,83 @@ begin
   Result := FWorkTableManager;
 end;
 
-procedure TAppServices.EnsureProjectSettingsDirectory;
-begin
-  ForceDirectories(TPath.Combine(FBasePath, 'DATA\Projects'));
-end;
-
 procedure TAppServices.LoadPersistentState;
 begin
   TMeterValue.LoadFromStorage;
 end;
 
-procedure TAppServices.Initialize;
+procedure TAppServices.LoadWorkTableDeviceData;
+var
+  WorkTable: TWorkTable;
+  Channel: TChannel;
+  Repo: TDeviceRepository;
+  Device: TDevice;
+
+  procedure LoadChannel(AChannel: TChannel);
+  begin
+    if (AChannel = nil) or (Trim(AChannel.DeviceUUID) = '') then
+      Exit;
+
+    Repo := nil;
+    Device := FDataManager.LoadDeviceRuntimeData(
+      AChannel.DeviceUUID,
+      AChannel.RepoDeviceName,
+      Repo
+    );
+    if Device = nil then
+      Exit;
+
+    if AChannel.FlowMeter <> nil then
+    begin
+      AChannel.FlowMeter.Device := Device;
+      AChannel.FlowMeter.RebindCalculatedValues;
+    end;
+
+    if Repo <> nil then
+    begin
+      AChannel.RepoDeviceName := Repo.Name;
+      AChannel.RepoDeviceUUID := Repo.UUID;
+    end;
+  end;
+
 begin
-  if FInitialized then
+  if (FDataManager = nil) or (FWorkTableManager = nil) or
+     (FWorkTableManager.WorkTables = nil) then
     Exit;
 
-  EnsureProjectSettingsDirectory;
+  for WorkTable in FWorkTableManager.WorkTables do
+  begin
+    if WorkTable = nil then
+      Continue;
+
+    for Channel in WorkTable.DeviceChannels do
+      LoadChannel(Channel);
+
+    for Channel in WorkTable.EtalonChannels do
+      LoadChannel(Channel);
+  end;
+end;
+
+procedure TAppServices.Initialize(const AProjectFileName: string);
+var
+  ProjectFileName: string;
+begin
+  ProjectFileName := ResolveProjectFileName(AProjectFileName);
+
+  if FInitialized then
+  begin
+    if SameText(FProjectFileName, ProjectFileName) then
+      Exit;
+    Shutdown;
+  end;
+
+  FProjectFileName := ProjectFileName;
+  SetProjectSettingsFileName(FProjectFileName);
 
   // --- DataManager ---
   if FDataManager = nil then
   begin
-    FDataManager := TManagerTTableDM.Create(BuildSettingsDatabasePath);
+    FDataManager := TManagerTTableDM.Create(FProjectFileName);
     uDataManager.DataManager := FDataManager;
     FOwnsDataManager := True;
   end;
@@ -153,13 +220,15 @@ begin
   // --- WorkTableManager ---
   if FWorkTableManager = nil then
   begin
-    FWorkTableManager := TWorkTableManager.Create(BuildSettingsDatabasePath);
+    FWorkTableManager := TWorkTableManager.Create(FProjectFileName);
     uWorkTable.WorkTableManager := FWorkTableManager;
     FOwnsWorkTableManager := True;
   end;
 
   FWorkTableManager.Load;
+  LoadWorkTableDeviceData;
 
+  FShutdownPrepared := False;
   FInitialized := True;
 end;
 
@@ -172,6 +241,18 @@ begin
     FDataManager.Save;
 
   TMeterValue.SaveToStorage;
+end;
+
+procedure TAppServices.PrepareForShutdown;
+begin
+  if not FInitialized or FShutdownPrepared then
+    Exit;
+
+  if Assigned(FOnBeforeShutdown) then
+    FOnBeforeShutdown(Self);
+
+  SaveAll;
+  FShutdownPrepared := True;
 end;
 
 procedure TAppServices.ResetGlobalStatics;
@@ -193,13 +274,10 @@ begin
   if FShuttingDown then
     Exit;
 
+  PrepareForShutdown;
+
   FShuttingDown := True;
   try
-    if Assigned(FOnBeforeShutdown) then
-      FOnBeforeShutdown(Self);
-
-    SaveAll;
-
     // --- WorkTableManager ---
     if FOwnsWorkTableManager and (FWorkTableManager <> nil) then
     begin
@@ -228,11 +306,14 @@ begin
     end;
 
     ResetGlobalStatics;
+    SetProjectSettingsFileName('');
 
     FOwnsDataManager := False;
     FOwnsProtocolManager := False;
     FOwnsWorkTableManager := False;
 
+    FOnBeforeShutdown := nil;
+    FShutdownPrepared := False;
     FInitialized := False;
   finally
     FShuttingDown := False;

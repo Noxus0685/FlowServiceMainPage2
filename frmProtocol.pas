@@ -20,6 +20,7 @@ uses
   System.StrUtils,
   System.SysUtils,
   System.UITypes,
+  uBaseProcedures,
   uProtocols,
   uProjectSettings,
   uAppVersion,
@@ -55,7 +56,21 @@ type
     FMessages: TObjectList<TProtocolMessage>;
     FListener: TProtocolListener;
     FLoadingSettings: Boolean;
+    FProtocolSettingsFileName: string;
+    FFullLogFileName: string;
+    FFullLogWriter: TStreamWriter;
+    FSessionLogFiles: TStringList;
+    FCurrentLogSizeBytes: Int64;
+    FTotalMessageCount: Int64;
     procedure HandleProtocolMessage(Msg: TProtocolMessage);
+    function ProtocolLogDirectory: string;
+    procedure CleanupOldProtocolFiles;
+    procedure InitializeFullLog;
+    procedure ResetFullLog;
+    procedure AppendFullLogMessage(const Msg: TProtocolMessage);
+    procedure TrimStoredMessages;
+    procedure TrimProtocolItems;
+    procedure ShowPartialCopyWarning(const ACopiedCount: Integer);
 
     procedure AddProtocolItem(const Msg: TProtocolMessage);
     function IsAllowedByFilters(Msg: TProtocolMessage): Boolean;
@@ -78,6 +93,14 @@ implementation
 
 {$R *.fmx}
 
+const
+  CProtocolMemoryMessageLimit = 2000;
+  CProtocolDisplayMessageLimit = 2000;
+  CClipboardCharacterLimit = 5 * 1024 * 1024;
+  CProtocolRetentionDays = 7;
+  CProtocolTotalSizeLimit = Int64(1024) * 1024 * 1024;
+  CProtocolFileSizeLimit = Int64(100) * 1024 * 1024;
+
 constructor TFrameProtocol.Create(AOwner: TComponent);
 var
   BtnExport: TSpeedButton;
@@ -87,7 +110,14 @@ var
   EffectiveSimulationText: string;
 begin
   inherited;
+  FProtocolSettingsFileName := '';
   FMessages := TObjectList<TProtocolMessage>.Create(True);
+  FFullLogWriter := nil;
+  FSessionLogFiles := TStringList.Create;
+  FFullLogFileName := '';
+  FCurrentLogSizeBytes := 0;
+  FTotalMessageCount := 0;
+  InitializeFullLog;
   FLoadingSettings := True;
 
   CheckBoxEvent.IsChecked := True;
@@ -97,8 +127,11 @@ begin
   CheckBoxParameters.IsChecked := True;
   CheckBoxWorkTable.IsChecked := True;
   CheckBoxMeasurement.IsChecked := True;
-  CheckBoxEngine.IsChecked := True;
   CheckBoxMKS.IsChecked := True;
+  CheckBoxWorkLog.IsChecked := True;
+  CheckBoxProc.IsChecked := True;
+  CheckBoxHandler.IsChecked := True;
+  CheckBoxEngine.IsChecked := True;
   FLoadingSettings := False;
   LoadProtocolSettings;
 
@@ -145,10 +178,13 @@ end;
 
 function TFrameProtocol.ProtocolSettingsFileName: string;
 begin
-  if (WorkTableManager <> nil) and (Trim(WorkTableManager.IniFileName) <> '') then
-    Exit(WorkTableManager.IniFileName);
+  // Запоминаем путь, пока менеджер рабочего стола ещё существует.
+  if (WorkTableManager <> nil) and
+     (Trim(WorkTableManager.IniFileName) <> '') then
+    FProtocolSettingsFileName := WorkTableManager.IniFileName;
 
-  Result := GetProjectSettingsFileName;
+  // При завершении работы возвращаем ранее сохранённый путь без исключения.
+  Result := FProtocolSettingsFileName;
 end;
 
 procedure TFrameProtocol.LoadCheckBoxSetting(AIni: TCustomIniFile; ACheckBox: TCheckBox);
@@ -215,11 +251,11 @@ begin
     LoadCheckBoxSetting(Ini, CheckBoxParameters);
     LoadCheckBoxSetting(Ini, CheckBoxWorkTable);
     LoadCheckBoxSetting(Ini, CheckBoxMeasurement);
-    LoadCheckBoxSetting(Ini, CheckBoxEngine);
     LoadCheckBoxSetting(Ini, CheckBoxMKS);
     LoadCheckBoxSetting(Ini, CheckBoxWorkLog);
     LoadCheckBoxSetting(Ini, CheckBoxProc);
     LoadCheckBoxSetting(Ini, CheckBoxHandler);
+    LoadCheckBoxSetting(Ini, CheckBoxEngine);
     for I := 0 to ComponentCount - 1 do
       if Components[I] is TComboBox then
       begin
@@ -251,11 +287,11 @@ begin
     SaveCheckBoxSetting(Ini, CheckBoxParameters);
     SaveCheckBoxSetting(Ini, CheckBoxWorkTable);
     SaveCheckBoxSetting(Ini, CheckBoxMeasurement);
-    SaveCheckBoxSetting(Ini, CheckBoxEngine);
     SaveCheckBoxSetting(Ini, CheckBoxMKS);
     SaveCheckBoxSetting(Ini, CheckBoxWorkLog);
-        SaveCheckBoxSetting(Ini, CheckBoxProc);
-        SaveCheckBoxSetting(Ini, CheckBoxHandler);
+    SaveCheckBoxSetting(Ini, CheckBoxProc);
+    SaveCheckBoxSetting(Ini, CheckBoxHandler);
+    SaveCheckBoxSetting(Ini, CheckBoxEngine);
     for I := 0 to ComponentCount - 1 do
       if Components[I] is TComboBox then
         SaveComboBoxSetting(Ini, TComboBox(Components[I]));
@@ -264,56 +300,304 @@ begin
   end;
 end;
 
-procedure TFrameProtocol.ExportProtocolToFile;
+function TFrameProtocol.ProtocolLogDirectory: string;
 var
-  Lines: TStringList;
-  I: Integer;
-  FileName: string;
-  Item: TListBoxItem;
-  ActiveWorkTable: TWorkTable;
-  SimulationModeText: string;
-  EffectiveSimulationText: string;
+  ProjectFileName: string;
 begin
-  Lines := TStringList.Create;
-  try
-    ActiveWorkTable := nil;
-    if WorkTableManager <> nil then
-      ActiveWorkTable := WorkTableManager.ActiveWorkTable;
-    SimulationModeText := 'False';
-    EffectiveSimulationText := 'False';
-    if ActiveWorkTable <> nil then
-    begin
-      SimulationModeText := IfThen(ActiveWorkTable.IsSimulationMode, 'True', 'False');
-      EffectiveSimulationText := IfThen(ActiveWorkTable.SimulationActive, 'True', 'False');
+  if TryGetProjectSettingsFileName(ProjectFileName) then
+    Result := TPath.Combine(
+      ExtractFileDir(ExpandFileName(ProjectFileName)), 'Logs')
+  else
+    Result := TPath.GetDocumentsPath;
+end;
+
+procedure TFrameProtocol.CleanupOldProtocolFiles;
+var
+  LogDirectory: string;
+  Files: TStringList;
+  FoundFiles: TArray<string>;
+  FileName: string;
+  Cutoff: TDateTime;
+  ModifiedTime: TDateTime;
+  OldestTime: TDateTime;
+  TotalSize: Int64;
+  FileSize: Int64;
+  OldestIndex: Integer;
+  I: Integer;
+
+  function IsCurrentLogFile(const AFileName: string): Boolean;
+  begin
+    Result := (FFullLogFileName <> '') and
+      SameText(ExpandFileName(AFileName), ExpandFileName(FFullLogFileName));
+  end;
+
+  procedure CollectFiles(const APattern: string);
+  var
+    Candidate: string;
+  begin
+    try
+      FoundFiles := TDirectory.GetFiles(LogDirectory, APattern);
+      for Candidate in FoundFiles do
+        if Files.IndexOf(Candidate) < 0 then
+          Files.Add(Candidate);
+    except
+      { Cleanup failure must not interrupt application startup or logging. }
     end;
-    Lines.Add(Format('ApplicationVersion | Версия программы | Version=%s; Executable=%s; BuildDate=; GitCommit=; SimulationMode=%s; EffectiveSimulationActive=%s',
-      [APP_VERSION, ExpandFileName(ParamStr(0)), SimulationModeText,
-       EffectiveSimulationText]));
-    for I := 0 to ListBoxProtocol.Count - 1 do
-      if ListBoxProtocol.ItemByIndex(I) is TListBoxItem then
+  end;
+
+begin
+  LogDirectory := ProtocolLogDirectory;
+  Files := TStringList.Create;
+  try
+    CollectFiles('protocol_session_*.txt');
+    CollectFiles('protocol_export_*.txt');
+
+    Cutoff := Now - CProtocolRetentionDays;
+    TotalSize := 0;
+
+    for I := Files.Count - 1 downto 0 do
+    begin
+      FileName := Files[I];
+
+      try
+        if not TFile.Exists(FileName) then
+        begin
+          Files.Delete(I);
+          Continue;
+        end;
+
+        ModifiedTime := TFile.GetLastWriteTime(FileName);
+        if (ModifiedTime < Cutoff) and not IsCurrentLogFile(FileName) then
+        begin
+          TFile.Delete(FileName);
+          Files.Delete(I);
+          Continue;
+        end;
+
+        Inc(TotalSize, TFile.GetSize(FileName));
+      except
+        Files.Delete(I);
+      end;
+    end;
+
+    while TotalSize > CProtocolTotalSizeLimit do
+    begin
+      OldestIndex := -1;
+      OldestTime := EncodeDate(9999, 12, 31);
+
+      for I := 0 to Files.Count - 1 do
       begin
-        Item := TListBoxItem(ListBoxProtocol.ItemByIndex(I));
-        Lines.Add(Item.Text);
+        FileName := Files[I];
+        if IsCurrentLogFile(FileName) then
+          Continue;
+
+        try
+          ModifiedTime := TFile.GetLastWriteTime(FileName);
+          if ModifiedTime < OldestTime then
+          begin
+            OldestTime := ModifiedTime;
+            OldestIndex := I;
+          end;
+        except
+          { Ignore inaccessible candidates and continue with other files. }
+        end;
       end;
 
-    FileName := TPath.Combine(TPath.GetDocumentsPath,
-      'protocol_export_' + FormatDateTime('yyyymmdd_hhnnss', Now) + '.txt');
-    Lines.SaveToFile(FileName, TEncoding.UTF8);
-    ShowMessage('Журнал выгружен: ' + FileName);
+      if OldestIndex < 0 then
+        Break;
+
+      FileName := Files[OldestIndex];
+      try
+        FileSize := TFile.GetSize(FileName);
+        TFile.Delete(FileName);
+        Dec(TotalSize, FileSize);
+      except
+        { Remove an inaccessible candidate to prevent an endless loop. }
+      end;
+      Files.Delete(OldestIndex);
+    end;
   finally
-    Lines.Free;
+    Files.Free;
   end;
+end;
+
+procedure TFrameProtocol.InitializeFullLog;
+var
+  LogDirectory: string;
+begin
+  FreeAndNil(FFullLogWriter);
+  FFullLogFileName := '';
+  FCurrentLogSizeBytes := 0;
+
+  LogDirectory := ProtocolLogDirectory;
+  ForceDirectories(LogDirectory);
+  CleanupOldProtocolFiles;
+
+  FFullLogFileName := TPath.Combine(
+    LogDirectory,
+    'protocol_session_' + FormatDateTime('yyyymmdd_hhnnss_zzz', Now) + '.txt'
+  );
+
+  try
+    FFullLogWriter := TStreamWriter.Create(
+      FFullLogFileName,
+      False,
+      TEncoding.UTF8
+    );
+    FFullLogWriter.AutoFlush := True;
+    if FSessionLogFiles.IndexOf(FFullLogFileName) < 0 then
+      FSessionLogFiles.Add(FFullLogFileName);
+  except
+    FreeAndNil(FFullLogWriter);
+    FFullLogFileName := '';
+  end;
+end;
+
+procedure TFrameProtocol.ResetFullLog;
+begin
+  FTotalMessageCount := 0;
+  FSessionLogFiles.Clear;
+  InitializeFullLog;
+end;
+
+procedure TFrameProtocol.AppendFullLogMessage(
+  const Msg: TProtocolMessage);
+var
+  Line: string;
+  LineSize: Int64;
+begin
+  if Msg = nil then
+    Exit;
+
+  Line := TProtocolManager.FormatMessage(Msg);
+  LineSize := TEncoding.UTF8.GetByteCount(Line + sLineBreak);
+
+  if (FFullLogWriter <> nil) and
+     (FCurrentLogSizeBytes + LineSize > CProtocolFileSizeLimit) then
+    InitializeFullLog;
+
+  if FFullLogWriter = nil then
+    Exit;
+
+  try
+    FFullLogWriter.WriteLine(Line);
+    Inc(FCurrentLogSizeBytes, LineSize);
+  except
+    FreeAndNil(FFullLogWriter);
+  end;
+end;
+
+procedure TFrameProtocol.TrimStoredMessages;
+begin
+  while FMessages.Count > CProtocolMemoryMessageLimit do
+    FMessages.Delete(0);
+end;
+
+procedure TFrameProtocol.TrimProtocolItems;
+var
+  Item: TListBoxItem;
+begin
+  while ListBoxProtocol.Count > CProtocolDisplayMessageLimit do
+  begin
+    Item := ListBoxProtocol.ItemByIndex(0) as TListBoxItem;
+    ListBoxProtocol.RemoveObject(Item);
+    Item.Free;
+  end;
+end;
+
+procedure TFrameProtocol.ShowPartialCopyWarning(
+  const ACopiedCount: Integer);
+var
+  FileInfo: string;
+begin
+  if ACopiedCount >= FTotalMessageCount then
+    Exit;
+
+  FileInfo := '';
+  if FSessionLogFiles.Count > 0 then
+    FileInfo := sLineBreak +
+      'Полный журнал можно получить кнопкой «Выгрузить в файл».' +
+      sLineBreak + 'Папка журналов: ' + ProtocolLogDirectory;
+
+  ShowMessage(Format(
+    'В буфер скопирован не весь журнал: %d из %d сообщений.%s',
+    [ACopiedCount, FTotalMessageCount, FileInfo]
+  ));
+end;
+
+procedure TFrameProtocol.ExportProtocolToFile;
+var
+  FileName: string;
+  SourceFileName: string;
+  Reader: TStreamReader;
+  Writer: TStreamWriter;
+  HasSourceFiles: Boolean;
+  I: Integer;
+begin
+  if FFullLogWriter <> nil then
+    FFullLogWriter.Flush;
+
+  HasSourceFiles := False;
+  for I := 0 to FSessionLogFiles.Count - 1 do
+    if TFile.Exists(FSessionLogFiles[I]) then
+    begin
+      HasSourceFiles := True;
+      Break;
+    end;
+
+  if not HasSourceFiles then
+  begin
+    ShowMessage('Полный файл журнала недоступен.');
+    Exit;
+  end;
+
+  FileName := TPath.Combine(
+    ProtocolLogDirectory,
+    'protocol_export_' + FormatDateTime('yyyymmdd_hhnnss_zzz', Now) + '.txt'
+  );
+
+  Writer := nil;
+  try
+    Writer := TStreamWriter.Create(FileName, False, TEncoding.UTF8);
+
+    for I := 0 to FSessionLogFiles.Count - 1 do
+    begin
+      SourceFileName := FSessionLogFiles[I];
+      if not TFile.Exists(SourceFileName) then
+        Continue;
+
+      Reader := TStreamReader.Create(
+        SourceFileName,
+        TEncoding.UTF8,
+        True
+      );
+      try
+        while not Reader.EndOfStream do
+          Writer.WriteLine(Reader.ReadLine);
+      finally
+        Reader.Free;
+      end;
+    end;
+
+    Writer.Flush;
+    CleanupOldProtocolFiles;
+    ShowMessage('Журнал выгружен: ' + FileName);
+  except
+    on E: Exception do
+      ShowMessage('Не удалось выгрузить журнал: ' + E.Message);
+  end;
+  Writer.Free;
 end;
 
 destructor TFrameProtocol.Destroy;
 begin
   SaveProtocolSettings;
- if ProtocolManager<>nil then
-   begin
-   ProtocolManager.Unsubscribe(FListener);
-  FreeAndNil(FMessages);
-   end;
+  if ProtocolManager <> nil then
+    ProtocolManager.Unsubscribe(FListener);
 
+  FreeAndNil(FFullLogWriter);
+  FreeAndNil(FSessionLogFiles);
+  FreeAndNil(FMessages);
   inherited;
 end;
 
@@ -329,7 +613,11 @@ begin
   TThread.Synchronize(nil,
     procedure
     begin
+      Inc(FTotalMessageCount);
+      AppendFullLogMessage(CopyMsg);
+
       FMessages.Add(CopyMsg);
+      TrimStoredMessages;
 
       if IsAllowedByFilters(CopyMsg) then
         AddProtocolItem(CopyMsg);
@@ -339,28 +627,49 @@ end;
 
 procedure TFrameProtocol.CopyProtocolToClipboard;
 var
-  Lines: TStringList;
+  Builder: TStringBuilder;
   I: Integer;
   Item: TListBoxItem;
+  Line: string;
+  ClipboardText: string;
+  CopiedCount: Integer;
   ClipboardService: IFMXClipboardService;
 begin
   if ListBoxProtocol.Count = 0 then
+  begin
+    if FTotalMessageCount > 0 then
+      ShowPartialCopyWarning(0);
     Exit;
+  end;
 
-  Lines := TStringList.Create;
+  Builder := TStringBuilder.Create;
   try
+    CopiedCount := 0;
+
     for I := 0 to ListBoxProtocol.Count - 1 do
       if ListBoxProtocol.ItemByIndex(I) is TListBoxItem then
       begin
         Item := TListBoxItem(ListBoxProtocol.ItemByIndex(I));
-        Lines.Add(Item.Text);
+        Line := Item.Text;
+
+        if Builder.Length + Length(Line) + Length(sLineBreak) >
+           CClipboardCharacterLimit then
+          Break;
+
+        Builder.Append(Line);
+        Builder.Append(sLineBreak);
+        Inc(CopiedCount);
       end;
 
-    if (Lines.Count > 0) and TPlatformServices.Current.SupportsPlatformService(
+    if (CopiedCount > 0) and TPlatformServices.Current.SupportsPlatformService(
       IFMXClipboardService, IInterface(ClipboardService)) then
-      ClipboardService.SetClipboard(Lines.Text);
+    begin
+      ClipboardText := Builder.ToString;
+      ClipboardService.SetClipboard(ClipboardText);
+      ShowPartialCopyWarning(CopiedCount);
+    end;
   finally
-    Lines.Free;
+    Builder.Free;
   end;
 end;
 
@@ -381,12 +690,13 @@ begin
   Item.TextSettings.WordWrap := False;
 
   case Msg.Category of
-    pcInfo: Item.TextSettings.FontColor := TAlphaColorRec.Dodgerblue;
-    pcWarning: Item.TextSettings.FontColor := TAlphaColorRec.Gold;
-    pcError: Item.TextSettings.FontColor := TAlphaColorRec.Red;
+    pcInfo: Item.TextSettings.FontColor := TEXT_COLOR_INFO;
+    pcWarning: Item.TextSettings.FontColor := TEXT_COLOR_WARNING;
+    pcError: Item.TextSettings.FontColor := TEXT_COLOR_ERROR;
   end;
 
   ListBoxProtocol.AddObject(Item);
+  TrimProtocolItems;
   ListBoxProtocol.ScrollToItem(Item);
 end;
 
@@ -444,6 +754,7 @@ begin
   ProtocolManager.Clear;
   FMessages.Clear;
   ListBoxProtocol.Clear;
+  ResetFullLog;
 end;
 
 procedure TFrameProtocol.SpeedButtonExportClick(Sender: TObject);

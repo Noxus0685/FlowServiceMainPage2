@@ -135,7 +135,7 @@ object FrameProtocol: TFrameProtocol
     object CheckBoxEngine: TCheckBox
       Align = Left
       Position.X = 731.000000000000000000
-      Size.Width = 60.000000000000000000
+      Size.Width = 55.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 11

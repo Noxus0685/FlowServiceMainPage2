@@ -11,7 +11,7 @@ object FrameMRResults: TFrameMRResults
     Size.PlatformDefault = False
     TabOrder = 0
     Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, AutoDisplacement]
-    OnDrawColumnCell = GridMRResultsDrawColumnCell
+    OnDrawColumnBackground = GridMRResultsDrawColumnCell
     OnGetValue = GridMRResultsGetValue
     Viewport.Width = 1210.000000000000000000
     Viewport.Height = 663.000000000000000000

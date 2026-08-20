@@ -104,6 +104,7 @@ private
   FValueAirTemperture: TMeterValue;
   FValueHumidity: TMeterValue;
   FValueCurrent: TMeterValue;
+  FValueInterface: TMeterValue;
   FValueTime: TMeterValue;
   FEtalonMeter: TFlowMeter;
 
@@ -137,6 +138,7 @@ private
   HashValueAirTemperture: string;
   HashValueHumidity: string;
   HashValueCurrent: string;
+  HashValueInterface: string;
   HashValueTime: string;
 
   function GetDevice: TDevice;
@@ -210,6 +212,7 @@ private
   procedure SetValueAirTemperture(const AValue: TMeterValue);
   procedure SetValueHumidity(const AValue: TMeterValue);
   procedure SetValueCurrent(const AValue: TMeterValue);
+  procedure SetValueInterface(const AValue: TMeterValue);
   procedure SetValueTime(const AValue: TMeterValue);
 
 
@@ -361,6 +364,7 @@ public
   property ValueAirTemperture: TMeterValue read FValueAirTemperture write SetValueAirTemperture;
   property ValueHumidity: TMeterValue read FValueHumidity write SetValueHumidity;
   property ValueCurrent: TMeterValue read FValueCurrent write SetValueCurrent;
+  property ValueInterface: TMeterValue read FValueInterface write SetValueInterface;
   property ValueTime: TMeterValue read FValueTime write SetValueTime;
 
   procedure RestoreValueVolumeFlowHash(const AHash: string);
@@ -506,6 +510,7 @@ begin
   HashValueAirTemperture := '';
   HashValueHumidity := '';
   HashValueCurrent := '';
+  HashValueInterface := '';
   HashValueTime := '';
 
   FValueImp := nil;
@@ -538,6 +543,7 @@ begin
   FValueAirTemperture := nil;
   FValueHumidity := nil;
   FValueCurrent := nil;
+  FValueInterface := nil;
   FValueTime := nil;
 
   FRepoTypeName := '';
@@ -1072,6 +1078,11 @@ end;
 procedure TFlowMeter.SetValueCurrent(const AValue: TMeterValue);
 begin
   SetMeterValue(FValueCurrent, HashValueCurrent, AValue);
+end;
+
+procedure TFlowMeter.SetValueInterface(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueInterface, HashValueInterface, AValue);
 end;
 
 procedure TFlowMeter.SetValueTime(const AValue: TMeterValue);
