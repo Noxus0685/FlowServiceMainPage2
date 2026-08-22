@@ -7,6 +7,7 @@ uses
   FireDAC.Phys.SQLite,
   FireDAC.Phys.SQLiteDef,
   System.Classes,
+  System.Generics.Collections,
   System.IniFiles,
   System.IOUtils,
   System.SyncObjs,
@@ -24,13 +25,21 @@ type
     FConnection: TFDConnection;
     FStorageName: string;
     FWriteLockHeld: Boolean;
+    FSectionReadCache: TObjectDictionary<string, TStringList>;
+    FSectionReadCacheEnabled: Boolean;
+    procedure ClearSectionReadCache;
     procedure EnsureSchema;
     function CreateQuery: TFDQuery;
+    function GetCachedSectionValues(const Section: string): TStringList;
+    procedure InvalidateCachedSection(const Section: string);
   public
     // Открывает логическое INI-хранилище внутри выбранного файла проекта *.fpp.
     constructor Create(const ADatabaseFileName, AStorageName: string);
     destructor Destroy; override;
 
+    { Enables lazy section caching: the first read loads the whole section
+      with one SQL query and subsequent Read* calls use the in-memory copy. }
+    procedure EnableSectionReadCache;
     function ReadString(const Section, Ident, Default: string): string; override;
     procedure WriteString(const Section, Ident, Value: string); override;
     procedure ReadSection(const Section: string; Strings: TStrings); override;
@@ -113,6 +122,9 @@ begin
   inherited Create(ADatabaseFileName);
   FStorageName := AStorageName;
   FWriteLockHeld := False;
+  FSectionReadCacheEnabled := False;
+  FSectionReadCache := TObjectDictionary<string, TStringList>.Create(
+    [doOwnsValues]);
 
   FConnection := TFDConnection.Create(nil);
   FConnection.LoginPrompt := False;
@@ -139,8 +151,21 @@ begin
     FWriteLockHeld := False;
     EndProjectSettingsWrite;
   end;
+  FreeAndNil(FSectionReadCache);
   FreeAndNil(FConnection);
   inherited;
+end;
+
+procedure TProjectSettingsIni.ClearSectionReadCache;
+begin
+  if FSectionReadCache <> nil then
+    FSectionReadCache.Clear;
+end;
+
+procedure TProjectSettingsIni.EnableSectionReadCache;
+begin
+  ClearSectionReadCache;
+  FSectionReadCacheEnabled := True;
 end;
 
 function TProjectSettingsIni.CreateQuery: TFDQuery;
@@ -161,12 +186,52 @@ begin
   );
 end;
 
+function TProjectSettingsIni.GetCachedSectionValues(
+  const Section: string): TStringList;
+var
+  CacheKey: string;
+  Values: TStringList;
+begin
+  CacheKey := LowerCase(Section);
+  if not FSectionReadCache.TryGetValue(CacheKey, Values) then
+  begin
+    Values := TStringList.Create;
+    Values.CaseSensitive := False;
+    try
+      ReadSectionValues(Section, Values);
+      FSectionReadCache.Add(CacheKey, Values);
+    except
+      Values.Free;
+      raise;
+    end;
+  end;
+  Result := Values;
+end;
+
+procedure TProjectSettingsIni.InvalidateCachedSection(const Section: string);
+begin
+  if FSectionReadCache <> nil then
+    FSectionReadCache.Remove(LowerCase(Section));
+end;
+
 function TProjectSettingsIni.ReadString(const Section, Ident,
   Default: string): string;
 var
   Query: TFDQuery;
+  Values: TStringList;
+  ValueIndex: Integer;
 begin
   Result := Default;
+
+  if FSectionReadCacheEnabled then
+  begin
+    Values := GetCachedSectionValues(Section);
+    ValueIndex := Values.IndexOfName(Ident);
+    if ValueIndex >= 0 then
+      Result := Values.ValueFromIndex[ValueIndex];
+    Exit;
+  end;
+
   Query := CreateQuery;
   try
     Query.SQL.Text :=
@@ -221,6 +286,7 @@ begin
   finally
     EndProjectSettingsWrite;
   end;
+  InvalidateCachedSection(Section);
 end;
 
 procedure TProjectSettingsIni.ReadSection(const Section: string;
@@ -330,6 +396,7 @@ begin
   finally
     EndProjectSettingsWrite;
   end;
+  InvalidateCachedSection(Section);
 end;
 
 procedure TProjectSettingsIni.DeleteKey(const Section, Ident: string);
@@ -354,6 +421,7 @@ begin
   finally
     EndProjectSettingsWrite;
   end;
+  InvalidateCachedSection(Section);
 end;
 
 procedure TProjectSettingsIni.UpdateFile;
@@ -379,6 +447,7 @@ begin
   finally
     EndProjectSettingsWrite;
   end;
+  ClearSectionReadCache;
 end;
 
 procedure TProjectSettingsIni.BeginUpdate;

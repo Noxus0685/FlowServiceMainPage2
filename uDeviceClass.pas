@@ -556,13 +556,13 @@ type
     { МЕТРОЛОГИЯ И ДИАПАЗОНЫ }
     {====================================================================}
     DN: string;                 // Номинальный диаметр
-    Qmax: Double;               // Максимальный расход
+    Qmax: Double;               // Максимальный расход в базовых единицах
     Qmin: Double;               // Минимальный расход
     RangeDynamic: Double;       // Динамический диапазон (Qmax / Qmin)
     Qtr: Double;
     Q2tr: Double;
     Qnom: Double;
-    QFmax : Double;
+    QFmax : Double;             // QF в базовых единицах измеряемой величины
     Kp: Double;
     Temp: string;               // Температура
     Error: Double;              // Допустимая погрешность, %
@@ -590,7 +590,7 @@ type
     NoiseFilter: Integer;       // Фильтр помех, мс (-1=off, 0=auto, >0=ms)
     Freq: Integer;              // Максимальная частота, Гц
     Coef: Double;               // Коэффициент преобразования
-    FreqFlowRate: Double;       // Отношение расхода к частоте
+    FreqFlowRate: Double;       // QF в базовых единицах измеряемой величины
 
     {====================================================================}
     { НАПРЯЖЕНИЕ }
@@ -666,6 +666,13 @@ type
     function GetDimensionName: string;
     function ToBaseUnits(const AValue: Double): Double;
     function FromBaseUnits(const AValue: Double): Double;
+    { Frequency-output calculations use only the model's base flow units. }
+    function FrequencyToFlowRate(
+      const AFrequency, ABaseCoefficient: Double): Double;
+    function FlowRateToFrequency(
+      const AFlowRate, ABaseCoefficient: Double): Double;
+    function FrequencyAndFlowRateToCoefficient(
+      const AFrequency, AFlowRate: Double): Double;
     procedure AnalyseDevicePointsResults;
     procedure AnalyseResults;
     procedure SetValidation(const AValidation: EValidationStatus;
@@ -1364,6 +1371,33 @@ begin
   end
   else
     Result := AValue * Dim.Rate / Dim.Devider;
+end;
+
+function TDevice.FrequencyToFlowRate(
+  const AFrequency, ABaseCoefficient: Double): Double;
+begin
+  if ABaseCoefficient > 0 then
+    Result := AFrequency / ABaseCoefficient
+  else
+    Result := 0;
+end;
+
+function TDevice.FlowRateToFrequency(
+  const AFlowRate, ABaseCoefficient: Double): Double;
+begin
+  if (AFlowRate > 0) and (ABaseCoefficient > 0) then
+    Result := AFlowRate * ABaseCoefficient
+  else
+    Result := 0;
+end;
+
+function TDevice.FrequencyAndFlowRateToCoefficient(
+  const AFrequency, AFlowRate: Double): Double;
+begin
+  if AFlowRate > 0 then
+    Result := AFrequency / AFlowRate
+  else
+    Result := 0;
 end;
 
 procedure TDevice.SetState(const Value: TObjectState);
@@ -3247,7 +3281,8 @@ begin
     if (LQ > 0) and (P.LimitTime > 0) then
     begin
       Tm := P.LimitTime;
-      V := LQ * Tm / 3.6;
+      { Flow is already in base units compatible with the base coefficient. }
+      V := LQ * Tm;
       P.LimitVolume := V;
       if Coef > 0 then
         P.LimitImp := Round(V * Coef);
@@ -3371,4 +3406,7 @@ begin
 end;
 
 end.
+
+
+
 

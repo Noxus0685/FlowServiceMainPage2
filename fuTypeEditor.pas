@@ -4592,7 +4592,7 @@ begin
 
   FType.CoefDim := InputValue;
 
-  FType.Freq := Round(FType.Coef/3.6);
+  FType.Freq := Round(FType.Coef);
 
   // 6. Пересчёт Kp для всех диаметров
   RecalcDiametersKpByCoef;
@@ -4713,7 +4713,7 @@ begin
   begin
 
     if FDiametersLocal[I].QFmax > 0 then
-      Kp := 3.6 * FType.Freq / FDiametersLocal[I].QFmax
+      Kp := FType.Freq / FDiametersLocal[I].QFmax
     else
       Kp := 0;
 
@@ -4808,10 +4808,10 @@ begin
   // Сохраняем в тип
   // ----------------------------------------
   FType.Freq := NewFreq;
-  FType.Coef := 3.6 *  FType.Freq;
+  FType.Coef := FType.Freq;
   // ----------------------------------------
   // Пересчёт Kp по частоте
-  // Kp = 3.6 * Freq / QFmax
+  // QFmax is stored in base units, so no UI-unit factor is involved.
   // ----------------------------------------
   RecalcDiametersKpByFreq;
 

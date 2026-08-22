@@ -12,6 +12,9 @@ uses
   uProjectSettings,
   uProtocols,
   uFlowMeter,
+{$IFDEF MSWINDOWS}
+ WinAPI.Windows,
+{$ENDIF}
   uWorkTable;
 
 type
@@ -186,6 +189,10 @@ procedure TAppServices.Initialize(const AProjectFileName: string);
 var
   ProjectFileName: string;
 begin
+  {$IFDEF DEBUG}
+  OutputDebugString(PChar('TAppServices.Initialize - НАЧАЛО:'+IntToStr(GetTickCount())));
+  {$ENDIF}
+
   ProjectFileName := ResolveProjectFileName(AProjectFileName);
 
   if FInitialized then
@@ -215,7 +222,13 @@ begin
   end;
 
   FDataManager.Load;
+  {$IFDEF DEBUG}
+  OutputDebugString(PChar('TAppServices.Initialize - FDataManager.Load:'+IntToStr(GetTickCount())));
+  {$ENDIF}
   LoadPersistentState;
+  {$IFDEF DEBUG}
+  OutputDebugString(PChar('TAppServices.Initialize - LoadPersistentState:'+IntToStr(GetTickCount())));
+  {$ENDIF}
 
   // --- WorkTableManager ---
   if FWorkTableManager = nil then
@@ -226,9 +239,18 @@ begin
   end;
 
   FWorkTableManager.Load;
+  {$IFDEF DEBUG}
+  OutputDebugString(PChar('TAppServices.Initialize - FWorkTableManager.Load:'+IntToStr(GetTickCount())));
+  {$ENDIF}
   LoadWorkTableDeviceData;
+  {$IFDEF DEBUG}
+  OutputDebugString(PChar('TAppServices.Initialize - LoadWorkTableDeviceData:'+IntToStr(GetTickCount())));
+  {$ENDIF}
 
   FShutdownPrepared := False;
+  {$IFDEF DEBUG}
+  OutputDebugString(PChar('TAppServices.Initialize - КОНЕЦ:'+IntToStr(GetTickCount())));
+  {$ENDIF}
   FInitialized := True;
 end;
 

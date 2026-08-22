@@ -590,7 +590,7 @@ type
       read FSaveConfirmationResult;
 
     property Mode: EMeasurementRunMode read FMode write FMode;
-    property CurrentPointIndex: Integer read FCurrentPointIndex write FCurrentPointIndex;
+    property CurrentPointIndex: Integer read FCurrentPointIndex;
     property CurrentPoint: TDevicePoint read GetCurrentPoint;
     property CurrentRepeat: Integer read FCurrentRepeat;
     property StopRequested: Boolean read FStopRequested;
@@ -3696,6 +3696,14 @@ procedure TMeasurementRun.RebuildMeasurementPoints;
 var
   Point: TDevicePoint;
 begin
+  if not (FCurrentStage in [msNone, msDone]) then
+  begin
+    AddDiagnosticEvent(Format(
+      'RebuildMeasurementPoints blocked: Stage=%s; CurrentPointIndex=%d; PointsCount=%d',
+      [MeasurementStateToString(FCurrentStage), FCurrentPointIndex, FPoints.Count]));
+    Exit;
+  end;
+
   FPointsPrepared := False;
   FPoints.Clear;
   ResetPointSelectionContext;
@@ -3711,14 +3719,17 @@ begin
       begin
         Point := TDevicePoint.Create(0);
         Point.Assign(FWorkTable.CurrentPoint, False);
-        if Trim(Point.Name) = '' then
-          Point.Name := 'Ручная точка';
+        // При каждом входе Auto -> Manual создаётся одна самостоятельная
+        // runtime-точка, не связанная с последней автоматической точкой.
+        Point.UUID := TGUID.NewGuid.ToString;
+        Point.Name := 'Ручная точка';
         Point.Enabled := True;
         Point.Status := mptsNone;
         Point.RepeatsCompleted := 0;
         FPoints.Add(Point);
         FCurrentPointIndex := 0;
         FWorkTable.CurrentPoint.Assign(Point, False);
+        FWorkTable.CurrentPoint.UUID := Point.UUID;
       end;
     mrmHalfAutomatic:
       begin
@@ -3733,6 +3744,13 @@ end;
 
 procedure TMeasurementRun.InvalidatePreparedPoints;
 begin
+  if not (FCurrentStage in [msNone, msDone]) then
+  begin
+    AddDiagnosticEvent(Format(
+      'InvalidatePreparedPoints blocked: Stage=%s; CurrentPointIndex=%d; PointsCount=%d',
+      [MeasurementStateToString(FCurrentStage), FCurrentPointIndex, FPoints.Count]));
+    Exit;
+  end;
   FPointsPrepared := False;
 end;
 
@@ -6836,6 +6854,21 @@ var
   SavedRepeat: Integer;
   ResultsSaved: Boolean;
 begin
+  Point := GetCurrentPoint;
+  if Point = nil then
+  begin
+    FLastSaveMeasurementResultsResult := 'failed: current point is nil';
+    FLastSaveErrorText := 'Потеряна текущая точка измерения перед сохранением';
+    ProtocolManager.AddMessage(pcError, psMeasurement, 'ProcessSave',
+      'Сохранение результата остановлено: текущая точка не найдена',
+      Format('Stage=%s; CurrentPointIndex=%d; PointsCount=%d',
+        [MeasurementStateToString(FCurrentStage), FCurrentPointIndex,
+         FPoints.Count]));
+    ContinueAfterPointError(mptsMeasureError, meSaveError,
+      BuildError(1412, FLastSaveErrorText));
+    Exit;
+  end;
+
   // Одиночное ручное измерение остаётся в msSave до решения пользователя.
   if RequiresSaveConfirmation then
     case FSaveConfirmationResult of
@@ -6872,7 +6905,6 @@ begin
     FireEvent(meSaveDone);
   end;
 
-  Point := GetCurrentPoint;
   if (FForceNextPoint >= 0) and (FNextStageAfterSave = msSelectPoint) then
   begin
     MarkInterruptedPointIfNeeded;

@@ -14,6 +14,7 @@ uses
   FMX.TreeView,
   FMX.Types,
   System.Classes,
+  System.Math,
   System.SysUtils,
   System.Types,
   System.UITypes,
@@ -27,6 +28,7 @@ type
   private
     FWorkTable: TWorkTable;
     FLoading: Boolean;
+    FOnDeleteWorkTable: TNotifyEvent;
 
     LayoutRoot: TLayout;
     EditWorkTableText: TEdit;
@@ -63,17 +65,27 @@ type
     ButtonSelectTemperture: TButton;
     ButtonSelectFlowRate: TButton;
     ButtonSelectQuantity: TButton;
+    ComboPumpCatalog: TComboBox;
     EditPumpName: TEdit;
+    EditPumpCaption: TEdit;
+    EditPumpMin: TEdit;
+    EditPumpMax: TEdit;
     ButtonPumpAdd: TButton;
     ButtonPumpDelete: TButton;
+    ButtonPumpCatalogDelete: TButton;
     EditScaleName: TEdit;
     ButtonScaleAdd: TButton;
     ButtonScaleDelete: TButton;
+    ButtonDeleteWorkTable: TButton;
 
     procedure BuildUI;
     procedure AddEditRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit);
     procedure AddLabelRow(AParent: TTreeViewItem; const ACaption: string; out ALabel: TLabel);
+    procedure AddWorkTableNameRow(AParent: TTreeViewItem;
+      const ACaption: string; out AEdit: TEdit);
     procedure AddComboRow(AParent: TTreeViewItem; const ACaption: string; out ACombo: TComboBox);
+    procedure AddComboButtonRow(AParent: TTreeViewItem; const ACaption: string;
+      out ACombo: TComboBox; out AButton: TButton; AOnClick: TNotifyEvent);
     procedure AddInstrumentRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit;
       out AAddButton, ADeleteButton: TButton; AOnAddClick, AOnDeleteClick: TNotifyEvent);
     procedure AddMeterValueRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit;
@@ -87,6 +99,11 @@ type
     procedure RefreshValues;
     procedure FillChannelCombo;
     procedure RefreshInstrumentEdits;
+    function SelectedCatalogPump: TPump;
+    function IsPumpAssignedToWorkTable(APump: TPump): Boolean;
+    procedure HandlePumpCatalogChange(Sender: TObject);
+    procedure HandlePumpNameChange(Sender: TObject);
+    procedure HandlePumpFieldExit(Sender: TObject);
     procedure HandleWorkTableTextExit(Sender: TObject);
     procedure HandleWorkTableNameExit(Sender: TObject);
     procedure HandleSyncComboChange(Sender: TObject);
@@ -100,8 +117,10 @@ type
     procedure ButtonSelectQuantityClick(Sender: TObject);
     procedure ButtonPumpAddClick(Sender: TObject);
     procedure ButtonPumpDeleteClick(Sender: TObject);
+    procedure ButtonPumpCatalogDeleteClick(Sender: TObject);
     procedure ButtonScaleAddClick(Sender: TObject);
     procedure ButtonScaleDeleteClick(Sender: TObject);
+    procedure ButtonDeleteWorkTableClick(Sender: TObject);
   public
     constructor Create(AOwner: TComponent); override;
     function CanEditWorkTable: Boolean;
@@ -109,6 +128,9 @@ type
     procedure LoadSyncSetupToUI(ASetup: TSyncSetup);
     procedure SaveUISyncSetup(ASetup: TSyncSetup);
     procedure UpdateSyncControlsState;
+    procedure UpdateDeleteButtonEnabled(const AEnabled: Boolean);
+    property OnDeleteWorkTable: TNotifyEvent read FOnDeleteWorkTable
+      write FOnDeleteWorkTable;
   end;
 
 implementation
@@ -200,15 +222,27 @@ begin
   AddEditRow(GeneralCategory, 'Название рабочего стола', EditWorkTableText);
   EditWorkTableText.OnExit := HandleWorkTableTextExit;
 
-  AddEditRow(GeneralCategory, 'Имя рабочего стола', EditWorkTableName);
+  AddWorkTableNameRow(GeneralCategory, 'Имя рабочего стола',
+    EditWorkTableName);
   EditWorkTableName.OnExit := HandleWorkTableNameExit;
 
   AddLabelRow(GeneralCategory, 'UUID рабочего стола', LabelWorkTableUUID);
   AddLabelRow(GeneralCategory, 'Текущее состояние', LabelWorkTableState);
 
   PumpsCategory := AddCategory('Насосы');
-  AddInstrumentRow(PumpsCategory, 'Насос', EditPumpName, ButtonPumpAdd, ButtonPumpDelete,
+  AddComboButtonRow(PumpsCategory, 'Насосы', ComboPumpCatalog, ButtonPumpCatalogDelete,
+    ButtonPumpCatalogDeleteClick);
+  ComboPumpCatalog.OnChange := HandlePumpCatalogChange;
+  AddInstrumentRow(PumpsCategory, 'Имя', EditPumpName, ButtonPumpAdd, ButtonPumpDelete,
     ButtonPumpAddClick, ButtonPumpDeleteClick);
+  AddEditRow(PumpsCategory, 'Название', EditPumpCaption);
+  AddEditRow(PumpsCategory, 'Минимум, Гц', EditPumpMin);
+  AddEditRow(PumpsCategory, 'Максимум, Гц', EditPumpMax);
+  EditPumpName.OnChange := HandlePumpNameChange;
+  EditPumpName.OnExit := HandlePumpFieldExit;
+  EditPumpCaption.OnExit := HandlePumpFieldExit;
+  EditPumpMin.OnExit := HandlePumpFieldExit;
+  EditPumpMax.OnExit := HandlePumpFieldExit;
 
   ScalesCategory := AddCategory('Весы');
   AddInstrumentRow(ScalesCategory, 'Весы', EditScaleName, ButtonScaleAdd, ButtonScaleDelete,
@@ -393,6 +427,77 @@ begin
   RowGrid.ControlCollection.AddControl(ALabel, 1, 0);
 end;
 
+procedure TFrameWorkTableProperties.AddWorkTableNameRow(
+  AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit);
+var
+  Item: TTreeViewItem;
+  RowGrid: TGridPanelLayout;
+  CaptionLabel: TLabel;
+  ValueLayout: TLayout;
+begin
+  Item := TTreeViewItem.Create(Self);
+  Item.Parent := AParent;
+  Item.Text := '';
+  Item.Height := 36;
+  Item.Stored := False;
+
+  RowGrid := TGridPanelLayout.Create(Self);
+  RowGrid.Parent := Item;
+  RowGrid.Align := TAlignLayout.Client;
+  RowGrid.RowCollection.Clear;
+  RowGrid.ColumnCollection.Clear;
+  RowGrid.ColumnCollection.Add.Value := 45;
+  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.RowCollection.Add.Value := 100;
+  RowGrid.Stored := False;
+
+  CaptionLabel := TLabel.Create(Self);
+  CaptionLabel.Parent := RowGrid;
+  CaptionLabel.Align := TAlignLayout.Client;
+  CaptionLabel.Text := ACaption;
+  CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
+  CaptionLabel.HitTest := False;
+  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
+  RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
+
+  ValueLayout := TLayout.Create(Self);
+  ValueLayout.Parent := RowGrid;
+  ValueLayout.Align := TAlignLayout.Client;
+  ValueLayout.Margins.Rect := TRectF.Create(6, 3, 10, 3);
+  ValueLayout.Stored := False;
+  RowGrid.ControlCollection.AddControl(ValueLayout, 1, 0);
+
+  ButtonDeleteWorkTable := TButton.Create(Self);
+  ButtonDeleteWorkTable.Parent := ValueLayout;
+  ButtonDeleteWorkTable.Align := TAlignLayout.Right;
+  ButtonDeleteWorkTable.Width := 36;
+  ButtonDeleteWorkTable.Margins.Left := 8;
+  ButtonDeleteWorkTable.Text := '-';
+  ButtonDeleteWorkTable.Hint := 'Удалить рабочий стол';
+  ButtonDeleteWorkTable.ShowHint := True;
+  ButtonDeleteWorkTable.OnClick := ButtonDeleteWorkTableClick;
+  ButtonDeleteWorkTable.Enabled := False;
+
+  AEdit := TEdit.Create(Self);
+  AEdit.Parent := ValueLayout;
+  AEdit.Align := TAlignLayout.Client;
+  AEdit.KillFocusByReturn := True;
+end;
+
+{ Передаёт запрос удаления владельцу frame, не изменяя менеджер напрямую. }
+procedure TFrameWorkTableProperties.ButtonDeleteWorkTableClick(Sender: TObject);
+begin
+  if Assigned(FOnDeleteWorkTable) then
+    FOnDeleteWorkTable(Sender);
+end;
+
+procedure TFrameWorkTableProperties.UpdateDeleteButtonEnabled(
+  const AEnabled: Boolean);
+begin
+  if ButtonDeleteWorkTable <> nil then
+    ButtonDeleteWorkTable.Enabled := AEnabled and (FWorkTable <> nil);
+end;
+
 procedure TFrameWorkTableProperties.AddComboRow(AParent: TTreeViewItem; const ACaption: string; out ACombo: TComboBox);
 var
   Item: TTreeViewItem;
@@ -429,6 +534,61 @@ begin
   ACombo.Align := TAlignLayout.Client;
   ACombo.Margins.Rect := TRectF.Create(6, 3, 10, 3);
   RowGrid.ControlCollection.AddControl(ACombo, 1, 0);
+end;
+
+{ Creates a combo row with one adjacent action button. }
+procedure TFrameWorkTableProperties.AddComboButtonRow(AParent: TTreeViewItem;
+  const ACaption: string; out ACombo: TComboBox; out AButton: TButton;
+  AOnClick: TNotifyEvent);
+var
+  Item: TTreeViewItem;
+  RowGrid: TGridPanelLayout;
+  CaptionLabel: TLabel;
+  ValueLayout: TLayout;
+begin
+  Item := TTreeViewItem.Create(Self);
+  Item.Parent := AParent;
+  Item.Text := '';
+  Item.Height := 36;
+  Item.Stored := False;
+
+  RowGrid := TGridPanelLayout.Create(Self);
+  RowGrid.Parent := Item;
+  RowGrid.Align := TAlignLayout.Client;
+  RowGrid.RowCollection.Clear;
+  RowGrid.ColumnCollection.Clear;
+  RowGrid.ColumnCollection.Add.Value := 45;
+  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.RowCollection.Add.Value := 100;
+  RowGrid.Stored := False;
+
+  CaptionLabel := TLabel.Create(Self);
+  CaptionLabel.Parent := RowGrid;
+  CaptionLabel.Align := TAlignLayout.Client;
+  CaptionLabel.Text := ACaption;
+  CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
+  CaptionLabel.HitTest := False;
+  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
+  RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
+
+  ValueLayout := TLayout.Create(Self);
+  ValueLayout.Parent := RowGrid;
+  ValueLayout.Align := TAlignLayout.Client;
+  ValueLayout.Margins.Rect := TRectF.Create(6, 3, 10, 3);
+  ValueLayout.Stored := False;
+  RowGrid.ControlCollection.AddControl(ValueLayout, 1, 0);
+
+  AButton := TButton.Create(Self);
+  AButton.Parent := ValueLayout;
+  AButton.Align := TAlignLayout.Right;
+  AButton.Width := 36;
+  AButton.Margins.Left := 8;
+  AButton.Text := '-';
+  AButton.OnClick := AOnClick;
+
+  ACombo := TComboBox.Create(Self);
+  ACombo.Parent := ValueLayout;
+  ACombo.Align := TAlignLayout.Client;
 end;
 
 procedure TFrameWorkTableProperties.AddInstrumentRow(AParent: TTreeViewItem; const ACaption: string;
@@ -479,13 +639,17 @@ begin
   AAddButton.Text := '+';
   AAddButton.OnClick := AOnAddClick;
 
-  ADeleteButton := TButton.Create(Self);
-  ADeleteButton.Parent := ValueLayout;
-  ADeleteButton.Align := TAlignLayout.Right;
-  ADeleteButton.Width := 36;
-  ADeleteButton.Margins.Left := 8;
-  ADeleteButton.Text := '-';
-  ADeleteButton.OnClick := AOnDeleteClick;
+  ADeleteButton := nil;
+  if Assigned(AOnDeleteClick) then
+  begin
+    ADeleteButton := TButton.Create(Self);
+    ADeleteButton.Parent := ValueLayout;
+    ADeleteButton.Align := TAlignLayout.Right;
+    ADeleteButton.Width := 36;
+    ADeleteButton.Margins.Left := 8;
+    ADeleteButton.Text := '-';
+    ADeleteButton.OnClick := AOnDeleteClick;
+  end;
 
   AEdit := TEdit.Create(Self);
   AEdit.Parent := ValueLayout;
@@ -982,8 +1146,15 @@ end;
 procedure TFrameWorkTableProperties.ApplyEditState;
 var
   CanEdit: Boolean;
+  Pump: TPump;
+  PumpAssigned: Boolean;
+  PumpNameMatches: Boolean;
 begin
   CanEdit := CanEditWorkTable;
+  Pump := SelectedCatalogPump;
+  PumpAssigned := IsPumpAssignedToWorkTable(Pump);
+  PumpNameMatches := (Pump <> nil) and
+    SameText(Trim(EditPumpName.Text), Trim(Pump.Name));
 
   EditWorkTableText.Enabled := CanEdit;
   EditWorkTableName.Enabled := CanEdit;
@@ -999,9 +1170,16 @@ begin
   EditFlowRateMax.Enabled := CanEdit;
   EditQuantityMin.Enabled := CanEdit;
   EditQuantityMax.Enabled := CanEdit;
+  ComboPumpCatalog.Enabled := CanEdit;
+  // The name remains editable because it is also the input for creating a pump.
+  // Other pump fields may be changed only after the pump is assigned to this table.
   EditPumpName.Enabled := CanEdit;
+  EditPumpCaption.Enabled := CanEdit and PumpAssigned and PumpNameMatches;
+  EditPumpMin.Enabled := CanEdit and PumpAssigned and PumpNameMatches;
+  EditPumpMax.Enabled := CanEdit and PumpAssigned and PumpNameMatches;
   ButtonPumpAdd.Enabled := CanEdit;
-  ButtonPumpDelete.Enabled := CanEdit;
+  ButtonPumpDelete.Enabled := CanEdit and PumpAssigned and PumpNameMatches;
+  ButtonPumpCatalogDelete.Enabled := CanEdit and (Pump <> nil);
   EditScaleName.Enabled := CanEdit;
   ButtonScaleAdd.Enabled := CanEdit;
   ButtonScaleDelete.Enabled := CanEdit;
@@ -1112,23 +1290,159 @@ end;
 
 
 procedure TFrameWorkTableProperties.RefreshInstrumentEdits;
+var
+  I, SelectedIndex: Integer;
+  Pump: TPump;
 begin
+  ComboPumpCatalog.Items.Clear;
+  ComboPumpCatalog.ItemIndex := -1;
+  SelectedIndex := -1;
+
+  if TPump.Pumps <> nil then
+    for I := 0 to TPump.Pumps.Count - 1 do
+    begin
+      Pump := TPump.Pumps[I];
+      if Pump = nil then
+        Continue;
+      ComboPumpCatalog.Items.AddObject(Pump.Caption, Pump);
+      if (FWorkTable <> nil) and (FWorkTable.ActivePump = Pump) then
+        SelectedIndex := ComboPumpCatalog.Items.Count - 1;
+    end;
+
+  ComboPumpCatalog.ItemIndex := SelectedIndex;
+
   if FWorkTable = nil then
   begin
     EditPumpName.Text := '';
+    EditPumpCaption.Text := '';
+    EditPumpMin.Text := '';
+    EditPumpMax.Text := '';
     EditScaleName.Text := '';
     Exit;
   end;
 
-  if FWorkTable.ActivePump <> nil then
-    EditPumpName.Text := FWorkTable.ActivePump.Name
+  Pump := SelectedCatalogPump;
+  if (Pump = nil) and (FWorkTable.ActivePump <> nil) then
+    Pump := FWorkTable.ActivePump;
+
+  if Pump <> nil then
+  begin
+    EditPumpName.Text := Pump.Name;
+    EditPumpCaption.Text := Pump.Caption;
+    EditPumpMin.Text := FormatFloat('0.##', Pump.Min);
+    EditPumpMax.Text := FormatFloat('0.##', Pump.Max);
+  end
   else
+  begin
     EditPumpName.Text := '';
+    EditPumpCaption.Text := '';
+    EditPumpMin.Text := '';
+    EditPumpMax.Text := '';
+  end;
 
   if FWorkTable.ActiveScale <> nil then
     EditScaleName.Text := FWorkTable.ActiveScale.Name
   else
     EditScaleName.Text := '';
+end;
+
+function TFrameWorkTableProperties.SelectedCatalogPump: TPump;
+begin
+  Result := nil;
+  if (ComboPumpCatalog = nil) or
+     (ComboPumpCatalog.ItemIndex < 0) or
+     (ComboPumpCatalog.ItemIndex >= ComboPumpCatalog.Items.Count) then
+    Exit;
+
+  if ComboPumpCatalog.Items.Objects[ComboPumpCatalog.ItemIndex] is TPump then
+    Result := TPump(ComboPumpCatalog.Items.Objects[ComboPumpCatalog.ItemIndex]);
+end;
+
+{ Returns True only when the catalog pump is already assigned to the current table. }
+function TFrameWorkTableProperties.IsPumpAssignedToWorkTable(APump: TPump): Boolean;
+begin
+  Result := (FWorkTable <> nil) and (FWorkTable.Pumps <> nil) and
+    (APump <> nil) and (FWorkTable.Pumps.IndexOf(APump) >= 0);
+end;
+
+procedure TFrameWorkTableProperties.HandlePumpCatalogChange(Sender: TObject);
+var
+  Pump: TPump;
+begin
+  if FLoading then
+    Exit;
+
+  Pump := SelectedCatalogPump;
+  if Pump = nil then
+    Exit;
+
+  FLoading := True;
+  try
+    EditPumpName.Text := Pump.Name;
+    EditPumpCaption.Text := Pump.Caption;
+    EditPumpMin.Text := FormatFloat('0.##', Pump.Min);
+    EditPumpMax.Text := FormatFloat('0.##', Pump.Max);
+  finally
+    FLoading := False;
+  end;
+  ApplyEditState;
+end;
+
+procedure TFrameWorkTableProperties.HandlePumpNameChange(Sender: TObject);
+begin
+  if not FLoading then
+    ApplyEditState;
+end;
+
+procedure TFrameWorkTableProperties.HandlePumpFieldExit(Sender: TObject);
+var
+  Pump: TPump;
+  NewName, NewCaption: string;
+  NewMin, NewMax: Double;
+begin
+  if FLoading then
+    Exit;
+
+  Pump := SelectedCatalogPump;
+  if not IsPumpAssignedToWorkTable(Pump) then
+  begin
+    ApplyEditState;
+    Exit;
+  end;
+
+  NewName := Trim(EditPumpName.Text);
+  // A different name is a request to create/select another pump on '+'.
+  // Never rename the currently selected TPump from the edit exit event.
+  if (NewName = '') or not SameText(NewName, Trim(Pump.Name)) then
+  begin
+    ApplyEditState;
+    Exit;
+  end;
+
+  NewCaption := Trim(EditPumpCaption.Text);
+  if NewCaption = '' then
+    NewCaption := Pump.Name;
+
+  if not TryStrToFloat(Trim(EditPumpMin.Text), NewMin) then
+    NewMin := Pump.Min;
+  if not TryStrToFloat(Trim(EditPumpMax.Text), NewMax) then
+    NewMax := Pump.Max;
+  if NewMax < NewMin then
+  begin
+    EditPumpMin.Text := FormatFloat('0.##', Pump.Min);
+    EditPumpMax.Text := FormatFloat('0.##', Pump.Max);
+    Exit;
+  end;
+
+  Pump.Caption := NewCaption;
+  Pump.Min := NewMin;
+  Pump.Max := NewMax;
+
+  if (ComboPumpCatalog.ItemIndex >= 0) and
+     (ComboPumpCatalog.ItemIndex < ComboPumpCatalog.Items.Count) then
+    ComboPumpCatalog.Items[ComboPumpCatalog.ItemIndex] := Pump.Caption;
+  ApplyEditState;
+  NotifyRefreshIfChanged(True);
 end;
 
 procedure TFrameWorkTableProperties.NotifyRefreshIfChanged(const AChanged: Boolean);
@@ -1174,47 +1488,114 @@ end;
 
 procedure TFrameWorkTableProperties.ButtonPumpAddClick(Sender: TObject);
 var
-  Name: string;
+  Pump, Candidate: TPump;
+  PumpName: string;
+  Changed: Boolean;
 begin
   if FWorkTable = nil then
     Exit;
 
-  Name := Trim(EditPumpName.Text);
-  if Name = '' then
-    Name := '1';
-  FWorkTable.AddPump(Name);
+  PumpName := Trim(EditPumpName.Text);
+  if PumpName = '' then
+    Exit;
+
+  Pump := SelectedCatalogPump;
+  if (Pump = nil) or not SameText(Trim(Pump.Name), PumpName) then
+  begin
+    // The entered name differs from the current catalog item:
+    // find it in TPump first, otherwise create it in the global catalog.
+    Pump := nil;
+    if TPump.Pumps <> nil then
+      for Candidate in TPump.Pumps do
+        if (Candidate <> nil) and SameText(Trim(Candidate.Name), PumpName) then
+        begin
+          Pump := Candidate;
+          Break;
+        end;
+
+    if Pump = nil then
+      Pump := TPump.Create(PumpName);
+  end;
+
+  if Pump = nil then
+    Exit;
+
+  Changed := FWorkTable.AddPump(Pump);
+  if FWorkTable.ActivePump <> Pump then
+  begin
+    FWorkTable.ActivePump := Pump;
+    Changed := True;
+  end;
+
+  RefreshInstrumentEdits;
+  ApplyEditState;
+  NotifyRefreshIfChanged(Changed);
+end;
+
+{ Removes a pump from TPump.Pumps after detaching it from every work table. }
+procedure TFrameWorkTableProperties.ButtonPumpCatalogDeleteClick(Sender: TObject);
+var
+  Pump: TPump;
+  WorkTable: TWorkTable;
+begin
+  Pump := SelectedCatalogPump;
+  if (Pump = nil) or (TPump.Pumps = nil) then
+    Exit;
+
+  // TPump.Pumps owns pump objects, so all table references must be removed first.
+  if (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil) then
+  begin
+    for WorkTable in WorkTableManager.WorkTables do
+      if (WorkTable <> nil) and (WorkTable.Pumps <> nil) and
+         (WorkTable.Pumps.IndexOf(Pump) >= 0) then
+        WorkTable.RemovePump(Pump);
+  end
+  else if IsPumpAssignedToWorkTable(Pump) then
+    FWorkTable.RemovePump(Pump);
+
+  TPump.Pumps.Remove(Pump);
+  RefreshInstrumentEdits;
   ApplyEditState;
   NotifyRefreshIfChanged(True);
 end;
 
 procedure TFrameWorkTableProperties.ButtonPumpDeleteClick(Sender: TObject);
 var
-  Name: string;
+  I: Integer;
   Pump: TPump;
-  WorkTable: TWorkTable;
 begin
-  Name := Trim(EditPumpName.Text);
-  if (Name = '') or (TPump.Pumps = nil) then
+  if (FWorkTable = nil) or (FWorkTable.Pumps = nil) then
     Exit;
 
-  Pump := nil;
-  for Pump in TPump.Pumps do
-    if (Pump <> nil) and SameText(Trim(Pump.Name), Name) then
-      Break;
-
-  if (Pump = nil) or not SameText(Trim(Pump.Name), Name) then
+  Pump := SelectedCatalogPump;
+  if Pump = nil then
+    Pump := FWorkTable.ActivePump;
+  if (Pump = nil) or (FWorkTable.Pumps.IndexOf(Pump) < 0) then
     Exit;
 
-  if (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil) then
-    for WorkTable in WorkTableManager.WorkTables do
-      if (WorkTable <> nil) and (WorkTable.Pumps <> nil) and
-         (WorkTable.Pumps.IndexOf(Pump) >= 0) then
-        WorkTable.RemovePump(Pump);
-
-  TPump.Pumps.Remove(Pump);
-  RefreshInstrumentEdits;
-  ApplyEditState;
+  FWorkTable.RemovePump(Pump);
   NotifyRefreshIfChanged(True);
+
+  // ewtRefresh reloads the frame and selects ActivePump. Restore the catalog
+  // selection by object without assigning the removed pump back to the table.
+  FLoading := True;
+  try
+    ComboPumpCatalog.ItemIndex := -1;
+    for I := 0 to ComboPumpCatalog.Items.Count - 1 do
+      if ComboPumpCatalog.Items.Objects[I] = Pump then
+      begin
+        ComboPumpCatalog.ItemIndex := I;
+        Break;
+      end;
+
+    EditPumpName.Text := Pump.Name;
+    EditPumpCaption.Text := Pump.Caption;
+    EditPumpMin.Text := FormatFloat('0.##', Pump.Min);
+    EditPumpMax.Text := FormatFloat('0.##', Pump.Max);
+  finally
+    FLoading := False;
+  end;
+  ApplyEditState;
 end;
 
 procedure TFrameWorkTableProperties.ButtonScaleAddClick(Sender: TObject);

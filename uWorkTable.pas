@@ -800,6 +800,7 @@ type
     procedure RecordCurrentMeasurement(const ARawValue: Double; const ASource: string);
     procedure RecordVoltageMeasurement(const ARawValue: Double; const ASource: string);
     procedure RecordPendingMeasurements(const ASource: string);
+    procedure ClearPendingMeasurements;
     procedure ClearRuntimeMeasurements;
     function GetSignalStatistics(const AKind: TChannelSignalKind): TChannelSignalStatistics;
     procedure CreateDevice;
@@ -906,6 +907,7 @@ type
     FLayoutMesureVisible: Boolean;
     FLayoutConditionsVisible: Boolean;
     FLayoutProceduresVisible: Boolean;
+    FEtalonsPanelHeight: Single;
     FInstrumentalLayoutOrder: string;
     FMergeMeasurementPoints: Boolean;
 
@@ -1169,6 +1171,19 @@ type
       AScales: TObjectList<TWeight>
     ); static;
 
+    class procedure SavePumpList(
+      AIni: TCustomIniFile;
+      const ASectionPrefix: string;
+      APumps: TObjectList<TPump>;
+      AActivePump: TPump
+    ); static;
+
+    class procedure LoadPumpList(
+      AIni: TCustomIniFile;
+      const ASectionPrefix: string;
+      AWorkTable: TWorkTable
+    ); static;
+
   private
 
   FCurrentPoint:  TDevicePoint;
@@ -1266,7 +1281,14 @@ type
   procedure ClearScales;
   procedure SetActivePump(APumpName: string);
   procedure SetActiveScale(AScaleName: string);
-  function DeleteChannel(AChannel: TChannel): Boolean;
+    function DeleteChannel(AChannel: TChannel): Boolean;
+  { Changes the order of TChannel objects in their owning collection.  The
+    channel UUID and assigned instrument are preserved and the new sequence is
+    persisted as part of the work-table configuration. }
+  function MoveChannel(AChannel: TChannel; const ANewIndex: Integer): Boolean;
+  function MoveChannelUp(AChannel: TChannel): Boolean;
+  function MoveChannelDown(AChannel: TChannel): Boolean;
+  function CanMoveChannels: Boolean;
   procedure ReindexChannels(AChannels: TObjectList<TChannel>;
       const AEtalonChannels: Boolean);
 
@@ -1378,6 +1400,7 @@ type
     property LayoutMesureVisible: Boolean read FLayoutMesureVisible write FLayoutMesureVisible;
     property LayoutConditionsVisible: Boolean read FLayoutConditionsVisible write FLayoutConditionsVisible;
     property LayoutProceduresVisible: Boolean read FLayoutProceduresVisible write FLayoutProceduresVisible;
+    property EtalonsPanelHeight: Single read FEtalonsPanelHeight write FEtalonsPanelHeight;
     property InstrumentalLayoutOrder: string read FInstrumentalLayoutOrder write FInstrumentalLayoutOrder;
     property MergeMeasurementPoints: Boolean read FMergeMeasurementPoints write FMergeMeasurementPoints;
 
@@ -1574,6 +1597,7 @@ type
   IWorkTableObserverHost = interface
     ['{8E305AD6-49F7-4D3C-AD3E-1DBDF5692656}']
     procedure DetachWorkTableObservers(AWorkTable: TWorkTable);
+    procedure AttachWorkTableObservers(AWorkTable: TWorkTable);
   end;
 
   TWorkTableManager = class
@@ -1592,7 +1616,15 @@ type
     procedure Save;
     procedure AddWorkTable;  overload;
     procedure AddWorkTable(const WorkTableName: string);  overload;
+    { Создаёт независимую копию канала и назначенного ему прибора
+      для нового рабочего стола без копирования результатов измерений. }
+    function CloneChannelForWorkTable(const ASourceChannel: TChannel;
+      const ADestinationWorkTable: TWorkTable;
+      const ADestinationWorkTableID: Integer): TChannel;
+    function CopyWorkTable(const ASource: TWorkTable): TWorkTable;
+    function CanCopyWorkTable(const ASource: TWorkTable): Boolean;
     function DeleteWorkTableByName(const AWorkTableName: string): Boolean;
+    function DeleteWorkTableByUUID(const AWorkTableUUID: string): Boolean;
     function DeleteWorkTablesByNames: Integer;
 
     function FindWorkTableName(const WorkTableName: string): TWorkTable;
@@ -1613,7 +1645,9 @@ type
     property IsSimulationMode: Boolean read FIsSimulationMode write SetIsSimulationMode;
     procedure UpdateSimulation;
 
+    procedure SetActivePump(const APumpName: string);
 
+    function FindChannelByName(const ChannelName: string): TChannel;
 
 
   end;
@@ -1623,6 +1657,7 @@ type
 implementation
 
 uses
+  Winapi.Windows,
   FmxHelper,
   frmMainTable,
   uMeasurementRun,
@@ -1632,6 +1667,37 @@ uses
 const
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
   DEVICE_FLOW_RATE_DIM_INDEX = 4;
+
+{$IFDEF DEBUG}
+{ Выводит длительность очередного этапа загрузки и абсолютную отметку
+  GetTickCount64. Предыдущая отметка передаётся по ссылке и автоматически
+  переносится на конец этапа, поэтому каждый следующий вызов измеряет только
+  свой участок, а не всё время от начала загрузки. }
+procedure DebugLoadStep(const ASource, AStep: string;
+  var APreviousTick: UInt64);
+var
+  CurrentTick: UInt64;
+begin
+  CurrentTick := GetTickCount64;
+  OutputDebugString(PChar(ASource + ' - ' + AStep +
+    ': elapsed=' + UIntToStr(CurrentTick - APreviousTick) +
+    ' ms; tick=' + UIntToStr(CurrentTick)));
+  APreviousTick := CurrentTick;
+end;
+
+{ Выводит полную длительность составной операции. В отличие от
+  DebugLoadStep начальная отметка здесь не изменяется. }
+procedure DebugLoadDuration(const ASource, AStep: string;
+  const AStartedAt: UInt64);
+var
+  CurrentTick: UInt64;
+begin
+  CurrentTick := GetTickCount64;
+  OutputDebugString(PChar(ASource + ' - ' + AStep +
+    ': elapsed=' + UIntToStr(CurrentTick - AStartedAt) +
+    ' ms; tick=' + UIntToStr(CurrentTick)));
+end;
+{$ENDIF}
 
 function TWorkTable.GetMeasurementRunStage: EMeasurementState;
 begin
@@ -2747,6 +2813,7 @@ end;
 procedure TChannel.SetImpSecProxy(const AValue: Double);
 begin
   FImpSec := AValue;
+  if FValueImp <> nil then FValueImp.SetValue(AValue);
   FFrequencyMeasurementPending := True;
 end;
 
@@ -2772,6 +2839,7 @@ end;
 procedure TChannel.SetCurSecProxy(const AValue: Double);
 begin
   FCurSec := AValue;
+  if FValueCurrent <> nil then FValueCurrent.SetValue(AValue);
   FCurrentMeasurementPending := True;
 end;
 
@@ -2809,6 +2877,7 @@ end;
 procedure TChannel.SetValueSecProxy(const AValue: Double);
 begin
   FValueSec := AValue;
+  if FValueInterface <> nil then FValueInterface.SetValue(AValue);
   FVoltageMeasurementPending := True;
 end;
 
@@ -2929,7 +2998,9 @@ var
 begin
   if IsNan(APhysicalValue) or IsInfinite(APhysicalValue) then
   begin
-    ProtocolManager.AddMessage(pcError, psWorkTable, 'ChannelSignalSample',
+    if (ProtocolManager <> nil) and ProtocolManager.ProtocolEnabled and
+       ProtocolManager.SampleChartEnabled then
+      ProtocolManager.AddMessage(pcError, psWorkTable, 'ChannelSignalSample',
       'Получен невалидный отсчёт канала', Format(
       'UUID=%s; Channel=%s; Source=%s; Raw=%g; Valid=False',
       [UUID, Name, ASource, ARawValue]));
@@ -2960,11 +3031,13 @@ begin
   if MeterValue <> nil then
     MeterValue.SetValue(APhysicalValue);
 
-  ProtocolManager.AddMessage(pcProc, psWorkTable, 'ChannelSignalSample',
-    'Получен отсчёт канала', Format(
-    'UUID=%s; Channel=%s; Source=%s; Raw=%g; Physical=%g; Signal=%s; Period=%d; Valid=True',
-    [UUID, Name, ASource, ARawValue, APhysicalValue, SignalName,
-     Ord(GetAveragingPeriod(AKind))]));
+  if (ProtocolManager <> nil) and ProtocolManager.ProtocolEnabled and
+     ProtocolManager.SampleChartEnabled then
+    ProtocolManager.AddMessage(pcProc, psWorkTable, 'ChannelSignalSample',
+      'Получен отсчёт канала', Format(
+      'UUID=%s; Channel=%s; Source=%s; Raw=%g; Physical=%g; Signal=%s; Period=%d; Valid=True',
+      [UUID, Name, ASource, ARawValue, APhysicalValue, SignalName,
+       Ord(GetAveragingPeriod(AKind))]));
 end;
 
 procedure TChannel.RecordFrequencyMeasurement(const ARawValue: Double; const ASource: string);
@@ -3003,6 +3076,14 @@ begin
   FVoltageMeasurementPending := False;
 end;
 
+{ Drops acquisition markers without changing current runtime signal values. }
+procedure TChannel.ClearPendingMeasurements;
+begin
+  FFrequencyMeasurementPending := False;
+  FCurrentMeasurementPending := False;
+  FVoltageMeasurementPending := False;
+end;
+
 { Separates the displayed value from statistics calculated over the selected window. }
 function TChannel.GetSignalStatistics(const AKind: TChannelSignalKind): TChannelSignalStatistics;
 var
@@ -3014,6 +3095,7 @@ var
   SignalName: string;
 begin
   Result := Default(TChannelSignalStatistics);
+  if (ProtocolManager = nil) or not ProtocolManager.StatisticsEnabled then Exit;
   Samples := GetSamples(AKind);
   if (Samples = nil) or (Samples.Count = 0) then Exit;
   LastMs := Samples[Samples.Count - 1].TimeMs;
@@ -3072,7 +3154,8 @@ begin
     else
       SignalName := 'Voltage';
     end;
-    ProtocolManager.AddMessage(pcProc, psWorkTable, 'ChannelSignalStatistics',
+    if ProtocolManager.ProtocolEnabled then
+      ProtocolManager.AddMessage(pcProc, psWorkTable, 'ChannelSignalStatistics',
       'Рассчитана статистика сигнала канала', Format(
       'UUID=%s; Channel=%s; Signal=%s; Period=%d; Count=%d; WindowMs=%d; ' +
       'Last=%g; Display=%g; Average=%g; StdDeviationPercent=%g; Deviation=%g; ' +
@@ -3171,6 +3254,7 @@ begin
   FLayoutMesureVisible := True;
   FLayoutConditionsVisible := True;
   FLayoutProceduresVisible := True;
+  FEtalonsPanelHeight := 152;
   FMergeMeasurementPoints := True;
   FInstrumentalLayoutOrder := 'FlowRate,Pump,Main,Mesure,Conditions,Procedures';
 
@@ -5692,7 +5776,7 @@ begin
    for I := 0 to FEtalonChannels.Count - 1 do
   begin
     Channel := FEtalonChannels[I];
-    if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
+    if (Channel = nil) {or (not Channel.Enabled)} or (Channel.FlowMeter = nil) then
       Continue;
 
     Channel.SetValues;
@@ -5882,6 +5966,12 @@ var
         Ini.WriteString(Section, 'UUID', WorkTable.UUID);
         Ini.WriteString(Section, 'Name', WorkTable.Name);
         Ini.WriteString(Section, 'Text', WorkTable.Text);
+        Ini.WriteString(Section, 'FlowRateName', WorkTable.FlowRate.Name);
+        Ini.WriteString(Section, 'FlowRateCaption', WorkTable.FlowRate.Caption);
+        Ini.WriteString(Section, 'FluidTempName', WorkTable.FluidTemp.Name);
+        Ini.WriteString(Section, 'FluidTempCaption', WorkTable.FluidTemp.Caption);
+        Ini.WriteString(Section, 'FluidPressName', WorkTable.FluidPress.Name);
+        Ini.WriteString(Section, 'FluidPressCaption', WorkTable.FluidPress.Caption);
         Ini.WriteFloat(Section, 'Temp', WorkTable.FluidTemp.Value.Value);
         Ini.WriteFloat(Section, 'TempDelta', WorkTable.TempDelta);
         Ini.WriteFloat(Section, 'PressDelta', WorkTable.PressDelta);
@@ -5941,12 +6031,16 @@ var
           WorkTable.LayoutConditionsVisible);
         Ini.WriteBool(Section, 'LayoutProceduresVisible',
           WorkTable.LayoutProceduresVisible);
+        Ini.WriteFloat(Section, 'EtalonsPanelHeight',
+          WorkTable.EtalonsPanelHeight);
         Ini.WriteString(Section, 'InstrumentalLayoutOrder',
           WorkTable.InstrumentalLayoutOrder);
         Ini.WriteBool(Section, 'MergeMeasurementPoints',
           WorkTable.MergeMeasurementPoints);
 
         SaveScaleList(Ini, Section + '.Scales', WorkTable.Weights);
+        SavePumpList(Ini, Section + '.Pumps', WorkTable.Pumps,
+          WorkTable.ActivePump);
         SaveChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
         SaveChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
         SaveGridColumns(Ini, Section + '.EtalonGrid',
@@ -6004,22 +6098,51 @@ var
   Count, I: Integer;
   WorkTable: TWorkTable;
   Section: string;
+{$IFDEF DEBUG}
+  LoadStartedAt: UInt64;
+  LoadStepStartedAt: UInt64;
+  TableStartedAt: UInt64;
+  TableStepStartedAt: UInt64;
+{$ENDIF}
 begin
   if (AIniFileName = '') or (AWorkTables = nil) then
     Exit;
+
+{$IFDEF DEBUG}
+  LoadStartedAt := GetTickCount64;
+  LoadStepStartedAt := LoadStartedAt;
+  OutputDebugString(PChar('TWorkTable.Load - НАЧАЛО: tick=' +
+    UIntToStr(LoadStartedAt)));
+{$ENDIF}
 
   AWorkTables.Clear;
   if TWeight.Weights <> nil then
     TWeight.Weights.Clear;
 
+{$IFDEF DEBUG}
+  DebugLoadStep('TWorkTable.Load', 'очистка существующих объектов',
+    LoadStepStartedAt);
+{$ENDIF}
+
   Ini := TProjectSettingsIni.Create(AIniFileName, STORAGE_TABLE_SETTINGS);
   ValuesIni := TProjectSettingsIni.Create(AIniFileName, STORAGE_WORK_TABLE_VALUES);
+  TProjectSettingsIni(Ini).EnableSectionReadCache;
+  TProjectSettingsIni(ValuesIni).EnableSectionReadCache;
   try
     Count := Ini.ReadInteger('WorkTables', 'Count', 0);
     TMeterValue.SetInitDensity(S2F(ValuesIni.ReadString('Common', 'InitDensity', FloatToStr(TMeterValue.GetInitDensity))));
+{$IFDEF DEBUG}
+    DebugLoadStep('TWorkTable.Load',
+      Format('открытие хранилищ; WorkTables.Count=%d', [Count]),
+      LoadStepStartedAt);
+{$ENDIF}
 
     for I := 0 to Count - 1 do
     begin
+{$IFDEF DEBUG}
+      TableStartedAt := GetTickCount64;
+      TableStepStartedAt := TableStartedAt;
+{$ENDIF}
       Section := 'WorkTable.' + IntToStr(I);
       WorkTable := TWorkTable.Create;
 
@@ -6032,6 +6155,18 @@ begin
       WorkTable.Text := Ini.ReadString(Section, 'Text', 'Рабочий стол ' + IntToStr(WorkTable.ID));
       if Trim(WorkTable.Text) = '' then
         WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
+      WorkTable.FlowRate.Name := Ini.ReadString(Section, 'FlowRateName',
+        WorkTable.FlowRate.Name);
+      WorkTable.FlowRate.Caption := Ini.ReadString(Section, 'FlowRateCaption',
+        WorkTable.FlowRate.Name);
+      WorkTable.FluidTemp.Name := Ini.ReadString(Section, 'FluidTempName',
+        WorkTable.FluidTemp.Name);
+      WorkTable.FluidTemp.Caption := Ini.ReadString(Section, 'FluidTempCaption',
+        WorkTable.FluidTemp.Name);
+      WorkTable.FluidPress.Name := Ini.ReadString(Section, 'FluidPressName',
+        WorkTable.FluidPress.Name);
+      WorkTable.FluidPress.Caption := Ini.ReadString(Section, 'FluidPressCaption',
+        WorkTable.FluidPress.Name);
       //WorkTable.FluidTemp.Value.Value := S2F(Ini.ReadString(Section, 'Temp', '0'));
       WorkTable.TempDelta := S2F(Ini.ReadString(Section, 'TempDelta','0'));
       //WorkTable.Press := Ini.ReadFloat(Section, 'Press', 0);
@@ -6089,9 +6224,16 @@ begin
       WorkTable.LayoutMesureVisible := Ini.ReadBool(Section, 'LayoutMesureVisible', True);
       WorkTable.LayoutConditionsVisible := Ini.ReadBool(Section, 'LayoutConditionsVisible', True);
       WorkTable.LayoutProceduresVisible := Ini.ReadBool(Section, 'LayoutProceduresVisible', True);
+      WorkTable.EtalonsPanelHeight := Ini.ReadFloat(Section,
+        'EtalonsPanelHeight', 152);
       WorkTable.InstrumentalLayoutOrder := Ini.ReadString(Section, 'InstrumentalLayoutOrder',
         'FlowRate,Pump,Main,Mesure,Conditions,Procedures');
       WorkTable.MergeMeasurementPoints := Ini.ReadBool(Section, 'MergeMeasurementPoints', True);
+{$IFDEF DEBUG}
+      DebugLoadStep('TWorkTable.Load',
+        Format('%s: создание и основные настройки', [Section]),
+        TableStepStartedAt);
+{$ENDIF}
 
       WorkTable.FHashValueTempertureBefore := ValuesIni.ReadString(Section, 'HashValueTempertureBefore', WorkTable.FHashValueTempertureBefore);
       WorkTable.FHashValueTempertureAfter := ValuesIni.ReadString(Section, 'HashValueTempertureAfter', WorkTable.FHashValueTempertureAfter);
@@ -6108,6 +6250,11 @@ begin
       WorkTable.FHashValueTime := ValuesIni.ReadString(Section, 'HashValueTime', WorkTable.FHashValueTime);
       WorkTable.FHashValueQuantity := ValuesIni.ReadString(Section, 'HashValueQuantity', WorkTable.FHashValueQuantity);
       WorkTable.FHashValueFlowRate := ValuesIni.ReadString(Section, 'HashValueFlowRate', WorkTable.FHashValueFlowRate);
+{$IFDEF DEBUG}
+      DebugLoadStep('TWorkTable.Load',
+        Format('%s: чтение хэшей значений', [Section]),
+        TableStepStartedAt);
+{$ENDIF}
 
       if WorkTable.FTableFlow.ValueTempertureBefore <> nil then WorkTable.FTableFlow.ValueTempertureBefore.DeleteFromVector;
       if WorkTable.FTableFlow.ValueTempertureAfter <> nil then WorkTable.FTableFlow.ValueTempertureAfter.DeleteFromVector;
@@ -6125,6 +6272,10 @@ begin
       if WorkTable.FTableFlow.ValueFlowRate <> nil then WorkTable.FTableFlow.ValueFlowRate.DeleteFromVector;
 
       WorkTable.InitMeterValues;
+{$IFDEF DEBUG}
+      DebugLoadStep('TWorkTable.Load',
+        Format('%s: InitMeterValues', [Section]), TableStepStartedAt);
+{$ENDIF}
 
       WorkTable.ValueTempertureBefore.SetValue(S2F(ValuesIni.ReadString(Section, 'ValueTempertureBefore', '21')));
       WorkTable.ValueTempertureAfter.SetValue(S2F(ValuesIni.ReadString(Section, 'ValueTempertureAfter', '21')));
@@ -6146,27 +6297,81 @@ begin
       WorkTable.ValueTempertureAfter.SetValue(21);
 
       WorkTable.FluidTemp.Value.Value := 21;
+{$IFDEF DEBUG}
+      DebugLoadStep('TWorkTable.Load',
+        Format('%s: восстановление текущих значений', [Section]),
+        TableStepStartedAt);
+{$ENDIF}
 
       LoadScaleList(Ini, Section + '.Scales', WorkTable.Weights);
+{$IFDEF DEBUG}
+      DebugLoadStep('TWorkTable.Load',
+        Format('%s: LoadScaleList; count=%d',
+          [Section, WorkTable.Weights.Count]), TableStepStartedAt);
+{$ENDIF}
+      LoadPumpList(Ini, Section + '.Pumps', WorkTable);
+{$IFDEF DEBUG}
+      DebugLoadStep('TWorkTable.Load',
+        Format('%s: LoadPumpList; count=%d',
+          [Section, WorkTable.Pumps.Count]), TableStepStartedAt);
+{$ENDIF}
       WorkTable.ActiveScale := WorkTable.FindScaleByUUID(Ini.ReadString(Section, 'ActiveScaleUUID', ''));
       LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels, WorkTable.ID);
+{$IFDEF DEBUG}
+      DebugLoadStep('TWorkTable.Load',
+        Format('%s: LoadChannelList Etalon; count=%d',
+          [Section, WorkTable.EtalonChannels.Count]), TableStepStartedAt);
+{$ENDIF}
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels, WorkTable.ID);
+{$IFDEF DEBUG}
+      DebugLoadStep('TWorkTable.Load',
+        Format('%s: LoadChannelList Device; count=%d',
+          [Section, WorkTable.DeviceChannels.Count]), TableStepStartedAt);
+{$ENDIF}
       LoadGridColumns(Ini, Section + '.EtalonGrid', WorkTable.FEtalonsGridColumns);
       LoadGridColumns(Ini, Section + '.DeviceGrid', WorkTable.FDevicesGridColumns);
       LoadGridColumns(Ini, Section + '.DataPointsGrid', WorkTable.FDataPointsGridColumns);
       LoadGridColumns(Ini, Section + '.ResultsGrid', WorkTable.FResultsGridColumns);
+{$IFDEF DEBUG}
+      DebugLoadStep('TWorkTable.Load',
+        Format('%s: загрузка параметров колонок', [Section]),
+        TableStepStartedAt);
+{$ENDIF}
 
       WorkTable.RebindAllFlowMeters;
+{$IFDEF DEBUG}
+      DebugLoadStep('TWorkTable.Load',
+        Format('%s: RebindAllFlowMeters', [Section]), TableStepStartedAt);
+{$ENDIF}
       WorkTable.RecalculateAllMeterValues;
+{$IFDEF DEBUG}
+      DebugLoadStep('TWorkTable.Load',
+        Format('%s: RecalculateAllMeterValues', [Section]),
+        TableStepStartedAt);
+{$ENDIF}
       WorkTable.UpdateAggregateMeterValues;
       WorkTable.UpdateFlowRateLimitsByEtalons;
+{$IFDEF DEBUG}
+      DebugLoadStep('TWorkTable.Load',
+        Format('%s: финальные агрегаты и пределы', [Section]),
+        TableStepStartedAt);
+{$ENDIF}
 
       AWorkTables.Add(WorkTable);
+{$IFDEF DEBUG}
+      DebugLoadDuration('TWorkTable.Load',
+        Format('%s ИТОГО; name="%s"; etalons=%d; devices=%d',
+          [Section, WorkTable.Name, WorkTable.EtalonChannels.Count,
+           WorkTable.DeviceChannels.Count]), TableStartedAt);
+{$ENDIF}
     end;
   finally
     ValuesIni.Free;
     Ini.Free;
   end;
+{$IFDEF DEBUG}
+  DebugLoadDuration('TWorkTable.Load', 'КОНЕЦ', LoadStartedAt);
+{$ENDIF}
 end;
 
 class procedure TWorkTable.SaveGridColumns(AIni: TCustomIniFile;
@@ -6325,15 +6530,34 @@ var
   Channel: TChannel;
   Section: string;
   IsExisted: Integer;
+{$IFDEF DEBUG}
+  ListStartedAt: UInt64;
+  ListStepStartedAt: UInt64;
+  ChannelStartedAt: UInt64;
+  ChannelStepStartedAt: UInt64;
+{$ENDIF}
 begin
   if (AIni = nil) or (AChannels = nil) then
     Exit;
 
+{$IFDEF DEBUG}
+  ListStartedAt := GetTickCount64;
+  ListStepStartedAt := ListStartedAt;
+{$ENDIF}
   AChannels.Clear;
   Count := AIni.ReadInteger(ASectionPrefix, 'Count', 0);
+{$IFDEF DEBUG}
+  DebugLoadStep('TWorkTable.LoadChannelList',
+    Format('%s: очистка и чтение Count=%d', [ASectionPrefix, Count]),
+    ListStepStartedAt);
+{$ENDIF}
 
   for I := 0 to Count - 1 do
   begin
+{$IFDEF DEBUG}
+    ChannelStartedAt := GetTickCount64;
+    ChannelStepStartedAt := ChannelStartedAt;
+{$ENDIF}
     Section := ASectionPrefix + '.' + IntToStr(I);
 
     Channel := TChannel.Create;
@@ -6409,6 +6633,11 @@ begin
     Channel.FHashValueCurrent := AIni.ReadString(Section, 'HashValueCurrent', Channel.FHashValueCurrent);
     Channel.FHashValueInterface := AIni.ReadString(Section, 'HashValueInterface', Channel.FHashValueInterface);
     Channel.FHashValueFlow := AIni.ReadString(Section, 'HashValueFlow', Channel.FHashValueFlow);
+{$IFDEF DEBUG}
+    DebugLoadStep('TWorkTable.LoadChannelList',
+      Format('%s: создание и чтение настроек', [Section]),
+      ChannelStepStartedAt);
+{$ENDIF}
     if (Channel.FlowMeter <> nil) and (Trim(Channel.FHashValueFlow) <> '') then
     begin
       Channel.FlowMeter.RestoreValueVolumeFlowHash(Channel.FHashValueFlow);
@@ -6420,10 +6649,20 @@ begin
     if Channel.FValueInterface <> nil then Channel.FValueInterface.DeleteFromVector;
 
     Channel.InitMeterValues;
+{$IFDEF DEBUG}
+    DebugLoadStep('TWorkTable.LoadChannelList',
+      Format('%s: Channel.InitMeterValues', [Section]),
+      ChannelStepStartedAt);
+{$ENDIF}
 
     Channel.FlowMeter.Name := 'прибор '+ Channel.Name;
 
     Channel.Init;
+{$IFDEF DEBUG}
+    DebugLoadStep('TWorkTable.LoadChannelList',
+      Format('%s: Channel.Init / TFlowMeter.Init', [Section]),
+      ChannelStepStartedAt);
+{$ENDIF}
     if not AIni.ValueExists(Section, 'QMaxWork') then
       Channel.InitWorkRangesFromFlowMeter;
 
@@ -6431,7 +6670,16 @@ begin
     Channel.ClearRuntimeMeasurements;
 
     AChannels.Add(Channel);
+{$IFDEF DEBUG}
+    DebugLoadDuration('TWorkTable.LoadChannelList',
+      Format('%s ИТОГО; name="%s"; deviceUUID="%s"',
+        [Section, Channel.Name, Channel.DeviceUUID]), ChannelStartedAt);
+{$ENDIF}
   end;
+{$IFDEF DEBUG}
+  DebugLoadDuration('TWorkTable.LoadChannelList',
+    Format('%s КОНЕЦ; count=%d', [ASectionPrefix, Count]), ListStartedAt);
+{$ENDIF}
 end;
 
 class procedure TWorkTable.SaveScaleList(AIni: TCustomIniFile;
@@ -6493,6 +6741,104 @@ begin
   end;
 end;
 
+
+class procedure TWorkTable.SavePumpList(AIni: TCustomIniFile;
+  const ASectionPrefix: string; APumps: TObjectList<TPump>;
+  AActivePump: TPump);
+var
+  I, OldCount: Integer;
+  Pump: TPump;
+  Section: string;
+begin
+  if (AIni = nil) or (APumps = nil) then
+    Exit;
+
+  OldCount := AIni.ReadInteger(ASectionPrefix, 'Count', 0);
+  AIni.WriteInteger(ASectionPrefix, 'Count', APumps.Count);
+
+  for I := APumps.Count to OldCount - 1 do
+    AIni.EraseSection(ASectionPrefix + '.' + IntToStr(I));
+
+  for I := 0 to APumps.Count - 1 do
+  begin
+    Pump := APumps[I];
+    if Pump = nil then
+      Continue;
+
+    Section := ASectionPrefix + '.' + IntToStr(I);
+    AIni.WriteString(Section, 'UUID', Pump.UUID);
+    AIni.WriteString(Section, 'Name', Pump.Name);
+    AIni.WriteString(Section, 'Caption', Pump.Caption);
+    AIni.WriteFloat(Section, 'Min', Pump.Min);
+    AIni.WriteFloat(Section, 'Max', Pump.Max);
+    AIni.WriteBool(Section, 'Active', Pump = AActivePump);
+  end;
+end;
+
+class procedure TWorkTable.LoadPumpList(AIni: TCustomIniFile;
+  const ASectionPrefix: string; AWorkTable: TWorkTable);
+var
+  I, Count: Integer;
+  Pump: TPump;
+  Candidate: TPump;
+  Section, PumpName, PumpUUID: string;
+  PumpMin, PumpMax: Double;
+begin
+  if (AIni = nil) or (AWorkTable = nil) then
+    Exit;
+
+  AWorkTable.ClearPumps;
+  Count := AIni.ReadInteger(ASectionPrefix, 'Count', 0);
+  for I := 0 to Count - 1 do
+  begin
+    Section := ASectionPrefix + '.' + IntToStr(I);
+    PumpUUID := Trim(AIni.ReadString(Section, 'UUID', ''));
+    PumpName := Trim(AIni.ReadString(Section, 'Name', ''));
+    if PumpName = '' then
+      Continue;
+
+    Pump := nil;
+    if TPump.Pumps <> nil then
+      for Candidate in TPump.Pumps do
+      begin
+        if Candidate = nil then
+          Continue;
+
+        { UUID is the persistent identity of a pump. Name matching is retained
+          only for projects saved before pump UUIDs were introduced. }
+        if ((PumpUUID <> '') and
+            SameText(Trim(Candidate.UUID), PumpUUID)) or
+           ((PumpUUID = '') and
+            SameText(Trim(Candidate.Name), PumpName)) then
+        begin
+          Pump := Candidate;
+          Break;
+        end;
+      end;
+
+    if Pump = nil then
+    begin
+      Pump := TPump.Create(PumpName);
+      if PumpUUID <> '' then
+        Pump.UUID := PumpUUID;
+    end;
+
+    Pump.Caption := AIni.ReadString(Section, 'Caption', PumpName);
+    PumpMin := AIni.ReadFloat(Section, 'Min', Pump.Min);
+    PumpMax := AIni.ReadFloat(Section, 'Max', Pump.Max);
+    if PumpMax >= PumpMin then
+    begin
+      Pump.Min := Min(Pump.Min, PumpMin);
+      Pump.Max := PumpMax;
+      Pump.Min := PumpMin;
+    end;
+
+    AWorkTable.AddPump(Pump);
+    if AIni.ReadBool(Section, 'Active', False) then
+      AWorkTable.ActivePump := Pump;
+  end;
+end;
+
 { Builds canonical internal service name for a work table by index. }
 class function TWorkTable.BuildWorkTableServiceName(const ATableIndex: Integer): string;
 begin
@@ -6547,6 +6893,66 @@ begin
     Result := True;
     Exit;
   end;
+end;
+
+function TWorkTable.CanMoveChannels: Boolean;
+begin
+  Result := FState in [swtNONE, swtSTANDBY, swtCONNECTED, swtCONFIGED,
+    swtCOMPLETE, swtFAILURE];
+  if Result then
+    Result := not (FHydraulicLineState in [hlsSelecting, hlsSettingUp]);
+end;
+
+function TWorkTable.MoveChannel(AChannel: TChannel;
+  const ANewIndex: Integer): Boolean;
+var
+  Channels: TObjectList<TChannel>;
+  OldIndex: Integer;
+begin
+  Result := False;
+  if (AChannel = nil) or not CanMoveChannels then
+    Exit;
+
+  Channels := nil;
+  OldIndex := FEtalonChannels.IndexOf(AChannel);
+  if OldIndex >= 0 then
+    Channels := FEtalonChannels
+  else
+  begin
+    OldIndex := FDeviceChannels.IndexOf(AChannel);
+    if OldIndex >= 0 then
+      Channels := FDeviceChannels;
+  end;
+
+  if (Channels = nil) or (ANewIndex < 0) or
+     (ANewIndex >= Channels.Count) or (ANewIndex = OldIndex) then
+    Exit;
+
+  { Exchange moves the complete channel object.  Its UUID, DeviceUUID,
+    assigned instrument and all accumulated settings therefore stay intact;
+    SaveChannelList persists the resulting collection sequence. }
+  Channels.Exchange(OldIndex, ANewIndex);
+  Result := True;
+end;
+
+function TWorkTable.MoveChannelUp(AChannel: TChannel): Boolean;
+var
+  Index: Integer;
+begin
+  Index := FEtalonChannels.IndexOf(AChannel);
+  if Index < 0 then
+    Index := FDeviceChannels.IndexOf(AChannel);
+  Result := MoveChannel(AChannel, Index - 1);
+end;
+
+function TWorkTable.MoveChannelDown(AChannel: TChannel): Boolean;
+var
+  Index: Integer;
+begin
+  Index := FEtalonChannels.IndexOf(AChannel);
+  if Index < 0 then
+    Index := FDeviceChannels.IndexOf(AChannel);
+  Result := MoveChannel(AChannel, Index + 1);
 end;
 
 //нигде не используется
@@ -8781,8 +9187,9 @@ begin
   if Assigned(Pump) then
   begin
     if FActivePump = Pump then
-      FActivePump := nil;
-    UnbindParameterEvents(Pump);
+      ActivePump := nil
+    else
+      UnbindParameterEvents(Pump);
     FPumps.Remove(Pump);
 
     FAction:=awtRemovePump;
@@ -8795,8 +9202,9 @@ begin
   if Assigned(APump) then
   begin
     if FActivePump = APump then
-      FActivePump := nil;
-    UnbindParameterEvents(APump);
+      ActivePump := nil
+    else
+      UnbindParameterEvents(APump);
     FPumps.Remove(APump);
 
     FAction := awtRemovePump;
@@ -8810,38 +9218,44 @@ var
 begin
   for Pump in FPumps do
     UnbindParameterEvents(Pump);
-  FActivePump := nil;
+  ActivePump := nil;
   FPumps.Clear;
 end;
 
 function TWorkTable.FindPumpByName(const APumpName: string): TPump;
 var
   Pump: TPump;
+  PumpName: string;
 begin
+  Result := nil;
+
+  PumpName := Trim(APumpName);
+  if PumpName = '' then
+    Exit;
+
   for Pump in FPumps do
   begin
-    if Pump.Name = APumpName then
-    begin
-      Result := Pump;
-      Exit;
-    end;
+    if not Assigned(Pump) then
+      Continue;
+
+    if SameText(Trim(Pump.Name), PumpName) then
+      Exit(Pump);
   end;
-  Result := nil;
 end;
 
 function TWorkTable.FindPumpByUUID(const APumpUUID: string): TPump;
 var
   Pump: TPump;
+  PumpUUID: string;
 begin
- { for Pump in FPumps do
-  begin
-    if Pump.UUID = APumpUUID then
-    begin
-      Result := Pump;
-      Exit;
-    end;
-  end;
-  Result := nil;   }
+  Result := nil;
+  PumpUUID := Trim(APumpUUID);
+  if PumpUUID = '' then
+    Exit;
+
+  for Pump in FPumps do
+    if (Pump <> nil) and SameText(Trim(Pump.UUID), PumpUUID) then
+      Exit(Pump);
 end;
 
 procedure TWorkTable.SetActivePump(APumpName: string);
@@ -8849,7 +9263,10 @@ var
   Pump: TPump;
 begin
   Pump := nil;
-  for Pump in tPump.Pumps do
+  // Активным может быть только насос, назначенный этому рабочему столу.
+  // Поиск в глобальном TPump.Pumps повторно назначал насос между удалением
+  // его из стола и освобождением глобальным owning-списком.
+  for Pump in FPumps do
   begin
     if Pump.Name = APumpName then
       Break;
@@ -9720,6 +10137,7 @@ begin
   if FIniFileName <> '' then
   begin
     Ini := TProjectSettingsIni.Create(FIniFileName, STORAGE_TABLE_SETTINGS);
+    TProjectSettingsIni(Ini).EnableSectionReadCache;
     try
       ActiveUUID := Trim(Ini.ReadString('WorkTables', 'ActiveUUID', ''));
       ActiveName := Trim(Ini.ReadString('WorkTables', 'ActiveName', ''));
@@ -9813,6 +10231,249 @@ begin
    WorkTables[WorkTables.Count-1].Name :=  WorkTableName;
 end;
 
+function TWorkTableManager.CanCopyWorkTable(
+  const ASource: TWorkTable): Boolean;
+begin
+  Result := (ASource <> nil) and (FWorkTables <> nil) and
+    (FWorkTables.IndexOf(ASource) >= 0) and
+    (ASource.State in [swtNONE, swtSTANDBY, swtCONNECTED, swtCONFIGED,
+      swtCOMPLETE, swtFAILURE]) and
+    (ASource.MeasurementRunStage in [msNone, msDone]);
+end;
+
+function TWorkTableManager.CloneChannelForWorkTable(
+  const ASourceChannel: TChannel;
+  const ADestinationWorkTable: TWorkTable;
+  const ADestinationWorkTableID: Integer): TChannel;
+var
+  SourceDevice, ClonedDevice: TDevice;
+  NewUUID: string;
+begin
+  Result := nil;
+  ClonedDevice := nil;
+  if (ASourceChannel = nil) or (ADestinationWorkTable = nil) then
+    Exit;
+  Result := TChannel.Create;
+  try
+    Result.Enabled := ASourceChannel.Enabled;
+    Result.Name := ASourceChannel.Name;
+    Result.Text := ASourceChannel.Text;
+    Result.Group := ASourceChannel.Group;
+    Result.WorkTabeID := ADestinationWorkTableID;
+    Result.QMaxWork := ASourceChannel.QMaxWork;
+    Result.QMinWork := ASourceChannel.QMinWork;
+    Result.VMaxWork := ASourceChannel.VMaxWork;
+    Result.VMinWork := ASourceChannel.VMinWork;
+    Result.OutputSet := ASourceChannel.OutputSet;
+    Result.SyncMode := ASourceChannel.SyncMode;
+    Result.NoiseFilter := ASourceChannel.NoiseFilter;
+    Result.FrequencyAveraging := ASourceChannel.FrequencyAveraging;
+    Result.CurrentAveraging := ASourceChannel.CurrentAveraging;
+    Result.VoltageAveraging := ASourceChannel.VoltageAveraging;
+    Result.CurrentOutputRange := ASourceChannel.CurrentOutputRange;
+    Result.VoltageOutputRange := ASourceChannel.VoltageOutputRange;
+    Result.AssignFlowMeterFrom(ASourceChannel, ADestinationWorkTable, True);
+
+    SourceDevice := ASourceChannel.FlowMeter.Device;
+    ClonedDevice := Result.FlowMeter.Device;
+    if SourceDevice <> nil then
+    begin
+      if ClonedDevice = nil then
+        raise Exception.Create('Channel device was not cloned');
+      NewUUID := TGUID.NewGuid.ToString;
+      ClonedDevice.UUID := NewUUID;
+      Result.FlowMeter.DeviceUUID := NewUUID;
+      Result.DeviceUUID := NewUUID;
+    end;
+    Result.ClearRuntimeMeasurements;
+  except
+    if (ClonedDevice <> nil) and (DataManager <> nil) and
+       (DataManager.ActiveDeviceRepo <> nil) then
+      DataManager.ActiveDeviceRepo.DeleteDevice(ClonedDevice);
+    Result.Free;
+    Result := nil;
+    raise;
+  end;
+end;
+
+function TWorkTableManager.CopyWorkTable(
+  const ASource: TWorkTable): TWorkTable;
+var
+  NextID, CopyNo, I: Integer;
+  Candidate, BaseText: string;
+  SourceChannel, NewChannel: TChannel;
+  Pump: TPump;
+  Scale: TWeight;
+  WorkTable: TWorkTable;
+  TextExists: Boolean;
+  AddedToManager, InvariantsValid: Boolean;
+  ClonedDeviceCount: Integer;
+  ClonedDevices: TList<TDevice>;
+
+  procedure RemoveClonedDevices;
+  var
+    Device: TDevice;
+  begin
+    if (DataManager = nil) or (DataManager.ActiveDeviceRepo = nil) then Exit;
+    for Device in ClonedDevices do
+      if Device <> nil then
+        DataManager.ActiveDeviceRepo.DeleteDevice(Device);
+  end;
+
+  function ChannelsValid(const SourceChannels,
+    DestinationChannels: TObjectList<TChannel>): Boolean;
+  var
+    J: Integer;
+    SourceDevice, DestinationDevice: TDevice;
+  begin
+    Result := (SourceChannels.Count = DestinationChannels.Count);
+    if not Result then Exit;
+    for J := 0 to SourceChannels.Count - 1 do
+    begin
+      Result := DestinationChannels[J].WorkTabeID = NextID;
+      if not Result then Exit;
+      SourceDevice := SourceChannels[J].FlowMeter.Device;
+      DestinationDevice := DestinationChannels[J].FlowMeter.Device;
+      if SourceDevice <> nil then
+      begin
+        Result := (DestinationDevice <> nil) and
+          (DestinationDevice <> SourceDevice) and
+          not SameText(DestinationDevice.UUID, SourceDevice.UUID) and
+          (DestinationChannels[J].FlowMeter.Device = DestinationDevice) and
+          SameText(DestinationChannels[J].DeviceUUID, DestinationDevice.UUID);
+        if not Result then Exit;
+      end;
+    end;
+  end;
+begin
+  Result := nil;
+  if not CanCopyWorkTable(ASource) then
+    Exit;
+
+  NextID := 1;
+  while FindWorkTableByID(NextID) <> nil do
+    Inc(NextID);
+
+  BaseText := Trim(ASource.Text);
+  if BaseText = '' then
+    BaseText := 'Рабочий стол ' + IntToStr(ASource.ID);
+  CopyNo := 1;
+  repeat
+    if CopyNo = 1 then
+      Candidate := BaseText + ' (копия)'
+    else
+      Candidate := Format('%s (копия %d)', [BaseText, CopyNo]);
+    Inc(CopyNo);
+    TextExists := False;
+    for WorkTable in FWorkTables do
+      if (WorkTable <> nil) and SameText(Trim(WorkTable.Text), Candidate) then
+      begin
+        TextExists := True;
+        Break;
+      end;
+  until not TextExists;
+
+  AddedToManager := False;
+  ClonedDevices := TList<TDevice>.Create;
+  try
+    Result := TWorkTable.Create;
+    try
+      Result.ID := NextID;
+      Result.UUID := TGUID.NewGuid.ToString;
+      Result.Name := TWorkTable.BuildWorkTableServiceName(NextID);
+      Result.Text := Candidate;
+      Result.IsSimulationMode := FIsSimulationMode;
+
+      Result.TempDelta := ASource.TempDelta;
+    Result.PressDelta := ASource.PressDelta;
+    Result.TimeSet := ASource.TimeSet;
+    Result.LimitImpSet := ASource.LimitImpSet;
+    Result.LimitVolumeSet := ASource.LimitVolumeSet;
+    Result.Repeats := ASource.Repeats;
+    Result.MeasurementMode := ASource.MeasurementMode;
+    Result.TableClamped := ASource.TableClamped;
+    Result.FlowUnitName := ASource.FlowUnitName;
+    Result.QuantityUnitName := ASource.QuantityUnitName;
+    Result.LayoutFlowRateVisible := ASource.LayoutFlowRateVisible;
+    Result.LayoutPumpVisible := ASource.LayoutPumpVisible;
+    Result.LayoutMainVisible := ASource.LayoutMainVisible;
+    Result.LayoutMesureVisible := ASource.LayoutMesureVisible;
+    Result.LayoutConditionsVisible := ASource.LayoutConditionsVisible;
+    Result.LayoutProceduresVisible := ASource.LayoutProceduresVisible;
+    Result.EtalonsPanelHeight := ASource.EtalonsPanelHeight;
+    Result.InstrumentalLayoutOrder := ASource.InstrumentalLayoutOrder;
+    Result.MergeMeasurementPoints := ASource.MergeMeasurementPoints;
+    Result.EtalonsGridColumns := Copy(ASource.EtalonsGridColumns);
+    Result.DevicesGridColumns := Copy(ASource.DevicesGridColumns);
+    Result.DataPointsGridColumns := Copy(ASource.DataPointsGridColumns);
+    Result.ResultsGridColumns := Copy(ASource.ResultsGridColumns);
+    Result.SyncSetup.Assign(ASource.SyncSetup);
+
+    for Pump in ASource.Pumps do
+      Result.AddPump(Pump);
+    Result.ActivePump := ASource.ActivePump;
+    for Scale in ASource.Weights do
+      Result.AddScale(Scale);
+    Result.ActiveScale := ASource.ActiveScale;
+
+      for I := 0 to ASource.EtalonChannels.Count - 1 do
+      begin
+        SourceChannel := ASource.EtalonChannels[I];
+        NewChannel := CloneChannelForWorkTable(SourceChannel, Result, NextID);
+        Result.EtalonChannels.Add(NewChannel);
+        if NewChannel.FlowMeter.Device <> nil then
+          ClonedDevices.Add(NewChannel.FlowMeter.Device);
+      end;
+      for I := 0 to ASource.DeviceChannels.Count - 1 do
+      begin
+        SourceChannel := ASource.DeviceChannels[I];
+        NewChannel := CloneChannelForWorkTable(SourceChannel, Result, NextID);
+        Result.DeviceChannels.Add(NewChannel);
+        if NewChannel.FlowMeter.Device <> nil then
+          ClonedDevices.Add(NewChannel.FlowMeter.Device);
+      end;
+
+      InvariantsValid := ChannelsValid(ASource.EtalonChannels,
+        Result.EtalonChannels) and ChannelsValid(ASource.DeviceChannels,
+        Result.DeviceChannels);
+      if not InvariantsValid then
+      begin
+        if Assigned(ProtocolManager) then
+          ProtocolManager.AddMessage(pcError, psWorkTable,
+            'WorkTableCopyInvariantFailed',
+            Format('SourceWorkTableUUID=%s; NewWorkTableUUID=%s',
+              [ASource.UUID, Result.UUID]), '');
+        RemoveClonedDevices;
+        Result.Free;
+        Result := nil;
+        Exit;
+      end;
+
+      FWorkTables.Add(Result);
+      AddedToManager := True;
+      Result.Rebind;
+      Save;
+      ClonedDeviceCount := ClonedDevices.Count;
+      if Assigned(ProtocolManager) then
+        ProtocolManager.AddMessage(pcInfo, psWorkTable,
+          'WorkTableCopyCompleted', 'Копирование рабочего стола завершено',
+          Format('SourceWorkTableUUID=%s; NewWorkTableUUID=%s; SourceEtalonCount=%d; NewEtalonCount=%d; SourceDeviceCount=%d; NewDeviceCount=%d; ClonedDeviceCount=%d',
+            [ASource.UUID, Result.UUID, ASource.EtalonChannels.Count,
+             Result.EtalonChannels.Count, ASource.DeviceChannels.Count,
+             Result.DeviceChannels.Count, ClonedDeviceCount]));
+    except
+      if AddedToManager then
+        FWorkTables.Extract(Result);
+      RemoveClonedDevices;
+      Result.Free;
+      Result := nil;
+      raise;
+    end;
+  finally
+    ClonedDevices.Free;
+  end;
+end;
+
 procedure TWorkTableManager.SetActiveWorkTable(AWorkTable: TWorkTable);
 begin
   if FActiveWorkTable = AWorkTable then
@@ -9853,6 +10514,66 @@ begin
       'SimulationModeChanged', 'Изменён режим имитации рабочего стола',
       Format('ManagerMode=%s; WorkTableCount=%d',
         [BoolText(FIsSimulationMode), WorkTableCount]));
+end;
+
+{ Удаляет ровно один рабочий стол, найденный по нормализованному UUID. }
+function TWorkTableManager.DeleteWorkTableByUUID(
+  const AWorkTableUUID: string): Boolean;
+var
+  I: Integer;
+  WorkTable: TWorkTable;
+  NormalizedUUID: string;
+  DeletedMeterValueHashes: TStringList;
+  DeletedMeterValueOwners: TStringList;
+
+  procedure AddOwnerName(const AOwnerName: string);
+  var
+    OwnerName: string;
+  begin
+    OwnerName := Trim(AOwnerName);
+    if (OwnerName <> '') and (DeletedMeterValueOwners.IndexOf(OwnerName) < 0) then
+      DeletedMeterValueOwners.Add(OwnerName);
+  end;
+begin
+  Result := False;
+  NormalizedUUID := UpperCase(Trim(AWorkTableUUID));
+  if (NormalizedUUID = '') or (FWorkTables = nil) then
+    Exit;
+
+  DeletedMeterValueHashes := TStringList.Create;
+  DeletedMeterValueOwners := TStringList.Create;
+  try
+    DeletedMeterValueHashes.Duplicates := TDuplicates.dupIgnore;
+    DeletedMeterValueOwners.Duplicates := TDuplicates.dupIgnore;
+    for I := 0 to FWorkTables.Count - 1 do
+    begin
+      WorkTable := FWorkTables[I];
+      if (WorkTable = nil) or
+         (UpperCase(Trim(WorkTable.UUID)) <> NormalizedUUID) then
+        Continue;
+
+      AddOwnerName(WorkTable.Text);
+      AddOwnerName(WorkTable.Name);
+      AddOwnerName(TWorkTable.BuildWorkTableServiceName(WorkTable.ID));
+      AddOwnerName('Рабочий стол ' + IntToStr(WorkTable.ID));
+      WorkTable.RemoveMeterValuesFromStorage(DeletedMeterValueHashes);
+
+      { Барьер отменяет queued callbacks до очистки подписок и освобождения. }
+      WorkTable.CancelPendingNotifications;
+      WorkTable.ClearObservers;
+      if FActiveWorkTable = WorkTable then
+        SetActiveWorkTable(nil);
+      FWorkTables.Delete(I);
+      TMeterValue.DeleteFromStorage(DeletedMeterValueHashes,
+        DeletedMeterValueOwners);
+      Save;
+      Result := True;
+      Exit;
+    end;
+  finally
+    DeletedMeterValueOwners.Free;
+    DeletedMeterValueHashes.Free;
+  end;
 end;
 
 function TWorkTableManager.DeleteWorkTableByName(
@@ -10012,35 +10733,67 @@ begin
       Exit(WorkTable);
 end;
 
-function TWorkTableManager.FindPumpByName(const APumpName: string): TPump;
+function TWorkTableManager.FindChannelByName(
+  const ChannelName: string): TChannel;
 var
   WorkTable: TWorkTable;
+  Channel: TChannel;
+  SearchName: string;
+begin
+  Result := nil;
+  SearchName := Trim(ChannelName);
+
+  if SearchName = '' then
+    Exit;
+
+  for WorkTable in WorkTables do
+  begin
+    if not Assigned(WorkTable) then
+      Continue;
+
+    { Сначала ищем среди эталонных каналов }
+    if Assigned(WorkTable.EtalonChannels) then
+      for Channel in WorkTable.EtalonChannels do
+        if Assigned(Channel) and
+           SameText(Trim(Channel.Name), SearchName) then
+          Exit(Channel);
+
+    { Затем ищем среди поверяемых каналов }
+    if Assigned(WorkTable.DeviceChannels) then
+      for Channel in WorkTable.DeviceChannels do
+        if Assigned(Channel) and
+           SameText(Trim(Channel.Name), SearchName) then
+          Exit(Channel);
+  end;
+end;
+
+function TWorkTableManager.FindPumpByName(const APumpName: string): TPump;
+var
   Pump: TPump;
+  PumpName: string;
 begin
   Result := nil;
 
-  if (FWorkTables = nil) or (APumpName = '') then
+  PumpName := Trim(APumpName);
+  if PumpName = '' then
     Exit;
 
-  for WorkTable in FWorkTables do
+  if TPump.Pumps = nil then
+    Exit;
+
+  for Pump in TPump.Pumps do
   begin
-    if (WorkTable = nil) or (WorkTable.Pumps = nil) then
+    if not Assigned(Pump) then
       Continue;
 
-    for Pump in WorkTable.Pumps do
-    begin
-      if Pump.Name = APumpName then
-      begin
-        Result := Pump;
-        Exit;
-      end;
-    end;
+    if SameText(Trim(Pump.Name), PumpName) then
+      Exit(Pump);
   end;
 end;
 
 function TWorkTableManager.GetChannelFlowCoef(const AChannel: TChannel): Double;
 
-  function IsValidCoef(const AValue: Double): Boolean;
+function IsValidCoef(const AValue: Double): Boolean;
   begin
     Result := (AValue > 0.0) and (Abs(AValue) < MaxDouble);
   end;
@@ -10175,8 +10928,6 @@ begin
     end;
   end;
 end;
-
-
 
 procedure TWorkTableManager.UpdateSimulation;
 
@@ -10401,7 +11152,10 @@ begin
   Pump := AWorkTable.ActivePump;   // Насос (может быть nil)
 
 
-  if Pump = nil then
+  // Помимо nil проверяем принадлежность столу до первого разыменования.
+  // Это защищает таймер имитации от устаревшей ссылки при изменении списка.
+  if (Pump = nil) or (AWorkTable.Pumps = nil) or
+     (AWorkTable.Pumps.IndexOf(Pump) < 0) then
     Exit;
 
 
@@ -11556,7 +12310,35 @@ begin
 
   end;
 
+procedure TWorkTableManager.SetActivePump(const APumpName: string);
+var
+  WorkTable: TWorkTable;
+  Pump: TPump;
+  WorkTablePump: TPump;
+  PumpName: string;
+begin
+  PumpName := Trim(APumpName);
+  if PumpName = '' then
+    Exit;
 
+  // Ищем насос в общем списке TPump.Pumps.
+  Pump := FindPumpByName(PumpName);
+  if not Assigned(Pump) then
+    Exit;
+
+  if not Assigned(FWorkTables) then
+    Exit;
+
+  // Делаем насос активным во всех столах,
+  // в которых уже имеется ссылка на этот насос.
+  for WorkTable in FWorkTables do
+  begin
+    if not Assigned(WorkTable) then
+      Continue;
+
+    WorkTable.SetActivePump(PumpName);
+  end;
+end;
 
 
 

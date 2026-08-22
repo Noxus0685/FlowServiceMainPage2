@@ -5,6 +5,7 @@ interface
 uses
   System.Classes,
   System.Generics.Collections,
+  System.SyncObjs,
   System.SysUtils,
   uBaseProcedures;
 
@@ -14,6 +15,23 @@ type
     notifyAction,             // Действие пользователя
     notifyEvent               // Событие которое произошло с объектом
   );
+
+  IObservableLifetimeToken = interface
+    ['{65A0A4BD-B83E-4B83-A298-2F6549FA0472}']
+    function IsAlive: Boolean;
+    procedure Invalidate;
+  end;
+
+  { Потокобезопасный барьер времени жизни отложенного уведомления. }
+  TObservableLifetimeToken = class(TInterfacedObject,
+    IObservableLifetimeToken)
+  private
+    FAlive: Integer;
+  public
+    constructor Create;
+    procedure Invalidate;
+    function IsAlive: Boolean;
+  end;
 
   IEventObserver = interface
     ['{7E95DA5C-E734-49FA-868D-4CF8CDFF24B0}']
@@ -57,6 +75,7 @@ type
   private
     FObservers: TList<IEventObserver>;
     FObserversLock: TObject;
+    FNotificationLifetime: IObservableLifetimeToken;
     FIsDestroying: Boolean;
     FEvent: Integer;
     FLastError: TErrorInfo;
@@ -76,6 +95,8 @@ type
 
     procedure Subscribe(const AObserver: IEventObserver);
     procedure Unsubscribe(const AObserver: IEventObserver);
+    procedure ClearObservers;
+    procedure CancelPendingNotifications;
     function ObserverCount: Integer;
     procedure FireEvent(AEvent: Integer; const AError: TErrorInfo); overload; virtual;
     procedure FireEvent(AEvent: Integer); overload; virtual;
@@ -88,6 +109,22 @@ type
   end;
 
 implementation
+
+constructor TObservableLifetimeToken.Create;
+begin
+  inherited Create;
+  FAlive := 1;
+end;
+
+procedure TObservableLifetimeToken.Invalidate;
+begin
+  TInterlocked.Exchange(FAlive, 0);
+end;
+
+function TObservableLifetimeToken.IsAlive: Boolean;
+begin
+  Result := TInterlocked.CompareExchange(FAlive, 1, 1) = 1;
+end;
 
 constructor TActionNotification.Create(AAction: Integer);
 begin
@@ -119,6 +156,7 @@ begin
   inherited Create;
   FObservers := TList<IEventObserver>.Create;
   FObserversLock := TObject.Create;
+  FNotificationLifetime := TObservableLifetimeToken.Create;
   FEvent := 0;
   FLastError := TErrorInfo.Empty(0);
 end;
@@ -126,6 +164,8 @@ end;
 destructor TObservableObject.Destroy;
 begin
   FIsDestroying := True;
+  if FNotificationLifetime <> nil then
+    FNotificationLifetime.Invalidate;
 
   if FObserversLock <> nil then
   begin
@@ -138,6 +178,7 @@ begin
     end;
   end;
 
+  FNotificationLifetime := nil;
   FreeAndNil(FObservers);
   FreeAndNil(FObserversLock);
 
@@ -177,6 +218,39 @@ begin
   end;
 end;
 
+procedure TObservableObject.ClearObservers;
+begin
+  if (FObserversLock = nil) or (FObservers = nil) then
+    Exit;
+  TMonitor.Enter(FObserversLock);
+  try
+    FObservers.Clear;
+  finally
+    TMonitor.Exit(FObserversLock);
+  end;
+end;
+
+{ Инвалидирует callbacks старого поколения и открывает новое при жизни объекта. }
+procedure TObservableObject.CancelPendingNotifications;
+var
+  OldLifetime: IObservableLifetimeToken;
+begin
+  if FObserversLock = nil then
+    Exit;
+  TMonitor.Enter(FObserversLock);
+  try
+    OldLifetime := FNotificationLifetime;
+    if OldLifetime <> nil then
+      OldLifetime.Invalidate;
+    if not FIsDestroying then
+      FNotificationLifetime := TObservableLifetimeToken.Create
+    else
+      FNotificationLifetime := nil;
+  finally
+    TMonitor.Exit(FObserversLock);
+  end;
+end;
+
 function TObservableObject.ObserverCount: Integer;
 begin
   if FIsDestroying or (FObserversLock = nil) or (FObservers = nil) then
@@ -193,6 +267,7 @@ end;
 procedure TObservableObject.Notify(Event: Integer; Data: TObject);
 var
   LocalObservers: TArray<IEventObserver>;
+  LocalLifetime: IObservableLifetimeToken;
 begin
   if FIsDestroying or (FObserversLock = nil) or (FObservers = nil) then
     Exit;
@@ -200,6 +275,7 @@ begin
   TMonitor.Enter(FObserversLock);
   try
     LocalObservers := FObservers.ToArray;
+    LocalLifetime := FNotificationLifetime;
   finally
     TMonitor.Exit(FObserversLock);
   end;
@@ -210,12 +286,15 @@ begin
       I: Integer;
       Observer: IEventObserver;
     begin
+      { Не обращаемся к Self, пока token не подтвердил жизнь отправителя. }
+      if (LocalLifetime = nil) or not LocalLifetime.IsAlive then
+        Exit;
       for I := 0 to Length(LocalObservers) - 1 do
       begin
         Observer := LocalObservers[I];
         if Observer <> nil then
           Observer.OnNotify(Self, Event, Data);
-       end;
+      end;
     end);
 end;
 
@@ -229,24 +308,22 @@ var
   LocalObservers: TArray<IEventObserver>;
   LocalData: TObject;
   LocalEvent: Integer;
+  LocalLifetime: IObservableLifetimeToken;
 begin
   if Data = nil then
     Exit;
-
   LocalData := Data;
   LocalEvent := Event;
 
-  if FIsDestroying or
-     (FObserversLock = nil) or
-     (FObservers = nil) then
+  if FIsDestroying or (FObserversLock = nil) or (FObservers = nil) then
   begin
     LocalData.Free;
     Exit;
   end;
-
   TMonitor.Enter(FObserversLock);
   try
     LocalObservers := FObservers.ToArray;
+    LocalLifetime := FNotificationLifetime;
   finally
     TMonitor.Exit(FObserversLock);
   end;
@@ -258,22 +335,19 @@ begin
       Observer: IEventObserver;
     begin
       try
+        { LocalData принадлежит callback и освобождается даже после отмены. }
+        if (LocalLifetime = nil) or not LocalLifetime.IsAlive then
+          Exit;
         for I := 0 to Length(LocalObservers) - 1 do
         begin
           Observer := LocalObservers[I];
-
           if Observer <> nil then
-            Observer.OnNotify(
-              Self,
-              LocalEvent,
-              LocalData
-            );
+            Observer.OnNotify(Self, LocalEvent, LocalData);
         end;
       finally
         LocalData.Free;
       end;
-    end
-  );
+    end);
 end;
 
 procedure TObservableObject.NotifyOwned(AEvent: ENotifyEvent; Data: TObject);

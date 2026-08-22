@@ -46,15 +46,30 @@ type
     CheckBoxProc: TCheckBox;
     CheckBoxHandler: TCheckBox;
     CheckBoxEngine: TCheckBox;
+    SwitchProtocol: TSwitch;
+    SwitchLog: TSwitch;
+    CheckBoxSampleChart: TCheckBox;
+    CheckBoxStat: TCheckBox;
+    OptimizationTimer: TTimer;
+
+    LayoutOptions: TLayout;
+    Label1: TLabel;
+    Label2: TLabel;
+
+
+
     procedure SpeedButtonResumeClick(Sender: TObject);
     procedure SpeedButtonPauseClick(Sender: TObject);
     procedure SpeedButtonClearClick(Sender: TObject);
     procedure SpeedButtonExportClick(Sender: TObject);
     procedure SpeedButtonCopyClick(Sender: TObject);
     procedure FilterChanged(Sender: TObject);
+    procedure OptimizationControlChanged(Sender: TObject);
+    procedure OptimizationTimerTimer(Sender: TObject);
   private
     FMessages: TObjectList<TProtocolMessage>;
-    FListener: TProtocolListener;
+    FBatchListener: TProtocolBatchListener;
+    FUpdatingOptimizationControls: Boolean;
     FLoadingSettings: Boolean;
     FProtocolSettingsFileName: string;
     FFullLogFileName: string;
@@ -62,7 +77,8 @@ type
     FSessionLogFiles: TStringList;
     FCurrentLogSizeBytes: Int64;
     FTotalMessageCount: Int64;
-    procedure HandleProtocolMessage(Msg: TProtocolMessage);
+    procedure HandleProtocolMessages(const Messages: TArray<TProtocolMessage>);
+    procedure UpdateOptimizationControls;
     function ProtocolLogDirectory: string;
     procedure CleanupOldProtocolFiles;
     procedure InitializeFullLog;
@@ -117,7 +133,6 @@ begin
   FFullLogFileName := '';
   FCurrentLogSizeBytes := 0;
   FTotalMessageCount := 0;
-  InitializeFullLog;
   FLoadingSettings := True;
 
   CheckBoxEvent.IsChecked := True;
@@ -134,6 +149,8 @@ begin
   CheckBoxEngine.IsChecked := True;
   FLoadingSettings := False;
   LoadProtocolSettings;
+  UpdateOptimizationControls;
+  if ProtocolManager.LogEnabled then InitializeFullLog;
 
   BtnCopy := TSpeedButton.Create(ToolBarProtocol);
   BtnCopy.Parent := ToolBarProtocol;
@@ -149,13 +166,13 @@ begin
   BtnExport.Width := 140;
   BtnExport.OnClick := SpeedButtonExportClick;
 
-  FListener :=
-    procedure(Msg: TProtocolMessage)
+  FBatchListener :=
+    procedure(const Messages: TArray<TProtocolMessage>)
     begin
-      HandleProtocolMessage(Msg);
+      HandleProtocolMessages(Messages);
     end;
 
-  ProtocolManager.Subscribe(FListener);
+  ProtocolManager.SubscribeBatch(FBatchListener);
   ActiveWorkTable := nil;
   if WorkTableManager <> nil then
     ActiveWorkTable := WorkTableManager.ActiveWorkTable;
@@ -244,6 +261,7 @@ begin
   FLoadingSettings := True;
   Ini := TProjectSettingsIni.Create(FileName, STORAGE_TABLE_SETTINGS);
   try
+    ProtocolManager.LoadSettings(FileName);
     LoadCheckBoxSetting(Ini, CheckBoxEvent);
     LoadCheckBoxSetting(Ini, CheckBoxState);
     LoadCheckBoxSetting(Ini, CheckBoxAction);
@@ -277,6 +295,7 @@ begin
   FileName := ProtocolSettingsFileName;
   if Trim(FileName) = '' then
     Exit;
+  ProtocolManager.SaveSettings(FileName);
 
   Ini := TProjectSettingsIni.Create(FileName, STORAGE_TABLE_SETTINGS);
   try
@@ -425,6 +444,7 @@ procedure TFrameProtocol.InitializeFullLog;
 var
   LogDirectory: string;
 begin
+  if (ProtocolManager = nil) or not ProtocolManager.LogEnabled then Exit;
   FreeAndNil(FFullLogWriter);
   FFullLogFileName := '';
   FCurrentLogSizeBytes := 0;
@@ -466,7 +486,7 @@ var
   Line: string;
   LineSize: Int64;
 begin
-  if Msg = nil then
+  if (Msg = nil) or (ProtocolManager = nil) or not ProtocolManager.LogEnabled then
     Exit;
 
   Line := TProtocolManager.FormatMessage(Msg);
@@ -593,7 +613,7 @@ destructor TFrameProtocol.Destroy;
 begin
   SaveProtocolSettings;
   if ProtocolManager <> nil then
-    ProtocolManager.Unsubscribe(FListener);
+    ProtocolManager.UnsubscribeBatch(FBatchListener);
 
   FreeAndNil(FFullLogWriter);
   FreeAndNil(FSessionLogFiles);
@@ -601,28 +621,36 @@ begin
   inherited;
 end;
 
-procedure TFrameProtocol.HandleProtocolMessage(Msg: TProtocolMessage);
+procedure TFrameProtocol.HandleProtocolMessages(
+  const Messages: TArray<TProtocolMessage>);
 var
-  CopyMsg: TProtocolMessage;
+  Msg, CopyMsg: TProtocolMessage;
+  LastItem: TListBoxItem;
 begin
-  if Msg = nil then
-    Exit;
-
-  CopyMsg := Msg.Clone;
-
-  TThread.Synchronize(nil,
-    procedure
+  if (csDestroying in ComponentState) or (ProtocolManager = nil) or
+     not ProtocolManager.ProtocolEnabled then Exit;
+  LastItem := nil;
+  ListBoxProtocol.BeginUpdate;
+  try
+    for Msg in Messages do
     begin
+      if Msg = nil then Continue;
+      CopyMsg := Msg.Clone;
       Inc(FTotalMessageCount);
       AppendFullLogMessage(CopyMsg);
-
       FMessages.Add(CopyMsg);
-      TrimStoredMessages;
-
       if IsAllowedByFilters(CopyMsg) then
+      begin
         AddProtocolItem(CopyMsg);
-    end
-  );
+        LastItem := ListBoxProtocol.ItemByIndex(ListBoxProtocol.Count - 1) as TListBoxItem;
+      end;
+    end;
+    TrimStoredMessages;
+    TrimProtocolItems;
+  finally
+    ListBoxProtocol.EndUpdate;
+  end;
+  if LastItem <> nil then ListBoxProtocol.ScrollToItem(LastItem);
 end;
 
 procedure TFrameProtocol.CopyProtocolToClipboard;
@@ -696,8 +724,37 @@ begin
   end;
 
   ListBoxProtocol.AddObject(Item);
-  TrimProtocolItems;
-  ListBoxProtocol.ScrollToItem(Item);
+end;
+
+procedure TFrameProtocol.UpdateOptimizationControls;
+begin
+  if FUpdatingOptimizationControls or (csDestroying in ComponentState) or
+     (ProtocolManager = nil) then Exit;
+  FUpdatingOptimizationControls := True;
+  try
+    SwitchProtocol.IsChecked := ProtocolManager.ProtocolEnabled;
+    SwitchLog.IsChecked := ProtocolManager.LogEnabled;
+    CheckBoxSampleChart.IsChecked := ProtocolManager.SampleChartEnabled;
+    CheckBoxStat.IsChecked := ProtocolManager.StatisticsEnabled;
+  finally FUpdatingOptimizationControls := False; end;
+end;
+
+procedure TFrameProtocol.OptimizationControlChanged(Sender: TObject);
+begin
+  if FUpdatingOptimizationControls or (ProtocolManager = nil) then Exit;
+  ProtocolManager.ProtocolEnabled := SwitchProtocol.IsChecked;
+  ProtocolManager.LogEnabled := SwitchLog.IsChecked;
+  ProtocolManager.SampleChartEnabled := CheckBoxSampleChart.IsChecked;
+  ProtocolManager.StatisticsEnabled := CheckBoxStat.IsChecked;
+  if ProtocolManager.LogEnabled and (FFullLogWriter = nil) then InitializeFullLog
+  else if not ProtocolManager.LogEnabled then FreeAndNil(FFullLogWriter);
+  SaveProtocolSettings;
+end;
+
+procedure TFrameProtocol.OptimizationTimerTimer(Sender: TObject);
+begin
+  { Property changes made by worker code are reflected only on the FMX thread. }
+  UpdateOptimizationControls;
 end;
 
 function TFrameProtocol.IsAllowedByFilters(Msg: TProtocolMessage): Boolean;

@@ -167,6 +167,7 @@ type
 
   public
     procedure DetachWorkTableObservers(AWorkTable: TWorkTable);
+    procedure AttachWorkTableObservers(AWorkTable: TWorkTable);
     destructor Destroy; override;
     property T_WorkBench_First:Double read FT_WorkBench_First write SetT_WorkBench_First;
     property T_WorkBench_Last:Double read FT_WorkBench_Last write SetT_WorkBench_Last;
@@ -190,6 +191,12 @@ begin
   inherited Destroy;
 end;
 
+
+procedure TTableMainForm.AttachWorkTableObservers(AWorkTable: TWorkTable);
+begin
+  if AWorkTable <> nil then
+    SubscribeWorkTableObjects(AWorkTable);
+end;
 
 procedure TTableMainForm.DetachWorkTableObservers(AWorkTable: TWorkTable);
 var

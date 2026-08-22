@@ -361,6 +361,9 @@ type
     function GetNewUUID: string;
     // Сохраняет значения в логическое хранилище MeterValues выбранного файла проекта *.fpp.
     class procedure SaveToStorage; static;
+    // Удаляет из хранилища записи, которые не входят в итоговый набор IsToSave.
+    // Возвращает количество фактически удалённых секций и заполняет их описания.
+    class function CleanupStorage(const ARemovedEntries: TStrings): Integer; static;
     // Загружает значения из логического хранилища MeterValues выбранного файла проекта *.fpp.
     class procedure LoadFromStorage; static;
     // Удаляет указанные значения/владельцев и перезаписывает хранилище MeterValues.
@@ -3998,6 +4001,116 @@ begin
   end;
 end;
 
+class function TMeterValue.CleanupStorage(
+  const ARemovedEntries: TStrings): Integer;
+var
+  Ini: TCustomIniFile;
+  ActiveKeys: TStringList;
+  ActiveValues: TObjectList<TMeterValue>;
+  SavedHashes: TStringList;
+  SeenStoredHashes: TStringList;
+  MV: TMeterValue;
+  I: Integer;
+  ExistingIndex: Integer;
+  Count: Integer;
+  Section: string;
+  Key: string;
+  Hash: string;
+  HashOwner: string;
+  NameOwner: string;
+  ValueName: string;
+  ValueKind: string;
+  RemovalReason: string;
+begin
+  Result := 0;
+  if ARemovedEntries <> nil then
+    ARemovedEntries.Clear;
+
+  ActiveKeys := TStringList.Create;
+  ActiveValues := TObjectList<TMeterValue>.Create(False);
+  SavedHashes := TStringList.Create;
+  SeenStoredHashes := TStringList.Create;
+  try
+    ActiveKeys.CaseSensitive := False;
+    SavedHashes.CaseSensitive := False;
+    SavedHashes.Sorted := True;
+    SavedHashes.Duplicates := dupIgnore;
+    SeenStoredHashes.CaseSensitive := False;
+    SeenStoredHashes.Sorted := True;
+    SeenStoredHashes.Duplicates := dupIgnore;
+
+    { Build exactly the same final set as SaveToStorage: the last active
+      value wins for a persistent HashOwner + ValueKind key. }
+    for MV in FMeterValues do
+      if MV.IsToSave then
+      begin
+        if (Trim(MV.HashOwner) <> '') and (Trim(MV.GetValueKind) <> '') then
+          Key := MV.HashOwner + '|' + MV.GetValueKind
+        else
+          Key := MV.Hash;
+
+        ExistingIndex := ActiveKeys.IndexOf(Key);
+        if ExistingIndex >= 0 then
+          ActiveValues[ExistingIndex] := MV
+        else
+        begin
+          ActiveKeys.Add(Key);
+          ActiveValues.Add(MV);
+        end;
+      end;
+
+    for MV in ActiveValues do
+      if Trim(MV.Hash) <> '' then
+        SavedHashes.Add(Trim(MV.Hash));
+
+    { Compare the current database contents with the final set. This avoids
+      reporting transient runtime values which have never existed in storage. }
+    Ini := OpenProjectSettings(STORAGE_METER_VALUES);
+    try
+      Count := Ini.ReadInteger('MeterValues', 'ValuesCount', 0);
+      for I := 0 to Count - 1 do
+      begin
+        Section := 'MeterValue.' + IntToStr(I);
+        Hash := Trim(Ini.ReadString(Section, 'Hash', ''));
+        HashOwner := Ini.ReadString(Section, 'HashOwner', '');
+        NameOwner := Ini.ReadString(Section, 'NameOwner', '');
+        ValueName := Ini.ReadString(Section, 'Name', '');
+        ValueKind := Ini.ReadString(Section, 'ValueKind', '');
+
+        RemovalReason := '';
+        if Hash = '' then
+          RemovalReason := 'пустой Hash'
+        else if SeenStoredHashes.IndexOf(Hash) >= 0 then
+          RemovalReason := 'дублирующая запись'
+        else if SavedHashes.IndexOf(Hash) < 0 then
+          RemovalReason := 'IsToSave=False';
+
+        if Hash <> '' then
+          SeenStoredHashes.Add(Hash);
+
+        if RemovalReason <> '' then
+        begin
+          Inc(Result);
+          if ARemovedEntries <> nil then
+            ARemovedEntries.Add(Format(
+              'Section=%s; Hash=%s; HashOwner=%s; NameOwner=%s; Name=%s; ValueKind=%s; Reason=%s',
+              [Section, Hash, HashOwner, NameOwner, ValueName, ValueKind,
+               RemovalReason]));
+        end;
+      end;
+    finally
+      Ini.Free;
+    end;
+
+    SaveToStorage;
+  finally
+    SeenStoredHashes.Free;
+    SavedHashes.Free;
+    ActiveValues.Free;
+    ActiveKeys.Free;
+  end;
+end;
+
 class procedure TMeterValue.DeleteFromStorage(const AHashes: TStrings;
   const AOwnerNames: TStrings);
 var
@@ -4039,12 +4152,32 @@ end;
 class procedure TMeterValue.LoadFromStorage;
 var
   Ini: TCustomIniFile;
+  SourceIni: TCustomIniFile;
+  CacheIni: TMemIniFile;
+  SectionValues: TStringList;
+  ValuesByHash: TDictionary<string, TMeterValue>;
   Count, I, J: Integer;
+  DimensionsCount, CoefsCount: Integer;
+  ExistingCount, CreatedCount: Integer;
+  TotalDimensions, TotalCoefs: Integer;
   Section: string;
   MV: TMeterValue;
+  ExistingMV: TMeterValue;
   Dim: TDimension;
   CoefItem: TCoef;
   Hash: string;
+  Stopwatch: TStopwatch;
+
+  procedure CacheSection(const ASection: string);
+  var
+    ValueIndex: Integer;
+  begin
+    SectionValues.Clear;
+    SourceIni.ReadSectionValues(ASection, SectionValues);
+    for ValueIndex := 0 to SectionValues.Count - 1 do
+      CacheIni.WriteString(ASection, SectionValues.Names[ValueIndex],
+        SectionValues.ValueFromIndex[ValueIndex]);
+  end;
 
   function LoadChartColorOption(const AStoredValue: Integer; const ADefault: TChartColorOption): TChartColorOption;
   begin
@@ -4080,22 +4213,88 @@ var
   end;
 
 begin
-  Ini := OpenProjectSettings(STORAGE_METER_VALUES);
+  Stopwatch := TStopwatch.StartNew;
+  ExistingCount := 0;
+  CreatedCount := 0;
+  TotalDimensions := 0;
+  TotalCoefs := 0;
+
+  { ReadSectionValues выполняет один SELECT для всей секции. Копирование во
+    временный TMemIniFile сохраняет прежнюю семантику всех Ini.Read* ниже,
+    но исключает отдельный SQLite-запрос для каждого поля. }
+  CacheIni := TMemIniFile.Create('');
   try
+    SourceIni := nil;
+    SectionValues := nil;
+    try
+      SourceIni := OpenProjectSettings(STORAGE_METER_VALUES);
+      SectionValues := TStringList.Create;
+      CacheSection('MeterValues');
+      Count := CacheIni.ReadInteger('MeterValues', 'ValuesCount', 0);
+      if Count < 0 then
+        Count := 0;
+
+      for I := 0 to Count - 1 do
+      begin
+        Section := 'MeterValue.' + IntToStr(I);
+        CacheSection(Section);
+
+        DimensionsCount := CacheIni.ReadInteger(Section,
+          'DimensionsCount', 0);
+        if DimensionsCount < 0 then
+          DimensionsCount := 0;
+        for J := 0 to DimensionsCount - 1 do
+          CacheSection(Section + '.Dimension.' + IntToStr(J));
+
+        CoefsCount := CacheIni.ReadInteger(Section, 'CoefsCount', 0);
+        if CoefsCount < 0 then
+          CoefsCount := 0;
+        for J := 0 to CoefsCount - 1 do
+          CacheSection(Section + '.Coef.' + IntToStr(J));
+      end;
+    finally
+      SectionValues.Free;
+      SourceIni.Free;
+    end;
+
+    Ini := CacheIni;
     FInitDensity := S2F(Ini.ReadString('MeterValues', 'InitDensity', FloatToStr(FInitDensity)));
     Count := Ini.ReadInteger('MeterValues', 'ValuesCount', 0);
+    if Count < 0 then
+      Count := 0;
     FMeterValuesSaves.Clear;
+    FMeterValuesSaves.Capacity := Count;
 
-    for I := 0 to Count - 1 do
-    begin
-      Section := 'MeterValue.' + IntToStr(I);
-      Hash := Ini.ReadString(Section, 'Hash', '');
-      MV := GetMeterValue(Hash);
-      if MV = nil then
-        MV := TMeterValue.Create;
+    ValuesByHash := TDictionary<string, TMeterValue>.Create;
+    try
+      { Сохраняем прежнее правило: если Hash повторяется, используется первый
+        ранее созданный объект. Поиск при этом становится O(1), а не полным
+        перебором FMeterValues для каждой записи. }
+      for ExistingMV in FMeterValues do
+        if (ExistingMV <> nil) and (not ExistingMV.Hash.IsEmpty) and
+           (not ValuesByHash.ContainsKey(ExistingMV.Hash)) then
+          ValuesByHash.Add(ExistingMV.Hash, ExistingMV);
 
-      if not Hash.IsEmpty then
-        MV.Hash := Hash;
+      for I := 0 to Count - 1 do
+      begin
+        Section := 'MeterValue.' + IntToStr(I);
+        Hash := Ini.ReadString(Section, 'Hash', '');
+        if Hash.IsEmpty or (not ValuesByHash.TryGetValue(Hash, MV)) then
+          MV := nil;
+        if MV = nil then
+        begin
+          MV := TMeterValue.Create;
+          Inc(CreatedCount);
+        end
+        else
+          Inc(ExistingCount);
+
+        if not Hash.IsEmpty then
+        begin
+          MV.Hash := Hash;
+          if not ValuesByHash.ContainsKey(Hash) then
+            ValuesByHash.Add(Hash, MV);
+        end;
       MV.IsToSave := True;
       MV.HashOwner := Ini.ReadString(Section, 'HashOwner', '');
       MV.NameOwner := Ini.ReadString(Section, 'NameOwner', '');
@@ -4116,7 +4315,6 @@ begin
       MV.Accuracy := Ini.ReadInteger(Section, 'Accuracy', MV.Accuracy);
       MV.ShowTrailingZeros := Ini.ReadBool(Section, 'ShowTrailingZeros', MV.ShowTrailingZeros);
       MV.Error := S2F(Ini.ReadString(Section, 'Error', F2S(MV.Error)));
-      MV.ShowTrailingZeros := Ini.ReadBool(Section, 'ShowTrailingZeros', MV.ShowTrailingZeros);
       MV.MaxValue := S2F(Ini.ReadString(Section, 'MaxValue', F2S(MV.MaxValue)));
       MV.MinValue := S2F(Ini.ReadString(Section, 'MinValue', F2S(MV.MinValue)));
       MV.MaxNomValue := S2F(Ini.ReadString(Section, 'MaxNomValue', F2S(MV.MaxNomValue)));
@@ -4131,9 +4329,12 @@ begin
 
       MV.FStabilitySettings.Enabled := Ini.ReadBool(Section, 'StabilityEnabled', MV.FStabilitySettings.Enabled);
       MV.FStabilitySettings.MinSampleCount := Ini.ReadInteger(Section, 'StabilityMinSampleCount', MV.FStabilitySettings.MinSampleCount);
-      MV.FStabilitySettings.MinWindowDurationSec := Ini.ReadFloat(Section,
-        'Min_Window_Duration_Sec', Ini.ReadFloat(Section,
-        'Window_Duration_Sec', 10.0));
+      if Ini.ValueExists(Section, 'Min_Window_Duration_Sec') then
+        MV.FStabilitySettings.MinWindowDurationSec := Ini.ReadFloat(Section,
+          'Min_Window_Duration_Sec', 10.0)
+      else
+        MV.FStabilitySettings.MinWindowDurationSec := Ini.ReadFloat(Section,
+          'Window_Duration_Sec', 10.0);
       MV.FStabilitySettings.SampleSize := Ini.ReadInteger(Section, 'Sample_Size', MV.FStabilitySettings.SampleSize);
       MV.FStabilitySettings.MinimumSampleIntervalSec := Ini.ReadFloat(Section,
         'MinimumSampleIntervalSec', MV.FStabilitySettings.MinimumSampleIntervalSec);
@@ -4163,8 +4364,13 @@ begin
 {$IFDEF DEBUG}
 {$ENDIF}
 
+      DimensionsCount := Ini.ReadInteger(Section, 'DimensionsCount', 0);
+      if DimensionsCount < 0 then
+        DimensionsCount := 0;
       MV.Dimensions.Clear;
-      for J := 0 to Ini.ReadInteger(Section, 'DimensionsCount', 0) - 1 do
+      MV.Dimensions.Capacity := DimensionsCount;
+      Inc(TotalDimensions, DimensionsCount);
+      for J := 0 to DimensionsCount - 1 do
       begin
         Dim.Name := Ini.ReadString(Section + '.Dimension.' + IntToStr(J), 'Name', '');
         Dim.Hash := Ini.ReadString(Section + '.Dimension.' + IntToStr(J), 'Hash', '');
@@ -4175,8 +4381,13 @@ begin
         MV.Dimensions.Add(Dim);
       end;
 
+      CoefsCount := Ini.ReadInteger(Section, 'CoefsCount', 0);
+      if CoefsCount < 0 then
+        CoefsCount := 0;
       MV.Coefs.Clear;
-      for J := 0 to Ini.ReadInteger(Section, 'CoefsCount', 0) - 1 do
+      MV.Coefs.Capacity := CoefsCount;
+      Inc(TotalCoefs, CoefsCount);
+      for J := 0 to CoefsCount - 1 do
       begin
         CoefItem.Name := Ini.ReadString(Section + '.Coef.' + IntToStr(J), 'Name', '');
         CoefItem.Index := Ini.ReadInteger(Section + '.Coef.' + IntToStr(J), 'Index', J);
@@ -4191,10 +4402,20 @@ begin
         MV.Coefs.Add(CoefItem);
       end;
       MV.SetToSave(False);
+      end;
+    finally
+      ValuesByHash.Free;
     end;
   finally
-    Ini.Free;
+    CacheIni.Free;
   end;
+
+  Stopwatch.Stop;
+  OutputDebugMessage(Format(
+    'TMeterValue.LoadFromStorage: %d ms; values=%d; existing=%d; ' +
+    'created=%d; dimensions=%d; coefs=%d',
+    [Stopwatch.ElapsedMilliseconds, Count, ExistingCount, CreatedCount,
+     TotalDimensions, TotalCoefs]));
 end;
 
 class function TMeterValue.GetInitDensity: Double;

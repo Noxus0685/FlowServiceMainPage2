@@ -405,24 +405,20 @@ var
   C: TAlphaColor;
   SavedState: TCanvasSaveState;
 begin
+  // Обработчик подключён к OnDrawColumnBackground: здесь рисуется только
+  // фон статуса, а текст и выделение строки оставляются штатной FMX-отрисовке.
+  if (Row < 0) or (Column <> StringColumnMRStatus) then
+    Exit;
+
+  C := GetRowColor(Row);
+  if C = TAlphaColors.Null then
+    Exit;
+
   SavedState := Canvas.SaveState;
-
-  if Row<0 then
-  Exit;
-
   try
-    C := TAlphaColors.Null;
-    if Column = StringColumnMRStatus then
-      C := GetRowColor(Row);
-
-    if C <> TAlphaColors.Null then
-    begin
-      Canvas.Fill.Kind := TBrushKind.Solid;
-      Canvas.Fill.Color := C;
-      Canvas.FillRect(Bounds, 0, 0, [], 1);
-    end;
-
-    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+    Canvas.Fill.Kind := TBrushKind.Solid;
+    Canvas.Fill.Color := C;
+    Canvas.FillRect(Bounds, 0, 0, [], 1);
   finally
     Canvas.RestoreState(SavedState);
   end;
@@ -726,6 +722,9 @@ begin
   UpdateCurrentPointIndicator;
   UpdatePointOrderControls;
   UpdateMeasurementControls;
+  // DataChanged обновляет значения, но не гарантирует повторный вызов
+  // OnDrawColumnBackground для уже созданных presentation-ячеек.
+  GridMeasurmentRun.Repaint;
 end;
 
 procedure TFrameMeasurementRun.UpdatePointOrderControls;
@@ -1004,9 +1003,12 @@ begin
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonCreatePointsClick(Sender: TObject);
-var State: TPointsGridState;
+var
+  State: TPointsGridState;
 begin
-  if MeasurementRun = nil then Exit;
+  if MeasurementRun = nil then
+    Exit;
+
   State := CapturePointsGridState;
   UpdateGridMesurmentRun;
   RestorePointsGridSelectionAndFocus(State, State.Row, True, 'Refresh');

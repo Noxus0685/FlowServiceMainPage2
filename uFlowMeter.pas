@@ -1302,55 +1302,75 @@ var
   end;
 
 
-  procedure BindSavedMeterValue(var AMeterValue: TMeterValue; var AHash: string;
+  procedure BindSavedMeterValue(var AMeterValue: TMeterValue;
     const AExpectedName: string; var AIsExisted: Integer);
   var
     SavedValue: TMeterValue;
-    LookupMode: string;
-    LookupKey: string;
-    MatchedSection: string;
-    MatchedHash: string;
-    MatchedHashOwner: string;
-    MatchedValueKind: string;
   begin
-    if (AMeterValue <> nil) and TMeterValue.LoadStabilitySettingsByPersistentKey(AMeterValue,
-      LookupMode, LookupKey, MatchedSection, MatchedHash, MatchedHashOwner, MatchedValueKind) then
+    { TMeterValue.LoadFromStorage выполняется раньше TWorkTableManager.Load.
+      Поэтому, если GetExistedMeterValueBool уже нашёл значение по постоянному
+      хэшу (AIsExisted <> 0), этот объект уже содержит настройки устойчивости
+      и отображения, прочитанные из базы данных проекта.
+
+      Раньше после каждого успешного поиска в памяти всё равно вызывался
+      LoadStabilitySettingsByPersistentKey. Этот метод заново открывал SQLite
+      и мог просматривать все секции MeterValue. InitValues выполняет такую
+      привязку для множества значений каждого расходомера, поэтому одни и те
+      же данные проекта повторно читались сотни или тысячи раз. }
+    if (AMeterValue = nil) or (AIsExisted <> 0) then
+      Exit;
+
+    { После копирования рабочего стола или преобразования старого проекта
+      хэш может измениться. Вместо повторного обращения к SQLite сопоставляем
+      значение с коллекцией TMeterValue, уже полностью заполненной методом
+      LoadFromStorage.
+
+      Точный поиск по хэшу здесь не повторяется. Его только что выполнил
+      GetExistedMeterValueBool. Если выполнение дошло до этой строки, точного
+      совпадения не было, а AMeterValue уже создан и зарегистрирован.
+      Повторный GetMeterValue по его новому хэшу нашёл бы только сам объект
+      и добавил бы ещё один линейный проход списка. }
+
+    SavedValue := TMeterValue.FindMeterValueByOwnerAndKind(
+      UUID, AMeterValue.GetValueKind);
+    if SavedValue = AMeterValue then
+      SavedValue := nil;
+
+    { Поиск по имени оставлен как последний вариант сопоставления в памяти
+      для проектов, созданных до появления сохраняемого поля ValueKind. }
+    if SavedValue = nil then
     begin
+      SavedValue := TMeterValue.FindMeterValueByOwnerAndName(
+        UUID, Name, AExpectedName);
+      if SavedValue = AMeterValue then
+        SavedValue := nil;
+    end;
+
+    if SavedValue <> nil then
+    begin
+      { При совместимом сопоставлении сохраняем новый runtime-объект, но
+        переносим пользовательские настройки устойчивости и флаг сохранения. }
+      AMeterValue.StabilitySettings := SavedValue.StabilitySettings;
+      AMeterValue.SetToSave(SavedValue.IsToSave);
       AIsExisted := 1;
       Exit;
     end;
 
-    SavedValue := TMeterValue.GetMeterValue(AHash);
-    LookupMode := 'Hash';
-    if (SavedValue = nil) and (AMeterValue <> nil) then
-    begin
-      SavedValue := TMeterValue.FindMeterValueByOwnerAndKind(UUID, AMeterValue.GetValueKind);
-      LookupMode := 'HashOwner+ValueKind';
-    end;
-    if SavedValue = nil then
-    begin
-      SavedValue := TMeterValue.FindMeterValueByOwnerAndName(UUID, Name, AExpectedName);
-      LookupMode := 'HashOwner+Name';
-    end;
+    { Если ни один вариант поиска в памяти не дал совпадения, значение
+      считается новым. Повторный поиск в SQLite намеренно не выполняется:
+      TMeterValue.LoadFromStorage уже прочитал всё хранилище MeterValues до
+      загрузки рабочих столов. Повторный просмотр тех же секций не может дать
+      дополнительного результата и создавал 12 полных сканирований базы для
+      каждого канала.
 
-    if (SavedValue <> nil) and (SavedValue <> AMeterValue) then
-    begin
-      if LookupMode = 'Hash' then
-      begin
-        AMeterValue := SavedValue;
-        AHash := SavedValue.Hash;
-      end
-      else if AMeterValue <> nil then
-      begin
-        AMeterValue.StabilitySettings := SavedValue.StabilitySettings;
-        AMeterValue.SetToSave(SavedValue.IsToSave);
-      end;
-      AIsExisted := 1;
-    end;
+      AIsExisted остаётся равным нулю, поэтому последующий код InitValues
+      настроит новое значение стандартным способом: задаст тип, описание,
+      зависимости и начальные параметры. }
+    AIsExisted := 0;
   end;
 begin
   ValueTime := TMeterValue.GetExistedMeterValueBool(HashValueTime, IsExisted, UUID, Name);
-  BindSavedMeterValue(FValueTime, HashValueTime, 'Время', IsExisted);
+  BindSavedMeterValue(FValueTime, 'Время', IsExisted);
   if IsExisted = 0 then
   begin
     ValueTime.SetAsTime;
@@ -1358,7 +1378,7 @@ begin
   end;
 
   ValuePressure := TMeterValue.GetExistedMeterValueBool(HashValuePressure, IsExisted, UUID, Name);
-  BindSavedMeterValue(FValuePressure, HashValuePressure, 'Давление', IsExisted);
+  BindSavedMeterValue(FValuePressure, 'Давление', IsExisted);
   if IsExisted = 0 then
   begin
     ValuePressure.SetAsPressure;
@@ -1366,7 +1386,7 @@ begin
   end;
 
   ValueTemperture := TMeterValue.GetExistedMeterValueBool(HashValueTemperture, IsExisted, UUID, Name);
-  BindSavedMeterValue(FValueTemperture, HashValueTemperture, 'Температура', IsExisted);
+  BindSavedMeterValue(FValueTemperture, 'Температура', IsExisted);
   if IsExisted = 0 then
   begin
     ValueTemperture.SetAsTemp;
@@ -1374,7 +1394,7 @@ begin
   end;
 
   ValueDensity := TMeterValue.GetExistedMeterValueBool(HashValueDensity, IsExisted, UUID, Name);
-  BindSavedMeterValue(FValueDensity, HashValueDensity, 'Плотность', IsExisted);
+  BindSavedMeterValue(FValueDensity, 'Плотность', IsExisted);
   if IsExisted = 0 then
   begin
     ValueDensity.SetAsDensity;
@@ -1405,7 +1425,7 @@ begin
   end;
 
   ValueImp := TMeterValue.GetExistedMeterValueBool(HashValueImp, IsExisted, UUID, Name);
-  BindSavedMeterValue(FValueImp, HashValueImp, 'Импульсы', IsExisted);
+  BindSavedMeterValue(FValueImp, 'Импульсы', IsExisted);
   if IsExisted = 0 then
   begin
 
@@ -1414,7 +1434,7 @@ begin
     ValueImp.SetAsImp;
 
   ValueImpTotal := TMeterValue.GetExistedMeterValueBool(HashValueImpTotal, IsExisted, UUID, Name);
-  BindSavedMeterValue(FValueImpTotal, HashValueImpTotal, 'Суммарные импульсы', IsExisted);
+  BindSavedMeterValue(FValueImpTotal, 'Суммарные импульсы', IsExisted);
   if IsExisted = 0 then
   begin
     SetDescription(ValueImpTotal, 'Суммарные импульсы');
@@ -1422,7 +1442,7 @@ begin
     ValueImpTotal.SetAsImp;
 
   ValueVolumeCoef := TMeterValue.GetExistedMeterValueBool(HashValueVolumeCoef, IsExisted, UUID, Name);
-  BindSavedMeterValue(FValueVolumeCoef, HashValueVolumeCoef, 'Коэффициент объема', IsExisted);
+  BindSavedMeterValue(FValueVolumeCoef, 'Коэффициент объема', IsExisted);
   if IsExisted = 0 then
   begin
     ValueVolumeCoef.SetAsVolumeCoef;
@@ -1431,7 +1451,7 @@ begin
   ValueVolumeCoef.SetValue(1);
 
   ValueMassCoef := TMeterValue.GetExistedMeterValueBool(HashValueMassCoef, IsExisted, UUID, Name);
-  BindSavedMeterValue(FValueMassCoef, HashValueMassCoef, 'Коэффициент массы', IsExisted);
+  BindSavedMeterValue(FValueMassCoef, 'Коэффициент массы', IsExisted);
   if IsExisted = 0 then
   begin
     ValueMassCoef.SetAsMassCoef;
@@ -1440,7 +1460,7 @@ begin
   ValueMassCoef.SetValue(1);
 
   ValueMassFlow := TMeterValue.GetExistedMeterValueBool(HashValueMassFlow, IsExisted, UUID, Name);
-  BindSavedMeterValue(FValueMassFlow, HashValueMassFlow, 'Массовый расход', IsExisted);
+  BindSavedMeterValue(FValueMassFlow, 'Массовый расход', IsExisted);
   if IsExisted = 0 then
   begin
     ValueMassFlow.SetAsMassFlow;
@@ -1458,7 +1478,7 @@ begin
     ValueVolumeFlow.SetAsVolumeFlow;
     SetDescription(ValueVolumeFlow, 'Объемный расход');
   end;
-  BindSavedMeterValue(FValueVolumeFlow, HashValueVolumeFlow, 'Объемный расход', IsExisted);
+  BindSavedMeterValue(FValueVolumeFlow, 'Объемный расход', IsExisted);
   ValueVolumeFlow.ValueCorrection := nil;
   ValueVolumeFlow.ValueBaseMultiplier := ValueImp;
   ValueVolumeFlow.ValueBaseDevider := ValueVolumeCoef;
@@ -1466,7 +1486,7 @@ begin
   ValueVolumeFlow.ValueEtalon := nil;
 
   ValueVolume := TMeterValue.GetExistedMeterValueBool(HashValueVolume, IsExisted, UUID, Name);
-  BindSavedMeterValue(FValueVolume, HashValueVolume, 'Объем', IsExisted);
+  BindSavedMeterValue(FValueVolume, 'Объем', IsExisted);
   if IsExisted = 0 then
   begin
     ValueVolume.SetAsVolume;
@@ -1479,7 +1499,7 @@ begin
   ValueVolume.ValueEtalon := nil;
 
   ValueMass := TMeterValue.GetExistedMeterValueBool(HashValueMass, IsExisted, UUID, Name);
-  BindSavedMeterValue(FValueMass, HashValueMass, 'Масса', IsExisted);
+  BindSavedMeterValue(FValueMass, 'Масса', IsExisted);
   if IsExisted = 0 then
   begin
     ValueMass.SetAsMass;
@@ -1526,7 +1546,7 @@ begin
   ValueMassError.ValueBaseMultiplier := ValueMass;
 
   ValueError := TMeterValue.GetExistedMeterValueBool(HashValueError, IsExisted, UUID, Name);
-  BindSavedMeterValue(FValueError, HashValueError, 'Погрешность', IsExisted);
+  BindSavedMeterValue(FValueError, 'Погрешность', IsExisted);
   if IsExisted = 0 then
   begin
     ValueError.SetAsError;
@@ -1536,7 +1556,7 @@ begin
   UpdateErrorEtalon;
 
   ValueCurrent := TMeterValue.GetExistedMeterValueBool(HashValueCurrent, IsExisted, UUID, Name);
-  BindSavedMeterValue(FValueCurrent, HashValueCurrent, 'Токовый сигнал', IsExisted);
+  BindSavedMeterValue(FValueCurrent, 'Токовый сигнал', IsExisted);
   if IsExisted = 0 then
   begin
     ValueCurrent.SetAsCurrent;

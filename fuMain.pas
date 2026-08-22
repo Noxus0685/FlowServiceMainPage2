@@ -12,6 +12,7 @@ uses
   System.UITypes,
   System.SysUtils, System.Classes, FMX.Types, FMX.Controls,  System.Generics.Collections, FMX.Forms, FMX.TabControl,
   FMX.Filter.Effects, FMX.StdCtrls, FMX.Colors, FMX.Effects,System.Math,
+  FMX.Menus,
   FMX.ListBox, FMX.Controls.Presentation, FMX.Objects, FMX.Layouts, FMX.Edit,
   FMX.Memo.Types, FMX.ScrollBox, FMX.Memo,
   FMX.EditBox, FMX.SpinBox, UnitParameter, uProjectSettings, uProtocols;
@@ -72,6 +73,18 @@ type
     FNextClimateChangeAt: TDateTime;
     FNextFreqChangeAt: TDateTime;
     FNextPressChangeAt: TDateTime;
+    FCopyDevicesMenuItem: TMenuItem;
+    FCopyEtalonsMenuItem: TMenuItem;
+    FDevicesPopupHandler: TNotifyEvent;
+    FEtalonsPopupHandler: TNotifyEvent;
+    function WorkTableForGridPopup: TWorkTable;
+    { Повторно определяет исходный рабочий стол и обновляет доступность
+      команд копирования после изменения режима, состояния или активной вкладки. }
+    procedure UpdateCopyWorkTableMenuState;
+    procedure InstallCopyWorkTableMenus;
+    procedure DevicesGridPopup(Sender: TObject);
+    procedure EtalonsGridPopup(Sender: TObject);
+    procedure CopyWorkTableClick(Sender: TObject);
 
     procedure UpdateTemp(const AWorkTable: TWorkTable);
 
@@ -303,6 +316,7 @@ begin
   FFrameMainTable.Align := TAlignLayout.Client;
   FFrameMainTable.WorkTableManager := FWorkTableManager ;
   FFrameMainTable.Initialize;
+  InstallCopyWorkTableMenus;
   FFrameMainTable.AttachGraphsTo(TabItemGraphs);
 
 
@@ -316,6 +330,84 @@ begin
     visible results frame now, after both frames have been created. }
   FFrameMainTable.ConnectResultsProcessing(FFrameProceed);
 
+end;
+
+function TFormMain.WorkTableForGridPopup: TWorkTable;
+begin
+  Result := nil;
+  if FFrameMainTable = nil then
+    Exit;
+  Result := FFrameMainTable.ActiveTabWorkTable;
+end;
+
+procedure TFormMain.UpdateCopyWorkTableMenuState;
+var
+  SourceWorkTable: TWorkTable;
+  CanCopy: Boolean;
+begin
+  SourceWorkTable := WorkTableForGridPopup;
+  CanCopy := (FWorkTableManager <> nil) and
+    FWorkTableManager.CanCopyWorkTable(SourceWorkTable);
+  if FCopyDevicesMenuItem <> nil then
+    FCopyDevicesMenuItem.Enabled := CanCopy;
+  if FCopyEtalonsMenuItem <> nil then
+    FCopyEtalonsMenuItem.Enabled := CanCopy;
+end;
+
+procedure TFormMain.InstallCopyWorkTableMenus;
+  procedure AddCopyItem(AParent: TMenuItem; out AItem: TMenuItem);
+  begin
+    AItem := TMenuItem.Create(Self);
+    AItem.Text := 'Копировать рабочий стол';
+    AItem.OnClick := CopyWorkTableClick;
+    AParent.AddObject(AItem);
+  end;
+begin
+  if FFrameMainTable = nil then
+    Exit;
+
+  AddCopyItem(FFrameMainTable.MenuItemDevicesWorkTablesGroup,
+    FCopyDevicesMenuItem);
+  AddCopyItem(FFrameMainTable.MenuItemEtalonsWorkTablesGroup,
+    FCopyEtalonsMenuItem);
+
+  FDevicesPopupHandler := FFrameMainTable.PopupMenuDevicesGrid.OnPopup;
+  FEtalonsPopupHandler := FFrameMainTable.PopupMenuEtalonsGrid.OnPopup;
+  FFrameMainTable.PopupMenuDevicesGrid.OnPopup := DevicesGridPopup;
+  FFrameMainTable.PopupMenuEtalonsGrid.OnPopup := EtalonsGridPopup;
+end;
+
+procedure TFormMain.DevicesGridPopup(Sender: TObject);
+begin
+  if Assigned(FDevicesPopupHandler) then
+    FDevicesPopupHandler(Sender);
+  UpdateCopyWorkTableMenuState;
+end;
+
+procedure TFormMain.EtalonsGridPopup(Sender: TObject);
+begin
+  if Assigned(FEtalonsPopupHandler) then
+    FEtalonsPopupHandler(Sender);
+  UpdateCopyWorkTableMenuState;
+end;
+
+procedure TFormMain.CopyWorkTableClick(Sender: TObject);
+var
+  NewWorkTable: TWorkTable;
+  SourceWorkTable: TWorkTable;
+begin
+  SourceWorkTable := WorkTableForGridPopup;
+  if (FWorkTableManager = nil) or
+     (not FWorkTableManager.CanCopyWorkTable(SourceWorkTable)) then
+    Exit;
+
+  NewWorkTable := FWorkTableManager.CopyWorkTable(SourceWorkTable);
+  if NewWorkTable <> nil then
+  begin
+    FFrameMainTable.SyncWorkTableTabs;
+    FFrameMainTable.SelectWorkTable(NewWorkTable);
+  end;
+  UpdateCopyWorkTableMenuState;
 end;
 
 procedure TFormMain.TabControlMainChange(Sender: TObject);
@@ -936,6 +1028,9 @@ var
   CurrentVolume: Double;   // Текущий измеренный объём/масса
   I: Integer;
 begin
+  { Таймер также является единой точкой обновления после асинхронной
+    смены режима/состояния и удаления стола. }
+  UpdateCopyWorkTableMenuState;
 
   // ============================================================
   // 1. Получение рабочей таблицы

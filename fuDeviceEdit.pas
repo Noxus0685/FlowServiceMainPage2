@@ -696,6 +696,8 @@ begin
     // ОБНОВЛЕНИЕ ТАБЛИЦ
     // ==================================================
     UpdateQmaxQmin;
+    UpdateUIFreq;
+    RecalcDevicePointsCoef;
     UpdatePointsGrid;
 
   finally
@@ -1215,6 +1217,7 @@ var
   Repo: TDeviceRepository;
   CandidateRepo: TDeviceRepository;
   RegisteredDevice: TDevice;
+  ExpectedFreq: Double;
 begin
   CanClose := True;
   FlushPendingChanges;
@@ -1222,6 +1225,21 @@ begin
   try
     if ModalResult = mrOk then
     begin
+      { Freq and QF are authoritative.  Normalize the stored coefficient
+        before persistence, including any discrepancy larger than integer
+        frequency rounding. }
+      if (FDevice <> nil) and (FDevice.Freq > 0) and
+         (FDevice.FreqFlowRate > 0) then
+      begin
+        ExpectedFreq := FDevice.FlowRateToFrequency(
+          FDevice.FreqFlowRate, FDevice.Coef);
+        if Abs(ExpectedFreq - FDevice.Freq) > 0.5 then
+          FDevice.Coef := FDevice.FrequencyAndFlowRateToCoefficient(
+            FDevice.Freq, FDevice.FreqFlowRate);
+        RecalcDevicePointsCoef;
+        UpdatePointsGrid;
+      end;
+
       {----------------------------------}
       { Нажали OK }
       {----------------------------------}
@@ -2414,15 +2432,16 @@ begin
   if SameValue(NewValue, FDevice.Qmax) then
     Exit;
   FDevice.Qmax := NewValue;
-  FDevice.FreqFlowRate := FDevice.FromBaseUnits(FDevice.Qmax);
-  EditFreqFlowRate.Text := FloatToStr(FDevice.FreqFlowRate);
+  FDevice.FreqFlowRate := FDevice.Qmax;
   if (FDevice.Freq > 0) and (FDevice.FreqFlowRate > 0) then
-    FDevice.Coef := 3.6 * FDevice.Freq / FDevice.FreqFlowRate;
+    FDevice.Coef := FDevice.FrequencyAndFlowRateToCoefficient(
+      FDevice.Freq, FDevice.FreqFlowRate);
 
   SetModified;
   FDevice.RecalcPoints;
   UpdateQmaxQmin;
   UpdateUIFreq;
+  RecalcDevicePointsCoef;
   UpdatePointsGrid;
 end;
 
@@ -2571,7 +2590,8 @@ begin
     // == Отношение расхода к частоте
     // =====================================================
     if FDevice.FreqFlowRate > 0 then
-      EditFreqFlowRate.Text := FloatToStr(FDevice.FreqFlowRate)
+      EditFreqFlowRate.Text := FormatByBaseError(
+        FDevice.FromBaseUnits(FDevice.FreqFlowRate), FDevice.Error)
     else
       EditFreqFlowRate.Text := '';
 
@@ -3281,7 +3301,8 @@ begin
   // 5. Сохраняем базовый коэффициент
   FDevice.Coef := NewStoredCoef;
 
-  FDevice.Freq := Round(FDevice.Coef * FDevice.FreqFlowRate  / 3.6);
+  FDevice.Freq := Round(FDevice.FlowRateToFrequency(
+    FDevice.FreqFlowRate, FDevice.Coef));
 
 
   // 6. Пересчёт точек прибора
@@ -3326,8 +3347,8 @@ begin
     begin
       Tm := P.LimitTime;
 
-      // Объём / масса:
-      // Q [м³/ч] * T [с] / 3600
+      // Расход находится во внутренних базовых единицах,
+      // совместимых с базовым коэффициентом преобразования.
       V := Q * Tm;
 
       P.LimitVolume := V;
@@ -3408,16 +3429,18 @@ begin
  //   Exit;
 
   // ----------------------------------------
-  // Сохраняем в прибор    Kp = 3.6 * Freq / QFmax
+  // Частота и QF заданы пользователем; сохраняем прямой базовый Kp.
   // ----------------------------------------
   FDevice.Freq := NewFreq;
-  FDevice.Coef :=   3.6 *  FDevice.Freq /  FDevice.FreqFlowRate;
+  FDevice.Coef := FDevice.FrequencyAndFlowRateToCoefficient(
+    FDevice.Freq, FDevice.FreqFlowRate);
 
 
   // ----------------------------------------
   // Обновляем точки прибора (если частота влияет)
   // ----------------------------------------
-  //RecalcDeviceBySignalSettings; // если есть / нужен
+  RecalcDevicePointsCoef;
+  UpdatePointsGrid;
 
   SetModified;
 end;
@@ -3439,7 +3462,7 @@ end;
 
 procedure TFormDeviceEditor.EditFreqFlowRateExit(Sender: TObject);
 var
-  NewRate: Double;
+  DisplayRate, NewRate: Double;
 begin
 
   if FLoading then
@@ -3451,11 +3474,13 @@ begin
   // ----------------------------------------
   // Безопасный ввод
   // ----------------------------------------
-  NewRate := NormalizeFloatInput(EditFreqFlowRate.Text);
+  DisplayRate := NormalizeFloatInput(EditFreqFlowRate.Text);
+  NewRate := FDevice.ToBaseUnits(DisplayRate);
 
   if NewRate <= 0 then
   begin
-    EditFreqFlowRate.Text := FloatToStr(FDevice.FreqFlowRate);
+    EditFreqFlowRate.Text := FormatByBaseError(
+      FDevice.FromBaseUnits(FDevice.FreqFlowRate), FDevice.Error);
     Exit;
   end;
 
@@ -3466,16 +3491,17 @@ begin
     Exit;
 
   // ----------------------------------------
-  // Сохраняем в прибор  Kp = 3.6 * Freq / QFmax
+  // QF хранится в базовых единицах, как и остальные расходы модели.
   // ----------------------------------------
   FDevice.FreqFlowRate := NewRate;
-  FDevice.Coef :=   3.6 *  FDevice.Freq /  FDevice.FreqFlowRate;
+  FDevice.Coef := FDevice.FrequencyAndFlowRateToCoefficient(
+    FDevice.Freq, FDevice.FreqFlowRate);
 
   // ----------------------------------------
   // Пересчёт параметров прибора
   // (частота → расход в точках)
   // ----------------------------------------
-  //RecalcDevicePointsFreqFlow; // ← аналог QF = Qmax * FreqFlowRate
+  RecalcDevicePointsCoef;
 
   // ----------------------------------------
   // Обновление таблицы точек

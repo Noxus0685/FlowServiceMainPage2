@@ -14,7 +14,7 @@ object FrameMeasurementRun: TFrameMeasurementRun
     Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
     OnHeaderClick = GridMeasurmentRunHeaderClick
     OnSelChanged = GridMeasurmentRunSelChanged
-    OnDrawColumnCell = GridMeasurmentRunDrawColumnCell
+    OnDrawColumnBackground = GridMeasurmentRunDrawColumnCell
     OnGetValue = GridMeasurmentRunGetValue
     OnCellClick = GridMeasurmentRunCellClick
     Viewport.Width = 1228.000000000000000000

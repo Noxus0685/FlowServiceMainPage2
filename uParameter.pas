@@ -86,6 +86,7 @@ type
 TParameter = class(TObservableObject)
   private
     FName: string;
+    FCaption: string;
     FHint: string;
 
     FState: EStateParameter;
@@ -131,6 +132,7 @@ TParameter = class(TObservableObject)
     procedure SetParam(Avalue: Double);
     procedure EnsureMeterValues;
     function GetSetValue: Double;
+    function GetCaption: string;
   public
     constructor Create(const AName, AHint: string); virtual;
     /// <summary>Combines TMeterValue signal analysis with target-range checks and returns measurement readiness.</summary>
@@ -140,6 +142,7 @@ TParameter = class(TObservableObject)
     procedure Start;
     procedure SetValue(AValue: Double);
     property Name: string read FName write FName;
+    property Caption: string read GetCaption write FCaption;
     property Hint: string read FHint write FHint;
     property State: EStateParameter read  FState write SetState;
     property Action: EActionParameter read FAction write SetAction;
@@ -170,8 +173,17 @@ end;
   TPump = class(TParameter)
 
   private
+    FUUID: string;
     FHeader: string; // êðàòêîå íàçâàíèå íàñîñà ïî ìíåìîñõåìå
     FPumpType: string;
+    FSetFreq: Double;
+    function GetFreq: Double;
+    function GetTargetFreq: Double;
+    procedure SetCurrentFreq(const Value: Double);
+    procedure SetTargetFreq(const Value: Double);
+    procedure FireEvent(AEvent: EEventPump; const AError: TErrorInfo); overload;
+    procedure FireEvent(AEvent: EEventPump); overload;
+
   public
 
     class var Pumps: TObjectList<TPump>;
@@ -180,18 +192,18 @@ end;
     constructor Create;  overload;
     destructor Destroy; override;
     function GetActionAsString: string;
+    property UUID: string read FUUID write FUUID;
     property Header: string read FHeader write FHeader;
     property PumpType : string read FPumpType write FPumpType;
-
-
-
     procedure DoPumpStart;
     procedure DoPumpStop;
     procedure DoFreqSet( ANewFreq: Double);
+    procedure SyncTargetFreq(const Value: Double);
+    procedure SyncSetFreq(const Value: Double);
     procedure PumpSetState( AStatus: EStateParameter);
-    procedure FireEvent(AEvent: EEventPump; const AError: TErrorInfo); overload;
-    procedure FireEvent(AEvent: EEventPump); overload;
-
+    property Freq: Double read GetFreq write SetCurrentFreq;
+    property SetFreq: Double read FSetFreq;
+    property TargetFreq: Double read GetTargetFreq write SetTargetFreq;
   end;
 //---------------------------------
   TWeight = class(TParameter)
@@ -507,6 +519,7 @@ end;
 constructor TPump.Create;
 begin
   inherited Create('', '');
+  FUUID := TGUID.NewGuid.ToString;
   FMax:= 50;
   FMin:= 12;
 
@@ -518,7 +531,8 @@ end;
 constructor TPump.Create(const APumpName: string);
 begin
   Create;
-  Self.FName :=   APumpName;
+  Self.FName := APumpName;
+  Self.FCaption := APumpName;
   Pumps.Add(Self);
   EnsureMeterValues;
 end;
@@ -575,6 +589,43 @@ begin
   SetParam(ANewFreq);
 end;
 
+function TPump.GetFreq: Double;
+begin
+  EnsureMeterValues;
+  Result:=FValue.Value;
+end;
+
+function TPump.GetTargetFreq: Double;
+begin
+  Result:=TargetValue;
+end;
+
+procedure TPump.SetCurrentFreq(const Value: Double);
+begin
+  SetValue(Value);
+end;
+
+procedure TPump.SetTargetFreq(const Value: Double);
+begin
+  SetParam(Value);
+end;
+
+procedure TPump.SyncSetFreq(const Value: Double);
+begin
+  FSetFreq:=Value;
+end;
+
+procedure TPump.SyncTargetFreq(const Value: Double);
+begin
+  EnsureMeterValues;
+  if Value<FMin then
+    FValueSet.Value:=FMin
+  else if Value>FMax then
+    FValueSet.Value:=FMax
+  else
+    FValueSet.Value:=Value;
+end;
+
 procedure TPump.PumpSetState(AStatus: EStateParameter);
 begin
  // Pump:=FindPumpByName(APumpName);
@@ -624,6 +675,7 @@ constructor TParameter.Create(const AName, AHint: string);
 begin
   inherited Create;
   FName := AName;
+  FCaption := AName;
   ProtocolManager.AddMessage(pcState, psParameters, 'ParameterCreate', 'Parameter created', AName);
   FHint := AHint;
   FState := spStopped;
@@ -631,6 +683,13 @@ begin
   FHasTaskHistory := False;
   //FValue:=TMeterValue.Create;
   //FValueset:=TMeterValue.Create;
+end;
+
+function TParameter.GetCaption: string;
+begin
+  Result := Trim(FCaption);
+  if Result = '' then
+    Result := FName;
 end;
 
 procedure TParameter.Stop;
@@ -925,7 +984,7 @@ begin
       else if AValue>FMax then
         FValueSet.Value:=FMax
       else
-        FValueSet.Value:=AValue;
+      FValueSet.Value:=AValue;
       FValue.ClearSamplesHistory;
       ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterSet', 'Parameter set changed', Format('%s=%.4f', [FName, FValueSet.Value]));
 

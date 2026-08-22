@@ -338,7 +338,12 @@ type
     procedure SyncProcessingDevicesFromTable(AWorkTable: TWorkTable; const AClearBeforeSync: Boolean);
     procedure SyncProcessingDevicesWithNewPoints;
     procedure SyncProcessingDevicesFromAllTables(const AClearBeforeSync: Boolean);
+    // После синхронизации очищает runtime-статусы существующих строк.
+    // Список точек и активный запуск при этом не перестраиваются.
+    procedure ResetSynchronizedMeasurementPointStates(AWorkTable: TWorkTable);
+    procedure ResetAllSynchronizedMeasurementPointStates;
     procedure ActionSessionSynchTableExecute(Sender: TObject);
+    procedure ActionSessionSynchTableUpdate(Sender: TObject);
     procedure MenuTreeViewDevicesAddClick(Sender: TObject);
     procedure MenuTreeViewDevicesDeleteClick(Sender: TObject);
     // Проверяет, что выбранный узел дерева является рабочим столом.
@@ -504,6 +509,8 @@ type
     procedure FailReportExport(const AOperationId: Int64;
       const AErrorClass, AErrorMessage, AStage: string;
       const ADurationMs: Int64);
+    // Runtime-статусы можно очищать только после завершения измерительной FSM.
+    function CanSynchronizeProcessingDevices: Boolean;
 
   public
     { Public declarations }
@@ -980,11 +987,35 @@ end;
 
 
 procedure TFrameProceed.RefreshResultsTab;
+var
+  SelectedObject: TObject;
+  SelectedText: string;
+  I: Integer;
 begin
   DbgProceedTree(1501, 'RefreshResultsTab ENTER'#13#10 + GetSelectedTreeDebugText);
+  SelectedObject := nil;
+  SelectedText := '';
+  if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
+  begin
+    SelectedObject := TreeViewDevices.Selected.TagObject;
+    SelectedText := TreeViewDevices.Selected.Text;
+  end;
   SyncProcessingDevicesWithNewPoints;
   PopulateTreeViewDevices;
-  ShowAllDevicesResults;
+  if SelectedObject <> nil then
+    SelectTreeItemByTagObject(SelectedObject)
+  else if (TreeViewDevices <> nil) and (SelectedText <> '') then
+    for I := 0 to TreeViewDevices.Count - 1 do
+      if SameText(TreeViewDevices.ItemByIndex(I).Text, SelectedText) then
+      begin
+        TreeViewDevices.Selected := TreeViewDevices.ItemByIndex(I);
+        Break;
+      end;
+
+  if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
+    TreeViewDevicesChange(TreeViewDevices)
+  else
+    ShowAllDevicesResults;
   UpdateActionHints;
 end;
 
@@ -1818,10 +1849,34 @@ begin
     UpdateItem(TreeViewDevices.ItemByIndex(I));
 end;
 procedure TFrameProceed.RefreshResultsAfterDevicesAction;
+var
+  SelectedObject: TObject;
+  SelectedText: string;
+  I: Integer;
 begin
   DbgProceedTree(1502, 'RefreshResultsAfterDevicesAction ENTER'#13#10 + GetSelectedTreeDebugText);
+  SelectedObject := nil;
+  SelectedText := '';
+  if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
+  begin
+    SelectedObject := TreeViewDevices.Selected.TagObject;
+    SelectedText := TreeViewDevices.Selected.Text;
+  end;
   PopulateTreeViewDevices;
-  ShowAllDevicesResults;
+  if SelectedObject <> nil then
+    SelectTreeItemByTagObject(SelectedObject)
+  else if (TreeViewDevices <> nil) and (SelectedText <> '') then
+    for I := 0 to TreeViewDevices.Count - 1 do
+      if SameText(TreeViewDevices.ItemByIndex(I).Text, SelectedText) then
+      begin
+        TreeViewDevices.Selected := TreeViewDevices.ItemByIndex(I);
+        Break;
+      end;
+
+  if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
+    TreeViewDevicesChange(TreeViewDevices)
+  else
+    ShowAllDevicesResults;
 end;
 function TFrameProceed.FindTreeItemByTagObject(ATagObject: TObject): TTreeViewItem;
 var
@@ -1931,6 +1986,28 @@ function TFrameProceed.CanManageResultSessions: Boolean;
 begin
   Result := (FActiveWorkTable = nil) or (FActiveWorkTable.MeasurementRun = nil) or
     (FActiveWorkTable.MeasurementRun.Stage in [msNone, msDone]);
+end;
+
+function TFrameProceed.CanSynchronizeProcessingDevices: Boolean;
+var
+  I: Integer;
+  WorkTable: TWorkTable;
+begin
+  Result := True;
+
+  if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
+    Exit;
+
+  for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+  begin
+    WorkTable := FWorkTableManager.WorkTables[I];
+    if (WorkTable <> nil) and (WorkTable.MeasurementRun <> nil) and
+       not (WorkTable.MeasurementRun.Stage in [msNone, msDone]) then
+    begin
+      Result := False;
+      Exit;
+    end;
+  end;
 end;
 
 function TFrameProceed.RequestClearActiveSession(ADevice: TDevice): Boolean;
@@ -2986,7 +3063,9 @@ begin
         ChartLeftBaseX := Min(ChartPointMinX, ChartMinX);
         if ChartLineMinX <> MaxDouble then
           ChartLeftBaseX := Min(ChartLeftBaseX, ChartLineMinX);
-        Chart1.XMin := ChartLeftBaseX;
+        // На логарифмической шкале запас слева задаётся отношением,
+        // чтобы крайняя точка или продолжение линии не лежали на оси.
+        Chart1.XMin := ChartLeftBaseX / 1.1;
         if (Chart1.XMin = MaxDouble) or (Chart1.XMin <= 0) or
            SameValue(Chart1.XMin, Chart1.XMax) then
           Chart1.XMin := Chart1.XMax / 1000;
@@ -2998,7 +3077,8 @@ begin
     else
       Chart1.AutoRangeX := True;
 
-    // Сверху оставляется 10% от значения самой верхней точки.
+    // С обеих сторон оставляется 10% диапазона, чтобы крайние точки и
+    // продолжение линии не совпадали с верхней или нижней осью графика.
     if (ChartMinY <> MaxDouble) and (ChartMaxY <> -MaxDouble) then
     begin
       Chart1.AutoRangeY := False;
@@ -3007,10 +3087,7 @@ begin
       if SameValue(ChartPaddingY, 0.0) then
         ChartPaddingY := 0.1;
 
-      if SameValue(ChartMinY, ChartMaxY) then
-        Chart1.YMin := ChartMinY - ChartPaddingY
-      else
-        Chart1.YMin := ChartMinY;
+      Chart1.YMin := ChartMinY - ChartPaddingY;
       Chart1.YMax := ChartMaxY + ChartPaddingY;
     end
     else
@@ -6168,9 +6245,56 @@ begin
     SyncProcessingDevicesFromTable(WT, False);
   end;
 end;
+
+procedure TFrameProceed.ResetSynchronizedMeasurementPointStates(
+  AWorkTable: TWorkTable);
+var
+  Run: TMeasurementRun;
+  Point: TDevicePoint;
+  ResetCount: Integer;
+begin
+  if (AWorkTable = nil) or (AWorkTable.MeasurementRun = nil) then
+    Exit;
+
+  Run := TMeasurementRun(AWorkTable.MeasurementRun);
+  // msDone уже не выбирает следующую точку, поэтому допускается очистить
+  // runtime-результаты без удаления объектов и без вмешательства в поток.
+  if not (Run.Stage in [msNone, msDone]) or (Run.Points = nil) then
+    Exit;
+
+  ResetCount := 0;
+  for Point in Run.Points do
+    if Point <> nil then
+    begin
+      Point.Status := mptsNone;
+      Point.RepeatsCompleted := 0;
+      Inc(ResetCount);
+    end;
+
+  ProtocolManager.AddMessage(pcAction, psMeasurement,
+    'MeasurementPointRuntimeStatesReset',
+    'Состояния строк хода измерения очищены после синхронизации',
+    Format('WorkTable=%s; Mode=%s; PointsCount=%d; ResetCount=%d; Stage=%s',
+      [AWorkTable.Name, TMeasurementRun.MeasurementRunModeToString(Run.Mode),
+       Run.Points.Count, ResetCount,
+       TMeasurementRun.MeasurementStateToString(Run.Stage)]));
+end;
+
+procedure TFrameProceed.ResetAllSynchronizedMeasurementPointStates;
+var
+  I: Integer;
+begin
+  if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
+    Exit;
+
+  for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+    ResetSynchronizedMeasurementPointStates(FWorkTableManager.WorkTables[I]);
+end;
+
 procedure TFrameProceed.ActionSessionSynchTableExecute(Sender: TObject);
 var
   Item: TTreeViewItem;
+  WorkTable: TWorkTable;
 begin
   DbgProceedTree(1506, 'ActionSessionSynchTableExecute ENTER'#13#10 + GetSelectedTreeDebugText);
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
@@ -6179,17 +6303,41 @@ begin
   Item := TreeViewDevices.Selected;
 
   if Item.TagObject is TWorkTable then
-    SyncProcessingDevicesFromTable(TWorkTable(Item.TagObject), False)
+  begin
+    WorkTable := TWorkTable(Item.TagObject);
+    SyncProcessingDevicesFromTable(WorkTable, False);
+    if CanSynchronizeProcessingDevices then
+      ResetSynchronizedMeasurementPointStates(WorkTable);
+  end
   else if SameText(Item.Text, '...') then
-    SyncProcessingDevicesFromAllTables(True)
+  begin
+    SyncProcessingDevicesFromAllTables(True);
+    if CanSynchronizeProcessingDevices then
+      ResetAllSynchronizedMeasurementPointStates;
+  end
   else if SameText(Item.Text, 'прочее') then
-    SyncProcessingDevicesFromAllTables(False)
+  begin
+    SyncProcessingDevicesFromAllTables(False);
+    if CanSynchronizeProcessingDevices then
+      ResetAllSynchronizedMeasurementPointStates;
+  end
   else
     Exit;
 
   SaveProcessingDevices;
   RefreshResultsAfterDevicesAction;
+  if Assigned(FOnResultsSynchronized) then
+    FOnResultsSynchronized(Self);
 end;
+
+procedure TFrameProceed.ActionSessionSynchTableUpdate(Sender: TObject);
+begin
+  if Sender is TAction then
+    // Обновление дерева и результатов безопасно и во время измерения.
+    // Перестройка точек отдельно защищена проверкой полного завершения run.
+    TAction(Sender).Enabled := True;
+end;
+
 procedure TFrameProceed.MenuTreeViewDevicesAddClick(Sender: TObject);
 begin
   DbgProceedTree(1001, 'MenuTreeViewDevicesAddClick ENTER'#13#10 + GetSelectedTreeDebugText);

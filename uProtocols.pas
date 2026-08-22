@@ -5,6 +5,7 @@ interface
 uses
   System.Classes,
   System.Generics.Collections,
+  System.Diagnostics,
   System.SyncObjs,
   System.SysUtils,
   uObservable;
@@ -230,6 +231,8 @@ type
   end;
 
   TProtocolListener = reference to procedure(Msg: TProtocolMessage);
+  TProtocolBatchListener = reference to procedure(
+    const Messages: TArray<TProtocolMessage>);
 
   TProtocolMessageContent = record
     Description: string;
@@ -243,6 +246,7 @@ type
   private
     FQueue: TThreadedQueue<TProtocolMessage>;
     FListeners: TList<TProtocolListener>;
+    FBatchListeners: TList<TProtocolBatchListener>;
     FListenersLock: TObject;
     FRecentMessages: TDictionary<string, TProtocolMessageContent>;
     FRecentMessageKeys: TQueue<string>;
@@ -250,11 +254,21 @@ type
     FPaused: Boolean;
     FWorkerThread: TThread;
     FShuttingDown: Boolean;
+    { Atomic optimization switches; zero is the safe default. }
+    FProtocolEnabled: Integer;
+    FLogEnabled: Integer;
+    FSampleChartEnabled: Integer;
+    FStatisticsEnabled: Integer;
+    { Prepared messages waiting for the single bounded UI callback. }
+    FUiQueue: TThreadedQueue<TProtocolMessage>;
+    FUiCallbackPending: Integer;
 
     class function CategoryMarker(ACategory: EProtocolCategory): string; static;
     class function SourceMarker(ASource: TProtocolSource): string; static;
 
-    procedure NotifyListeners(const Msg: TProtocolMessage);
+    procedure QueueForUi(const Msg: TProtocolMessage);
+    procedure ScheduleUiDelivery;
+    procedure DeliverUiBatch;
     procedure StartWorker;
     procedure StopWorker;
     procedure WorkerProc;
@@ -263,6 +277,14 @@ type
       ASource: TProtocolSource; const AName, ADescription,
       AParams: string): Boolean;
     procedure ClearRecentMessages;
+    function GetProtocolEnabled: Boolean;
+    function GetLogEnabled: Boolean;
+    function GetSampleChartEnabled: Boolean;
+    function GetStatisticsEnabled: Boolean;
+    procedure SetProtocolEnabled(const Value: Boolean);
+    procedure SetLogEnabled(const Value: Boolean);
+    procedure SetSampleChartEnabled(const Value: Boolean);
+    procedure SetStatisticsEnabled(const Value: Boolean);
   public
     constructor Create;
     destructor Destroy; override;
@@ -275,6 +297,10 @@ type
 
     procedure Subscribe(AListener: TProtocolListener); overload;
     procedure Unsubscribe(AListener: TProtocolListener); overload;
+    procedure SubscribeBatch(AListener: TProtocolBatchListener);
+    procedure UnsubscribeBatch(AListener: TProtocolBatchListener);
+    procedure LoadSettings(const AFileName: string);
+    procedure SaveSettings(const AFileName: string);
 
     procedure Pause;
     procedure Resume;
@@ -283,12 +309,20 @@ type
     class function FormatMessage(const Msg: TProtocolMessage): string; static;
 
     property Paused: Boolean read FPaused;
+    property ProtocolEnabled: Boolean read GetProtocolEnabled write SetProtocolEnabled;
+    property LogEnabled: Boolean read GetLogEnabled write SetLogEnabled;
+    property SampleChartEnabled: Boolean read GetSampleChartEnabled write SetSampleChartEnabled;
+    property StatisticsEnabled: Boolean read GetStatisticsEnabled write SetStatisticsEnabled;
   end;
 
 var
   ProtocolManager: TProtocolManager;
 
 implementation
+
+uses
+  System.IniFiles,
+  uProjectSettings;
 
 procedure FinalizeProtocolManager;
 var
@@ -319,12 +353,19 @@ begin
   inherited;
   FShuttingDown := False;
   FQueue := TThreadedQueue<TProtocolMessage>.Create(CQueueCapacity, 50, 50);
+  FUiQueue := TThreadedQueue<TProtocolMessage>.Create(CQueueCapacity, 0, 0);
   FListeners := TList<TProtocolListener>.Create;
+  FBatchListeners := TList<TProtocolBatchListener>.Create;
   FListenersLock := TObject.Create;
   FRecentMessages := TDictionary<string, TProtocolMessageContent>.Create;
   FRecentMessageKeys := TQueue<string>.Create;
   FRecentMessagesLock := TCriticalSection.Create;
   FPaused := False;
+  FProtocolEnabled := 0;
+  FLogEnabled := 0;
+  FSampleChartEnabled := 0;
+  FStatisticsEnabled := 0;
+  FUiCallbackPending := 0;
   StartWorker;
 end;
 
@@ -332,19 +373,26 @@ destructor TProtocolManager.Destroy;
 begin
   FShuttingDown := True;
   StopWorker;
+  { Only callbacks owned by our worker are removed; unrelated UI work is intact. }
+  if FWorkerThread <> nil then
+    TThread.RemoveQueuedEvents(FWorkerThread);
+  TInterlocked.Exchange(FUiCallbackPending, 0);
   Clear;
   TMonitor.Enter(FListenersLock);
   try
     FListeners.Clear;
+    FBatchListeners.Clear;
   finally
     TMonitor.Exit(FListenersLock);
   end;
   FreeAndNil(FListeners);
+  FreeAndNil(FBatchListeners);
   FreeAndNil(FListenersLock);
   FreeAndNil(FRecentMessages);
   FreeAndNil(FRecentMessageKeys);
   FreeAndNil(FRecentMessagesLock);
   FreeAndNil(FQueue);
+  FreeAndNil(FUiQueue);
   inherited;
 end;
 
@@ -368,12 +416,13 @@ var
   LThread: TThread;
 begin
   LThread := FWorkerThread;
-  FWorkerThread := nil;
   if LThread = nil then
     Exit;
 
   LThread.Terminate;
   LThread.WaitFor;
+  TThread.RemoveQueuedEvents(LThread);
+  FWorkerThread := nil;
   LThread.Free;
 end;
 
@@ -382,6 +431,7 @@ var
   Msg: TProtocolMessage;
   PopResult: TWaitResult;
 begin
+  TThread.NameThreadForDebugging('ProtocolThread');
   Msg := nil;
   while not TThread.CurrentThread.CheckTerminated do
   begin
@@ -397,7 +447,7 @@ begin
     if PopResult = wrSignaled then
     begin
       try
-        NotifyListeners(Msg);
+        QueueForUi(Msg);
       finally
         FreeMessage(Msg);
       end;
@@ -418,6 +468,7 @@ var
   OldMsg: TProtocolMessage;
 begin
   if FShuttingDown then Exit;
+  if not ProtocolEnabled then Exit;
   if (FQueue = nil) then Exit;
   if not ShouldPublishMessage(ACategory, ASource, AName, ADescription,
     AParams) then
@@ -514,37 +565,67 @@ begin
   end;
 end;
 
-procedure TProtocolManager.NotifyListeners(const Msg: TProtocolMessage);
+procedure TProtocolManager.QueueForUi(const Msg: TProtocolMessage);
 var
-  LocalListeners: TArray<TProtocolListener>;
-  L: TProtocolListener;
   CopyMsg: TProtocolMessage;
 begin
-  if FShuttingDown or (Msg = nil) or (FListeners = nil) or
-     (FListenersLock = nil) then
-    Exit;
+  if FShuttingDown or not ProtocolEnabled or (Msg = nil) or (FUiQueue = nil) then Exit;
+  CopyMsg := Msg.Clone;
+  if FUiQueue.PushItem(CopyMsg) <> wrSignaled then
+    CopyMsg.Free;
+  ScheduleUiDelivery;
+end;
 
-  TMonitor.Enter(FListenersLock);
+procedure TProtocolManager.ScheduleUiDelivery;
+begin
+  if FShuttingDown or not ProtocolEnabled then Exit;
+  if TInterlocked.CompareExchange(FUiCallbackPending, 1, 0) <> 0 then Exit;
+  TThread.Queue(FWorkerThread,
+    procedure
+    begin
+      DeliverUiBatch;
+    end);
+end;
+
+procedure TProtocolManager.DeliverUiBatch;
+var
+  LocalListeners: TArray<TProtocolListener>;
+  LocalBatchListeners: TArray<TProtocolBatchListener>;
+  L: TProtocolListener;
+  BL: TProtocolBatchListener;
+  Msg: TProtocolMessage;
+  Batch: TList<TProtocolMessage>;
+  Started: Int64;
+begin
+  TInterlocked.Exchange(FUiCallbackPending, 0);
+  if FShuttingDown or not ProtocolEnabled or (FUiQueue = nil) then Exit;
+  Batch := TList<TProtocolMessage>.Create;
   try
-    LocalListeners := FListeners.ToArray;
-  finally
-    TMonitor.Exit(FListenersLock);
-  end;
+    Started := TStopwatch.GetTimeStamp;
+    Msg := nil;
+    while (Batch.Count < 100) and
+      ((TStopwatch.GetTimeStamp - Started) * 1000.0 /
+       TStopwatch.Frequency < 10) and
+      (FUiQueue.PopItem(Msg) = wrSignaled) do
+      Batch.Add(Msg);
+    if Batch.Count = 0 then Exit;
 
-  for L in LocalListeners do
-  begin
-    if FShuttingDown then Exit;
-    CopyMsg := Msg.Clone;
-    TThread.Queue(nil,
-      procedure
-      begin
-        try
-          L(CopyMsg);
-        finally
-          CopyMsg.Free;
-        end;
-      end);
+    TMonitor.Enter(FListenersLock);
+    try
+      LocalListeners := FListeners.ToArray;
+      LocalBatchListeners := FBatchListeners.ToArray;
+    finally
+      TMonitor.Exit(FListenersLock);
+    end;
+
+    for BL in LocalBatchListeners do BL(Batch.ToArray);
+    for Msg in Batch do
+      for L in LocalListeners do L(Msg);
+  finally
+    for Msg in Batch do Msg.Free;
+    Batch.Free;
   end;
+  if (not FShuttingDown) and (FUiQueue.QueueSize > 0) then ScheduleUiDelivery;
 end;
 
 procedure TProtocolManager.Subscribe(AListener: TProtocolListener);
@@ -575,6 +656,87 @@ begin
   end;
 end;
 
+procedure TProtocolManager.SubscribeBatch(AListener: TProtocolBatchListener);
+begin
+  if FShuttingDown or not Assigned(AListener) then Exit;
+  TMonitor.Enter(FListenersLock);
+  try FBatchListeners.Add(AListener); finally TMonitor.Exit(FListenersLock); end;
+end;
+
+procedure TProtocolManager.UnsubscribeBatch(AListener: TProtocolBatchListener);
+begin
+  if FShuttingDown or not Assigned(AListener) then Exit;
+  TMonitor.Enter(FListenersLock);
+  try FBatchListeners.Remove(AListener); finally TMonitor.Exit(FListenersLock); end;
+end;
+
+function TProtocolManager.GetProtocolEnabled: Boolean;
+begin Result := TInterlocked.CompareExchange(FProtocolEnabled, 0, 0) <> 0; end;
+function TProtocolManager.GetLogEnabled: Boolean;
+begin Result := TInterlocked.CompareExchange(FLogEnabled, 0, 0) <> 0; end;
+function TProtocolManager.GetSampleChartEnabled: Boolean;
+begin Result := TInterlocked.CompareExchange(FSampleChartEnabled, 0, 0) <> 0; end;
+function TProtocolManager.GetStatisticsEnabled: Boolean;
+begin Result := TInterlocked.CompareExchange(FStatisticsEnabled, 0, 0) <> 0; end;
+
+procedure TProtocolManager.SetProtocolEnabled(const Value: Boolean);
+var Msg: TProtocolMessage;
+begin
+  if FShuttingDown then Exit;
+  TInterlocked.Exchange(FProtocolEnabled, Ord(Value));
+  if not Value then
+  begin
+    TInterlocked.Exchange(FUiCallbackPending, 0);
+    if FWorkerThread <> nil then TThread.RemoveQueuedEvents(FWorkerThread);
+    Msg := nil;
+    if FUiQueue <> nil then
+      while FUiQueue.QueueSize > 0 do
+        if FUiQueue.PopItem(Msg) = wrSignaled then FreeMessage(Msg);
+  end;
+  Notify(Integer(pmeMessageQueued));
+end;
+procedure TProtocolManager.SetLogEnabled(const Value: Boolean);
+begin if not FShuttingDown then begin TInterlocked.Exchange(FLogEnabled, Ord(Value)); Notify(Integer(pmeMessageQueued)); end; end;
+procedure TProtocolManager.SetSampleChartEnabled(const Value: Boolean);
+begin if not FShuttingDown then begin TInterlocked.Exchange(FSampleChartEnabled, Ord(Value)); Notify(Integer(pmeMessageQueued)); end; end;
+procedure TProtocolManager.SetStatisticsEnabled(const Value: Boolean);
+begin if not FShuttingDown then begin TInterlocked.Exchange(FStatisticsEnabled, Ord(Value)); Notify(Integer(pmeMessageQueued)); end; end;
+
+procedure TProtocolManager.LoadSettings(const AFileName: string);
+var Ini: TCustomIniFile;
+  function ReadStrictBool(const Key: string): Boolean;
+  var S: string;
+  begin
+    S := Trim(Ini.ReadString('Protocol', Key, ''));
+    Result := SameText(S, '1') or SameText(S, 'True');
+  end;
+begin
+  ProtocolEnabled := False; LogEnabled := False;
+  SampleChartEnabled := False; StatisticsEnabled := False;
+  if Trim(AFileName) = '' then Exit;
+  Ini := TProjectSettingsIni.Create(AFileName, STORAGE_TABLE_SETTINGS);
+  try
+    ProtocolEnabled := ReadStrictBool('ProtocolEnabled');
+    LogEnabled := ReadStrictBool('LogEnabled');
+    SampleChartEnabled := ReadStrictBool('SampleChartEnabled');
+    StatisticsEnabled := ReadStrictBool('StatisticsEnabled');
+  finally Ini.Free; end;
+end;
+
+procedure TProtocolManager.SaveSettings(const AFileName: string);
+var Ini: TCustomIniFile;
+begin
+  {
+  if FShuttingDown or (Trim(AFileName) = '') then Exit;
+  Ini := TProjectSettingsIni.Create(AFileName, STORAGE_TABLE_SETTINGS);
+  try
+    Ini.WriteInteger('Protocol', 'ProtocolEnabled', Ord(ProtocolEnabled));
+    Ini.WriteInteger('Protocol', 'LogEnabled', Ord(LogEnabled));
+    Ini.WriteInteger('Protocol', 'SampleChartEnabled', Ord(SampleChartEnabled));
+    Ini.WriteInteger('Protocol', 'StatisticsEnabled', Ord(StatisticsEnabled));
+  finally Ini.Free; end;   }
+end;
+
 procedure TProtocolManager.Pause;
 begin
   if FShuttingDown then Exit;
@@ -597,6 +759,10 @@ begin
   if FQueue <> nil then
     while FQueue.QueueSize > 0 do
       if FQueue.PopItem(Msg) = wrSignaled then
+        FreeMessage(Msg);
+  if FUiQueue <> nil then
+    while FUiQueue.QueueSize > 0 do
+      if FUiQueue.PopItem(Msg) = wrSignaled then
         FreeMessage(Msg);
 
   ClearRecentMessages;

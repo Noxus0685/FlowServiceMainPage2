@@ -22,9 +22,13 @@ uses
   System.UITypes,
   uBaseProcedures,
   uClasses,
+  uProtocols,
   uWorkTable;
 
 type
+  TChannelMoveRequestEvent = procedure(Sender: TObject; AChannel: TChannel;
+    const AMoveUp: Boolean) of object;
+
   TFrameChannelProperties = class(TFrame)
   private
     LayoutRoot: TLayout;
@@ -67,11 +71,17 @@ type
     LabelVoltageDeviation: TLabel;
     FChannel: TChannel;
     FLoading: Boolean;
+    FOnMoveChannel: TChannelMoveRequestEvent;
+    SpeedButtonChannelMoveUp: TSpeedButton;
+    SpeedButtonChannelMoveDown: TSpeedButton;
 
     function AddCategory(const ACaption: string): TTreeViewItem;
     function AddPropertyRow(AParent: TTreeViewItem; const ACaption: string;
       AControl: TControl): TLabel;
     function CreateEditCombo(const AItems: array of string): TComboEdit;
+    function CreateChannelMoveControls: TControl;
+    procedure ChannelMoveUpClick(Sender: TObject);
+    procedure ChannelMoveDownClick(Sender: TObject);
     procedure BuildUI;
     function CreateComboBox(const AItems: array of string): TComboBox;
     function CreateComboWithIndicator(ACombo: TComboBox; out AIndicator: TCircle): TControl;
@@ -104,6 +114,10 @@ type
     procedure LoadFromChannel(AChannel: TChannel);
     procedure UpdateDynamicValues;
     procedure UpdateFlowUnitPresentation;
+    procedure UpdateMoveButtons;
+    property Channel: TChannel read FChannel;
+    property OnMoveChannel: TChannelMoveRequestEvent read FOnMoveChannel
+      write FOnMoveChannel;
   end;
 
 implementation
@@ -114,6 +128,91 @@ constructor TFrameChannelProperties.Create(AOwner: TComponent);
 begin
   inherited;
   BuildUI;
+end;
+
+function TFrameChannelProperties.CreateChannelMoveControls: TControl;
+var
+  MoveLayout: TLayout;
+begin
+  MoveLayout := TLayout.Create(Self);
+  MoveLayout.Stored := False;
+
+  SpeedButtonChannelMoveUp := TSpeedButton.Create(Self);
+  SpeedButtonChannelMoveUp.Parent := MoveLayout;
+  SpeedButtonChannelMoveUp.Align := TAlignLayout.Left;
+  SpeedButtonChannelMoveUp.Width := 57;
+  SpeedButtonChannelMoveUp.StyleLookup := 'arrowuptoolbutton';
+  SpeedButtonChannelMoveUp.Hint := 'Переместить канал вверх';
+  SpeedButtonChannelMoveUp.ShowHint := True;
+  SpeedButtonChannelMoveUp.ParentShowHint := False;
+  SpeedButtonChannelMoveUp.TabStop := False;
+  SpeedButtonChannelMoveUp.OnClick := ChannelMoveUpClick;
+
+  SpeedButtonChannelMoveDown := TSpeedButton.Create(Self);
+  SpeedButtonChannelMoveDown.Parent := MoveLayout;
+  SpeedButtonChannelMoveDown.Align := TAlignLayout.Left;
+  SpeedButtonChannelMoveDown.Width := 57;
+  SpeedButtonChannelMoveDown.StyleLookup := 'arrowdowntoolbutton';
+  SpeedButtonChannelMoveDown.Hint := 'Переместить канал вниз';
+  SpeedButtonChannelMoveDown.ShowHint := True;
+  SpeedButtonChannelMoveDown.ParentShowHint := False;
+  SpeedButtonChannelMoveDown.TabStop := False;
+  SpeedButtonChannelMoveDown.OnClick := ChannelMoveDownClick;
+
+  Result := MoveLayout;
+end;
+
+procedure TFrameChannelProperties.ChannelMoveUpClick(Sender: TObject);
+begin
+  if Assigned(FOnMoveChannel) and Assigned(FChannel) and
+     SpeedButtonChannelMoveUp.Enabled then
+    FOnMoveChannel(Self, FChannel, True);
+  UpdateMoveButtons;
+end;
+
+procedure TFrameChannelProperties.ChannelMoveDownClick(Sender: TObject);
+begin
+  if Assigned(FOnMoveChannel) and Assigned(FChannel) and
+     SpeedButtonChannelMoveDown.Enabled then
+    FOnMoveChannel(Self, FChannel, False);
+  UpdateMoveButtons;
+end;
+
+// Updates the two order buttons for the channel currently shown in the inspector.
+procedure TFrameChannelProperties.UpdateMoveButtons;
+var
+  WorkTable: TWorkTable;
+  ChannelIndex: Integer;
+  ChannelCount: Integer;
+  CanMove: Boolean;
+begin
+  if not Assigned(SpeedButtonChannelMoveUp) or
+     not Assigned(SpeedButtonChannelMoveDown) then
+    Exit;
+
+  WorkTable := GetChannelWorkTable;
+  ChannelIndex := -1;
+  ChannelCount := 0;
+  CanMove := Assigned(FChannel) and Assigned(WorkTable) and
+    WorkTable.CanMoveChannels;
+
+  if CanMove then
+  begin
+    ChannelIndex := WorkTable.EtalonChannels.IndexOf(FChannel);
+    if ChannelIndex >= 0 then
+      ChannelCount := WorkTable.EtalonChannels.Count
+    else
+    begin
+      ChannelIndex := WorkTable.DeviceChannels.IndexOf(FChannel);
+      if ChannelIndex >= 0 then
+        ChannelCount := WorkTable.DeviceChannels.Count;
+    end;
+  end;
+
+  SpeedButtonChannelMoveUp.Enabled := CanMove and (ChannelIndex > 0) and
+    (ChannelIndex < ChannelCount);
+  SpeedButtonChannelMoveDown.Enabled := CanMove and (ChannelIndex >= 0) and
+    (ChannelIndex < ChannelCount - 1);
 end;
 
 function TFrameChannelProperties.AddCategory(const ACaption: string): TTreeViewItem;
@@ -589,6 +688,7 @@ begin
   finally
     FLoading := False;
     RefreshRegisterColors;
+    UpdateMoveButtons;
   end;
 end;
 
@@ -621,6 +721,15 @@ begin
   ClearDynamicValues;
   if FChannel = nil then
     Exit;
+
+  { Instantaneous values remain visible when statistical history is disabled. }
+  if (ProtocolManager = nil) or not ProtocolManager.StatisticsEnabled then
+  begin
+    LabelFrequency.Text := FormatDynamicValue(FChannel.ImpSec);
+    LabelCurrent.Text := FormatDynamicValue(FChannel.CurSec);
+    LabelVoltage.Text := FormatDynamicValue(FChannel.ValueSec);
+    Exit;
+  end;
 
   Statistics := FChannel.GetSignalStatistics(cskFrequency);
   if Statistics.HasValue then
@@ -678,6 +787,7 @@ var
   CategoryAnalogCurrent: TTreeViewItem;
   CategoryAnalogVoltage: TTreeViewItem;
   CategoryRanges: TTreeViewItem;
+  ChannelMoveControls: TControl;
 begin
   LayoutRoot := TLayout.Create(Self);
   LayoutRoot.Parent := Self;
@@ -734,6 +844,9 @@ begin
   AddPropertyRow(CategoryGeneral, 'Группа каналов', EditChannelGroup);
   EditChannelGroup.KillFocusByReturn:=True;
   EditChannelGroup.OnExit := HandleChannelGroupExit;
+
+  ChannelMoveControls := CreateChannelMoveControls;
+  AddPropertyRow(CategoryGeneral, 'Порядок каналов', ChannelMoveControls);
 
   ComboChannelType := CreateComboBox(['Не задан', 'Частотный', 'Импульсный', 'Токовый', 'Напряжение']);
   AddPropertyRow(CategoryGeneral, 'Тип канала', ComboChannelType);
