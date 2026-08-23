@@ -174,7 +174,7 @@ end;
 
   private
     FUUID: string;
-    FHeader: string; // êðàòêîå íàçâàíèå íàñîñà ïî ìíåìîñõåìå
+    FHeader: string; // краткое название насоса по мнемосхеме
     FPumpType: string;
     FSetFreq: Double;
     function GetFreq: Double;

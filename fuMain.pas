@@ -620,7 +620,7 @@ begin
 
 
 
-   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
+   // Обновляем не каждую секунду
   if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
   begin
     Freq := (Random * 10);
@@ -775,7 +775,7 @@ begin
     AFlowRate.State:=spStopped;
 
   WorkTable:= FWorkTableManager.ActiveWorkTable;
-   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
+   // Обновляем не каждую секунду
   if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
   begin
 

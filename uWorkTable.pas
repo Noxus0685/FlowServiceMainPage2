@@ -11159,7 +11159,7 @@ begin
     Exit;
 
 
-   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
+   // Обновляем не каждую секунду
   if (AWorkTable.NextFreqChangeAt = 0) or (Now >= AWorkTable.NextFreqChangeAt) then
   begin
     Freq := (Random * 10);
