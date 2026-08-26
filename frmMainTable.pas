@@ -8160,93 +8160,6 @@ var
   EtalonSnapshot: string;
   DeviceSnapshot: string;
   UiSnapshot: string;
-  ErrorValue: TMeterValue;
-  ErrorBase: TMeterValue;
-  ErrorEtalon: TMeterValue;
-  ErrorEtalonIsTableQuantity: Boolean;
-
-  function MeterValueOrZero(AMeterValue: TMeterValue): Double;
-  begin
-    if AMeterValue <> nil then
-      Result := AMeterValue.GetDoubleValue
-    else
-      Result := 0;
-  end;
-
-  function MeterValueTypeOrMinusOne(AMeterValue: TMeterValue): Integer;
-  begin
-    if AMeterValue <> nil then
-      Result := Ord(AMeterValue.ValueType)
-    else
-      Result := -1;
-  end;
-
-  function MeterValueTypeName(AMeterValue: TMeterValue): string;
-  begin
-    if AMeterValue = nil then
-      Exit('<nil>');
-
-    case AMeterValue.ValueType of
-      FLOW_TYPE: Result := 'FLOW_TYPE';
-      SUM_TYPE: Result := 'SUM_TYPE';
-      CONST_TYPE: Result := 'CONST_TYPE';
-      PARAM_TYPE: Result := 'PARAM_TYPE';
-      ERROR_TYPE: Result := 'ERROR_TYPE';
-      MEAN_TYPE: Result := 'MEAN_TYPE';
-      AGGREGATE_TYPE: Result := 'AGGREGATE_TYPE';
-      AGGREGATEMIN_TYPE: Result := 'AGGREGATEMIN_TYPE';
-    else
-      Result := '<unknown>';
-    end;
-  end;
-
-  function MeterValueHashOrEmpty(AMeterValue: TMeterValue): string;
-  begin
-    if AMeterValue <> nil then
-      Result := AMeterValue.Hash
-    else
-      Result := '';
-  end;
-
-  function ErrorBaseOrNil(AError: TMeterValue): TMeterValue;
-  begin
-    if AError <> nil then
-      Result := AError.ValueBaseMultiplier
-    else
-      Result := nil;
-  end;
-
-  function ErrorEtalonOrNil(AError: TMeterValue): TMeterValue;
-  begin
-    if AError <> nil then
-      Result := AError.ValueEtalon
-    else
-      Result := nil;
-  end;
-
-  function ExpectedErrorText(AError: TMeterValue): string;
-  var
-    BaseValue: Double;
-    EtalonValue: Double;
-  begin
-    Result := '<not-available>';
-    if AError = nil then
-      Exit;
-    if AError.ValueBaseMultiplier = nil then
-      Exit;
-    if AError.ValueEtalon = nil then
-      Exit;
-
-    BaseValue := AError.ValueBaseMultiplier.Value;
-    EtalonValue := AError.ValueEtalon.Value;
-    if EtalonValue = 0 then
-    begin
-      Result := '<etalon-zero>';
-      Exit;
-    end;
-
-    Result := FloatToStr((BaseValue - EtalonValue) * 100 / EtalonValue);
-  end;
 
   function FindFirstValueBaseMultiplier(
     AChannels: TObjectList<TChannel>): TMeterValue;
@@ -8601,23 +8514,12 @@ begin
       Channel := WorkTable.EtalonChannels[I];
       if Channel = nil then
         Continue;
-      if Channel.FlowMeter = nil then
-      begin
-        if EtalonSnapshot <> '' then
-          EtalonSnapshot := EtalonSnapshot + ',';
-        EtalonSnapshot := EtalonSnapshot + Format(
-          '#%d(%s;FlowMeterAssigned=False)', [I, Channel.Text]);
-        Continue;
-      end;
       if EtalonSnapshot <> '' then
         EtalonSnapshot := EtalonSnapshot + ',';
       EtalonSnapshot := EtalonSnapshot + Format(
-        '#%d(%s;Enabled=%s;CurSec=%.6f;ImpSec=%.6f;ImpResult=%.6f;' +
-        'ValueSec=%.6f;Flow=%.9f;Quantity=%.9f)',
+        '#%d(%s;Enabled=%s;CurSec=%.6f;ImpSec=%.6f;ImpResult=%.6f;ValueSec=%.6f)',
         [I, Channel.Text, BoolToStr(Channel.Enabled, True), Channel.CurSec,
-         Channel.ImpSec, Channel.ImpResult, Channel.ValueSec,
-         MeterValueOrZero(Channel.FlowMeter.ValueFlow),
-         MeterValueOrZero(Channel.FlowMeter.ValueQuantity)]);
+         Channel.ImpSec, Channel.ImpResult, Channel.ValueSec]);
     end;
     if EtalonSnapshot = '' then
       EtalonSnapshot := '<none>';
@@ -8628,50 +8530,12 @@ begin
       Channel := WorkTable.DeviceChannels[I];
       if Channel = nil then
         Continue;
-      if Channel.FlowMeter = nil then
-      begin
-        if DeviceSnapshot <> '' then
-          DeviceSnapshot := DeviceSnapshot + ',';
-        DeviceSnapshot := DeviceSnapshot + Format(
-          '#%d(%s;FlowMeterAssigned=False)', [I, Channel.Text]);
-        Continue;
-      end;
       if DeviceSnapshot <> '' then
         DeviceSnapshot := DeviceSnapshot + ',';
-      ErrorValue := Channel.FlowMeter.ValueError;
-      ErrorBase := ErrorBaseOrNil(ErrorValue);
-      ErrorEtalon := ErrorEtalonOrNil(ErrorValue);
-      ErrorEtalonIsTableQuantity := False;
-      if (WorkTable.TableFlow <> nil) and
-         (WorkTable.TableFlow.ValueQuantity <> nil) then
-        ErrorEtalonIsTableQuantity :=
-          ErrorEtalon = WorkTable.TableFlow.ValueQuantity;
       DeviceSnapshot := DeviceSnapshot + Format(
-        '#%d(%s;Enabled=%s;CurSec=%.6f;ImpSec=%.6f;ImpResult=%.6f;' +
-        'ValueSec=%.6f;Flow=%.9f;Quantity=%.9f;Error=%.9f;' +
-        'ErrorType=%s(%d);ExpectedError=%s;ErrorAssigned=%s;' +
-        'BaseAssigned=%s;EtalonAssigned=%s;BaseIsQuantity=%s;' +
-        'EtalonIsTableQuantity=%s;BaseValue=%.9f;EtalonValue=%.9f;' +
-        'ValueErrorHash=%s;BaseHash=%s;EtalonHash=%s)',
+        '#%d(%s;Enabled=%s;CurSec=%.6f;ImpSec=%.6f;ImpResult=%.6f;ValueSec=%.6f)',
         [I, Channel.Text, BoolToStr(Channel.Enabled, True), Channel.CurSec,
-         Channel.ImpSec, Channel.ImpResult, Channel.ValueSec,
-         MeterValueOrZero(Channel.FlowMeter.ValueFlow),
-         MeterValueOrZero(Channel.FlowMeter.ValueQuantity),
-         MeterValueOrZero(ErrorValue),
-         MeterValueTypeName(ErrorValue),
-         MeterValueTypeOrMinusOne(ErrorValue),
-         ExpectedErrorText(ErrorValue),
-         BoolToStr(ErrorValue <> nil, True),
-         BoolToStr(ErrorBase <> nil, True),
-         BoolToStr(ErrorEtalon <> nil, True),
-         BoolToStr((ErrorBase <> nil) and
-           (ErrorBase = Channel.FlowMeter.ValueQuantity), True),
-         BoolToStr(ErrorEtalonIsTableQuantity, True),
-         MeterValueOrZero(ErrorBase),
-         MeterValueOrZero(ErrorEtalon),
-         MeterValueHashOrEmpty(ErrorValue),
-         MeterValueHashOrEmpty(ErrorBase),
-         MeterValueHashOrEmpty(ErrorEtalon)]);
+         Channel.ImpSec, Channel.ImpResult, Channel.ValueSec]);
     end;
     if DeviceSnapshot = '' then
       DeviceSnapshot := '<none>';
