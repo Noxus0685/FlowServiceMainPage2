@@ -112,6 +112,9 @@ type
   TWorkTableCommandEvent = procedure(AWorkTable: TWorkTable;
     AAction: EActionWorkTable) of object;
 
+  TScaleTareRequestEvent = procedure(Sender: TObject;
+    const AScaleName: string) of object;
+
   TFlowGraphChannelKind = (fgckEtalon, fgckDevice);
 
   TAutoMeasurementTestResultKind = (amtrkNone, amtrkPass, amtrkFail, amtrkError, amtrkStopped);
@@ -826,14 +829,6 @@ type
   FLastPopupGrid: TGrid;
   FRefreshingGridColumns: Boolean;
   FChangingMeasurementGridFocus: Boolean;
-  FEtalonChannelUpAction: TAction;
-  FEtalonChannelDownAction: TAction;
-  FDeviceChannelUpAction: TAction;
-  FDeviceChannelDownAction: TAction;
-  FEtalonChannelUpButton: TSpeedButton;
-  FEtalonChannelDownButton: TSpeedButton;
-  FDeviceChannelUpButton: TSpeedButton;
-  FDeviceChannelDownButton: TSpeedButton;
   FChangingWorkTableTab: Boolean;
   FDeletingWorkTable: Boolean;
   FDeletingWorkTablePointer: Pointer;
@@ -895,15 +890,6 @@ type
     procedure NormalizeActiveWorkTable;
     procedure TabControlWorkTablesChange(Sender: TObject);
     procedure UpdateGridDevices;
-    procedure InitializeChannelMoveActions;
-    procedure CreateChannelMoveButton(var AButton: TSpeedButton;
-      AParent: TFmxObject; AAction: TAction);
-    procedure UpdateChannelMoveActions;
-    procedure MoveSelectedChannel(const AEtalon, AMoveUp: Boolean);
-    procedure EtalonChannelUpExecute(Sender: TObject);
-    procedure EtalonChannelDownExecute(Sender: TObject);
-    procedure DeviceChannelUpExecute(Sender: TObject);
-    procedure DeviceChannelDownExecute(Sender: TObject);
     procedure ChannelMoveRequested(Sender: TObject; AChannel: TChannel;
       const AMoveUp: Boolean);
     procedure ToggleAllChannelRows(AGrid: TGrid;
@@ -1057,6 +1043,7 @@ type
     FFrameProceed: TFrameProceed;
     FFrameMainTable: TFrameMainTable;
     FOnWorkTableCommand: TWorkTableCommandEvent;
+    FOnScaleTareRequest: TScaleTareRequestEvent;
     FDeviceClipboard: TChannelClipboardData;
     FEtalonClipboard: TChannelClipboardData;
     function GetLayoutByMenuItem(AMenuItem: TMenuItem): TLayout;
@@ -1078,6 +1065,8 @@ type
     procedure RefreshSynchronizedResults(Sender: TObject);
     { Public declarations }
     procedure Initialize;
+    { Prepares child frames before application services release their managers. }
+    procedure PrepareForShutdown;
     destructor Destroy; override;
 
     procedure OnChangeState(const ANewState: EStateWorkTable);
@@ -1124,6 +1113,8 @@ type
     procedure UpdateWorkTableTabCaption(AWorkTable: TWorkTable);
     property NewInstrumentName: string read FNewInstrumentName write FNewInstrumentName;
     property OnWorkTableCommand: TWorkTableCommandEvent read FOnWorkTableCommand write FOnWorkTableCommand;
+    property OnScaleTareRequest: TScaleTareRequestEvent
+      read FOnScaleTareRequest write FOnScaleTareRequest;
   private
     procedure SaveChannelToClipboard(AChannel: TChannel; var AClipboard: TChannelClipboardData);
     procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData);
@@ -1376,16 +1367,6 @@ begin
     Result := 'кг';
 end;
 
-function ConvertScaleWeight(const AWeightBase: Double; const AUnit: string): Double;
-begin
-  if SameText(AUnit, 'г') then
-    Result := AWeightBase * 1000
-  else if SameText(AUnit, 'т') or SameText(AUnit, 'м3') then
-    Result := AWeightBase / 1000
-  else
-    Result := AWeightBase;
-end;
-
 function BuildScaleCaption(const ACaptionPrefix, AUnit: string): string;
 var
   ValueName: string;
@@ -1508,6 +1489,20 @@ begin
   inherited;
 end;
 
+procedure TFrameMainTable.PrepareForShutdown;
+begin
+  if FDestroying then
+    Exit;
+
+  if FFrameProtocol <> nil then
+    FFrameProtocol.PrepareForShutdown;
+
+  if FFrameProceed <> nil then
+    FFrameProceed.PrepareForShutdown;
+
+  SaveLayoutSettingsToWorkTable;
+end;
+
 function TFrameMainTable.GetMeasurementRun: TMeasurementRun;
 begin
   Result := nil;
@@ -1620,180 +1615,6 @@ begin
     FGraphsWorkspace.RefreshEnabledSources;
 end;
 
-{ Creates a toolbar button owned by the frame and binds it to a frame-owned
-  channel movement action. }
-procedure TFrameMainTable.CreateChannelMoveButton(
-  var AButton: TSpeedButton; AParent: TFmxObject; AAction: TAction);
-begin
-  if not Assigned(AParent) or not Assigned(AAction) then
-    Exit;
-
-  AButton := TSpeedButton.Create(Self);
-  AButton.Parent := AParent;
-  AButton.Align := TAlignLayout.Right;
-  AButton.Width := 36;
-  AButton.ShowHint := True;
-  AButton.Action := AAction;
-end;
-
-procedure TFrameMainTable.InitializeChannelMoveActions;
-begin
-  { Actions and their buttons belong to the frame because the frame owns
-    the active work table, channel grids and all movement behaviour. }
-  FEtalonChannelUpAction := TAction.Create(Self);
-  FEtalonChannelUpAction.Text := #$2191;
-  FEtalonChannelUpAction.Hint := 'Переместить канал вверх';
-  FEtalonChannelUpAction.Enabled := False;
-  FEtalonChannelUpAction.OnExecute := EtalonChannelUpExecute;
-
-  FEtalonChannelDownAction := TAction.Create(Self);
-  FEtalonChannelDownAction.Text := #$2193;
-  FEtalonChannelDownAction.Hint := 'Переместить канал вниз';
-  FEtalonChannelDownAction.Enabled := False;
-  FEtalonChannelDownAction.OnExecute := EtalonChannelDownExecute;
-
-  FDeviceChannelUpAction := TAction.Create(Self);
-  FDeviceChannelUpAction.Text := #$2191;
-  FDeviceChannelUpAction.Hint := 'Переместить канал вверх';
-  FDeviceChannelUpAction.Enabled := False;
-  FDeviceChannelUpAction.OnExecute := DeviceChannelUpExecute;
-
-  FDeviceChannelDownAction := TAction.Create(Self);
-  FDeviceChannelDownAction.Text := #$2193;
-  FDeviceChannelDownAction.Hint := 'Переместить канал вниз';
-  FDeviceChannelDownAction.Enabled := False;
-  FDeviceChannelDownAction.OnExecute := DeviceChannelDownExecute;
-
-  CreateChannelMoveButton(FEtalonChannelDownButton, ToolBarEtalons1,
-    FEtalonChannelDownAction);
-  CreateChannelMoveButton(FEtalonChannelUpButton, ToolBarEtalons1,
-    FEtalonChannelUpAction);
-  CreateChannelMoveButton(FDeviceChannelDownButton, ToolBar1,
-    FDeviceChannelDownAction);
-  CreateChannelMoveButton(FDeviceChannelUpButton, ToolBar1,
-    FDeviceChannelUpAction);
-
-  UpdateChannelMoveActions;
-end;
-
-procedure TFrameMainTable.UpdateChannelMoveActions;
-var
-  WorkTable: TWorkTable;
-  EtalonRow: Integer;
-  DeviceRow: Integer;
-  CanMove: Boolean;
-begin
-  if not Assigned(FEtalonChannelUpAction) or
-     not Assigned(FEtalonChannelDownAction) or
-     not Assigned(FDeviceChannelUpAction) or
-     not Assigned(FDeviceChannelDownAction) then
-    Exit;
-
-  WorkTable := FActiveWorkTable;
-  CanMove := IsManagedWorkTable(WorkTable);
-  if CanMove then
-    CanMove := WorkTable.CanMoveChannels;
-
-  if not CanMove then
-  begin
-    FEtalonChannelUpAction.Enabled := False;
-    FEtalonChannelDownAction.Enabled := False;
-    FDeviceChannelUpAction.Enabled := False;
-    FDeviceChannelDownAction.Enabled := False;
-    Exit;
-  end;
-
-  EtalonRow := -1;
-  DeviceRow := -1;
-  if Assigned(GridEtalons) then
-    EtalonRow := GridEtalons.Selected;
-  if Assigned(GridDevices) then
-    DeviceRow := GridDevices.Selected;
-
-  FEtalonChannelUpAction.Enabled :=
-    (EtalonRow > 0) and
-    (EtalonRow < WorkTable.EtalonChannels.Count);
-  FEtalonChannelDownAction.Enabled :=
-    (EtalonRow >= 0) and
-    (EtalonRow < WorkTable.EtalonChannels.Count - 1);
-  FDeviceChannelUpAction.Enabled :=
-    (DeviceRow > 0) and
-    (DeviceRow < WorkTable.DeviceChannels.Count);
-  FDeviceChannelDownAction.Enabled :=
-    (DeviceRow >= 0) and
-    (DeviceRow < WorkTable.DeviceChannels.Count - 1);
-end;
-
-procedure TFrameMainTable.MoveSelectedChannel(
-  const AEtalon, AMoveUp: Boolean);
-var
-  WorkTable: TWorkTable;
-  Grid: TGrid;
-  Channel: TChannel;
-  Row: Integer;
-begin
-  if IsUpdating then
-    Exit;
-
-  NormalizeActiveWorkTable;
-  WorkTable := FActiveWorkTable;
-  if not IsManagedWorkTable(WorkTable) then
-  begin
-    UpdateChannelMoveActions;
-    Exit;
-  end;
-  if not WorkTable.CanMoveChannels then
-  begin
-    UpdateChannelMoveActions;
-    Exit;
-  end;
-
-  if AEtalon then
-  begin
-    Grid := GridEtalons;
-    Row := Grid.Selected;
-    if (Row < 0) or (Row >= WorkTable.EtalonChannels.Count) then
-    begin
-      UpdateChannelMoveActions;
-      Exit;
-    end;
-    Channel := WorkTable.EtalonChannels[Row];
-  end
-  else
-  begin
-    Grid := GridDevices;
-    Row := Grid.Selected;
-    if (Row < 0) or (Row >= WorkTable.DeviceChannels.Count) then
-    begin
-      UpdateChannelMoveActions;
-      Exit;
-    end;
-    Channel := WorkTable.DeviceChannels[Row];
-  end;
-
-  ChannelMoveRequested(Self, Channel, AMoveUp);
-end;
-
-procedure TFrameMainTable.EtalonChannelUpExecute(Sender: TObject);
-begin
-  MoveSelectedChannel(True, True);
-end;
-
-procedure TFrameMainTable.EtalonChannelDownExecute(Sender: TObject);
-begin
-  MoveSelectedChannel(True, False);
-end;
-
-procedure TFrameMainTable.DeviceChannelUpExecute(Sender: TObject);
-begin
-  MoveSelectedChannel(False, True);
-end;
-
-procedure TFrameMainTable.DeviceChannelDownExecute(Sender: TObject);
-begin
-  MoveSelectedChannel(False, False);
-end;
-
 { Moves a channel and refreshes the corresponding grid immediately. }
 procedure TFrameMainTable.ChannelMoveRequested(Sender: TObject;
   AChannel: TChannel; const AMoveUp: Boolean);
@@ -1831,7 +1652,6 @@ begin
   begin
     if Assigned(FFrameChannelProperties) then
       FFrameChannelProperties.UpdateMoveButtons;
-    UpdateChannelMoveActions;
     Exit;
   end;
 
@@ -1856,7 +1676,6 @@ begin
 
   if Assigned(WorkTableManager) then
     WorkTableManager.Save;
-  UpdateChannelMoveActions;
 end;
 
 procedure TFrameMainTable.ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
@@ -1893,31 +1712,31 @@ var
   I: Integer;
   Pump: TPump;
   ItemIndex: Integer;
+  OldTag: NativeInt;
 begin
-  ComboBoxPumps.Items.Clear;
-  ComboBoxPumps.ItemIndex := -1;
+  OldTag := LayoutPump.Tag;
+  LayoutPump.Tag := 2;
+  try
+    ComboBoxPumps.Items.Clear;
+    ComboBoxPumps.ItemIndex := -1;
 
-  if (FActiveWorkTable = nil) or (FActiveWorkTable.Pumps = nil) then
-    Exit;
+    if (FActiveWorkTable = nil) or (FActiveWorkTable.Pumps = nil) then
+      Exit;
 
-  ItemIndex := -1;
-  // В интерфейсе показываем Caption, но объект и синхронизация остаются по Name.
-  for Pump in FActiveWorkTable.Pumps do
-    if Pump <> nil then
-    begin
-      I := ComboBoxPumps.Items.AddObject(Pump.Caption, Pump);
-      if Pump = FActiveWorkTable.ActivePump then
-        ItemIndex := I;
-    end;
+    ItemIndex := -1;
+    // В интерфейсе показываем Caption, а объект храним в Items.Objects.
+    for Pump in FActiveWorkTable.Pumps do
+      if Pump <> nil then
+      begin
+        I := ComboBoxPumps.Items.AddObject(Pump.Caption, Pump);
+        if Pump = FActiveWorkTable.ActivePump then
+          ItemIndex := I;
+      end;
 
-  if (ItemIndex < 0) and (ComboBoxPumps.Items.Count > 0) then
-  begin
-    ItemIndex := 0;
-    Pump := TPump(ComboBoxPumps.Items.Objects[ItemIndex]);
-    FActiveWorkTable.ActivePump := Pump;
+    ComboBoxPumps.ItemIndex := ItemIndex;
+  finally
+    LayoutPump.Tag := OldTag;
   end;
-
-  ComboBoxPumps.ItemIndex := ItemIndex;
 end;
 
 procedure TFrameMainTable.RefreshScalesCombo;
@@ -2484,6 +2303,8 @@ begin
   if WorkTableEvent = ewtRefresh then
   begin
     UpdateWorkTableTabCaption(AWorkTable);
+    if FFrameProceed <> nil then
+      FFrameProceed.RefreshWorkTableDisplayName(AWorkTable);
     if FActiveWorkTable = AWorkTable then
     begin
       RefreshPumpsCombo;
@@ -2913,7 +2734,6 @@ begin
 
 
   FInitialized := True;
-  InitializeChannelMoveActions;
   FStabilitySampleTimer := TTimer.Create(Self);
   FStabilitySampleTimer.Interval := 1000;
   FStabilitySampleTimer.OnTimer := StabilitySampleTimerTimer;
@@ -4410,218 +4230,53 @@ end;
 procedure TFrameMainTable.DeleteActiveWorkTableClick(Sender: TObject);
 var
   DeletedWorkTable, NewActiveWorkTable: TWorkTable;
-  DeletedTab, NewActiveTab: TTabItem;
-  DeletedTabPointer: Pointer;
-  DeletedUUID, DeletedName, DeletedText, NewActiveUUID: string;
-  DeletedID, DeletedIndex, WorkCountBefore, TabCountBefore: Integer;
-  HydraulicState: EHydraulicLineState;
-  HydraulicError: TErrorInfo;
-  OperationID: Int64;
-  PointUUID: string;
-  PointIndex: Integer;
-  TargetFlow: Double;
-  Configuration: RWorkTableHydraulicConfiguration;
-  HydraulicRange: RWorkTableHydraulicRange;
+  DeletedUUID, DeletedText: string;
+  DeletedIndex: Integer;
   ObserverHost: IWorkTableObserverHost;
-  Confirmed, DeleteSucceeded, SwitchSucceeded, BaseSwitchSucceeded: Boolean;
-  SelectionError: string;
-
-  procedure LogDelete(const AEvent, ADetails: string);
-  begin
-    if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(pcInfo, psWorkTable, AEvent, ADetails, '');
-  end;
-
-  function DeleteContext: string;
-  begin
-    Result := Format('UUID=%s; ID=%d; Name=%s; Text=%s; Index=%d; ' +
-      'NewActiveUUID=%s; WorkTablesBefore=%d; WorkTablesAfter=%d; ' +
-      'TabsBefore=%d; TabsAfter=%d; Generation=%d', [DeletedUUID, DeletedID,
-      DeletedName, DeletedText, DeletedIndex, NewActiveUUID, WorkCountBefore,
-      WorkTableManager.WorkTables.Count, TabCountBefore,
-      TabControlWorkTables.TabCount, FWorkTableDeleteGeneration]);
-  end;
 begin
-  if (WorkTableManager = nil) or (WorkTableManager.WorkTables = nil) or
-     not IsManagedWorkTable(FActiveWorkTable) then
+  if not CanDeleteActiveWorkTable then
     Exit;
 
   DeletedWorkTable := FActiveWorkTable;
-  DeletedUUID := Trim(DeletedWorkTable.UUID);
-  DeletedID := DeletedWorkTable.ID;
-  DeletedName := DeletedWorkTable.Name;
+  DeletedUUID := DeletedWorkTable.UUID;
   DeletedText := DeletedWorkTable.Text;
   DeletedIndex := WorkTableManager.WorkTables.IndexOf(DeletedWorkTable);
-  WorkCountBefore := WorkTableManager.WorkTables.Count;
-  TabCountBefore := TabControlWorkTables.TabCount;
-  NewActiveUUID := '';
-  Inc(FWorkTableDeleteGeneration);
-  LogDelete('WorkTableDeleteRequested', DeleteContext);
 
-  if WorkCountBefore <= 1 then
-  begin
-    LogDelete('WorkTableDeleteBlocked', DeleteContext);
-    ShowMessage('Нельзя удалить единственный рабочий стол проекта.');
-    UpdateDeleteWorkTableButton;
+  if MessageDlg(Format('Удалить рабочий стол «%s»?'#13#10#13#10 +
+    'Будут удалены его каналы и настройки.', [DeletedText]),
+    TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0,
+    TMsgDlgBtn.mbNo) <> mrYes then
     Exit;
-  end;
 
-  DeletedWorkTable.GetHydraulicStateSnapshot(HydraulicState, HydraulicError,
-    OperationID, PointUUID, PointIndex, TargetFlow, Configuration,
-    HydraulicRange);
-  if IsMeasurementActive(DeletedWorkTable) or
-     (DeletedWorkTable.State in [swtSTARTMONITOR, swtSTARTMONITORWAIT,
-       swtMONITOR]) or
-     (HydraulicState in [hlsSelecting, hlsSettingUp]) then
-  begin
-    LogDelete('WorkTableDeleteBlocked', DeleteContext);
-    ShowMessage('Нельзя удалить рабочий стол во время измерения, мониторинга или выполнения операции.');
-    UpdateDeleteWorkTableButton;
-    Exit;
-  end;
+  if DeletedIndex + 1 < WorkTableManager.WorkTables.Count then
+    NewActiveWorkTable := WorkTableManager.WorkTables[DeletedIndex + 1]
+  else
+    NewActiveWorkTable := WorkTableManager.WorkTables[DeletedIndex - 1];
 
-  { Enable the guard before MessageDlg starts its nested message loop. }
+  { Move the shared UI to the replacement first. No tab is destroyed: the
+    permanent designer tab is simply rebound by SelectWorkTable. }
+  SelectWorkTable(NewActiveWorkTable);
   FDeletingWorkTable := True;
   FDeletingWorkTablePointer := Pointer(DeletedWorkTable);
-  LogDelete('WorkTableDeleteGuardEnabled', DeleteContext);
   try
-    Confirmed := MessageDlg(Format('Удалить рабочий стол «%s»?'#13#10#13#10 +
-      'Будут удалены его каналы, настройки и вкладка рабочего стола.',
-      [DeletedText]), TMsgDlgType.mtConfirmation,
-      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0,
-      TMsgDlgBtn.mbNo) = mrYes;
-    if not Confirmed then
-    begin
-      LogDelete('WorkTableDeleteCancelled', DeleteContext);
-      UpdateDeleteWorkTableButton;
-      Exit;
-    end;
-    LogDelete('WorkTableDeleteConfirmed', DeleteContext);
-
-    if DeletedIndex + 1 < WorkCountBefore then
-      NewActiveUUID := WorkTableManager.WorkTables[DeletedIndex + 1].UUID
-    else
-      NewActiveUUID := WorkTableManager.WorkTables[DeletedIndex - 1].UUID;
-    NewActiveWorkTable := FindManagedWorkTableByUUID(NewActiveUUID);
-    DeletedTab := FindWorkTableTabByUUID(DeletedUUID);
-    NewActiveTab := FindWorkTableTabByUUID(NewActiveUUID);
-
-    { Phase one: move every shared UI object while the old model and tab live. }
-    SelectWorkTable(NewActiveWorkTable);
-    BaseSwitchSucceeded := (NewActiveWorkTable <> nil) and
-      (FActiveWorkTable = NewActiveWorkTable) and
-      (WorkTableManager.ActiveWorkTable = NewActiveWorkTable) and
-      (TabControlWorkTables.ActiveTab = NewActiveTab) and
-      IsLiveWorkTableTab(NewActiveTab);
-
-    { FMX may place a control into a tab's internal content container.  Retry
-      only the normal activation path when the model and tab already match. }
-    if BaseSwitchSucceeded and
-       not IsControlInsideTab(PanelControlWorkTables, NewActiveTab) then
-    begin
-      ActivateWorkTable(NewActiveWorkTable);
-      NewActiveTab := FindWorkTableTabByUUID(NewActiveUUID);
-    end;
-
-    SwitchSucceeded := (FActiveWorkTable = NewActiveWorkTable) and
-      (WorkTableManager.ActiveWorkTable = NewActiveWorkTable) and
-      (TabControlWorkTables.ActiveTab = NewActiveTab) and
-      IsLiveWorkTableTab(NewActiveTab) and
-      IsControlInsideTab(PanelControlWorkTables, NewActiveTab);
-    if not SwitchSucceeded then
-    begin
-      if FActiveWorkTable <> NewActiveWorkTable then
-        SelectionError := 'FrameActiveMismatch'
-      else if WorkTableManager.ActiveWorkTable <> NewActiveWorkTable then
-        SelectionError := 'ManagerActiveMismatch'
-      else if TabControlWorkTables.ActiveTab <> NewActiveTab then
-        SelectionError := 'ActiveTabMismatch'
-      else if not IsLiveWorkTableTab(NewActiveTab) then
-        SelectionError := 'TabNotLive'
-      else
-        SelectionError := 'PanelNotInsideActiveTab';
-      LogDelete('WorkTableDeleteFailed', SelectionError + '; ' + DeleteContext);
-      Exit;
-    end;
-    LogDelete('WorkTableReplacementUIValidated', Format(
-      'WorkTableUUID=%s; TabPointer=%p; PanelDirectParentPointer=%p; ' +
-      'PanelInsideTab=True', [NewActiveUUID, Pointer(NewActiveTab),
-       Pointer(PanelControlWorkTables.Parent)]));
-
-    LogDelete('WorkTableDeleteNotificationBarrierBegin', DeleteContext);
     DeletedWorkTable.CancelPendingNotifications;
     if Supports(Owner, IWorkTableObserverHost, ObserverHost) then
       ObserverHost.DetachWorkTableObservers(DeletedWorkTable);
     DeletedWorkTable.ClearObservers;
-    LogDelete('WorkTableDeleteNotificationBarrierDone', DeleteContext);
-    LogDelete('WorkTablePostDeleteSelectionBegin', DeleteContext);
-
-    { Phase two: never allow a tab to own the shared panel when it is freed. }
-    if (DeletedTab = nil) or
-       IsControlInsideTab(PanelControlWorkTables, DeletedTab) then
+    if not WorkTableManager.DeleteWorkTableByUUID(DeletedUUID) then
     begin
-      LogDelete('WorkTableDeleteFailed',
-        'UI panel is still attached to deleted tab');
-      Exit;
-    end;
-
-    DeleteSucceeded := WorkTableManager.DeleteWorkTableByUUID(DeletedUUID);
-    if not DeleteSucceeded then
-    begin
-      { The model still owns its tab. Restore the previous active UI and its
-        observer subscription instead of leaving a half-completed switch. }
       if Supports(Owner, IWorkTableObserverHost, ObserverHost) then
         ObserverHost.AttachWorkTableObservers(DeletedWorkTable);
       SelectWorkTable(DeletedWorkTable);
-      LogDelete('WorkTableDeleteFailed', DeleteContext);
       Exit;
     end;
-    { NormalizeWorkTableUUID is declared later in this unit and is therefore
-      not visible here to the Delphi compiler.  The registry uses this same
-      normalized representation everywhere. }
-    FWorkTableTabs.Remove(UpperCase(Trim(DeletedUUID)));
-    DeletedTab.Parent := nil;
-    LogDelete('WorkTableTabRemoved', Format(
-      'WorkTableUUID=%s; TabPointer=%p', [DeletedUUID, Pointer(DeletedTab)]));
-    DeletedTab.Free;
-    DeletedTab := nil;
-
-    { The model has gone; now remove its still-live tab exactly once. }
-    if Assigned(DeletedTab) and IsLiveWorkTableTab(DeletedTab) then
-    begin
-      DeletedTabPointer := Pointer(DeletedTab);
-      FWorkTableTabs.Remove(UpperCase(Trim(DeletedUUID)));
-      DeletedTab.Parent := nil;
-      LogDelete('WorkTableTabRemoved', Format(
-        'WorkTableUUID=%s; TabPointer=%p',
-        [DeletedUUID, DeletedTabPointer]));
-      DeletedTab.Free;
-      DeletedTab := nil;
-    end;
-
-    { Structural synchronization happens only after UI transfer and deletion. }
     SyncWorkTableTabs;
-    NewActiveTab := FindWorkTableTabByUUID(NewActiveUUID);
-    if (FindManagedWorkTableByUUID(DeletedUUID) <> nil) or
-       (FindWorkTableTabByUUID(DeletedUUID) <> nil) or
-       (FActiveWorkTable <> NewActiveWorkTable) or
-       (WorkTableManager.ActiveWorkTable <> NewActiveWorkTable) or
-       (WorkTableManager.WorkTables.Count <> WorkCountBefore - 1) or
-       not IsLiveWorkTableTab(NewActiveTab) or
-       not IsControlInsideTab(PanelControlWorkTables, NewActiveTab) then
-    begin
-      LogDelete('WorkTableDeleteFailed',
-        'PostDeleteInvariantMismatch; ' + DeleteContext);
-      Exit;
-    end;
     WorkTableManager.Save;
-    UpdateDeleteWorkTableButton;
-    LogDelete('WorkTableDeleteDone', DeleteContext);
   finally
     FDeletingWorkTablePointer := nil;
     FDeletingWorkTable := False;
-    LogDelete('WorkTableDeleteGuardDisabled', DeleteContext);
   end;
+  UpdateDeleteWorkTableButton;
 end;
 
 procedure TFrameMainTable.NormalizeActiveWorkTable;
@@ -4753,21 +4408,9 @@ var
 begin
   Result := nil;
   Key := NormalizeWorkTableUUID(AWorkTableUUID);
-  if (Key = '') or (FWorkTableTabs = nil) then Exit;
-  if FWorkTableTabs.TryGetValue(Key, Result) then
-  begin
-    if not IsLiveWorkTableTab(Result) then
-    begin
-      FWorkTableTabs.Remove(Key);
-      Result := nil;
-      Exit;
-    end;
-    if GetWorkTableTabUUID(Result) <> Key then
-    begin
-      FWorkTableTabs.Remove(Key);
-      Result := nil;
-    end;
-  end;
+  if (Key <> '') and IsLiveWorkTableTab(TabItemWorkTable1) and
+     (GetWorkTableTabUUID(TabItemWorkTable1) = Key) then
+    Result := TabItemWorkTable1;
 end;
 
 function TFrameMainTable.FindWorkTableByTab(ATab: TTabItem): TWorkTable;
@@ -4791,36 +4434,22 @@ function TFrameMainTable.EnsureWorkTableTab(
 var
   Key: string;
 begin
-  { Reuse a live UUID tab; structural sync is the only creation path. }
   Result := nil;
-  if not IsManagedWorkTable(AWorkTable) then Exit;
+  if not IsManagedWorkTable(AWorkTable) or
+     not IsLiveWorkTableTab(TabItemWorkTable1) then
+    Exit;
   Key := NormalizeWorkTableUUID(AWorkTable.UUID);
-  if Key = '' then Exit;
-  Result := FindWorkTableTabByUUID(Key);
-  if Result = nil then
-  begin
-    if (WorkTableManager.WorkTables.IndexOf(AWorkTable) = 0) and
-       IsLiveWorkTableTab(TabItemWorkTable1) and
-       (GetWorkTableTabUUID(TabItemWorkTable1) = '') then
-      Result := TabItemWorkTable1
-    else
-    begin
-      Result := TTabItem.Create(Self);
-      Result.TagString := 'WORKTABLE:' + Key;
-      Result.Parent := TabControlWorkTables;
-    end;
-    Result.TagString := 'WORKTABLE:' + Key;
-    FWorkTableTabs.AddOrSetValue(Key, Result);
-    if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(pcInfo, psWorkTable, 'WorkTableTabCreated',
-        Format('WorkTableUUID=%s; WorkTableText=%s; TabPointer=%p',
-        [Key, AWorkTable.Text, Pointer(Result)]), '');
-  end
-  else if Assigned(ProtocolManager) then
-    ProtocolManager.AddMessage(pcInfo, psWorkTable, 'WorkTableTabReused',
-      Format('WorkTableUUID=%s; TabPointer=%p', [Key, Pointer(Result)]), '');
+  if Key = '' then
+    Exit;
+
+  { The designer-created tab is permanent. Switching only changes the model
+    identity and caption associated with this one visual surface. }
+  Result := TabItemWorkTable1;
+  Result.TagString := 'WORKTABLE:' + Key;
   Result.Text := AWorkTable.Text;
   Result.Visible := True;
+  FWorkTableTabs.Clear;
+  FWorkTableTabs.AddOrSetValue(Key, Result);
 end;
 
 procedure TFrameMainTable.RemoveWorkTableTabs(
@@ -4864,122 +4493,44 @@ end;
 
 procedure TFrameMainTable.SyncWorkTableTabs;
 var
-  I, CreatedCount, RemovedCount, TabCountBefore, WorkTabCount: Integer;
-  Tab, CanonicalTab: TTabItem;
-  WorkTable: TWorkTable;
-  Key, ActiveKey: string;
-  ManagedKeys: TDictionary<string, Boolean>;
-  CanonicalTabs: TDictionary<string, TTabItem>;
+  I: Integer;
+  Tab: TTabItem;
   TabsToRemove: TList<TTabItem>;
-  InvariantsValid: Boolean;
+  ActiveWorkTable: TWorkTable;
 begin
-  if FSyncingWorkTableTabs or (TabControlWorkTables = nil) or
-     (WorkTableManager = nil) or (WorkTableManager.WorkTables = nil) then Exit;
+  if FSyncingWorkTableTabs or (TabControlWorkTables = nil) then
+    Exit;
   FSyncingWorkTableTabs := True;
-  TabCountBefore := TabControlWorkTables.TabCount;
-  CreatedCount := 0;
-  RemovedCount := 0;
-  ManagedKeys := TDictionary<string, Boolean>.Create;
-  CanonicalTabs := TDictionary<string, TTabItem>.Create;
   TabsToRemove := TList<TTabItem>.Create;
   try
-    if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(pcInfo, psWorkTable, 'WorkTableTabsSyncBegin',
-        Format('WorkTableCount=%d; TabCountBefore=%d',
-        [WorkTableManager.WorkTables.Count, TabCountBefore]), '');
-    for I := 0 to WorkTableManager.WorkTables.Count - 1 do
-    begin
-      WorkTable := WorkTableManager.WorkTables[I];
-      if WorkTable <> nil then
-        ManagedKeys.AddOrSetValue(NormalizeWorkTableUUID(WorkTable.UUID), True);
-    end;
-
-    { Stage one only analyses live tabs; no TTabItem is freed in this loop. }
+    { Remove leftovers produced by the former one-tab-per-work-table
+      implementation. The designer tab is the only persistent tab. }
     for I := 0 to TabControlWorkTables.TabCount - 1 do
     begin
       Tab := TabControlWorkTables.Tabs[I];
-      Key := GetWorkTableTabUUID(Tab);
-      if Key = '' then Continue;
-      if not ManagedKeys.ContainsKey(Key) then
-        TabsToRemove.Add(Tab)
-      else if CanonicalTabs.TryGetValue(Key, CanonicalTab) then
-      begin
+      if Tab <> TabItemWorkTable1 then
         TabsToRemove.Add(Tab);
-        if Assigned(ProtocolManager) then
-          ProtocolManager.AddMessage(pcInfo, psWorkTable,
-            'WorkTableTabDuplicateRemoved', Format(
-            'WorkTableUUID=%s; KeptTabPointer=%p; RemovedTabPointer=%p',
-            [Key, Pointer(CanonicalTab), Pointer(Tab)]), '');
-      end
-      else
-        CanonicalTabs.Add(Key, Tab);
-      if TabsToRemove.IndexOf(Tab) >= 0 then
-        if Assigned(ProtocolManager) then
-          ProtocolManager.AddMessage(pcInfo, psWorkTable,
-            'WorkTableTabScheduledForRemoval',
-            Format('WorkTableUUID=%s; TabPointer=%p', [Key, Pointer(Tab)]), '');
     end;
-
-    FWorkTableTabs.Clear;
-    for Key in CanonicalTabs.Keys do
-      FWorkTableTabs.AddOrSetValue(Key, CanonicalTabs[Key]);
-    RemovedCount := TabsToRemove.Count;
     RemoveWorkTableTabs(TabsToRemove);
 
-    { Rebuild solely from tabs that remain in TTabControl after deletion. }
-    FWorkTableTabs.Clear;
-    for I := 0 to TabControlWorkTables.TabCount - 1 do
-    begin
-      Tab := TabControlWorkTables.Tabs[I];
-      Key := GetWorkTableTabUUID(Tab);
-      if (Key <> '') and ManagedKeys.ContainsKey(Key) and
-         not FWorkTableTabs.ContainsKey(Key) then
-        FWorkTableTabs.Add(Key, Tab);
-    end;
-    for I := 0 to WorkTableManager.WorkTables.Count - 1 do
-    begin
-      WorkTable := WorkTableManager.WorkTables[I];
-      if WorkTable = nil then Continue;
-      if FindWorkTableTabByUUID(WorkTable.UUID) = nil then Inc(CreatedCount);
-      EnsureWorkTableTab(WorkTable);
-    end;
+    ActiveWorkTable := nil;
+    if (WorkTableManager <> nil) and
+       IsManagedWorkTable(WorkTableManager.ActiveWorkTable) then
+      ActiveWorkTable := WorkTableManager.ActiveWorkTable
+    else if IsManagedWorkTable(FActiveWorkTable) then
+      ActiveWorkTable := FActiveWorkTable;
 
-    WorkTabCount := 0;
-    CanonicalTabs.Clear;
-    InvariantsValid := True;
-    for I := 0 to TabControlWorkTables.TabCount - 1 do
+    FWorkTableTabs.Clear;
+    if ActiveWorkTable <> nil then
+      EnsureWorkTableTab(ActiveWorkTable)
+    else
     begin
-      Tab := TabControlWorkTables.Tabs[I];
-      Key := GetWorkTableTabUUID(Tab);
-      if Key = '' then Continue;
-      Inc(WorkTabCount);
-      if CanonicalTabs.ContainsKey(Key) then InvariantsValid := False
-      else CanonicalTabs.Add(Key, Tab);
+      TabItemWorkTable1.TagString := '';
+      TabItemWorkTable1.Text := '';
     end;
-    if WorkTabCount <> WorkTableManager.WorkTables.Count then InvariantsValid := False;
-    for Key in FWorkTableTabs.Keys do
-      if not IsLiveWorkTableTab(FWorkTableTabs[Key]) then InvariantsValid := False;
-    ActiveKey := '';
-    if IsManagedWorkTable(FActiveWorkTable) then ActiveKey := NormalizeWorkTableUUID(FActiveWorkTable.UUID);
-    if (FActiveWorkTable <> WorkTableManager.ActiveWorkTable) or
-       ((not FDeletingWorkTable) and (ActiveKey <> '') and
-        (GetWorkTableTabUUID(TabControlWorkTables.ActiveTab) <> ActiveKey)) then
-      InvariantsValid := False;
-    if not InvariantsValid and Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(pcError, psWorkTable,
-        'WorkTableTabsInvariantFailed',
-        Format('WorkTableCount=%d; WorkTabCount=%d; RegistryCount=%d',
-        [WorkTableManager.WorkTables.Count, WorkTabCount, FWorkTableTabs.Count]), '');
+    TabControlWorkTables.ActiveTab := TabItemWorkTable1;
   finally
-    if Assigned(ProtocolManager) then
-      ProtocolManager.AddMessage(pcInfo, psWorkTable, 'WorkTableTabsSyncDone',
-        Format('WorkTableCount=%d; TabCountBefore=%d; TabCountAfter=%d; RegistryCount=%d; CreatedCount=%d; RemovedCount=%d',
-        [WorkTableManager.WorkTables.Count, TabCountBefore,
-         TabControlWorkTables.TabCount, FWorkTableTabs.Count,
-         CreatedCount, RemovedCount]), '');
     TabsToRemove.Free;
-    CanonicalTabs.Free;
-    ManagedKeys.Free;
     FSyncingWorkTableTabs := False;
   end;
   UpdateDeleteWorkTableButton;
@@ -5012,7 +4563,7 @@ begin
   FActiveWorkTable := AWorkTable;
   AWorkTable.IsActive := True;
 
-  ActiveTab := FindWorkTableTabByUUID(AWorkTable.UUID);
+  ActiveTab := EnsureWorkTableTab(AWorkTable);
   if (PanelControlWorkTables <> nil) and IsLiveWorkTableTab(ActiveTab) then
   begin
     OldPanelParent := PanelControlWorkTables.Parent;
@@ -5084,15 +4635,15 @@ begin
 end;
 
 procedure TFrameMainTable.SelectWorkTable(AWorkTable: TWorkTable);
-var
-  Tab: TTabItem;
 begin
-  if not IsManagedWorkTable(AWorkTable) then Exit;
-  Tab := FindWorkTableTabByUUID(AWorkTable.UUID);
-  if Tab = nil then Exit;
+  if not IsManagedWorkTable(AWorkTable) then
+    Exit;
+  { Keep the existing active-work-table mechanism; only reuse the permanent
+    visual tab instead of selecting or creating a tab per model. }
+  EnsureWorkTableTab(AWorkTable);
   FChangingWorkTableTab := True;
   try
-    TabControlWorkTables.ActiveTab := Tab;
+    TabControlWorkTables.ActiveTab := TabItemWorkTable1;
   finally
     FChangingWorkTableTab := False;
   end;
@@ -5100,11 +4651,10 @@ begin
 end;
 
 procedure TFrameMainTable.UpdateWorkTableTabCaption(AWorkTable: TWorkTable);
-var Tab: TTabItem;
 begin
-  if not IsManagedWorkTable(AWorkTable) then Exit;
-  Tab := FindWorkTableTabByUUID(AWorkTable.UUID);
-  if Tab <> nil then Tab.Text := AWorkTable.Text;
+  if IsManagedWorkTable(AWorkTable) and (AWorkTable = FActiveWorkTable) and
+     IsLiveWorkTableTab(TabItemWorkTable1) then
+    TabItemWorkTable1.Text := AWorkTable.Text;
 end;
 
 procedure TFrameMainTable.TabControlWorkTablesChange(Sender: TObject);
@@ -6440,6 +5990,7 @@ end;
 procedure TFrameMainTable.ComboBoxPumpsChange(Sender: TObject);
 var
   Pump: TPump;
+  Changed: Boolean;
 begin
   if FActiveWorkTable = nil then
     Exit;
@@ -6452,10 +6003,18 @@ begin
        (ComboBoxPumps.ItemIndex < ComboBoxPumps.Items.Count) and
        (ComboBoxPumps.Items.Objects[ComboBoxPumps.ItemIndex] is TPump) then
       Pump := TPump(ComboBoxPumps.Items.Objects[ComboBoxPumps.ItemIndex]);
-    FActiveWorkTable.ActivePump := Pump;
-    if FFrameWorkTableProperties <> nil then
-      FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
-    UpdateUIPump;
+    Changed := (Pump <> nil) and (FActiveWorkTable.Pumps <> nil) and
+      (FActiveWorkTable.Pumps.IndexOf(Pump) >= 0) and
+      (FActiveWorkTable.ActivePump <> Pump);
+    if Changed then
+    begin
+      FActiveWorkTable.ActivePump := Pump;
+      UpdateUIPump;
+      if FFrameWorkTableProperties <> nil then
+        FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
+      if WorkTableManager <> nil then
+        WorkTableManager.Save;
+    end;
   end;
 end;
 
@@ -6478,11 +6037,12 @@ end;
 
 procedure TFrameMainTable.ButtonScaleTareClick(Sender: TObject);
 begin
-  if FActiveWorkTable = nil then
+  if (FActiveWorkTable = nil) or
+     (FActiveWorkTable.ActiveScale = nil) then
     Exit;
 
-  FActiveWorkTable.DoScaleTare;
-  UpdateUIScale;
+  if Assigned(FOnScaleTareRequest) then
+    FOnScaleTareRequest(Self, FActiveWorkTable.ActiveScale.Name);
 end;
 
 procedure TFrameMainTable.ButtonScaleDrainClick(Sender: TObject);
@@ -6523,35 +6083,69 @@ end;
 
 procedure TFrameMainTable.ActionDeleteDeviceExecute(Sender: TObject);
 var
- Src: TChannel;
+  Src: TChannel;
+  SelectedRow: Integer;
 begin
   if FActiveWorkTable = nil then
     Exit;
 
-   Src := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
-   if (FFrameProceed <> nil) and (Src <> nil) and (Src.FlowMeter <> nil) then
-     FFrameProceed.RemoveProcessingDevice(Src.FlowMeter.Device);
-   if FActiveWorkTable.DeleteChannel(Src) then
-   begin
-     UpdateGrids;
-     SaveActiveWorkTableConfiguration;
-   end;
+  Src := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
+  if (FFrameProceed <> nil) and (Src <> nil) and (Src.FlowMeter <> nil) then
+    FFrameProceed.RemoveProcessingDevice(Src.FlowMeter.Device);
+
+  if FFrameChannelProperties <> nil then
+    FFrameChannelProperties.DetachChannel(Src);
+  if FFlowMeterPropertiesChannel = Src then
+    FFlowMeterPropertiesChannel := nil;
+
+  if FActiveWorkTable.DeleteChannel(Src) then
+  begin
+    UpdateGrids;
+    SelectedRow := GridDevices.Row;
+    if FFrameChannelProperties <> nil then
+    begin
+      if (SelectedRow >= 0) and
+         (SelectedRow < FActiveWorkTable.DeviceChannels.Count) then
+        FFrameChannelProperties.LoadFromChannel(
+          FActiveWorkTable.DeviceChannels[SelectedRow])
+      else
+        FFrameChannelProperties.LoadFromChannel(nil);
+    end;
+    SaveActiveWorkTableConfiguration;
+  end;
 end;
 
 
 procedure TFrameMainTable.ActionDeleteEtalonsExecute(Sender: TObject);
 var
   Src: TChannel;
+  SelectedRow: Integer;
 begin
   if FActiveWorkTable = nil then
     Exit;
 
-   Src := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
-   if FActiveWorkTable.DeleteChannel(Src) then
-   begin
-     UpdateGrids;
-     SaveActiveWorkTableConfiguration;
-   end;
+  Src := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
+
+  if FFrameChannelProperties <> nil then
+    FFrameChannelProperties.DetachChannel(Src);
+  if FFlowMeterPropertiesChannel = Src then
+    FFlowMeterPropertiesChannel := nil;
+
+  if FActiveWorkTable.DeleteChannel(Src) then
+  begin
+    UpdateGrids;
+    SelectedRow := GridEtalons.Row;
+    if FFrameChannelProperties <> nil then
+    begin
+      if (SelectedRow >= 0) and
+         (SelectedRow < FActiveWorkTable.EtalonChannels.Count) then
+        FFrameChannelProperties.LoadFromChannel(
+          FActiveWorkTable.EtalonChannels[SelectedRow])
+      else
+        FFrameChannelProperties.LoadFromChannel(nil);
+    end;
+    SaveActiveWorkTableConfiguration;
+  end;
 end;
 
 procedure TFrameMainTable.ActionDevicesAssignEtalonExecute(Sender: TObject);
@@ -6711,7 +6305,12 @@ var
   end;
 
 begin
-  if (AWorkTable = nil) or (AWorkTable.FlowRate = nil) or
+  { Расчёт веса по расходу выполняется только при имитации.
+    В реальном режиме вес поступает из DoOnChangeScales. }
+  if (AWorkTable = nil) or (not AWorkTable.IsSimulationMode) then
+    Exit;
+
+  if (AWorkTable.FlowRate = nil) or
      (AWorkTable.FlowRate.Value = nil) or (AWorkTable.ValueFlowRate = nil) or
      (AWorkTable.ActiveScale = nil) then
     Exit;
@@ -6865,7 +6464,6 @@ var
   WorkTable: TWorkTable;
 begin
   NormalizeActiveWorkTable;
-  UpdateChannelMoveActions;
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
   begin
@@ -11154,7 +10752,6 @@ begin
   finally
     FChangingMeasurementGridFocus := False;
   end;
-  UpdateChannelMoveActions;
 end;
 
 procedure TFrameMainTable.GridDevicesEnter(Sender: TObject);
@@ -11662,6 +11259,8 @@ var
   FlowMeter: TFlowMeter;
   CurrentFlow: Double;
   AverageFlow: Double;
+  DebugChannel: TChannel;
+  DebugError: TMeterValue;
 begin
   WorkTable := FActiveWorkTable;
 
@@ -12468,7 +12067,6 @@ begin
   if GridEtalons.RowCount <> EtalonRows then
     RefreshGridRowCount(GridEtalons, EtalonRows, 'channel-values');
   RefreshGridValues(GridEtalons, 'channel-values');
-  UpdateChannelMoveActions;
 end;
 
 procedure TFrameMainTable.GridEtalonsSetValue(Sender: TObject;
@@ -12655,6 +12253,7 @@ procedure TFrameMainTable.UpdateUIScale;
 var
   WorkTable: TWorkTable;
   UnitName: string;
+  RoundedWeight: Double;
   I: Integer;
 begin
   WorkTable := FActiveWorkTable;
@@ -12670,9 +12269,21 @@ begin
     Exit;
   end;
 
-  LabelScaleWeight.Text := FormatFloat('0.###',
-    ConvertScaleWeight(WorkTable.CurentValue, UnitName));
-  LabelScaleTotalWeight.Text := FormatFloat('0.###', WorkTable.Value);
+  if WorkTable.ValueQuantity <> nil then
+    LabelScaleWeight.Text := WorkTable.ValueQuantity.GetStrNum(WorkTable.ActiveScale.CurrentWeight,0)
+  else
+    LabelScaleWeight.Text := '-';
+
+  if (WorkTable.ActiveScale <> nil) and
+     (WorkTable.TableFlow <> nil) and
+     (WorkTable.TableFlow.ValueMass <> nil) then
+  begin
+    RoundedWeight := WorkTable.ActiveScale.TareWeight;
+    LabelScaleTotalWeight.Text := WorkTable.TableFlow.ValueMass.GetStrNum(
+      RoundedWeight, 0);
+  end
+  else
+    LabelScaleTotalWeight.Text := '-';
 
   if LayoutScale.Tag = 3 then
     Exit;

@@ -5415,7 +5415,6 @@ object FrameMainTable: TFrameMainTable
                   Align = Client
                   XMax = 100.000000000000000000
                   YMax = 100.000000000000000000
-                  XAxisHighlightColor = xFFFF8000
                   LineColor = claBlue
                   LineThickness = 2.000000000000000000
                   ShowMarkers = True
@@ -5458,7 +5457,6 @@ object FrameMainTable: TFrameMainTable
                   Align = Client
                   XMax = 100.000000000000000000
                   YMax = 100.000000000000000000
-                  XAxisHighlightColor = xFFFF8000
                   LineColor = claBlue
                   LineThickness = 2.000000000000000000
                   ShowMarkers = True

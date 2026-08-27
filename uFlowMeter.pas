@@ -1320,16 +1320,18 @@ var
     if (AMeterValue = nil) or (AIsExisted <> 0) then
       Exit;
 
+    { GetExistedMeterValueBool создаёт и регистрирует новое значение, если
+      сохранённый хэш не найден. Проверяем новый хэш до совместимого поиска:
+      если коллекция возвращает сам AMeterValue, значение действительно новое
+      и не должно сопоставляться с другим значением по общему имени. }
+    SavedValue := TMeterValue.GetMeterValue(AMeterValue.Hash);
+    if SavedValue = AMeterValue then
+      Exit;
+
     { После копирования рабочего стола или преобразования старого проекта
       хэш может измениться. Вместо повторного обращения к SQLite сопоставляем
       значение с коллекцией TMeterValue, уже полностью заполненной методом
-      LoadFromStorage.
-
-      Точный поиск по хэшу здесь не повторяется. Его только что выполнил
-      GetExistedMeterValueBool. Если выполнение дошло до этой строки, точного
-      совпадения не было, а AMeterValue уже создан и зарегистрирован.
-      Повторный GetMeterValue по его новому хэшу нашёл бы только сам объект
-      и добавил бы ещё один линейный проход списка. }
+      LoadFromStorage. }
 
     SavedValue := TMeterValue.FindMeterValueByOwnerAndKind(
       UUID, AMeterValue.GetValueKind);

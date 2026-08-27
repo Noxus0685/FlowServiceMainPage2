@@ -173,7 +173,6 @@ end;
   TPump = class(TParameter)
 
   private
-    FUUID: string;
     FHeader: string; // краткое название насоса по мнемосхеме
     FPumpType: string;
     FSetFreq: Double;
@@ -192,7 +191,6 @@ end;
     constructor Create;  overload;
     destructor Destroy; override;
     function GetActionAsString: string;
-    property UUID: string read FUUID write FUUID;
     property Header: string read FHeader write FHeader;
     property PumpType : string read FPumpType write FPumpType;
     procedure DoPumpStart;
@@ -519,7 +517,6 @@ end;
 constructor TPump.Create;
 begin
   inherited Create('', '');
-  FUUID := TGUID.NewGuid.ToString;
   FMax:= 50;
   FMin:= 12;
 

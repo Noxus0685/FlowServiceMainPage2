@@ -409,6 +409,7 @@ var
   Values: TArray<string>;
   DBFileName: string;
   Dlg: TSaveDialog;
+  ErrorText: string;
 begin
   {----------------------------------}
   { Проверки }
@@ -438,10 +439,9 @@ begin
 
   if AppServices.DataManager.RepositoryNameExists(RepoName) then
   begin
-    ShowMessage(Format(
-      'Репозиторий с именем "%s" уже существует. Создание отменено.',
-      [RepoName]
-    ));
+    MessageDlg(
+      Format('Репозиторий с именем "%s" уже существует.', [RepoName]),
+      TMsgDlgType.mtWarning, [TMsgDlgBtn.mbOK], 0);
     Exit;
   end;
 
@@ -461,7 +461,8 @@ begin
     if not Dlg.Execute then
       Exit;
 
-    DBFileName := Dlg.FileName;
+    { Новая пустая база всегда создаётся непосредственно в локальной папке. }
+    DBFileName := TPath.Combine(Dlg.InitialDir, TPath.GetFileName(Dlg.FileName));
   finally
     Dlg.Free;
   end;
@@ -471,24 +472,30 @@ begin
   { Менеджер сам создаёт, открывает и
   { делает его активным }
   {----------------------------------}
-  AppServices.DataManager.AddRepository(
+  if not AppServices.DataManager.AddRepository(
     RepoName,
     rkDevice,
-    DBFileName
-  );
+    DBFileName,
+    True,
+    ErrorText
+  ) then
+  begin
+    if ErrorText <> '' then
+      MessageDlg(ErrorText, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
+    Exit;
+  end;
 
   {----------------------------------}
   { Пересборка UI }
   {----------------------------------}
   LoadData;              // берёт данные из ActiveDeviceRepo
+  FDevices := AppServices.DataManager.ActiveDeviceRepo.Devices;
 
   FillComboBoxRepository;
-  TreeViewDevices.Clear;
-  TreeViewDevices.Clear;
-  BuildTree;
-  ApplyFilter;
-  UpdateGridDevices;
   ClearCheckedDevices;
+  ApplyFilter;
+  RebuildTreeFull;
+  UpdateGridDevices;
 end;
 
 procedure TFormDeviceSelect.miAddTestDataClick(Sender: TObject);
@@ -540,10 +547,8 @@ begin
   if AppServices.DataManager.ActiveDeviceRepo <> nil then
   begin
     LoadData;        // заново загружает данные активного репозитория
-    TreeViewDevices.Clear;
-    TreeViewDevices.Clear;
-    BuildTree;
     ApplyFilter;
+    RebuildTreeFull;
     UpdateGridDevices;
   end
   else
@@ -585,6 +590,9 @@ var
   Dlg: TOpenDialog;
   DbFileName: string;
   RepoName: string;
+  TargetDbFile, ErrorText: string;
+  OverwriteExisting: Boolean;
+  DialogResult: TModalResult;
 begin
   {----------------------------------}
   { Проверка менеджера }
@@ -627,14 +635,46 @@ begin
     Exit;
   end;
 
+  if AppServices.DataManager.RepositoryNameExists(RepoName) then
+  begin
+    MessageDlg(
+      Format('Репозиторий с именем "%s" уже существует.', [RepoName]),
+      TMsgDlgType.mtWarning, [TMsgDlgBtn.mbOK], 0);
+    Exit;
+  end;
+
+  TargetDbFile := TPath.Combine(TPath.Combine(
+    ExtractFilePath(ParamStr(0)), 'Settings'), 'Devices');
+  TargetDbFile := TPath.Combine(TargetDbFile, TPath.GetFileName(DbFileName));
+  OverwriteExisting := False;
+  if (not SameText(TPath.GetFullPath(DbFileName), TPath.GetFullPath(TargetDbFile))) and
+     TFile.Exists(TargetDbFile) then
+  begin
+    DialogResult := MessageDlg(
+      Format('Локальная база уже существует. Заменить её?' + sLineBreak +
+        'Исходный файл: %s' + sLineBreak + 'Локальный файл: %s',
+        [DbFileName, TargetDbFile]), TMsgDlgType.mtConfirmation,
+      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0);
+    if DialogResult <> mrYes then
+      Exit;
+    OverwriteExisting := True;
+  end;
+
   {----------------------------------}
   { Добавление репозитория ПРИБОРОВ }
   {----------------------------------}
-  AppServices.DataManager.AddRepository(
+  if not AppServices.DataManager.AddRepository(
     RepoName,
     rkDevice,
-    DbFileName
-  );
+    DbFileName,
+    OverwriteExisting,
+    ErrorText
+  ) then
+  begin
+    if ErrorText <> '' then
+      MessageDlg(ErrorText, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
+    Exit;
+  end;
 
   {----------------------------------}
   { Обновление связи и UI }
@@ -646,8 +686,8 @@ begin
   end;
 
   FillComboBoxRepository;
-  BuildTree;
   ApplyFilter;
+  RebuildTreeFull;
   UpdateGridDevices;
   UpdateDeviceActions(nil);
 end;
@@ -2137,14 +2177,18 @@ end;
 
 procedure TFormDeviceSelect.RebuildTreeFull;
 begin
+  { Полная перестройка применяется при смене репозитория и не сохраняет
+    узлы предыдущего репозитория. }
   TreeViewDevices.BeginUpdate;
   try
+    TreeViewDevices.Selected := nil;
     TreeViewDevices.Clear;
+    BuildTree;
+    if TreeViewDevices.Count > 0 then
+      TreeViewDevices.Selected := TreeViewDevices.Items[0];
   finally
     TreeViewDevices.EndUpdate;
   end;
-
-  BuildTree;
 end;
 
 procedure TFormDeviceSelect.ClearTreeAndGrid;

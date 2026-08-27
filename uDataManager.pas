@@ -19,8 +19,10 @@ uses
   uBaseProcedures,
   uClasses,
   uDeviceClass,
+  uDebugLog,
   uProjectSettings,
   uRepositories,
+System.UITypes,
   uTable_DATA;
 
 type
@@ -63,6 +65,14 @@ type
     function CreateDeviceRepository(const AName: string; ADM: TTableDM): TDeviceRepository;
     function MakeUniqueRepositoryName(const ABaseName: string): string;
     function NormalizeRepositoryDbFileName(AKind: TRepositoryKind; const ADbFile: string): string;
+    { Prepares a local repository database copy without using exceptions for expected failures. }
+    function PrepareRepositoryDbFile(AKind: TRepositoryKind;
+      const ASourceDbFile: string; const AOverwriteExisting: Boolean;
+      out ATargetDbFile: string; out AError: string): Boolean;
+    { Rolls back a partially completed repository registration. }
+    procedure RollbackRepositoryRegistration(const AName: string;
+      AKind: TRepositoryKind; const APreviousTypeRepo: TTypeRepository;
+      const APreviousDeviceRepo: TDeviceRepository);
     function GetBufferTypes: TList<TDeviceType>;
     procedure SetBufferTypes(const ATypes: TList<TDeviceType>);
     function GetBufferDevices: TList<TDevice>;
@@ -99,7 +109,10 @@ type
   property BufferDevices: TList<TDevice> read GetBufferDevices write SetBufferDevices;
   property PendingSelectedDeviceUUID: string read FPendingSelectedDeviceUUID write FPendingSelectedDeviceUUID;
 
-  procedure AddRepository(const AName: string; AKind: TRepositoryKind; const ADbFile: string);
+  { Adds a repository and returns False for validation, cancellation, or file preparation errors. }
+  function AddRepository(const AName: string; AKind: TRepositoryKind;
+    const ADbFile: string; const AOverwriteExisting: Boolean;
+    out AError: string): Boolean;
   procedure RemoveRepository(const AName: string);
 
   procedure SetActiveRepository(AKind: TRepositoryKind; const AName: string);
@@ -216,6 +229,85 @@ begin
   // когда это действительно необходимо
 end;
 
+function TManagerTTableDM.PrepareRepositoryDbFile(
+AKind: TRepositoryKind; const ASourceDbFile: string; const AOverwriteExisting: Boolean; out ATargetDbFile: string; out AError: string): Boolean;
+var
+  SourceDbFile, TempDbFile, BackupDbFile: string;
+begin
+  Result := False;
+  ATargetDbFile := '';
+  AError := '';
+  if Trim(ASourceDbFile) = '' then
+  begin
+    AError := 'Не указан файл базы данных репозитория';
+    Exit;
+  end;
+
+  try
+    SourceDbFile := TPath.GetFullPath(ASourceDbFile);
+    ATargetDbFile := TPath.GetFullPath(
+      NormalizeRepositoryDbFileName(AKind, SourceDbFile));
+
+    if SameText(SourceDbFile, ATargetDbFile) then
+    begin
+      Result := True;
+      Exit;
+    end;
+
+    if not TFile.Exists(SourceDbFile) then
+    begin
+      AError := 'Не найден файл подключаемого репозитория: ' + SourceDbFile;
+      Exit;
+    end;
+
+    if TFile.Exists(ATargetDbFile) and not AOverwriteExisting then
+      Exit;
+
+    ForceDirectories(TPath.GetDirectoryName(ATargetDbFile));
+    TempDbFile := ATargetDbFile + '.' +
+      StringReplace(TGUID.NewGuid.ToString, '-', '', [rfReplaceAll]) + '.tmp';
+    BackupDbFile := TempDbFile + '.bak';
+    try
+      TFile.Copy(SourceDbFile, TempDbFile, False);
+      if (not TFile.Exists(TempDbFile)) or
+         (TFile.GetSize(TempDbFile) <> TFile.GetSize(SourceDbFile)) then
+      begin
+        AError := 'Размер временной копии не совпадает с исходным файлом.';
+        Exit;
+      end;
+
+      if TFile.Exists(ATargetDbFile) then
+        TFile.Replace(TempDbFile, ATargetDbFile, BackupDbFile)
+      else
+        TFile.Move(TempDbFile, ATargetDbFile);
+
+      if (not TFile.Exists(ATargetDbFile)) or
+         (TFile.GetSize(ATargetDbFile) <> TFile.GetSize(SourceDbFile)) then
+      begin
+        AError := 'Размер локальной копии не совпадает с исходным файлом.';
+        Exit;
+      end;
+      if TFile.Exists(BackupDbFile) then
+        TFile.Delete(BackupDbFile);
+      Result := True;
+    finally
+      if TFile.Exists(TempDbFile) then
+        TFile.Delete(TempDbFile);
+      if Result and TFile.Exists(BackupDbFile) then
+        TFile.Delete(BackupDbFile);
+    end;
+
+  except
+    on E: EAbort do
+      raise;
+
+    on E: Exception do
+    begin
+      AError := E.Message;
+      Result := False;
+    end;
+  end;
+end;
 
 
 procedure TManagerTTableDM.SetBufferTypes(const ATypes: TList<TDeviceType>);
@@ -711,6 +803,8 @@ var
   RepoWriteAccess: Boolean;
 
   ActiveKey: string;
+  PreviousTypeRepo: TTypeRepository;
+  PreviousDeviceRepo: TDeviceRepository;
 begin
   Ini   := TProjectSettingsIni.Create(FIniFileName, STORAGE_DB_SETTINGS);
   Names := TStringList.Create;
@@ -733,6 +827,11 @@ begin
       DbFile := NormalizeRepositoryDbFileName(Kind, DbFile);
       if Kind <> AKind then
         Continue;
+      if RepositoryNameExists(RepoName) then
+      begin
+        DebugLog(Format('Repository skipped: duplicate name %s', [RepoName]));
+        Continue;
+      end;
 
       {--------------------------------------------------}
       { Параметры репозитория }
@@ -760,26 +859,32 @@ begin
           ''
         );
 
-      {--------------------------------------------------}
-      { Создаём DataModule }
-      {--------------------------------------------------}
-      DM := TTableDM.Create(DbFile);
+      if (not TFile.Exists(DbFile)) or (TFile.GetSize(DbFile) = 0) then
+      begin
+        DebugLog(Format('Repository skipped: %s; database file is missing or empty: %s',
+          [RepoName, DbFile]));
+        Continue;
+      end;
+
+      PreviousTypeRepo := FActiveTypeRepo;
+      PreviousDeviceRepo := FActiveDeviceRepo;
+      DM := nil;
       try
+        DM := TTableDM.Create(DbFile);
         DM.OpenDB;
-
-        {--------------------------------------------------}
-        { Создаём репозиторий }
-        {--------------------------------------------------}
-        Repo := CreateRepository(RepoName, Kind, DM);
-
-        {--------------------------------------------------}
-        { Инициализация общих свойств }
-        {--------------------------------------------------}
+        FDms.Add(RepoName, DM);
+        DM := nil;
+        Repo := CreateRepository(RepoName, Kind, FDms[RepoName]);
         Repo.Init(RepoUUID, RepoWriteAccess, RepoComment);
-
       except
-        DM.Free;
-        raise;
+        on E: Exception do
+        begin
+          DM.Free;
+          RollbackRepositoryRegistration(RepoName, Kind,
+            PreviousTypeRepo, PreviousDeviceRepo);
+          DebugLog(Format('Repository skipped: %s; %s', [RepoName, E.Message]));
+          Continue;
+        end;
       end;
     end;
 
@@ -893,7 +998,7 @@ begin
           if Repo = ActiveDeviceRepo then
           begin
             if Repo.State <> osClean then
-              Repo.Load;
+              TDeviceRepository(Repo).Load;
           end
           else
             { Незагруженный репозиторий не является изменённым:
@@ -966,91 +1071,100 @@ begin
   FActiveDeviceRepo := Result;
 end;
 
-procedure TManagerTTableDM.AddRepository(
-  const AName: string;
-  AKind: TRepositoryKind;
-  const ADbFile: string
-);
+procedure TManagerTTableDM.RollbackRepositoryRegistration(
+  const AName: string; AKind: TRepositoryKind;
+  const APreviousTypeRepo: TTypeRepository;
+  const APreviousDeviceRepo: TDeviceRepository);
+var
+  Obj: TObject;
+begin
+  if FRepositories.TryGetValue(AName, Obj) then
+  begin
+    case AKind of
+      rkType: FTypeRepositories.Remove(TTypeRepository(Obj));
+      rkDevice: FDeviceRepositories.Remove(TDeviceRepository(Obj));
+    end;
+    FRepositories.Remove(AName);
+  end;
+  FDms.Remove(AName);
+  FActiveTypeRepo := APreviousTypeRepo;
+  FActiveDeviceRepo := APreviousDeviceRepo;
+end;
+
+function TManagerTTableDM.AddRepository(
+  const AName: string; AKind: TRepositoryKind; const ADbFile: string;
+  const AOverwriteExisting: Boolean; out AError: string): Boolean;
 var
   Ini: TCustomIniFile;
   DM: TTableDM;
   Repo: TBaseRepository;
-  RepoName: string;
-  DbFile: string;
-  KindStr: string;
+  RepoName, DbFile, KindStr: string;
+  PreviousTypeRepo: TTypeRepository;
+  PreviousDeviceRepo: TDeviceRepository;
 begin
-  if (AName = '') or (ADbFile = '') then
-    raise Exception.Create('AddRepository: invalid parameters');
-
-  if RepositoryNameExists(AName) then
-    raise Exception.CreateFmt(
-      'Репозиторий с именем "%s" уже существует. Создание отменено.',
-      [AName]
-    );
-
+  Result := False;
+  AError := '';
   RepoName := Trim(AName);
-
-  {--------------------------------------------------}
-  { Файл БД (используем тот, что передали) }
-  {--------------------------------------------------}
-  DbFile := NormalizeRepositoryDbFileName(AKind, ADbFile);
-
-  KindStr := RepositoryKindToString(AKind);
-
-  {--------------------------------------------------}
-  { 1. Сохраняем настройки в ini }
-  {--------------------------------------------------}
-  Ini := TProjectSettingsIni.Create(FIniFileName, STORAGE_DB_SETTINGS);
-  try
-    Ini.WriteString('Repositories', RepoName, DbFile);
-    Ini.WriteString('Repository.' + RepoName, 'Kind', KindStr);
-
-    { базовые параметры репозитория }
-    Ini.WriteString(
-      'Repository.' + RepoName,
-      'UUID',
-      TGUID.NewGuid.ToString
-    );
-    Ini.WriteBool(
-      'Repository.' + RepoName,
-      'WriteAccess',
-      True
-    );
-    Ini.WriteString(
-      'Repository.' + RepoName,
-      'Comment',
-      ''
-    );
-
-    Ini.UpdateFile;
-  finally
-    Ini.Free;
+  if RepoName = '' then
+  begin
+    AError := 'Имя репозитория не может быть пустым';
+    Exit;
   end;
+  if Trim(ADbFile) = '' then
+  begin
+    AError := 'Не указан файл базы данных репозитория';
+    Exit;
+  end;
+  if RepositoryNameExists(RepoName) then
+  begin
+    AError := Format('Репозиторий с именем "%s" уже существует.', [RepoName]);
+    Exit;
+  end;
+  if not PrepareRepositoryDbFile(AKind, ADbFile, AOverwriteExisting,
+    DbFile, AError) then
+    Exit;
 
-  {--------------------------------------------------}
-  { 2. Создаём DataModule и открываем БД }
-  {--------------------------------------------------}
-  DM := TTableDM.Create(DbFile);
+  PreviousTypeRepo := FActiveTypeRepo;
+  PreviousDeviceRepo := FActiveDeviceRepo;
+  DM := nil;
   try
+    DM := TTableDM.Create(DbFile);
     DM.OpenDB;
-
-    { регистрируем DM }
     FDms.Add(RepoName, DM);
+    DM := nil;
+    Repo := CreateRepository(RepoName, AKind, FDms[RepoName]);
+    if (Repo.State <> osClean) and not Repo.Load then
+      raise Exception.Create('Не удалось загрузить репозиторий');
 
-    {--------------------------------------------------}
-    { 3. Создаём репозиторий }
-    {--------------------------------------------------}
-    Repo := CreateRepository(RepoName, AKind, DM);
-
-    {--------------------------------------------------}
-    { 4. Загружаем/инициализируем схему и данные }
-    {--------------------------------------------------}
-    if Repo.State <> osClean then
-      Repo.Load;
-
+    KindStr := RepositoryKindToString(AKind);
+    Ini := TProjectSettingsIni.Create(FIniFileName, STORAGE_DB_SETTINGS);
+    try
+      Ini.WriteString('Repositories', RepoName, DbFile);
+      Ini.WriteString('Repository.' + RepoName, 'Kind', KindStr);
+      Ini.WriteString('Repository.' + RepoName, 'UUID', TGUID.NewGuid.ToString);
+      Ini.WriteBool('Repository.' + RepoName, 'WriteAccess', True);
+      Ini.WriteString('Repository.' + RepoName, 'Comment', '');
+      Ini.UpdateFile;
+    finally
+      Ini.Free;
+    end;
+    Result := True;
   except
-    DM.Free;
-    raise;
+    on E: Exception do
+    begin
+      AError := E.Message;
+      DM.Free;
+      RollbackRepositoryRegistration(RepoName, AKind,
+        PreviousTypeRepo, PreviousDeviceRepo);
+      Ini := TProjectSettingsIni.Create(FIniFileName, STORAGE_DB_SETTINGS);
+      try
+        Ini.DeleteKey('Repositories', RepoName);
+        Ini.EraseSection('Repository.' + RepoName);
+        Ini.UpdateFile;
+      finally
+        Ini.Free;
+      end;
+    end;
   end;
 end;
 

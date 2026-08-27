@@ -15,7 +15,8 @@ uses
   FMX.Menus,
   FMX.ListBox, FMX.Controls.Presentation, FMX.Objects, FMX.Layouts, FMX.Edit,
   FMX.Memo.Types, FMX.ScrollBox, FMX.Memo,
-  FMX.EditBox, FMX.SpinBox, UnitParameter, uProjectSettings, uProtocols;
+  FMX.EditBox, FMX.SpinBox, UnitParameter, uProjectSettings, uProtocols,
+  uAppServices;
 
 type
   TFormMain = class(TForm)
@@ -272,10 +273,13 @@ begin
   Self.WindowState := TWindowState.wsMinimized;
 
   if FFrameMainTable <> nil then
-    FFrameMainTable.SaveLayoutSettingsToWorkTable;
+    FFrameMainTable.PrepareForShutdown;
 
   if FFrameProceed <> nil then
-    FFrameProceed.SavePendingProcessingChanges(Self);
+    FFrameProceed.PrepareForShutdown;
+
+  if Assigned(AppServices) then
+    AppServices.PrepareForShutdown;
 
   DataManager.Save;
 
