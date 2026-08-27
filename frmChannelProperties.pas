@@ -111,6 +111,7 @@ type
     function FormatFlowWorkValue(const AValue: Double): string;
   public
     constructor Create(AOwner: TComponent); override;
+    procedure DetachChannel(AChannel: TChannel);
     procedure LoadFromChannel(AChannel: TChannel);
     procedure UpdateDynamicValues;
     procedure UpdateFlowUnitPresentation;
@@ -630,6 +631,14 @@ begin
     WorkTable.FireEvent(ewtRefresh);
 end;
 
+
+procedure TFrameChannelProperties.DetachChannel(AChannel: TChannel);
+begin
+  if FChannel <> AChannel then
+    Exit;
+
+  LoadFromChannel(nil);
+end;
 
 procedure TFrameChannelProperties.LoadFromChannel(AChannel: TChannel);
 var

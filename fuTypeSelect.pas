@@ -1920,6 +1920,7 @@ var
   Values: TArray<string>;
   DBFileName: string;
   Dlg: TSaveDialog;
+  ErrorText: string;
 begin
   {----------------------------------}
   { Проверки }
@@ -1949,10 +1950,9 @@ begin
 
   if AppServices.DataManager.RepositoryNameExists(RepoName) then
   begin
-    ShowMessage(Format(
-      'Репозиторий с именем "%s" уже существует. Создание отменено.',
-      [RepoName]
-    ));
+    MessageDlg(
+      Format('Репозиторий с именем "%s" уже существует.', [RepoName]),
+      TMsgDlgType.mtWarning, [TMsgDlgBtn.mbOK], 0);
     Exit;
   end;
 
@@ -1972,7 +1972,8 @@ begin
     if not Dlg.Execute then
       Exit;
 
-    DBFileName := Dlg.FileName;
+    { Новая пустая база всегда создаётся непосредственно в локальной папке. }
+    DBFileName := TPath.Combine(Dlg.InitialDir, TPath.GetFileName(Dlg.FileName));
   finally
     Dlg.Free;
   end;
@@ -1980,11 +1981,18 @@ begin
   {----------------------------------}
   { Добавление репозитория }
   {----------------------------------}
-  AppServices.DataManager.AddRepository(
+  if not AppServices.DataManager.AddRepository(
     RepoName,
     rkType,
-    DBFileName
-  );
+    DBFileName,
+    True,
+    ErrorText
+  ) then
+  begin
+    if ErrorText <> '' then
+      MessageDlg(ErrorText, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
+    Exit;
+  end;
 
 
   {----------------------------------}
@@ -1996,8 +2004,9 @@ begin
   FDeviceTypes := AppServices.DataManager.ActiveTypeRepo.Types;
 
   FillComboBoxRepository;
-  BuildTree;
+  ClearCheckedTypes;
   ApplyFilter;
+  RebuildTreeFull;
   UpdateGridTypes;
 end;
 
@@ -2062,6 +2071,9 @@ var
   Dlg: TOpenDialog;
   DbFileName: string;
   RepoName: string;
+  TargetDbFile, ErrorText: string;
+  OverwriteExisting: Boolean;
+  DialogResult: TModalResult;
 begin
   {----------------------------------}
   { Проверка менеджера }
@@ -2104,14 +2116,46 @@ begin
     Exit;
   end;
 
+  if AppServices.DataManager.RepositoryNameExists(RepoName) then
+  begin
+    MessageDlg(
+      Format('Репозиторий с именем "%s" уже существует.', [RepoName]),
+      TMsgDlgType.mtWarning, [TMsgDlgBtn.mbOK], 0);
+    Exit;
+  end;
+
+  TargetDbFile := TPath.Combine(TPath.Combine(
+    ExtractFilePath(ParamStr(0)), 'Settings'), 'Types');
+  TargetDbFile := TPath.Combine(TargetDbFile, TPath.GetFileName(DbFileName));
+  OverwriteExisting := False;
+  if (not SameText(TPath.GetFullPath(DbFileName), TPath.GetFullPath(TargetDbFile))) and
+     TFile.Exists(TargetDbFile) then
+  begin
+    DialogResult := MessageDlg(
+      Format('Локальная база уже существует. Заменить её?' + sLineBreak +
+        'Исходный файл: %s' + sLineBreak + 'Локальный файл: %s',
+        [DbFileName, TargetDbFile]), TMsgDlgType.mtConfirmation,
+      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0);
+    if DialogResult <> mrYes then
+      Exit;
+    OverwriteExisting := True;
+  end;
+
   {----------------------------------}
   { Добавление репозитория }
   {----------------------------------}
-  AppServices.DataManager.AddRepository(
+  if not AppServices.DataManager.AddRepository(
     RepoName,
     rkType,
-    DbFileName
-  );
+    DbFileName,
+    OverwriteExisting,
+    ErrorText
+  ) then
+  begin
+    if ErrorText <> '' then
+      MessageDlg(ErrorText, TMsgDlgType.mtError, [TMsgDlgBtn.mbOK], 0);
+    Exit;
+  end;
 
   {----------------------------------}
   { Обновление связи и UI }
@@ -2123,22 +2167,26 @@ begin
   end;
 
   FillComboBoxRepository;
-  BuildTree;
   ApplyFilter;
+  RebuildTreeFull;
   UpdateGridTypes;
 end;
 
 
 procedure TFormTypeSelect.RebuildTreeFull;
 begin
+  { Полная перестройка применяется при смене репозитория и не сохраняет
+    узлы предыдущего репозитория. }
   TreeViewTypes.BeginUpdate;
   try
+    TreeViewTypes.Selected := nil;
     TreeViewTypes.Clear;
+    BuildTree;
+    if TreeViewTypes.Count > 0 then
+      TreeViewTypes.Selected := TreeViewTypes.Items[0];
   finally
     TreeViewTypes.EndUpdate;
   end;
-
-  BuildTree;
 end;
 
 procedure TFormTypeSelect.miSaveClick(Sender: TObject);
@@ -2822,4 +2870,3 @@ end;
 
 
 end.
-

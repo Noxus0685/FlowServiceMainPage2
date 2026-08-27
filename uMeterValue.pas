@@ -23,6 +23,7 @@ type
   EValueType = (FLOW_TYPE, SUM_TYPE, CONST_TYPE, PARAM_TYPE,
                   ERROR_TYPE, MEAN_TYPE, AGGREGATE_TYPE, AGGREGATEMIN_TYPE);
   EDependenceType = (INDEPENDENT, DEPENDENT);
+  TMeterValueUpdateMode = (mvuImmediate, mvuAllChanged, mvuSameCycle, mvuCommand);
 
   TDimension = record
     Name: string;
@@ -85,6 +86,18 @@ type
     FFactor: Double;
     FDevider: Double;
     FAggregateMeterValues: TObjectList<TMeterValue>;
+    FDependents: TList<TMeterValue>;
+    FAggregateChanged: TDictionary<TMeterValue, Boolean>;
+    FUpdateMode: TMeterValueUpdateMode;
+    FDirty: Boolean;
+    FUpdateVersion: UInt64;
+    FUpdateLevel: Integer;
+    FPendingNotify: Boolean;
+    FValueRate: TMeterValue;
+    FValueBaseMultiplier: TMeterValue;
+    FValueBaseDevider: TMeterValue;
+    FValueCorrection: TMeterValue;
+    FValueEtalon: TMeterValue;
     /// <summary>Stores all configurable signal-stability and target-range criteria for this meter value.</summary>
     FStabilitySettings: TMeterValueStabilitySettings;
     /// <summary>Chronological history of physical-value samples used only by stability analysis.</summary>
@@ -112,6 +125,17 @@ type
     procedure AddSample(const AValue: Double; const ATimeStampMs: Int64); overload;
     function FindDimIndex(const AName: string): Integer;
     function FormatDisplayValue(const AValue: Double): string;
+    procedure SetSource(var AField: TMeterValue; const AValue: TMeterValue);
+    procedure SetValueRate(const AValue: TMeterValue);
+    procedure SetValueBaseMultiplier(const AValue: TMeterValue);
+    procedure SetValueBaseDevider(const AValue: TMeterValue);
+    procedure SetValueCorrection(const AValue: TMeterValue);
+    procedure SetValueEtalon(const AValue: TMeterValue);
+    procedure NotifyDependents;
+    procedure SourceChanged(ASource: TMeterValue);
+    procedure MarkAggregateSourceChanged(ASource: TMeterValue);
+    function AllAggregateSourcesChanged: Boolean;
+    procedure ResetAggregateChanged;
     class constructor CreateClass;
     class destructor DestroyClass;
     procedure ProtocolValueChange(
@@ -140,12 +164,6 @@ type
     DependenceType: EDependenceType;
     UpdateType: EUpdateType;
 
-
-    ValueRate: TMeterValue;
-    ValueBaseMultiplier: TMeterValue;
-    ValueBaseDevider: TMeterValue;
-    ValueCorrection: TMeterValue;
-    ValueEtalon: TMeterValue;
 
 
     HashValueRate: string;
@@ -197,6 +215,12 @@ type
     constructor Create(ACopyFrom: TMeterValue); overload;
     constructor CreateFromHash(const AHash: string);
     destructor Destroy; override;
+        property ValueRate: TMeterValue read FValueRate write SetValueRate;
+    property ValueBaseMultiplier: TMeterValue read FValueBaseMultiplier write SetValueBaseMultiplier;
+    property ValueBaseDevider: TMeterValue read FValueBaseDevider write SetValueBaseDevider;
+    property ValueCorrection: TMeterValue read FValueCorrection write SetValueCorrection;
+    property ValueEtalon: TMeterValue read FValueEtalon write SetValueEtalon;
+
 
     procedure SetCopy(AMeterValue: TMeterValue);
     class function GetNewMeterValue(const AHash: string): TMeterValue; static;
@@ -379,7 +403,17 @@ type
     procedure AddMeterValue(AMeterValue: TMeterValue);
     procedure RemoveMeterValue(AMeterValue: TMeterValue);
     procedure ClearMeterValues;
+    procedure AddDependent(ADependent: TMeterValue);
+    procedure RemoveDependent(ADependent: TMeterValue);
+    procedure MarkDirty;
+    procedure ClearDirty;
+    procedure RequestUpdate;
+    procedure BeginUpdate;
+    procedure EndUpdate;
     property MeterValues: TObjectList<TMeterValue> read FAggregateMeterValues;
+    property UpdateMode: TMeterValueUpdateMode read FUpdateMode write FUpdateMode;
+    property Dirty: Boolean read FDirty;
+    property UpdateVersion: UInt64 read FUpdateVersion;
     class function GetMeterValues: TObjectList<TMeterValue>; static;
     class procedure RebindReferences(const AOldValue, ANewValue: TMeterValue); static;
     class function AnalyzeSingleStabilityWindow(
@@ -543,6 +577,13 @@ begin
   AverValues := TList<Single>.Create;
   Coefs := TList<TCoef>.Create;
   FAggregateMeterValues := TObjectList<TMeterValue>.Create(False);
+  FDependents := TList<TMeterValue>.Create;
+  FAggregateChanged := TDictionary<TMeterValue, Boolean>.Create;
+  FUpdateMode := mvuImmediate;
+  FDirty := False;
+  FUpdateVersion := 0;
+  FUpdateLevel := 0;
+  FPendingNotify := False;
   FSamples := TList<TMeterValueSample>.Create;
   FLastAutomaticStabilitySampleMs := 0;
   FActiveStabilityStartMs := 0;
@@ -585,6 +626,15 @@ end;
 { Frees owned collections and unregisters this instance from global lists. }
 destructor TMeterValue.Destroy;
 begin
+  ValueRate := nil;
+  ValueBaseMultiplier := nil;
+  ValueBaseDevider := nil;
+  ValueCorrection := nil;
+  ValueEtalon := nil;
+  ClearMeterValues;
+  RebindReferences(Self, nil);
+  FDependents.Clear;
+
   Coefs.Free;
   AverValues.Free;
   Values.Free;
@@ -593,6 +643,8 @@ begin
   Dimensions.Free;
   FSampleLock.Free;
   FSamples.Free;
+  FAggregateChanged.Free;
+  FDependents.Free;
   FAggregateMeterValues.Free;
   inherited;
 end;
@@ -624,6 +676,156 @@ begin
   for C in AMeterValue.Coefs do Coefs.Add(C);
   FStabilitySettings := AMeterValue.FStabilitySettings;
   ClearSamplesHistory;
+end;
+
+
+
+procedure TMeterValue.SetSource(var AField: TMeterValue; const AValue: TMeterValue);
+begin
+  if AValue = Self then
+    Exit;
+  if AField = AValue then
+    Exit;
+  if AField <> nil then
+    AField.RemoveDependent(Self);
+  AField := AValue;
+  if AField <> nil then
+    AField.AddDependent(Self);
+end;
+
+procedure TMeterValue.SetValueRate(const AValue: TMeterValue);
+begin
+  SetSource(FValueRate, AValue);
+end;
+
+procedure TMeterValue.SetValueBaseMultiplier(const AValue: TMeterValue);
+begin
+  SetSource(FValueBaseMultiplier, AValue);
+end;
+
+procedure TMeterValue.SetValueBaseDevider(const AValue: TMeterValue);
+begin
+  SetSource(FValueBaseDevider, AValue);
+end;
+
+procedure TMeterValue.SetValueCorrection(const AValue: TMeterValue);
+begin
+  SetSource(FValueCorrection, AValue);
+end;
+
+procedure TMeterValue.SetValueEtalon(const AValue: TMeterValue);
+begin
+  SetSource(FValueEtalon, AValue);
+end;
+
+procedure TMeterValue.AddDependent(ADependent: TMeterValue);
+begin
+  if (ADependent = nil) or (ADependent = Self) then
+    Exit;
+  if FDependents.IndexOf(ADependent) < 0 then
+    FDependents.Add(ADependent);
+end;
+
+procedure TMeterValue.RemoveDependent(ADependent: TMeterValue);
+begin
+  if ADependent <> nil then
+    FDependents.Remove(ADependent);
+end;
+
+procedure TMeterValue.NotifyDependents;
+var
+  Dependent: TMeterValue;
+begin
+  if FUpdateLevel > 0 then
+  begin
+    FPendingNotify := True;
+    Exit;
+  end;
+  Inc(FUpdateVersion);
+  for Dependent in FDependents.ToArray do
+    if Dependent <> nil then
+      Dependent.SourceChanged(Self);
+end;
+
+procedure TMeterValue.SourceChanged(ASource: TMeterValue);
+begin
+  case FUpdateMode of
+    mvuImmediate:
+      MarkDirty;
+    mvuAllChanged:
+      MarkAggregateSourceChanged(ASource);
+    mvuSameCycle:
+      ; // Будет активирован после введения общего CycleId.
+    mvuCommand:
+      ;
+  end;
+end;
+
+procedure TMeterValue.MarkAggregateSourceChanged(ASource: TMeterValue);
+begin
+  if (ASource = nil) or not FAggregateChanged.ContainsKey(ASource) then
+    Exit;
+  FAggregateChanged.AddOrSetValue(ASource, True);
+  if AllAggregateSourcesChanged then
+  begin
+    MarkDirty;
+    ResetAggregateChanged;
+  end;
+end;
+
+function TMeterValue.AllAggregateSourcesChanged: Boolean;
+var
+  Source: TMeterValue;
+  Changed: Boolean;
+begin
+  Result := FAggregateMeterValues.Count > 0;
+  if not Result then
+    Exit;
+  for Source in FAggregateMeterValues do
+  begin
+    if not FAggregateChanged.TryGetValue(Source, Changed) or not Changed then
+      Exit(False);
+  end;
+end;
+
+procedure TMeterValue.ResetAggregateChanged;
+var
+  Source: TMeterValue;
+begin
+  for Source in FAggregateMeterValues do
+    FAggregateChanged.AddOrSetValue(Source, False);
+end;
+
+procedure TMeterValue.MarkDirty;
+begin
+  FDirty := True;
+end;
+
+procedure TMeterValue.ClearDirty;
+begin
+  FDirty := False;
+end;
+
+procedure TMeterValue.RequestUpdate;
+begin
+  MarkDirty;
+end;
+
+procedure TMeterValue.BeginUpdate;
+begin
+  Inc(FUpdateLevel);
+end;
+
+procedure TMeterValue.EndUpdate;
+begin
+  if FUpdateLevel = 0 then
+    Exit;
+  Dec(FUpdateLevel);
+  if (FUpdateLevel = 0) and FPendingNotify then
+  begin
+    FPendingNotify := False;
+    NotifyDependents;
+  end;
 end;
 
 
@@ -2559,16 +2761,24 @@ begin
   end;
 end;
 
-function TMeterValue.GetStrNum(AValue: Double; const ADim: integer): string;
+function TMeterValue.GetStrNum(AValue: Double;
+  const ADim: Integer): string;
 var
   TempValue: Double;
+  TempType: EValueType;
 begin
   TempValue := Value;
+  TempType := ValueType;
+
+  { Переданное значение форматируется как константа, чтобы агрегатный
+    TMeterValue не пересчитал и не заменил его своим текущим значением. }
   Value := AValue;
+  ValueType := CONST_TYPE;
   try
     Result := GetStringValue(ADim);
   finally
     Value := TempValue;
+    ValueType := TempType;
   end;
 end;
 
@@ -2781,7 +2991,10 @@ begin
         if (MeterValue = nil) or (MeterValue = Self) or
            (TMeterValue.GetMeterValues.IndexOf(MeterValue) < 0) then
         begin
-          FAggregateMeterValues.Delete(I);
+          if MeterValue = nil then
+            FAggregateMeterValues.Delete(I)
+          else
+            RemoveMeterValue(MeterValue);
           Continue;
         end;
 
@@ -2899,7 +3112,11 @@ begin
   if (AMeterValue = nil) or (AMeterValue = Self) then
     Exit;
   if FAggregateMeterValues.IndexOf(AMeterValue) < 0 then
+  begin
     FAggregateMeterValues.Add(AMeterValue);
+    FAggregateChanged.AddOrSetValue(AMeterValue, False);
+    AMeterValue.AddDependent(Self);
+  end;
 end;
 
 { Removes a meter value from the aggregate source list. }
@@ -2907,12 +3124,20 @@ procedure TMeterValue.RemoveMeterValue(AMeterValue: TMeterValue);
 begin
   if AMeterValue = nil then
     Exit;
+  AMeterValue.RemoveDependent(Self);
+  FAggregateChanged.Remove(AMeterValue);
   FAggregateMeterValues.Remove(AMeterValue);
 end;
 
 { Clears all aggregate source meter values. }
 procedure TMeterValue.ClearMeterValues;
+var
+  MeterValue: TMeterValue;
 begin
+  for MeterValue in FAggregateMeterValues do
+    if MeterValue <> nil then
+      MeterValue.RemoveDependent(Self);
+  FAggregateChanged.Clear;
   FAggregateMeterValues.Clear;
 end;
 
@@ -2952,6 +3177,9 @@ begin
     PreviousValue,
     Value
   );
+
+  if not SameValue(PreviousValue, Value, EPS) then
+    NotifyDependents;
 
 end;
 
@@ -4698,12 +4926,9 @@ begin
       if MV.MeterValues[I] <> AOldValue then
         Continue;
 
-      if ANewValue = nil then
-        MV.MeterValues.Delete(I)
-      else if MV.MeterValues.IndexOf(ANewValue) < 0 then
-        MV.MeterValues[I] := ANewValue
-      else
-        MV.MeterValues.Delete(I);
+      MV.RemoveMeterValue(AOldValue);
+      if ANewValue <> nil then
+        MV.AddMeterValue(ANewValue);
     end;
   end;
 

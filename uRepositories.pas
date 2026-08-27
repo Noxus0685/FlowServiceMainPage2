@@ -78,8 +78,6 @@ type
 
     function Save: Boolean; virtual; abstract;
     function Load: Boolean; virtual; abstract;
-    procedure EnsureSchema; virtual; abstract;
-    procedure AssertSchema; virtual; abstract;
 
     function GetDMFileName:string;
     function CategoryToText(ACategory: Integer; const ACategoryName: string): string;

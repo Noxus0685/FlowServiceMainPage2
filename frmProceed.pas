@@ -61,6 +61,9 @@ uses
 const
   C_RESULTS_POINT_COLUMN_COUNT = 20;
 
+{ Returns the user-visible work-table title without changing its internal identity. }
+function WorkTableDisplayName(AWorkTable: TWorkTable): string;
+
 type
   // Направление сортировки таблицы обработки.
   TGridSortDirection = (gsdNone, gsdAscending, gsdDescending);
@@ -426,7 +429,6 @@ type
     procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
     procedure ApplyGridColumnsLayout(AGrid: TGrid;
       const AColumns: TArray<TGridColumnLayout>);
-    procedure SaveLayoutSettingsToWorkTable;
     procedure GridDataPointsColumnMoved(Column: TColumn; FromIndex,
       ToIndex: Integer);
     procedure btnOKClick(Sender: TObject);
@@ -458,6 +460,7 @@ type
     FReportExportInProgress: Boolean;
     FReportExportOperationId: Int64;
     FReportExportButtonText: string;
+    FShuttingDown: Boolean;
     FSelectedReportTemplateFileName: string;
     FSelectedReportTemplateDeviceUUID: string;
     FCurrentReportTemplateFileName: string;
@@ -514,8 +517,12 @@ type
 
   public
     { Public declarations }
+    { Saves pending frame state while external managers are still alive. }
+    procedure PrepareForShutdown;
+    procedure SaveLayoutSettingsToWorkTable;
     procedure Initialize;
     procedure RefreshResultsTab;
+    procedure RefreshWorkTableDisplayName(AWorkTable: TWorkTable);
     function RequestClearActiveSession(ADevice: TDevice): Boolean;
     function RequestCreateSession(ADevice: TDevice): TSessionSpillage;
     function RequestClearActiveSessions: Boolean;
@@ -553,6 +560,18 @@ const
   CManualProcessingDevicesSection = 'ManualProcessingDevices';
   CVolumeFlowUnits: array[0..4] of string = ('л/с','л/мин','л/ч','м3/мин','м3/ч');
   CMassFlowUnits: array[0..4] of string = ('кг/с','кг/мин','кг/ч','т/мин','т/ч');
+
+function WorkTableDisplayName(AWorkTable: TWorkTable): string;
+begin
+  Result := '';
+
+  if AWorkTable = nil then
+    Exit;
+
+  Result := Trim(AWorkTable.Text);
+  if Result = '' then
+    Result := Trim(AWorkTable.Name);
+end;
 
 function IsVolumeFlowUnit(const AUnit: string): Boolean;
 var
@@ -607,8 +626,11 @@ end;
 
 destructor TFrameProceed.Destroy;
 begin
-  // Сохраняем порядок и видимость функциональных столбцов перед закрытием формы.
-  SaveLayoutSettingsToWorkTable;
+  FShuttingDown := True;
+  FActiveWorkTable := nil;
+  FWorkTableManager := nil;
+
+  { External managers may already be destroyed, so the frame destructor only clears references. }
   if Assigned(AppServices) then
     AppServices.OnBeforeShutdown := nil;
   Inc(FReportExportOperationId);
@@ -637,6 +659,15 @@ begin
   FreeAndNil(FChartLineColors);
   FreeAndNil(FChartDeviceVisibility);
   inherited;
+end;
+
+procedure TFrameProceed.PrepareForShutdown;
+begin
+  if FShuttingDown then
+    Exit;
+
+  SaveLayoutSettingsToWorkTable;
+  SavePendingProcessingChanges(Self);
 end;
 
 procedure TFrameProceed.Initialize;
@@ -1718,6 +1749,13 @@ var
   DataPointsColumns: TArray<TGridColumnLayout>;
   ResultsColumns: TArray<TGridColumnLayout>;
 begin
+  if FShuttingDown then
+    Exit;
+  if csDestroying in ComponentState then
+    Exit;
+  if FWorkTableManager = nil then
+    Exit;
+
   // Keep the existing WorkTable/INI storage; resolve the active table at save
   // time so a tab switch cannot write the layout into the previous table.
   WorkTable := ResolveManagerWorkTable(FWorkTableManager);
@@ -3209,6 +3247,8 @@ var
   Item: TMenuItem;
   NewVisible: Boolean;
 begin
+  if FShuttingDown or (csDestroying in ComponentState) then
+    Exit;
   if not (Sender is TMenuItem) then
     Exit;
 
@@ -3449,8 +3489,9 @@ begin
             Continue;
 
           RootTable := TTreeViewItem.Create(TreeViewDevices);
-          RootTable.Text := WT.Name;
+          RootTable.Text := WorkTableDisplayName(WT);
           RootTable.TagObject := WT;
+          RootTable.TagString := 'WT|' + WT.UUID;
           TreeViewDevices.AddObject(RootTable);
 
           TableDeviceUUIDs := TStringList.Create;
@@ -3508,6 +3549,19 @@ begin
   end;
   UpdateActionHints;
 end;
+
+procedure TFrameProceed.RefreshWorkTableDisplayName(AWorkTable: TWorkTable);
+var
+  Item: TTreeViewItem;
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  Item := FindTreeItemByTagObject(AWorkTable);
+  if Item <> nil then
+    Item.Text := WorkTableDisplayName(AWorkTable);
+end;
+
 function TFrameProceed.GetStatusColor(const AStatus: Integer): TAlphaColor;
 begin
   case AStatus of
@@ -5582,6 +5636,8 @@ var
   Item: TMenuItem;
   I: Integer;
 begin
+  if FShuttingDown or (csDestroying in ComponentState) then
+    Exit;
   if not (Sender is TMenuItem) then
     Exit;
   Item := TMenuItem(Sender);
@@ -5601,6 +5657,8 @@ end;
 procedure TFrameProceed.GridColumnsResetClick(Sender: TObject);
 var Grid: TGrid; I: Integer;
 begin
+  if FShuttingDown or (csDestroying in ComponentState) then
+    Exit;
   if GridResults.Visible then Grid := GridResults else Grid := GridDataPoints;
   for I := 0 to Grid.ColumnCount - 1 do
   begin
@@ -6634,8 +6692,9 @@ end;
 procedure TFrameProceed.ActionDeleteWorkTableExecute(Sender: TObject);
 var
   WorkTable: TWorkTable;
-  WorkTableName: string;
-  ObserverHost: IWorkTableObserverHost;
+  InternalWorkTableName: string;
+  DisplayWorkTableName: string;
+  WorkTableUUID: string;
 begin
   if not IsSelectedTreeWorkTable(WorkTable) then
     Exit;
@@ -6643,22 +6702,27 @@ begin
   if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
     Exit;
 
-  WorkTableName := Trim(WorkTable.Name);
-  if WorkTableName = '' then
-    WorkTableName := Trim(WorkTable.Text);
+  InternalWorkTableName := Trim(WorkTable.Name);
+  DisplayWorkTableName := WorkTableDisplayName(WorkTable);
+  WorkTableUUID := Trim(WorkTable.UUID);
 
-  if WorkTableName = '' then
+  if (DisplayWorkTableName = '') or (WorkTableUUID = '') then
     Exit;
 
   if MessageDlg(Format('Удалить рабочий стол "%s"?'#13#10 +
-      'Все связанные данные этого рабочего стола будут удалены.', [WorkTableName]),
+      'Все связанные данные этого рабочего стола будут удалены.', [DisplayWorkTableName]),
       TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
     Exit;
 
   if TreeViewDevices <> nil then
     TreeViewDevices.Selected := nil;
 
-  if FWorkTableManager.DeleteWorkTableByName(WorkTableName) then
+  ProtocolManager.AddMessage(pcAction, psForm, 'DeleteProcessingWorkTable',
+    'Удаление рабочего стола из раздела обработки',
+    Format('WorkTableName=%s; WorkTableText=%s; WorkTableUUID=%s',
+      [InternalWorkTableName, WorkTable.Text, WorkTableUUID]));
+
+  if FWorkTableManager.DeleteWorkTableByUUID(WorkTableUUID) then
     RefreshAfterWorkTableDeletion;
 
 end;
@@ -8040,6 +8104,8 @@ end;
 procedure TFrameProceed.GridDataPointsColumnMoved(Column: TColumn; FromIndex,
   ToIndex: Integer);
 begin
+  if FShuttingDown or (csDestroying in ComponentState) then
+    Exit;
   { FMX может вызывать OnColumnMoved не только после завершённого
     перемещения. Не сохраняем *.fpp синхронно из этого события.
     Текущая раскладка будет сохранена при закрытии формы. }
@@ -8048,6 +8114,8 @@ end;
 procedure TFrameProceed.GridColumnLayoutMouseUp(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 begin
+  if FShuttingDown or (csDestroying in ComponentState) then
+    Exit;
   { Обычный MouseUp в гриде не изменяет раскладку столбцов и не должен
     запускать синхронное сохранение настроек рабочего стола. }
 end;

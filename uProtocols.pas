@@ -726,7 +726,6 @@ end;
 procedure TProtocolManager.SaveSettings(const AFileName: string);
 var Ini: TCustomIniFile;
 begin
-  {
   if FShuttingDown or (Trim(AFileName) = '') then Exit;
   Ini := TProjectSettingsIni.Create(AFileName, STORAGE_TABLE_SETTINGS);
   try
@@ -734,7 +733,8 @@ begin
     Ini.WriteInteger('Protocol', 'LogEnabled', Ord(LogEnabled));
     Ini.WriteInteger('Protocol', 'SampleChartEnabled', Ord(SampleChartEnabled));
     Ini.WriteInteger('Protocol', 'StatisticsEnabled', Ord(StatisticsEnabled));
-  finally Ini.Free; end;   }
+    Ini.UpdateFile;
+  finally Ini.Free; end;
 end;
 
 procedure TProtocolManager.Pause;
