@@ -327,6 +327,7 @@ type
     procedure GridPointsMenuPasteClick(Sender: TObject);
     procedure GridPointsMenuCutClick(Sender: TObject);
     procedure SyncGridPointsHeaderPopupMenu;
+    procedure FormShow(Sender: TObject);
 
 
   private
@@ -434,7 +435,7 @@ var
 
 implementation
  uses
-  uAppServices;
+  uAppServices, uFmxProject, fuMain;
 
 {$R *.fmx}
 
@@ -2224,6 +2225,16 @@ begin
     Key := 0;
     KeyChar := #0;
   end;
+end;
+
+procedure TFormDeviceEditor.FormShow(Sender: TObject);
+var i:integer;
+begin
+  if not Assigned(Project) then Exit;
+  //Заполняем список библиотек из DIGITAL_LIBRARIES
+  cbLibrares.Clear;
+  for i:=1 to Project.FP_DIGITAL_LIBRARIES_COUNT do
+    cbLibrares.Items.Add(Project.DIGITAL_LIBRARIES.Plugin[i-1].ShortName);
 end;
 
 procedure TFormDeviceEditor.GridPointsHeaderClick(Column: TColumn);

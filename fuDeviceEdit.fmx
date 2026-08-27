@@ -9,6 +9,7 @@ object FormDeviceEditor: TFormDeviceEditor
   FormFactor.Devices = [Desktop]
   OnClose = FormClose
   OnCloseQuery = FormCloseQuery
+  OnShow = FormShow
   DesignerMasterStyle = 0
   object layLeft: TLayout
     Align = Left
@@ -861,7 +862,7 @@ object FormDeviceEditor: TFormDeviceEditor
       Size.Width = 343.000000000000000000
       Size.Height = 176.000000000000000000
       Size.PlatformDefault = False
-      TabIndex = 2
+      TabIndex = 3
       TabOrder = 42
       TabPosition = None
       Sizes = (
@@ -1210,7 +1211,7 @@ object FormDeviceEditor: TFormDeviceEditor
           item
           end>
         TextSettings.Trimming = None
-        IsSelected = True
+        IsSelected = False
         Size.Width = 8.000000000000000000
         Size.Height = 8.000000000000000000
         Size.PlatformDefault = False
@@ -1359,7 +1360,7 @@ object FormDeviceEditor: TFormDeviceEditor
           item
           end>
         TextSettings.Trimming = None
-        IsSelected = False
+        IsSelected = True
         Size.Width = 8.000000000000000000
         Size.Height = 8.000000000000000000
         Size.PlatformDefault = False
@@ -2570,8 +2571,8 @@ object FormDeviceEditor: TFormDeviceEditor
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 909.000000000000000000
-      Viewport.Height = 50.000000000000000000
+      Viewport.Width = 905.000000000000000000
+      Viewport.Height = 46.000000000000000000
     end
     object DeepSeek: TSpeedButton
       Position.X = 872.000000000000000000
