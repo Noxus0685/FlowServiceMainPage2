@@ -1600,6 +1600,7 @@ object FormDeviceEditor: TFormDeviceEditor
               Size.Height = 22.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 1
+              OnChange = cbInputTypeChange
             end
           end
           object Layout13: TLayout

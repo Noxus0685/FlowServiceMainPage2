@@ -372,8 +372,10 @@ type
     { ДОПОЛНИТЕЛЬНО ДЛЯ СЧЁТЧИКОВ }
     {====================================================================}
 
-    VolumeBefore: Double;        // Показания до измерения
-    VolumeAfter: Double;         // Показания после измерения
+    ValueBefore: Double;        // Показания до измерения
+    ValueAfter: Double;         // Показания после измерения
+    PhotoBeforePath: string;    // Относительный путь к снимку до измерения
+    PhotoAfterPath: string;     // Относительный путь к снимку после измерения
 
     {====================================================================}
     { СЫРЫЕ ДАННЫЕ ИЗМЕРЕНИЯ }
@@ -1747,8 +1749,10 @@ begin
   QCV := 0.0;
 
   { Счётчики }
-  VolumeBefore := 0.0;
-  VolumeAfter := 0.0;
+  ValueBefore := 0.0;
+  ValueAfter := 0.0;
+  PhotoBeforePath := '';
+  PhotoAfterPath := '';
 
   { Сырые данные }
   PulseCount := 0.0;
@@ -2246,8 +2250,10 @@ begin
       Add(BoolToStr(S.Valid, True));
       Add(FloatToStr(S.QStd));
       Add(FloatToStr(S.QCV));
-      Add(FloatToStr(S.VolumeBefore));
-      Add(FloatToStr(S.VolumeAfter));
+      Add(FloatToStr(S.ValueBefore));
+      Add(FloatToStr(S.ValueAfter));
+      Add(S.PhotoBeforePath);
+      Add(S.PhotoAfterPath);
       Add(FloatToStr(S.PulseCount));
       Add(FloatToStr(S.MeanFrequency));
       Add(FloatToStr(S.AvgCurrent));
@@ -2709,8 +2715,10 @@ begin
   {====================================================================}
   { ДОПОЛНИТЕЛЬНО ДЛЯ СЧЁТЧИКОВ }
   {====================================================================}
-  VolumeBefore := ASource.VolumeBefore;
-  VolumeAfter := ASource.VolumeAfter;
+  ValueBefore := ASource.ValueBefore;
+  ValueAfter := ASource.ValueAfter;
+  PhotoBeforePath := ASource.PhotoBeforePath;
+  PhotoAfterPath := ASource.PhotoAfterPath;
 
   {====================================================================}
   { СЫРЫЕ ДАННЫЕ ИЗМЕРЕНИЯ }
@@ -3218,6 +3226,7 @@ begin
   Units := AType.Units;
   SetDimensions;
   OutputType := AType.OutputType;
+  InputType := AType.InputType;
   OutputSet := AType.OutputSet;
   DimensionCoef := AType.DimensionCoef;
   SpillageStop := AType.SpillageStop;
@@ -3406,7 +3415,5 @@ begin
 end;
 
 end.
-
-
 
 

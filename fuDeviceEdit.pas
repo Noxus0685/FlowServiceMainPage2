@@ -291,6 +291,7 @@ type
     procedure EditVoltageQminExit(Sender: TObject);
     procedure cbCurrentRangeChange(Sender: TObject);
     procedure cbOutPutType2Change(Sender: TObject);
+    procedure cbInputTypeChange(Sender: TObject);
     procedure cbCoefViewTypeChange(Sender: TObject);
     procedure EditCoefExit(Sender: TObject);
     procedure cbOutPutTypeChange(Sender: TObject);
@@ -3036,6 +3037,19 @@ begin
   SetModified;
 end;
 
+procedure TFormDeviceEditor.cbInputTypeChange(Sender: TObject);
+begin
+  if FLoading or (FDevice = nil) or (cbInputType.ItemIndex < 0) then
+    Exit;
+
+  if FDevice.InputType = cbInputType.ItemIndex then
+    Exit;
+
+  FDevice.InputType := cbInputType.ItemIndex;
+  cbInputType.Hint := cbInputType.Text;
+  SetModified;
+end;
+
 procedure TFormDeviceEditor.cbOutPutTypeChange(Sender: TObject);
 var
   V: Integer;
@@ -4478,6 +4492,11 @@ begin
     edtSerialNumberExit(edtSerialNumber)
   else if mmoComment.IsFocused then
     mmoCommentExit(mmoComment);
+
+  { ComboBox changes must also be captured when OK is pressed immediately
+    after selecting an item. }
+  if cbInputType.ItemIndex >= 0 then
+    FDevice.InputType := cbInputType.ItemIndex;
 end;
 
 

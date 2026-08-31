@@ -44,6 +44,7 @@ uses
   frmMeasurementRun,
   frmMRResults,
   frmProceed,
+  frmPhotoReading,
   frmProtocol,
   fuDeviceEdit,
   fuDeviceSelect,
@@ -77,9 +78,77 @@ uses
   uGraphsViewConfig,
   uWorkTable;
 
+const
+  CValueEditButtonWidth = 24;
+  CTestPhotoReadingFile =
+    'C:\Projects\FlowSericeX\FlowServiceWorkspace\FMXFP\FlowPlantFMX\' +
+    'Win32\Debug\DATA\Projects\' +
+    'misc-fbi-computer-hacker-wallpaper-9910681d914a8d4b36f768ffa0e176cd.jpg';
+
+{ Рисует кнопку фотофиксации одинаково в ячейке и активном редакторе. }
+procedure DrawValueEditButton(const ACanvas: TCanvas; const ARect: TRectF;
+  const APressed: Boolean);
 
 
 type
+  TGetGridButtonVisibleEvent = procedure(Sender: TObject; const ACol,
+    ARow: Integer; var AVisible: Boolean) of object;
+  TValueButtonClickEvent = procedure(Sender: TObject; const ACol,
+    ARow: Integer; const AText: string) of object;
+
+  TValueEditColumn = class;
+
+  { Нестилизованная кнопка редактора, совпадающая с кнопкой нарисованной ячейки. }
+  TValueEditButton = class(TEditButton)
+  private
+    FPressed: Boolean;
+  protected
+    procedure MouseDown(Button: TMouseButton; Shift: TShiftState;
+      X, Y: Single); override;
+    procedure MouseUp(Button: TMouseButton; Shift: TShiftState;
+      X, Y: Single); override;
+    procedure Paint; override;
+  end;
+
+  { Составной редактор с фиксированной кнопкой слева. }
+  TValueEditCellEditor = class(TEdit)
+  private
+    FPhotoButton: TValueEditButton;
+    FColumn: TValueEditColumn;
+    FCol: Integer;
+    FRow: Integer;
+    procedure ButtonClick(Sender: TObject);
+  public
+    constructor Create(AOwner: TComponent); override;
+    procedure Initialize(AColumn: TValueEditColumn; const ACol, ARow: Integer;
+      const AText: string; const AShowButton: Boolean);
+  end;
+
+  { Редактируемый столбец с дополнительной кнопкой слева. }
+  TValueEditColumn = class(TStringColumn)
+  private
+    FButtonText: string;
+    FButtonWidth: Single;
+    FOnGetButtonVisible: TGetGridButtonVisibleEvent;
+    FOnButtonClick: TValueButtonClickEvent;
+  public
+    constructor Create(AOwner: TComponent); override;
+    function ButtonVisible(const ACol, ARow: Integer): Boolean;
+    function CreateEditor(const ACol, ARow: Integer;
+      const AText: string): TValueEditCellEditor;
+    procedure ClickButton(const ACol, ARow: Integer; const AText: string);
+    procedure DrawButtonCell(const Canvas: TCanvas; const Bounds: TRectF;
+      const ACol, ARow: Integer; const AText: string;
+      const ABackground: TAlphaColor);
+  published
+    property ButtonText: string read FButtonText write FButtonText;
+    property ButtonWidth: Single read FButtonWidth write FButtonWidth;
+    property OnGetButtonVisible: TGetGridButtonVisibleEvent
+      read FOnGetButtonVisible write FOnGetButtonVisible;
+    property OnButtonClick: TValueButtonClickEvent
+      read FOnButtonClick write FOnButtonClick;
+  end;
+
   TRowData = record
     Enabled: Boolean;
     ChannelName: string;
@@ -416,8 +485,8 @@ type
     StringColumnEtalonRawValue1: TStringColumn;
     StringColumnDeviceRawValue1: TStringColumn;
     StringColumnEtalonPressureDelta1: TStringColumn;
-    StringColumnDeviceQuantityBefore1: TStringColumn;
-    StringColumnDeviceQuantityAfter1: TStringColumn;
+    StringColumnDeviceQuantityBefore1: TValueEditColumn;
+    StringColumnDeviceQuantityAfter1: TValueEditColumn;
     StringColumnDevicePressureDelta1: TStringColumn;
     PopupMenuDevicesGrid: TPopupMenu;
     MenuItemDevicesWorkTablesGroup: TMenuItem;
@@ -656,9 +725,19 @@ type
     procedure GridDevicesDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
       const Column: TColumn; const Bounds: TRectF; const Row: Integer;
       const Value: TValue; const State: TGridDrawStates);
+    procedure GridDevicesCreateCustomEditor(Sender: TObject;
+      const Column: TColumn; var Control: TStyledControl);
     procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
+    procedure DeviceReadingButtonVisible(Sender: TObject; const ACol,
+      ARow: Integer; var AVisible: Boolean);
+    procedure DeviceReadingButtonClick(Sender: TObject; const ACol,
+      ARow: Integer; const AText: string);
+    procedure BeginDeviceReadingEdit(const ACol, ARow: Integer);
+    function ResolveReadingPhotoPath(const AStoredPath: string): string;
+    function StorePendingReadingPhoto(const ASourcePath,
+      APreviousStoredPath: string): string;
     procedure GridDevicesEnter(Sender: TObject);
     procedure GridEtalonsEnter(Sender: TObject);
     procedure ActivateMeasurementGrid(AGrid: TGrid);
@@ -1218,7 +1297,192 @@ const
   CProcessingDevicesItemKeyPrefix = 'Item';
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
 
+function IsVisualInputChannel(AWorkTable: TWorkTable; const ARow,
+  AInputType: Integer): Boolean;
+var
+  Device: TDevice;
+begin
+  Result := False;
+  if (AWorkTable = nil) or (ARow < 0) or
+     (ARow >= AWorkTable.DeviceChannels.Count) or
+     (AWorkTable.DeviceChannels[ARow] = nil) or
+     (AWorkTable.DeviceChannels[ARow].FlowMeter = nil) then
+    Exit;
+
+  Device := AWorkTable.DeviceChannels[ARow].FlowMeter.Device;
+  Result := (Device <> nil) and
+    (Device.OutputType = Ord(otVisual)) and
+    (Device.InputType = AInputType);
+end;
+
+function IsDeviceReadingColumn(const AColumn: TColumn): Boolean;
+begin
+  Result := (AColumn <> nil) and
+    ((AColumn.Name = 'StringColumnDeviceQuantityBefore1') or
+     (AColumn.Name = 'StringColumnDeviceQuantityAfter1'));
+end;
+
 {$R *.fmx}
+
+procedure DrawValueEditButton(const ACanvas: TCanvas; const ARect: TRectF;
+  const APressed: Boolean);
+var
+  State: TCanvasSaveState;
+begin
+  State := ACanvas.SaveState;
+  try
+    ACanvas.Fill.Kind := TBrushKind.Solid;
+    if APressed then
+      ACanvas.Fill.Color := $FFC8C8C8
+    else
+      ACanvas.Fill.Color := $FFE0E0E0;
+    ACanvas.FillRect(ARect, 0, 0, [], 1);
+    ACanvas.Stroke.Kind := TBrushKind.Solid;
+    ACanvas.Stroke.Color := $FF808080;
+    ACanvas.Stroke.Thickness := 1;
+    ACanvas.DrawRect(ARect, 0, 0, [], 1);
+    ACanvas.Fill.Color := TAlphaColors.Black;
+    ACanvas.Font.Size := 12;
+    ACanvas.FillText(ARect, '...', False, 1, [], TTextAlign.Center,
+      TTextAlign.Center);
+  finally
+    ACanvas.RestoreState(State);
+  end;
+end;
+
+{ TValueEditButton }
+
+procedure TValueEditButton.Paint;
+begin
+  DrawValueEditButton(Canvas, LocalRect, FPressed);
+end;
+
+procedure TValueEditButton.MouseDown(Button: TMouseButton; Shift: TShiftState;
+  X, Y: Single);
+begin
+  if Button = TMouseButton.mbLeft then
+  begin
+    FPressed := True;
+    Repaint;
+  end;
+  inherited;
+end;
+
+procedure TValueEditButton.MouseUp(Button: TMouseButton; Shift: TShiftState;
+  X, Y: Single);
+begin
+  if Button = TMouseButton.mbLeft then
+  begin
+    FPressed := False;
+    Repaint;
+  end;
+  inherited;
+end;
+
+{ TValueEditColumn }
+
+constructor TValueEditColumn.Create(AOwner: TComponent);
+begin
+  inherited;
+  ReadOnly := False;
+  FButtonText := '...';
+  FButtonWidth := CValueEditButtonWidth;
+end;
+
+function TValueEditColumn.ButtonVisible(const ACol, ARow: Integer): Boolean;
+begin
+  Result := True;
+  if Assigned(FOnGetButtonVisible) then
+    FOnGetButtonVisible(Self, ACol, ARow, Result);
+end;
+
+procedure TValueEditColumn.ClickButton(const ACol, ARow: Integer;
+  const AText: string);
+begin
+  if Assigned(FOnButtonClick) then
+    FOnButtonClick(Self, ACol, ARow, AText);
+end;
+
+function TValueEditColumn.CreateEditor(const ACol, ARow: Integer;
+  const AText: string): TValueEditCellEditor;
+begin
+  Result := TValueEditCellEditor.Create(nil);
+  Result.Initialize(Self, ACol, ARow, AText, ButtonVisible(ACol, ARow));
+end;
+
+procedure TValueEditColumn.DrawButtonCell(const Canvas: TCanvas;
+  const Bounds: TRectF; const ACol, ARow: Integer; const AText: string;
+  const ABackground: TAlphaColor);
+var
+  ButtonBounds: TRectF;
+begin
+  Canvas.Fill.Kind := TBrushKind.Solid;
+  Canvas.Fill.Color := ABackground;
+  Canvas.FillRect(Bounds, 0, 0, [], 1);
+  if ButtonVisible(ACol, ARow) then
+  begin
+    ButtonBounds := RectF(Bounds.Left, Bounds.Top,
+      Bounds.Left + FButtonWidth, Bounds.Bottom);
+    DrawValueEditButton(Canvas, ButtonBounds, False);
+    Canvas.Fill.Color := TAlphaColors.Black;
+    Canvas.FillText(RectF(ButtonBounds.Right, Bounds.Top, Bounds.Right,
+      Bounds.Bottom), AText, False, 1, [], TTextAlign.Leading,
+      TTextAlign.Center);
+  end
+  else
+  begin
+    Canvas.Fill.Color := TAlphaColors.Black;
+    Canvas.FillText(RectF(Bounds.Left + 4, Bounds.Top, Bounds.Right,
+      Bounds.Bottom), AText, False, 1, [], TTextAlign.Leading,
+      TTextAlign.Center);
+  end;
+end;
+
+{ TValueEditCellEditor }
+
+constructor TValueEditCellEditor.Create(AOwner: TComponent);
+begin
+  inherited;
+  Enabled := True;
+  ReadOnly := False;
+  HitTest := True;
+  CanFocus := True;
+  TabStop := True;
+
+  FPhotoButton := TValueEditButton.Create(Self);
+  FPhotoButton.Parent := Self;
+  FPhotoButton.Align := TAlignLayout.Right;
+  FPhotoButton.Width := CValueEditButtonWidth;
+  FPhotoButton.Margins.Rect := TRectF.Empty;
+  FPhotoButton.OnClick := ButtonClick;
+end;
+
+procedure TValueEditCellEditor.ButtonClick(Sender: TObject);
+var
+  LColumn: TValueEditColumn;
+  LCol: Integer;
+  LRow: Integer;
+  LText: string;
+begin
+  LColumn := FColumn;
+  LCol := FCol;
+  LRow := FRow;
+  LText := Text;
+  if LColumn <> nil then
+    LColumn.ClickButton(LCol, LRow, LText);
+end;
+
+procedure TValueEditCellEditor.Initialize(AColumn: TValueEditColumn;
+  const ACol, ARow: Integer; const AText: string;
+  const AShowButton: Boolean);
+begin
+  FColumn := AColumn;
+  FCol := ACol;
+  FRow := ARow;
+  Text := AText;
+  FPhotoButton.Text := AColumn.ButtonText;
+  FPhotoButton.Visible := AShowButton;
+end;
 
 { TFlowGraphSeries }
 
@@ -1579,9 +1843,17 @@ end;
 
 procedure TFrameMainTable.RefreshActiveWorkTableViews(AChannel: TChannel;
   ASyncFromFlowMeter: Boolean);
+var
+  InputType: Integer;
+  HasInputType: Boolean;
 begin
   if IsUpdating then
     Exit;
+
+  HasInputType := ASyncFromFlowMeter and (AChannel <> nil) and
+    (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil);
+  if HasInputType then
+    InputType := AChannel.FlowMeter.Device.InputType;
 
   if ASyncFromFlowMeter and (AChannel <> nil) and (AChannel.FlowMeter <> nil) then
   begin
@@ -1590,6 +1862,11 @@ begin
     AChannel.Signal := AChannel.FlowMeter.OutputType;
     MarkChannelDeviceModified(AChannel);
     SyncChannelsWithSameDeviceUUID(AChannel, AChannel.DeviceUUID);
+
+    { SyncChannelsWithSameDeviceUUID may rebind the flow meter to the
+      repository device. Preserve the input mode selected in the properties. }
+    if HasInputType and (AChannel.FlowMeter.Device <> nil) then
+      AChannel.FlowMeter.Device.InputType := InputType;
   end;
 
   IsUpdating := True;
@@ -2765,6 +3042,12 @@ begin
   PopupColumnEtalonSignal1.Items.Assign(PopupColumnDeviceSignal1.Items);
   GridEtalons.OnDrawColumnCell := GridEtalonsDrawColumnCell;
   GridDevices.OnDrawColumnCell := GridDevicesDrawColumnCell;
+  StringColumnDeviceQuantityBefore1.OnGetButtonVisible :=
+    DeviceReadingButtonVisible;
+  StringColumnDeviceQuantityAfter1.OnGetButtonVisible :=
+    DeviceReadingButtonVisible;
+  StringColumnDeviceQuantityBefore1.OnButtonClick := DeviceReadingButtonClick;
+  StringColumnDeviceQuantityAfter1.OnButtonClick := DeviceReadingButtonClick;
 
   SyncDevicesColumnsMenu;
   SyncEtalonsColumnsMenu;
@@ -4173,7 +4456,10 @@ begin
     begin
       if StringColumnDeviceSerial1 <> nil then
         StringColumnDeviceSerial1.PopupMenu := nil;
-      GridDevices.Options := GridDevices.Options - [TGridOption.Editing];
+      { Editing remains available for ValueBefore/ValueAfter of manual visual
+        devices. GridDevicesCellClick keeps every other column read-only. }
+      GridDevices.Options := GridDevices.Options + [TGridOption.Editing];
+      GridDevices.ReadOnly := True;
     end;
   end;
 
@@ -10618,6 +10904,216 @@ begin
   end;
 end;
 
+procedure TFrameMainTable.GridDevicesCreateCustomEditor(Sender: TObject;
+  const Column: TColumn; var Control: TStyledControl);
+var
+  Editor: TValueEditCellEditor;
+  Value: TValue;
+begin
+  if not IsDeviceReadingColumn(Column) or
+     not IsVisualInputChannel(FActiveWorkTable, GridDevices.Row, 1) then
+    Exit;
+
+  GridDevicesGetValue(GridDevices, Column.Index, GridDevices.Row, Value);
+  Editor := TValueEditColumn(Column).CreateEditor(Column.Index,
+    GridDevices.Row, Value.ToString);
+  Control := Editor;
+end;
+
+{ Определяет, нужна ли кнопка фотофиксации для строки редактора. }
+procedure TFrameMainTable.DeviceReadingButtonVisible(Sender: TObject;
+  const ACol, ARow: Integer; var AVisible: Boolean);
+var
+  Channel: TChannel;
+begin
+  AVisible := False;
+  if (FActiveWorkTable = nil) or (ARow < 0) or
+     (ARow >= FActiveWorkTable.DeviceChannels.Count) then
+    Exit;
+  Channel := FActiveWorkTable.DeviceChannels[ARow];
+  AVisible := (Channel <> nil) and (Channel.FlowMeter <> nil) and
+    (Channel.FlowMeter.Device <> nil) and
+    (Channel.FlowMeter.Device.OutputType = Ord(otVisual)) and
+    (Channel.FlowMeter.Device.InputType = 1);
+end;
+
+{ Преобразует сохраненный относительный путь снимка в абсолютный. }
+function TFrameMainTable.ResolveReadingPhotoPath(
+  const AStoredPath: string): string;
+var
+  ProjectFile: string;
+begin
+  Result := Trim(AStoredPath);
+  if (Result = '') or TPath.IsPathRooted(Result) then
+    Exit;
+  ProjectFile := GetProjectSettingsFileName;
+  if ProjectFile <> '' then
+    Result := TPath.GetFullPath(TPath.Combine(
+      TPath.GetDirectoryName(ProjectFile), Result));
+end;
+
+{ Копирует выбранную фотографию в каталог проекта и возвращает
+  относительный путь, который безопасно хранить в настройках и БД. }
+function TFrameMainTable.StorePendingReadingPhoto(const ASourcePath,
+  APreviousStoredPath: string): string;
+var
+  ProjectFile: string;
+  ProjectDir: string;
+  RelativeDir: string;
+  PendingDir: string;
+  SourceFile: string;
+  TargetFile: string;
+  PreviousFile: string;
+  Extension: string;
+  FileName: string;
+  PhotoGuid: TGUID;
+begin
+  SourceFile := TPath.GetFullPath(Trim(ASourcePath));
+  if not FileExists(SourceFile) then
+    raise Exception.Create('Файл фотографии не найден: ' + SourceFile);
+
+  ProjectFile := GetProjectSettingsFileName;
+  if Trim(ProjectFile) = '' then
+    raise Exception.Create('Не определён файл текущего проекта');
+
+  ProjectDir := TPath.GetDirectoryName(ProjectFile);
+  RelativeDir := TPath.Combine(
+    TPath.GetFileNameWithoutExtension(ProjectFile) + '_files',
+    TPath.Combine('Photos', 'Pending'));
+  PendingDir := TPath.GetFullPath(TPath.Combine(ProjectDir, RelativeDir));
+  ForceDirectories(PendingDir);
+
+  Extension := LowerCase(TPath.GetExtension(SourceFile));
+  if Extension = '' then
+    Extension := '.jpg';
+  CreateGUID(PhotoGuid);
+  FileName := StringReplace(StringReplace(GUIDToString(PhotoGuid),
+    '{', '', [rfReplaceAll]), '}', '', [rfReplaceAll]) + Extension;
+  TargetFile := TPath.Combine(PendingDir, FileName);
+  TFile.Copy(SourceFile, TargetFile, False);
+  Result := TPath.Combine(RelativeDir, FileName);
+
+  { После успешного копирования удаляем заменённый временный снимок,
+    но никогда не удаляем произвольный внешний файл пользователя. }
+  PreviousFile := ResolveReadingPhotoPath(APreviousStoredPath);
+  if (PreviousFile <> '') and FileExists(PreviousFile) and
+     StartsText(IncludeTrailingPathDelimiter(PendingDir), PreviousFile) then
+    try
+      TFile.Delete(PreviousFile);
+    except
+      { Старый временный файл не мешает использовать новый снимок. }
+    end;
+end;
+
+procedure TFrameMainTable.DeviceReadingButtonClick(Sender: TObject;
+  const ACol, ARow: Integer; const AText: string);
+var
+  Column: TColumn;
+  Row: Integer;
+  ReadingValue: Double;
+  ReadingText: string;
+  PhotoPath: string;
+  SelectedPhotoFile: string;
+  StoredPhotoPath: string;
+  PreviousPhotoPath: string;
+  EditedValue: Double;
+  IsBefore: Boolean;
+begin
+  if (ACol < 0) or (ACol >= GridDevices.ColumnCount) then
+    Exit;
+  Column := GridDevices.Columns[ACol];
+  Row := ARow;
+  if not IsDeviceReadingColumn(Column) or
+     not IsVisualInputChannel(FActiveWorkTable, Row, 1) then
+    Exit;
+
+  if not TryStrToFloat(StringReplace(StringReplace(
+       Trim(AText), '.', FormatSettings.DecimalSeparator,
+       [rfReplaceAll]), ',', FormatSettings.DecimalSeparator, [rfReplaceAll]),
+       EditedValue) then
+  begin
+    ShowMessage('Некорректное числовое значение');
+    Exit;
+  end;
+  GridDevicesSetValue(GridDevices, ACol, ARow, AText);
+  IsBefore := Column = StringColumnDeviceQuantityBefore1;
+  if IsBefore then
+  begin
+    ReadingValue := FActiveWorkTable.DeviceChannels[Row].ValueBefore;
+    PhotoPath := FActiveWorkTable.DeviceChannels[Row].PhotoBeforePath;
+  end
+  else
+  begin
+    ReadingValue := FActiveWorkTable.DeviceChannels[Row].ValueAfter;
+    PhotoPath := FActiveWorkTable.DeviceChannels[Row].PhotoAfterPath;
+  end;
+  PhotoPath := ResolveReadingPhotoPath(PhotoPath);
+  if PhotoPath = '' then
+    PhotoPath := CTestPhotoReadingFile;
+
+  ReadingText := FActiveWorkTable.DeviceChannels[Row].FlowMeter.ValueQuantity.GetStrNum(
+    ReadingValue, 0);
+
+  if TFormPhotoReading.Execute(
+    PhotoPath, ReadingText, ReadingValue, SelectedPhotoFile) then
+  begin
+    if SelectedPhotoFile <> '' then
+    begin
+      if IsBefore then
+        PreviousPhotoPath :=
+          FActiveWorkTable.DeviceChannels[Row].PhotoBeforePath
+      else
+        PreviousPhotoPath :=
+          FActiveWorkTable.DeviceChannels[Row].PhotoAfterPath;
+
+      try
+        StoredPhotoPath := StorePendingReadingPhoto(
+          SelectedPhotoFile, PreviousPhotoPath);
+      except
+        on E: Exception do
+        begin
+          ShowMessage('Не удалось сохранить фотографию:' +
+            sLineBreak + E.Message);
+          Exit;
+        end;
+      end;
+
+      if IsBefore then
+        FActiveWorkTable.DeviceChannels[Row].PhotoBeforePath :=
+          StoredPhotoPath
+      else
+        FActiveWorkTable.DeviceChannels[Row].PhotoAfterPath :=
+          StoredPhotoPath;
+    end;
+
+    { GridDevicesSetValue сохраняет показание и новые пути рабочего стола.
+      При сохранении проливки пути переносятся в PointSpillage в БД. }
+    GridDevicesSetValue(GridDevices, ACol, ARow, FloatToStr(ReadingValue));
+  end;
+end;
+
+{ Запускает редактор показания одним щелчком по числовой области. }
+procedure TFrameMainTable.BeginDeviceReadingEdit(const ACol, ARow: Integer);
+begin
+  if (ACol < 0) or (ACol >= GridDevices.ColumnCount) or
+     (ARow < 0) or (ARow >= GridDevices.RowCount) then
+    Exit;
+
+  GridDevices.Col := ACol;
+  GridDevices.Row := ARow;
+  GridDevices.ReadOnly := False;
+  GridDevices.Options := GridDevices.Options + [TGridOption.Editing];
+  TThread.ForceQueue(nil,
+    procedure
+    begin
+      if (GridDevices.Col = ACol) and (GridDevices.Row = ARow) then
+      begin
+        GridDevices.SetFocus;
+        GridDevices.EditorMode := True;
+      end;
+    end);
+end;
+
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
 const
   SECOND_CLICK_MS = 1000; // окно "второго клика" (подбери по ощущениям)
@@ -10628,13 +11124,27 @@ var
   WorkTable: TWorkTable;
 begin
   ActivateMeasurementGrid(GridDevices);
- if not CanEditActiveWorkTable then
+  WorkTable := FActiveWorkTable;
+
+  if IsDeviceReadingColumn(Column) then
+  begin
+    GridDevices.ReadOnly := True;
+    GridDevices.EditorMode := False;
+
+    { Вне редактирования ячейка показывает только значение.
+      Кнопка фото создаётся внутри активного редактора. }
+    if IsVisualInputChannel(WorkTable, Row, 0) or
+       IsVisualInputChannel(WorkTable, Row, 1) then
+      BeginDeviceReadingEdit(Column.Index, Row);
+    Exit;
+  end;
+
+  if not CanEditActiveWorkTable then
   begin
     ApplyActiveWorkTableEditMode;
     Exit;
   end;
 
-  WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.DeviceChannels.Count)) then
     Exit;
 
@@ -10911,6 +11421,14 @@ var
   DuplicateFound: boolean;
 begin
   ActivateMeasurementGrid(GridDevices);
+  if (ACol >= 0) and (ACol < GridDevices.ColumnCount) and
+     IsDeviceReadingColumn(GridDevices.Columns[ACol]) then
+  begin
+    { Показания измерения редактируются независимо от режима настроек. }
+    ApplyActiveWorkTableEditMode;
+    RefreshGridValues(GridDevices, 'visual-reading-finished');
+    Exit;
+  end;
   if not CanEditActiveWorkTable then
     Exit;
 
@@ -11310,6 +11828,24 @@ begin
       else
         Value := '-';
     end
+    else if GridDevices.Columns[ACol] = StringColumnDeviceQuantityBefore1 then
+    begin
+      if IsVisualInputChannel(WorkTable, ARow, 0) or
+         IsVisualInputChannel(WorkTable, ARow, 1) then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity.GetStrNum(
+          WorkTable.DeviceChannels[ARow].ValueBefore, 0)
+      else
+        Value := '';
+    end
+    else if GridDevices.Columns[ACol] = StringColumnDeviceQuantityAfter1 then
+    begin
+      if IsVisualInputChannel(WorkTable, ARow, 0) or
+         IsVisualInputChannel(WorkTable, ARow, 1) then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity.GetStrNum(
+          WorkTable.DeviceChannels[ARow].ValueAfter, 0)
+      else
+        Value := '';
+    end
     else if GridDevices.Columns[ACol] = StringColumnDeviceCoef1 then
       Value := GetDeviceCoefficientText(WorkTable.DeviceChannels[ARow])
     else if GridDevices.Columns[ACol] = StringColumnDeviceCalculatedCoef1 then
@@ -11376,6 +11912,16 @@ end;
 procedure TFrameMainTable.GridDevicesSelectCell(Sender: TObject; const ACol,
   ARow: Integer; var CanSelect: Boolean);
 begin
+  if (ACol >= 0) and (ACol < GridDevices.ColumnCount) and
+     IsDeviceReadingColumn(GridDevices.Columns[ACol]) and
+     (IsVisualInputChannel(FActiveWorkTable, ARow, 0) or
+      IsVisualInputChannel(FActiveWorkTable, ARow, 1)) then
+  begin
+    { Показания доступны независимо от режима настройки рабочего стола. }
+    CanSelect := True;
+    Exit;
+  end;
+
   if not CanEditActiveWorkTable then
   begin
     ApplyActiveWorkTableEditMode;
@@ -11418,14 +11964,37 @@ var
   Signal: Integer;
   Changed: Boolean;
   DeviceFieldsChanged: Boolean;
+  ReadingValue: Double;
 begin
   if IsUpdating then
     Exit;
 
+  WorkTable := FActiveWorkTable;
+
+  if (WorkTable <> nil) and (ARow >= 0) and
+     (ARow < WorkTable.DeviceChannels.Count) and
+     IsDeviceReadingColumn(GridDevices.Columns[ACol]) then
+  begin
+    if (IsVisualInputChannel(WorkTable, ARow, 0) or
+        IsVisualInputChannel(WorkTable, ARow, 1)) and
+       TryStrToFloat(StringReplace(StringReplace(Trim(Value.AsString), '.',
+         FormatSettings.DecimalSeparator, [rfReplaceAll]), ',',
+         FormatSettings.DecimalSeparator, [rfReplaceAll]), ReadingValue) then
+    begin
+      if GridDevices.Columns[ACol] = StringColumnDeviceQuantityBefore1 then
+        WorkTable.DeviceChannels[ARow].ValueBefore := ReadingValue
+      else
+        WorkTable.DeviceChannels[ARow].ValueAfter := ReadingValue;
+      if not GridDevices.EditorMode then
+        RefreshGridValues(GridDevices, 'visual-reading');
+      ActionSaveWorkTableExecute(nil);
+    end;
+    Exit;
+  end;
+
   if not CanEditActiveWorkTable then
     Exit;
 
-  WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.DeviceChannels.Count) then
   begin
     Changed := False;
@@ -12434,6 +13003,7 @@ IF WorkTable.FluidPress.IsRunning THEN
 
 end;
 
-
+initialization
+  RegisterFmxClasses([TValueEditColumn]);
 
 end.

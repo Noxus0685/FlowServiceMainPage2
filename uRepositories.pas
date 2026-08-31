@@ -34,6 +34,7 @@ uses
   uBaseProcedures,
   uClasses,
   uDeviceClass,
+  uProjectSettings,
   uTable_Data;
 
 type
@@ -392,6 +393,39 @@ uses
   uWorkTable,
   uMKSDebug,
   uProtocols;
+
+{ Безопасно удаляет только фотографию внутри каталога Photos проекта. }
+procedure DeleteSpillagePhotoFile(const ARelativePath: string);
+var
+  ProjectFile: string;
+  PhotosRoot: string;
+  AbsoluteFile: string;
+  ParentDir: string;
+begin
+  if (Trim(ARelativePath) = '') or TPath.IsPathRooted(ARelativePath) then
+    Exit;
+  ProjectFile := GetProjectSettingsFileName;
+  PhotosRoot := TPath.GetFullPath(TPath.Combine(
+    TPath.GetDirectoryName(ProjectFile),
+    TPath.GetFileNameWithoutExtension(ProjectFile) + '_files\Photos'));
+  AbsoluteFile := TPath.GetFullPath(TPath.Combine(
+    TPath.GetDirectoryName(ProjectFile), ARelativePath));
+  if not StartsText(IncludeTrailingPathDelimiter(PhotosRoot), AbsoluteFile) then
+    Exit;
+  try
+    if FileExists(AbsoluteFile) then
+      TFile.Delete(AbsoluteFile);
+    ParentDir := TPath.GetDirectoryName(AbsoluteFile);
+    if DirectoryExists(ParentDir) and
+       (Length(TDirectory.GetFiles(ParentDir)) = 0) and
+       (Length(TDirectory.GetDirectories(ParentDir)) = 0) then
+      TDirectory.Delete(ParentDir, False);
+  except
+    on E: Exception do
+      LogMKS('PHOTO DELETE', 'Не удалось удалить фотографию',
+        AbsoluteFile + '; ' + E.Message);
+  end;
+end;
 
 {$REGION 'Helpers'}
 function Col(const AName, ASqlType: string): TTableColumn;
@@ -5672,8 +5706,10 @@ begin
     Col('Valid', 'INTEGER'),
     Col('QStd', 'REAL'),
     Col('QCV', 'REAL'),
-    Col('VolumeBefore', 'REAL'),
-    Col('VolumeAfter', 'REAL'),
+    Col('ValueBefore', 'REAL'),
+    Col('ValueAfter', 'REAL'),
+    Col('PhotoBeforePath', 'TEXT'),
+    Col('PhotoAfterPath', 'TEXT'),
     Col('PulseCount', 'REAL'),
     Col('MeanFrequency', 'REAL'),
     Col('AvgCurrent', 'REAL'),
@@ -5696,7 +5732,28 @@ begin
 end;
 
 procedure TDeviceRepository.EnsureSpillageSchema;
+var
+  Existing: TStringList;
 begin
+  { Existing project databases used VolumeBefore/VolumeAfter. Rename the
+    columns before EnsureTable checks the new schema, preserving all data. }
+  Existing := FDM.GetTableColumns('PointSpillage');
+  try
+    if (Existing.IndexOf('VolumeBefore') >= 0) and
+       (Existing.IndexOf('ValueBefore') < 0) then
+      FDM.ExecSQL(
+        'ALTER TABLE PointSpillage ' +
+        'RENAME COLUMN VolumeBefore TO ValueBefore');
+
+    if (Existing.IndexOf('VolumeAfter') >= 0) and
+       (Existing.IndexOf('ValueAfter') < 0) then
+      FDM.ExecSQL(
+        'ALTER TABLE PointSpillage ' +
+        'RENAME COLUMN VolumeAfter TO ValueAfter');
+  finally
+    Existing.Free;
+  end;
+
   FDM.EnsureTable('PointSpillage', RequiredSpillageColumns);
 end;
 
@@ -5790,8 +5847,10 @@ begin
   Result.Error := Q.FieldByName('Error').AsFloat;
   Result.QStd := Q.FieldByName('QStd').AsFloat;
   Result.QCV := Q.FieldByName('QCV').AsFloat;
-  Result.VolumeBefore := Q.FieldByName('VolumeBefore').AsFloat;
-  Result.VolumeAfter := Q.FieldByName('VolumeAfter').AsFloat;
+  Result.ValueBefore := Q.FieldByName('ValueBefore').AsFloat;
+  Result.ValueAfter := Q.FieldByName('ValueAfter').AsFloat;
+  Result.PhotoBeforePath := Q.FieldByName('PhotoBeforePath').AsString;
+  Result.PhotoAfterPath := Q.FieldByName('PhotoAfterPath').AsString;
   Result.PulseCount := Q.FieldByName('PulseCount').AsFloat;
   Result.MeanFrequency := Q.FieldByName('MeanFrequency').AsFloat;
   Result.AvgCurrent := Q.FieldByName('AvgCurrent').AsFloat;
@@ -5914,6 +5973,10 @@ begin
           Q.SQL.Text := 'delete from PointSpillage where ID = :ID';
           SetIntParam(Q, 'ID', ASpillage.ID);
           Q.ExecSQL;
+          DeleteSpillagePhotoFile(ASpillage.PhotoBeforePath);
+          if not SameText(ASpillage.PhotoAfterPath,
+            ASpillage.PhotoBeforePath) then
+            DeleteSpillagePhotoFile(ASpillage.PhotoAfterPath);
           Exit(True);
         end;
       osNew:
@@ -5922,7 +5985,7 @@ begin
           'SessionID, DeviceUUID, DeviceTypeUUID, EtalonName, EtalonUUID, Enabled, Num, Name, Description, DateTime, ' +
           'SpillTime, QavgEtalon, EtalonVolume, EtalonMass, QEtalonStd, QEtalonCV, ' +
           'DeviceVolume, DeviceMass, Velocity, Status, StatusStr, Error, Valid, QStd, QCV, ' +
-          'VolumeBefore, VolumeAfter, PulseCount, MeanFrequency, AvgCurrent, AvgVoltage, ' +
+          'ValueBefore, ValueAfter, PhotoBeforePath, PhotoAfterPath, PulseCount, MeanFrequency, AvgCurrent, AvgVoltage, ' +
           'Data1, Data2, ArchivedData, StartTemperature, EndTemperature, AvgTemperature, ' +
           'InputPressure, OutputPressure, Density, AmbientTemperature, AtmosphericPressure, RelativeHumidity, ' +
           'Coef, FCDCoefficient' +
@@ -5930,7 +5993,7 @@ begin
           ':SessionID, :DeviceUUID, :DeviceTypeUUID, :EtalonName, :EtalonUUID, :Enabled, :Num, :Name, :Description, :DateTime, ' +
           ':SpillTime, :QavgEtalon, :EtalonVolume, :EtalonMass, :QEtalonStd, :QEtalonCV, ' +
           ':DeviceVolume, :DeviceMass, :Velocity, :Status, :StatusStr, :Error, :Valid, :QStd, :QCV, ' +
-          ':VolumeBefore, :VolumeAfter, :PulseCount, :MeanFrequency, :AvgCurrent, :AvgVoltage, ' +
+          ':ValueBefore, :ValueAfter, :PhotoBeforePath, :PhotoAfterPath, :PulseCount, :MeanFrequency, :AvgCurrent, :AvgVoltage, ' +
           ':Data1, :Data2, :ArchivedData, :StartTemperature, :EndTemperature, :AvgTemperature, ' +
           ':InputPressure, :OutputPressure, :Density, :AmbientTemperature, :AtmosphericPressure, :RelativeHumidity, ' +
           ':Coef, :FCDCoefficient' +
@@ -5942,7 +6005,7 @@ begin
             'SessionID=:SessionID, DeviceUUID=:DeviceUUID, DeviceTypeUUID=:DeviceTypeUUID, EtalonName=:EtalonName, EtalonUUID=:EtalonUUID, Enabled=:Enabled, Num=:Num, ' +
             'Name=:Name, Description=:Description, DateTime=:DateTime, SpillTime=:SpillTime, QavgEtalon=:QavgEtalon, EtalonVolume=:EtalonVolume, EtalonMass=:EtalonMass, ' +
             'QEtalonStd=:QEtalonStd, QEtalonCV=:QEtalonCV, DeviceVolume=:DeviceVolume, DeviceMass=:DeviceMass, Velocity=:Velocity, ' +
-            'Status=:Status, StatusStr=:StatusStr, Error=:Error, Valid=:Valid, QStd=:QStd, QCV=:QCV, VolumeBefore=:VolumeBefore, VolumeAfter=:VolumeAfter, ' +
+            'Status=:Status, StatusStr=:StatusStr, Error=:Error, Valid=:Valid, QStd=:QStd, QCV=:QCV, ValueBefore=:ValueBefore, ValueAfter=:ValueAfter, PhotoBeforePath=:PhotoBeforePath, PhotoAfterPath=:PhotoAfterPath, ' +
             'PulseCount=:PulseCount, MeanFrequency=:MeanFrequency, AvgCurrent=:AvgCurrent, AvgVoltage=:AvgVoltage, ' +
             'Data1=:Data1, Data2=:Data2, ArchivedData=:ArchivedData, StartTemperature=:StartTemperature, EndTemperature=:EndTemperature, AvgTemperature=:AvgTemperature, ' +
             'InputPressure=:InputPressure, OutputPressure=:OutputPressure, Density=:Density, AmbientTemperature=:AmbientTemperature, AtmosphericPressure=:AtmosphericPressure, RelativeHumidity=:RelativeHumidity, ' +
@@ -5976,8 +6039,10 @@ begin
     SetIntParam(Q, 'Valid', Ord(ASpillage.Valid));
     SetFloatParam(Q, 'QStd', ASpillage.QStd);
     SetFloatParam(Q, 'QCV', ASpillage.QCV);
-    SetFloatParam(Q, 'VolumeBefore', ASpillage.VolumeBefore);
-    SetFloatParam(Q, 'VolumeAfter', ASpillage.VolumeAfter);
+    SetFloatParam(Q, 'ValueBefore', ASpillage.ValueBefore);
+    SetFloatParam(Q, 'ValueAfter', ASpillage.ValueAfter);
+    SetStrParam(Q, 'PhotoBeforePath', ASpillage.PhotoBeforePath);
+    SetStrParam(Q, 'PhotoAfterPath', ASpillage.PhotoAfterPath);
     SetFloatParam(Q, 'PulseCount', ASpillage.PulseCount);
     SetFloatParam(Q, 'MeanFrequency', ASpillage.MeanFrequency);
     SetFloatParam(Q, 'AvgCurrent', ASpillage.AvgCurrent);

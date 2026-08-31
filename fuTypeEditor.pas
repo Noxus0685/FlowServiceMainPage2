@@ -1421,6 +1421,8 @@ begin
 
 
   FType.ProcedureName     := cbProcedure.Text;
+  if cbInputType.ItemIndex >= 0 then
+    FType.InputType := cbInputType.ItemIndex;
 
   FType.VerificationMethod:= edtDocumentation.Text;
   FType.ReportingForm := Trim(EditReportingForm.Text);
@@ -3946,6 +3948,7 @@ begin
 
   // UX
   cbInputType.Hint := cbInputType.Text;
+  SetModified;
 end;
 
 

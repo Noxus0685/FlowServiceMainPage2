@@ -6,6 +6,7 @@ uses
   System.Classes,
   System.Generics.Collections,
   System.IniFiles,
+  System.IOUtils,
   System.Math,
   System.StrUtils,
   System.SysUtils,
@@ -593,6 +594,11 @@ type
 
     FValueSec: Double;
     FValueResult: Double;
+    FValueBefore: Double;
+    FValueAfter: Double;
+    { Временные относительные пути к снимкам текущего измерения. }
+    FPhotoBeforePath: string;
+    FPhotoAfterPath: string;
     FSimulationStartImpSec: Double;
     FSimulationTargetImpSec: Double;
     FSimulationRampStartTimeMs: Double;
@@ -775,6 +781,11 @@ type
     property VolResult: Double read GetVolResultProxy write SetVolResultProxy;
     property ValueSec: Double read GetValueSecProxy write SetValueSecProxy;
     property ValueResult: Double read GetValueResultProxy write SetValueResultProxy;
+    { Manual readings of a visual device before and after a measurement. }
+    property ValueBefore: Double read FValueBefore write FValueBefore;
+    property ValueAfter: Double read FValueAfter write FValueAfter;
+    property PhotoBeforePath: string read FPhotoBeforePath write FPhotoBeforePath;
+    property PhotoAfterPath: string read FPhotoAfterPath write FPhotoAfterPath;
     property SimulationStartImpSec: Double read FSimulationStartImpSec write FSimulationStartImpSec;
     property SimulationTargetImpSec: Double read FSimulationTargetImpSec write FSimulationTargetImpSec;
     property SimulationRampStartTimeMs: Double read FSimulationRampStartTimeMs write FSimulationRampStartTimeMs;
@@ -1659,6 +1670,41 @@ uses
   uAppVersion,
   uMKSDebug;
 
+{ Переносит временный снимок в безопасный каталог сохранённой проливки. }
+function PromotePendingPhoto(const ARelativeSource, ASpillageUUID,
+  AFileName: string): string;
+var
+  ProjectFile: string;
+  ProjectDir: string;
+  PhotosRoot: string;
+  SourceFile: string;
+  TargetDir: string;
+  TargetFile: string;
+  RelativeDir: string;
+begin
+  Result := '';
+  if TPath.IsPathRooted(ARelativeSource) or (Trim(ARelativeSource) = '') or
+     (Trim(ASpillageUUID) = '') then
+    Exit;
+  ProjectFile := GetProjectSettingsFileName;
+  ProjectDir := TPath.GetDirectoryName(ProjectFile);
+  PhotosRoot := TPath.GetFullPath(TPath.Combine(ProjectDir,
+    TPath.GetFileNameWithoutExtension(ProjectFile) +
+      '_files\Photos\Pending'));
+  SourceFile := TPath.GetFullPath(TPath.Combine(ProjectDir, ARelativeSource));
+  if not StartsText(IncludeTrailingPathDelimiter(PhotosRoot), SourceFile) or
+     not FileExists(SourceFile) then
+    Exit;
+  RelativeDir := TPath.Combine(
+    TPath.GetFileNameWithoutExtension(ProjectFile) + '_files',
+    TPath.Combine('Photos', ASpillageUUID));
+  TargetDir := TPath.Combine(ProjectDir, RelativeDir);
+  ForceDirectories(TargetDir);
+  TargetFile := TPath.Combine(TargetDir, AFileName);
+  TFile.Copy(SourceFile, TargetFile, True);
+  Result := TPath.Combine(RelativeDir, AFileName);
+end;
+
 const
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
   DEVICE_FLOW_RATE_DIM_INDEX = 4;
@@ -2273,6 +2319,10 @@ begin
   FVolResult := 0;
   FValueSec := 0;
   FValueResult := 0;
+  FValueBefore := 0;
+  FValueAfter := 0;
+  FPhotoBeforePath := '';
+  FPhotoAfterPath := '';
   FGroup := 0;
   FCategory := mftUnknownType;
   FWorkTabeID := 0;
@@ -2305,7 +2355,6 @@ begin
   FreeAndNil(FFlowMeter);
   inherited Destroy;
 end;
-
 
 { Initializes channel FlowMeter links using the configured device UUID. }
 procedure TChannel.Init;
@@ -2359,6 +2408,7 @@ begin
     FFlowMeter.ValueAirTemperture := AWorkTable.ValueAirTemperture;
     FFlowMeter.ValueHumidity := AWorkTable.ValueHumidity;
     FFlowMeter.ValueTime := AWorkTable.ValueTime;
+
   end;
 
 
@@ -6516,6 +6566,10 @@ begin
     AIni.WriteFloat(Section, 'CurResult', Channel.CurResult);
     AIni.WriteFloat(Section, 'ValueSec', Channel.ValueSec);
     AIni.WriteFloat(Section, 'ValueResult', Channel.ValueResult);
+    AIni.WriteFloat(Section, 'ValueBefore', Channel.ValueBefore);
+    AIni.WriteFloat(Section, 'ValueAfter', Channel.ValueAfter);
+    AIni.WriteString(Section, 'PhotoBeforePath', Channel.PhotoBeforePath);
+    AIni.WriteString(Section, 'PhotoAfterPath', Channel.PhotoAfterPath);
     AIni.WriteFloat(Section, 'VolSec', Channel.VolSec);
     AIni.WriteFloat(Section, 'VolResult', Channel.VolResult);
 
@@ -6640,6 +6694,10 @@ begin
     Channel.CurResult := S2F(AIni.ReadString(Section, 'CurResult', '0'));
     Channel.ValueSec := S2F(AIni.ReadString(Section, 'ValueSec', '0'));
     Channel.ValueResult := S2F(AIni.ReadString(Section, 'ValueResult', '0'));
+    Channel.ValueBefore := S2F(AIni.ReadString(Section, 'ValueBefore', '0'));
+    Channel.ValueAfter := S2F(AIni.ReadString(Section, 'ValueAfter', '0'));
+    Channel.PhotoBeforePath := AIni.ReadString(Section, 'PhotoBeforePath', '');
+    Channel.PhotoAfterPath := AIni.ReadString(Section, 'PhotoAfterPath', '');
     Channel.VolSec := S2F(AIni.ReadString(Section, 'VolSec', '0'));
     Channel.VolResult := S2F(AIni.ReadString(Section, 'VolResult', '0'));
 
@@ -7807,6 +7865,8 @@ var
   SavedPointTime: Double;
   SelectedTimeSource: string;
   ProcessedDeviceCount: Integer;
+  PendingPhotoBefore: string;
+  PendingPhotoAfter: string;
   BindingReason: string;
   BindingValid: Boolean;
   BindingRepairAttempted: Boolean;
@@ -8565,6 +8625,25 @@ begin
         );
       end;
 
+      { Visual devices use the readings entered manually or from a photo. }
+      if (Device.OutputType = Ord(otVisual)) and
+         (Device.InputType in [0, 1]) then
+      begin
+        Point.ValueBefore := DeviceChannel.ValueBefore;
+        Point.ValueAfter := DeviceChannel.ValueAfter;
+        Point.PhotoBeforePath := DeviceChannel.PhotoBeforePath;
+        Point.PhotoAfterPath := DeviceChannel.PhotoAfterPath;
+        PendingPhotoBefore := DeviceChannel.PhotoBeforePath;
+        PendingPhotoAfter := DeviceChannel.PhotoAfterPath;
+        if Device.InputType = 1 then
+        begin
+          Point.PhotoBeforePath := PromotePendingPhoto(PendingPhotoBefore,
+            Point.UUID, 'Before.jpg');
+          Point.PhotoAfterPath := PromotePendingPhoto(PendingPhotoAfter,
+            Point.UUID, 'After.jpg');
+        end;
+      end;
+
       Point.DeviceVolume :=
         DeviceChannel.FlowMeter.ValueVolume.GetDoubleValue;
 
@@ -8873,6 +8952,19 @@ begin
 
         try
           DeviceRepo.SaveDeviceResults(Device);
+
+          if Point.PhotoBeforePath <> '' then
+          begin
+            TFile.Delete(TPath.Combine(TPath.GetDirectoryName(
+              GetProjectSettingsFileName), PendingPhotoBefore));
+            DeviceChannel.PhotoBeforePath := '';
+          end;
+          if Point.PhotoAfterPath <> '' then
+          begin
+            TFile.Delete(TPath.Combine(TPath.GetDirectoryName(
+              GetProjectSettingsFileName), PendingPhotoAfter));
+            DeviceChannel.PhotoAfterPath := '';
+          end;
 
           ProtocolManager.AddMessage(
             pcProc,

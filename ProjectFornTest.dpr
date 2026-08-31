@@ -5,6 +5,7 @@ uses
   frmCalibrCoefs in 'frmCalibrCoefs.pas' {FrameCalibrCoefs: TFrame},
   frmFlowMeterProperties in 'frmFlowMeterProperties.pas' {FrameFlowMeterProperties: TFrame},
   frmMainTable in 'frmMainTable.pas' {FrameMainTable: TFrame},
+  frmPhotoReading in 'frmPhotoReading.pas' {FormPhotoReading},
   frmMeasurementRun in 'frmMeasurementRun.pas' {FrameMeasurementRun: TFrame},
   frmMRResults in 'frmMRResults.pas' {FrameMRResults: TFrame},
   frmProceed in 'frmProceed.pas' {FrameProceed: TFrame},

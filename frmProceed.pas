@@ -7889,24 +7889,24 @@ begin
     if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
     begin
       if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
-        Value := FActiveWorkTable.TableFlow.ValueVolume.GetStrNum(P.VolumeBefore)
+        Value := FActiveWorkTable.TableFlow.ValueVolume.GetStrNum(P.ValueBefore)
       else
-        Value := FActiveWorkTable.TableFlow.ValueMass.GetStrNum(P.VolumeBefore);
+        Value := FActiveWorkTable.TableFlow.ValueMass.GetStrNum(P.ValueBefore);
     end
     else
-      Value := FloatToStr(P.VolumeBefore);
+      Value := FloatToStr(P.ValueBefore);
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageVolumeAfter then
   begin
     if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
     begin
       if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
-        Value := FActiveWorkTable.TableFlow.ValueVolume.GetStrNum(P.VolumeAfter)
+        Value := FActiveWorkTable.TableFlow.ValueVolume.GetStrNum(P.ValueAfter)
       else
-        Value := FActiveWorkTable.TableFlow.ValueMass.GetStrNum(P.VolumeAfter);
+        Value := FActiveWorkTable.TableFlow.ValueMass.GetStrNum(P.ValueAfter);
     end
     else
-      Value := FloatToStr(P.VolumeAfter);
+      Value := FloatToStr(P.ValueAfter);
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillagePulseCount then
   begin
