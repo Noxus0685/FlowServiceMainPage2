@@ -76,80 +76,17 @@ uses
   uProtocols,
   uRepositories,
   uGraphsViewConfig,
+  uValueEditColumn,
   uWorkTable;
 
 const
-  CValueEditButtonWidth = 24;
   CTestPhotoReadingFile =
     'C:\Projects\FlowSericeX\FlowServiceWorkspace\FMXFP\FlowPlantFMX\' +
     'Win32\Debug\DATA\Projects\' +
     'misc-fbi-computer-hacker-wallpaper-9910681d914a8d4b36f768ffa0e176cd.jpg';
 
-{ Рисует кнопку фотофиксации одинаково в ячейке и активном редакторе. }
-procedure DrawValueEditButton(const ACanvas: TCanvas; const ARect: TRectF;
-  const APressed: Boolean);
-
-
 type
-  TGetGridButtonVisibleEvent = procedure(Sender: TObject; const ACol,
-    ARow: Integer; var AVisible: Boolean) of object;
-  TValueButtonClickEvent = procedure(Sender: TObject; const ACol,
-    ARow: Integer; const AText: string) of object;
-
-  TValueEditColumn = class;
-
-  { Нестилизованная кнопка редактора, совпадающая с кнопкой нарисованной ячейки. }
-  TValueEditButton = class(TEditButton)
-  private
-    FPressed: Boolean;
-  protected
-    procedure MouseDown(Button: TMouseButton; Shift: TShiftState;
-      X, Y: Single); override;
-    procedure MouseUp(Button: TMouseButton; Shift: TShiftState;
-      X, Y: Single); override;
-    procedure Paint; override;
-  end;
-
-  { Составной редактор с фиксированной кнопкой слева. }
-  TValueEditCellEditor = class(TEdit)
-  private
-    FPhotoButton: TValueEditButton;
-    FColumn: TValueEditColumn;
-    FCol: Integer;
-    FRow: Integer;
-    procedure ButtonClick(Sender: TObject);
-  public
-    constructor Create(AOwner: TComponent); override;
-    procedure Initialize(AColumn: TValueEditColumn; const ACol, ARow: Integer;
-      const AText: string; const AShowButton: Boolean);
-  end;
-
-  { Редактируемый столбец с дополнительной кнопкой слева. }
-  TValueEditColumn = class(TStringColumn)
-  private
-    FButtonText: string;
-    FButtonWidth: Single;
-    FOnGetButtonVisible: TGetGridButtonVisibleEvent;
-    FOnButtonClick: TValueButtonClickEvent;
-  public
-    constructor Create(AOwner: TComponent); override;
-    function ButtonVisible(const ACol, ARow: Integer): Boolean;
-    function CreateEditor(const ACol, ARow: Integer;
-      const AText: string): TValueEditCellEditor;
-    procedure ClickButton(const ACol, ARow: Integer; const AText: string);
-    procedure DrawButtonCell(const Canvas: TCanvas; const Bounds: TRectF;
-      const ACol, ARow: Integer; const AText: string;
-      const ABackground: TAlphaColor);
-  published
-    property ButtonText: string read FButtonText write FButtonText;
-    property ButtonWidth: Single read FButtonWidth write FButtonWidth;
-    property OnGetButtonVisible: TGetGridButtonVisibleEvent
-      read FOnGetButtonVisible write FOnGetButtonVisible;
-    property OnButtonClick: TValueButtonClickEvent
-      read FOnButtonClick write FOnButtonClick;
-  end;
-
-  TRowData = record
+    TRowData = record
     Enabled: Boolean;
     ChannelName: string;
     TypeName: string;
@@ -485,8 +422,8 @@ type
     StringColumnEtalonRawValue1: TStringColumn;
     StringColumnDeviceRawValue1: TStringColumn;
     StringColumnEtalonPressureDelta1: TStringColumn;
-    StringColumnDeviceQuantityBefore1: TValueEditColumn;
-    StringColumnDeviceQuantityAfter1: TValueEditColumn;
+    StringColumnDeviceQuantityBefore1: TStringColumn;
+    StringColumnDeviceQuantityAfter1: TStringColumn;
     StringColumnDevicePressureDelta1: TStringColumn;
     PopupMenuDevicesGrid: TPopupMenu;
     MenuItemDevicesWorkTablesGroup: TMenuItem;
@@ -1323,166 +1260,6 @@ begin
 end;
 
 {$R *.fmx}
-
-procedure DrawValueEditButton(const ACanvas: TCanvas; const ARect: TRectF;
-  const APressed: Boolean);
-var
-  State: TCanvasSaveState;
-begin
-  State := ACanvas.SaveState;
-  try
-    ACanvas.Fill.Kind := TBrushKind.Solid;
-    if APressed then
-      ACanvas.Fill.Color := $FFC8C8C8
-    else
-      ACanvas.Fill.Color := $FFE0E0E0;
-    ACanvas.FillRect(ARect, 0, 0, [], 1);
-    ACanvas.Stroke.Kind := TBrushKind.Solid;
-    ACanvas.Stroke.Color := $FF808080;
-    ACanvas.Stroke.Thickness := 1;
-    ACanvas.DrawRect(ARect, 0, 0, [], 1);
-    ACanvas.Fill.Color := TAlphaColors.Black;
-    ACanvas.Font.Size := 12;
-    ACanvas.FillText(ARect, '...', False, 1, [], TTextAlign.Center,
-      TTextAlign.Center);
-  finally
-    ACanvas.RestoreState(State);
-  end;
-end;
-
-{ TValueEditButton }
-
-procedure TValueEditButton.Paint;
-begin
-  DrawValueEditButton(Canvas, LocalRect, FPressed);
-end;
-
-procedure TValueEditButton.MouseDown(Button: TMouseButton; Shift: TShiftState;
-  X, Y: Single);
-begin
-  if Button = TMouseButton.mbLeft then
-  begin
-    FPressed := True;
-    Repaint;
-  end;
-  inherited;
-end;
-
-procedure TValueEditButton.MouseUp(Button: TMouseButton; Shift: TShiftState;
-  X, Y: Single);
-begin
-  if Button = TMouseButton.mbLeft then
-  begin
-    FPressed := False;
-    Repaint;
-  end;
-  inherited;
-end;
-
-{ TValueEditColumn }
-
-constructor TValueEditColumn.Create(AOwner: TComponent);
-begin
-  inherited;
-  ReadOnly := False;
-  FButtonText := '...';
-  FButtonWidth := CValueEditButtonWidth;
-end;
-
-function TValueEditColumn.ButtonVisible(const ACol, ARow: Integer): Boolean;
-begin
-  Result := True;
-  if Assigned(FOnGetButtonVisible) then
-    FOnGetButtonVisible(Self, ACol, ARow, Result);
-end;
-
-procedure TValueEditColumn.ClickButton(const ACol, ARow: Integer;
-  const AText: string);
-begin
-  if Assigned(FOnButtonClick) then
-    FOnButtonClick(Self, ACol, ARow, AText);
-end;
-
-function TValueEditColumn.CreateEditor(const ACol, ARow: Integer;
-  const AText: string): TValueEditCellEditor;
-begin
-  Result := TValueEditCellEditor.Create(nil);
-  Result.Initialize(Self, ACol, ARow, AText, ButtonVisible(ACol, ARow));
-end;
-
-procedure TValueEditColumn.DrawButtonCell(const Canvas: TCanvas;
-  const Bounds: TRectF; const ACol, ARow: Integer; const AText: string;
-  const ABackground: TAlphaColor);
-var
-  ButtonBounds: TRectF;
-begin
-  Canvas.Fill.Kind := TBrushKind.Solid;
-  Canvas.Fill.Color := ABackground;
-  Canvas.FillRect(Bounds, 0, 0, [], 1);
-  if ButtonVisible(ACol, ARow) then
-  begin
-    ButtonBounds := RectF(Bounds.Left, Bounds.Top,
-      Bounds.Left + FButtonWidth, Bounds.Bottom);
-    DrawValueEditButton(Canvas, ButtonBounds, False);
-    Canvas.Fill.Color := TAlphaColors.Black;
-    Canvas.FillText(RectF(ButtonBounds.Right, Bounds.Top, Bounds.Right,
-      Bounds.Bottom), AText, False, 1, [], TTextAlign.Leading,
-      TTextAlign.Center);
-  end
-  else
-  begin
-    Canvas.Fill.Color := TAlphaColors.Black;
-    Canvas.FillText(RectF(Bounds.Left + 4, Bounds.Top, Bounds.Right,
-      Bounds.Bottom), AText, False, 1, [], TTextAlign.Leading,
-      TTextAlign.Center);
-  end;
-end;
-
-{ TValueEditCellEditor }
-
-constructor TValueEditCellEditor.Create(AOwner: TComponent);
-begin
-  inherited;
-  Enabled := True;
-  ReadOnly := False;
-  HitTest := True;
-  CanFocus := True;
-  TabStop := True;
-
-  FPhotoButton := TValueEditButton.Create(Self);
-  FPhotoButton.Parent := Self;
-  FPhotoButton.Align := TAlignLayout.Right;
-  FPhotoButton.Width := CValueEditButtonWidth;
-  FPhotoButton.Margins.Rect := TRectF.Empty;
-  FPhotoButton.OnClick := ButtonClick;
-end;
-
-procedure TValueEditCellEditor.ButtonClick(Sender: TObject);
-var
-  LColumn: TValueEditColumn;
-  LCol: Integer;
-  LRow: Integer;
-  LText: string;
-begin
-  LColumn := FColumn;
-  LCol := FCol;
-  LRow := FRow;
-  LText := Text;
-  if LColumn <> nil then
-    LColumn.ClickButton(LCol, LRow, LText);
-end;
-
-procedure TValueEditCellEditor.Initialize(AColumn: TValueEditColumn;
-  const ACol, ARow: Integer; const AText: string;
-  const AShowButton: Boolean);
-begin
-  FColumn := AColumn;
-  FCol := ACol;
-  FRow := ARow;
-  Text := AText;
-  FPhotoButton.Text := AColumn.ButtonText;
-  FPhotoButton.Visible := AShowButton;
-end;
 
 { TFlowGraphSeries }
 
@@ -3042,13 +2819,6 @@ begin
   PopupColumnEtalonSignal1.Items.Assign(PopupColumnDeviceSignal1.Items);
   GridEtalons.OnDrawColumnCell := GridEtalonsDrawColumnCell;
   GridDevices.OnDrawColumnCell := GridDevicesDrawColumnCell;
-  StringColumnDeviceQuantityBefore1.OnGetButtonVisible :=
-    DeviceReadingButtonVisible;
-  StringColumnDeviceQuantityAfter1.OnGetButtonVisible :=
-    DeviceReadingButtonVisible;
-  StringColumnDeviceQuantityBefore1.OnButtonClick := DeviceReadingButtonClick;
-  StringColumnDeviceQuantityAfter1.OnButtonClick := DeviceReadingButtonClick;
-
   SyncDevicesColumnsMenu;
   SyncEtalonsColumnsMenu;
 
@@ -10909,14 +10679,20 @@ procedure TFrameMainTable.GridDevicesCreateCustomEditor(Sender: TObject;
 var
   Editor: TValueEditCellEditor;
   Value: TValue;
+  ShowButton: Boolean;
 begin
   if not IsDeviceReadingColumn(Column) or
      not IsVisualInputChannel(FActiveWorkTable, GridDevices.Row, 1) then
     Exit;
 
   GridDevicesGetValue(GridDevices, Column.Index, GridDevices.Row, Value);
-  Editor := TValueEditColumn(Column).CreateEditor(Column.Index,
-    GridDevices.Row, Value.ToString);
+  ShowButton := False;
+  DeviceReadingButtonVisible(Column, Column.Index, GridDevices.Row,
+    ShowButton);
+
+  Editor := TValueEditCellEditor.Create(nil);
+  Editor.Initialize(Column.Index, GridDevices.Row, Value.ToString,
+    ShowButton, DeviceReadingButtonClick);
   Control := Editor;
 end;
 
@@ -11055,7 +10831,8 @@ begin
     ReadingValue, 0);
 
   if TFormPhotoReading.Execute(
-    PhotoPath, ReadingText, ReadingValue, SelectedPhotoFile) then
+    PhotoPath, ReadingText, Column.Header, ReadingValue,
+    SelectedPhotoFile) then
   begin
     if SelectedPhotoFile <> '' then
     begin
@@ -13002,8 +12779,5 @@ IF WorkTable.FluidPress.IsRunning THEN
 
 
 end;
-
-initialization
-  RegisterFmxClasses([TValueEditColumn]);
 
 end.
