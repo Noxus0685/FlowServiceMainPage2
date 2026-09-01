@@ -13,7 +13,6 @@ type
   TFormPhotoReading = class(TForm)
   private
     FEditReading: TEdit;
-    FReadingLabel: TLabel;
     FSelectedPhotoFile: string;
     FPhotoScrollBox: TScrollBox;
     FImageHost: TLayout;
@@ -57,9 +56,8 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     { Opens the photo viewer and returns a reading only after Save is pressed. }
-    class function Execute(const AImageFile, ACurrentText,
-      AReadingCaption: string; out AValue: Double;
-      out ASelectedPhotoFile: string): Boolean;
+    class function Execute(const AImageFile, ACurrentText: string;
+      out AValue: Double; out ASelectedPhotoFile: string): Boolean;
   end;
 
 implementation
@@ -77,6 +75,7 @@ var
   ScaleRow: TLayout;
   RotationRow: TLayout;
   PhotoFrame: TRectangle;
+  ReadingLabel: TLabel;
   SaveButton: TCornerButton;
   CloseButton: TCornerButton;
   LoadPhotoButton: TCornerButton;
@@ -142,18 +141,17 @@ begin
   ReadingPanel.Parent := BottomArea;
   ReadingPanel.Align := TAlignLayout.Client;
 
-  FReadingLabel := TLabel.Create(Self);
-  FReadingLabel.Parent := ReadingPanel;
-  FReadingLabel.Align := TAlignLayout.Left;
-  FReadingLabel.Width := 105;
-  FReadingLabel.Margins.Left := 10;
-  FReadingLabel.Text := '';
-  FReadingLabel.TextSettings.VertAlign := TTextAlign.Center;
+  ReadingLabel := TLabel.Create(Self);
+  ReadingLabel.Parent := ReadingPanel;
+  ReadingLabel.Align := TAlignLayout.Left;
+  ReadingLabel.Width := 105;
+  ReadingLabel.Margins.Left := 10;
+  ReadingLabel.Text := 'Показание';
+  ReadingLabel.TextSettings.VertAlign := TTextAlign.Center;
 
   FEditReading := TEdit.Create(Self);
   FEditReading.Parent := ReadingPanel;
-  FEditReading.Align := TAlignLayout.Left;
-  FEditReading.Width := 180;
+  FEditReading.Align := TAlignLayout.Client;
   FEditReading.Margins.Rect := RectF(10, 10, 10, 10);
   FEditReading.KeyboardType := TVirtualKeyboardType.DecimalNumberPad;
 
@@ -249,8 +247,8 @@ begin
   RotationTrackBarChange(FRotationTrackBar);
 end;
 
-class function TFormPhotoReading.Execute(const AImageFile, ACurrentText,
-  AReadingCaption: string; out AValue: Double;
+class function TFormPhotoReading.Execute(const AImageFile,
+  ACurrentText: string; out AValue: Double;
   out ASelectedPhotoFile: string): Boolean;
 var
   Form: TFormPhotoReading;
@@ -258,7 +256,6 @@ begin
   ASelectedPhotoFile := '';
   Form := TFormPhotoReading.Create(nil);
   try
-    Form.FReadingLabel.Text := AReadingCaption;
     Form.FEditReading.Text := ACurrentText;
     Form.LoadImage(AImageFile);
     Result := Form.ShowModal = mrOk;
