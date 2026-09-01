@@ -11055,7 +11055,8 @@ begin
     ReadingValue, 0);
 
   if TFormPhotoReading.Execute(
-    PhotoPath, ReadingText, ReadingValue, SelectedPhotoFile) then
+    PhotoPath, ReadingText, Column.Header, ReadingValue,
+    SelectedPhotoFile) then
   begin
     if SelectedPhotoFile <> '' then
     begin
