@@ -1141,6 +1141,7 @@ type
     procedure FlowMeterPropertiesChanged(Sender: TObject);
     procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
     procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
+    procedure RestoreScaleChannelValue(AChannel: TChannel);
     function TryGetAverageFlow(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable;
       out AAverageFlow: Double): Boolean;
     function GetAverageFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
@@ -3129,7 +3130,19 @@ begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
   begin
     ProtocolManager.AddMessage(pcAction, psForm, 'PumpStart', 'Пользователь запустил насос', ComboBoxPumps.Text);
-    FActiveWorkTable.ActivePump.DoPumpStart ;
+    if IsHydraulicSimulationMode(FActiveWorkTable) then
+    begin
+      { Do not publish a normal pump action in simulation: the hardware
+        observer would forward it to the real frequency converter. }
+      FActiveWorkTable.ActivePump.Value.SetValue(
+        FActiveWorkTable.ActivePump.ValueSet.Value);
+      FActiveWorkTable.ActivePump.PumpSetState(spStarted);
+      ProtocolManager.AddMessage(pcState, psForm, 'SimulationPumpStart',
+        'Насос запущен только в модели имитации',
+        FActiveWorkTable.ActivePump.Name);
+    end
+    else
+      FActiveWorkTable.ActivePump.DoPumpStart;
     UpdateUIPump;
   end;
 end;
@@ -3158,14 +3171,28 @@ begin
 end;
 
 procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
+var
+  NewFrequency: Double;
 begin
   if (FActiveWorkTable = nil) or (FActiveWorkTable.ActivePump = nil) then
     Exit;
 
-  if  (LayoutPump.tag=0) or (LayoutPump.tag=3)  then
+  if (LayoutPump.Tag = 0) or (LayoutPump.Tag = 3) then
+  begin
+    NewFrequency := NormalizeFloatInput(SpinBoxFreq.Text);
+    if IsHydraulicSimulationMode(FActiveWorkTable) then
     begin
-      FActiveWorkTable.ActivePump.DoFreqSet(NormalizeFloatInput(SpinBoxFreq.Text));
-    end;
+      FActiveWorkTable.ActivePump.ValueSet.Value := NewFrequency;
+      if FActiveWorkTable.ActivePump.IsRunning then
+        FActiveWorkTable.ActivePump.Value.SetValue(NewFrequency);
+      ProtocolManager.AddMessage(pcState, psForm, 'SimulationPumpFrequency',
+        'Частота изменена только в модели имитации',
+        Format('Pump=%s; Frequency=%.4f',
+          [FActiveWorkTable.ActivePump.Name, NewFrequency]));
+    end
+    else
+      FActiveWorkTable.ActivePump.DoFreqSet(NewFrequency);
+  end;
 end;
 
 procedure TFrameMainTable.SpinBoxFreqEnter(Sender: TObject);
@@ -3266,7 +3293,16 @@ begin
 
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
     begin
-      FActiveWorkTable.ActivePump.DoPumpStop ;
+      if IsHydraulicSimulationMode(FActiveWorkTable) then
+      begin
+        FActiveWorkTable.ActivePump.Value.SetValue(0);
+        FActiveWorkTable.ActivePump.PumpSetState(spStopped);
+        ProtocolManager.AddMessage(pcState, psForm, 'SimulationPumpStop',
+          'Насос остановлен только в модели имитации',
+          FActiveWorkTable.ActivePump.Name);
+      end
+      else
+        FActiveWorkTable.ActivePump.DoPumpStop;
        UpdateUIPump;
       //FActiveWorkTable.ActivePump.State:=CONTROL_STOPPED;
     end;
@@ -10891,6 +10927,26 @@ begin
     end);
 end;
 
+{ Восстанавливает очищенное при выключении значение канала из текущего
+  состояния весов рабочего стола. }
+procedure TFrameMainTable.RestoreScaleChannelValue(AChannel: TChannel);
+var
+  Scale: TWeight;
+begin
+  if not Assigned(FActiveWorkTable) or not Assigned(AChannel) or
+     not AChannel.Enabled or (Trim(AChannel.Name) = '') then
+    Exit;
+
+  Scale := FActiveWorkTable.FindScaleByName(AChannel.Name);
+  if not Assigned(Scale) then
+    Exit;
+
+  AChannel.ValueSec := Scale.CurrentWeight;
+  AChannel.RecordPendingMeasurements(
+    'RestoreScaleChannelValue.Weight');
+  FActiveWorkTable.RecalculateAllMeterValues;
+end;
+
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
 const
   SECOND_CLICK_MS = 1000; // окно "второго клика" (подбери по ощущениям)
@@ -10948,6 +11004,7 @@ begin
       if WorkTable.DeviceChannels[Row].Enabled then
         begin
           ApplyEnabledChannelSimulationValues(WorkTable, False);
+          RestoreScaleChannelValue(WorkTable.DeviceChannels[Row]);
         end
       else
         begin
@@ -11107,6 +11164,9 @@ begin
   end;
 
   ApplyEnabledChannelSimulationValues(FActiveWorkTable, AEtalonChannels);
+  if NewEnabled then
+    for Channel in AChannels do
+      RestoreScaleChannelValue(Channel);
   FActiveWorkTable.RebindAllFlowMeters;
   if WorkTableManager <> nil then
     WorkTableManager.Save;
@@ -11790,6 +11850,7 @@ begin
         if WorkTable.DeviceChannels[ARow].Enabled then
           begin
             ApplyEnabledChannelSimulationValues(WorkTable, False);
+            RestoreScaleChannelValue(WorkTable.DeviceChannels[ARow]);
           end
         else
           begin
@@ -11916,6 +11977,7 @@ begin
         begin
           DisableOtherChannelGroups(WorkTable.EtalonChannels, Row);
           ApplyEnabledChannelSimulationValues(WorkTable, True);
+          RestoreScaleChannelValue(WorkTable.EtalonChannels[Row]);
         end
       else
         begin
@@ -12450,6 +12512,7 @@ begin
           begin
             DisableOtherChannelGroups(WorkTable.EtalonChannels, ARow);
             ApplyEnabledChannelSimulationValues(WorkTable, True);
+            RestoreScaleChannelValue(WorkTable.EtalonChannels[ARow]);
           end
         else
           begin
@@ -12599,14 +12662,20 @@ procedure TFrameMainTable.UpdateUIScale;
 var
   WorkTable: TWorkTable;
   UnitName: string;
+  IsVolumeUnits: Boolean;
   RoundedWeight: Double;
   I: Integer;
+  StabilityInfo: TMeterValueStabilityInfo;
 begin
   WorkTable := FActiveWorkTable;
   UnitName := NormalizeScaleUnit(ComboEditUnits.Text);
+  IsVolumeUnits := IsVolumeFlowUnit(ComboEditUnits.Text);
 
-
-  Label3.Text := 'Масса, ' + UnitName;
+  if IsVolumeUnits then
+    Label3.Text := 'Объем, ' + UnitName
+  else
+    Label3.Text := 'Масса, ' + UnitName;
+  RectangleScaleWeight.Fill.Color := COLOR_NONE;
 
   if WorkTable = nil then
   begin
@@ -12615,10 +12684,23 @@ begin
     Exit;
   end;
 
-  if WorkTable.ValueQuantity <> nil then
-    LabelScaleWeight.Text := WorkTable.ValueQuantity.GetStrNum(WorkTable.ActiveScale.CurrentWeight,0)
+  if (WorkTable.ActiveScale <> nil) and (WorkTable.ValueQuantity <> nil) then
+    LabelScaleWeight.Text := WorkTable.ValueQuantity.GetStrNum(
+      WorkTable.ValueQuantity.GetDoubleValueDim, 0)
   else
     LabelScaleWeight.Text := '-';
+
+  if (WorkTable.ActiveScale <> nil) and
+     (WorkTable.ActiveScale.Value <> nil) and
+     WorkTable.ActiveScale.Value.StabilitySettings.Enabled then
+  begin
+    WorkTable.ActiveScale.Value.AnalyzeStability(StabilityInfo);
+    if (StabilityInfo.SampleCount > 0) and StabilityInfo.IsDataActual then
+      if StabilityInfo.IsSignalStable then
+        RectangleScaleTotalWeight.Fill.Color := COLOR_COMPLETED
+      else
+        RectangleScaleTotalWeight.Fill.Color := COLOR_WARNING;
+  end;
 
   if (WorkTable.ActiveScale <> nil) and
      (WorkTable.TableFlow <> nil) and

@@ -189,6 +189,7 @@ type
   private
 
   FUpdatingRepositoryCombo: Boolean;
+  FSelectionEnabled: Boolean;
 
   { ================= НОВАЯ АРХИТЕКТУРА ================= }
 
@@ -248,6 +249,7 @@ type
     procedure SyncTreeAfterGridRowsRemoved;
     procedure RemoveTreeNode(ANode: TTreeViewItem);
     procedure WriteTypeActionLog(const AAction: string; AType: TDeviceType; const ADetails: string = '');
+    procedure SetSelectionEnabled(const AValue: Boolean);
 
   public
     { Public declarations }
@@ -255,6 +257,9 @@ type
     procedure SelectType (AType: TDeviceType);
     procedure SelectTypeByUUID(const AUUID: string);
     destructor Destroy; override;
+    { Controls whether this form may return a selected type to its caller. }
+    property SelectionEnabled: Boolean read FSelectionEnabled
+      write SetSelectionEnabled;
   end;
 
 
@@ -1314,8 +1319,15 @@ begin
 end;
 
 
+procedure TFormTypeSelect.SetSelectionEnabled(const AValue: Boolean);
+begin
+  FSelectionEnabled := AValue;
+  UpdateTypeActions(nil);
+end;
+
 procedure TFormTypeSelect.FormCreate(Sender: TObject);
 begin
+   FSelectionEnabled := True;
    FSortColumn := -1;
    FSortAscending := True;
    FSkipTypeDeleteConfirm := False;
@@ -1895,7 +1907,8 @@ begin
 
   actTypeAdd.Enabled := HasRepo;
   actTypeEdit.Enabled := HasRows and (HasGridFocus or HasCurrentSelection);
-  actTypeSelect.Enabled := HasRows and (HasGridFocus or HasCurrentSelection);
+  actTypeSelect.Enabled := FSelectionEnabled and HasRows and
+    (HasGridFocus or HasCurrentSelection);
   actTypeDelete.Enabled := HasRepo and HasRows;
   actTypeCopy.Enabled := HasRows;
   actTypeCut.Enabled := HasRepo and HasRows;

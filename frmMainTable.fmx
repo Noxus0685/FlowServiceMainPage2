@@ -1289,6 +1289,7 @@ object FrameMainTable: TFrameMainTable
                 Size.Width = 38.000000000000000000
                 Size.Height = 24.000000000000000000
                 Size.PlatformDefault = False
+                StyleLookup = 'cleareditbutton'
                 TabOrder = 2
                 Text = #1057#1083#1080#1074
                 TextSettings.Trimming = None
@@ -1300,6 +1301,7 @@ object FrameMainTable: TFrameMainTable
                 Size.Width = 35.000000000000000000
                 Size.Height = 24.000000000000000000
                 Size.PlatformDefault = False
+                StyleLookup = 'refreshtoolbutton'
                 TabOrder = 3
                 Text = #1058#1072#1088#1072
                 TextSettings.Trimming = None
@@ -5516,7 +5518,7 @@ object FrameMainTable: TFrameMainTable
           Size.Width = 674.000000000000000000
           Size.Height = 453.000000000000000000
           Size.PlatformDefault = False
-          TabIndex = 4
+          TabIndex = 0
           TabOrder = 1
           TabPosition = PlatformDefault
           OnChange = TabControl1Change
@@ -5538,7 +5540,7 @@ object FrameMainTable: TFrameMainTable
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = False
+            IsSelected = True
             Size.Width = 105.000000000000000000
             Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
@@ -5598,7 +5600,7 @@ object FrameMainTable: TFrameMainTable
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = True
+            IsSelected = False
             Size.Width = 74.000000000000000000
             Size.Height = 26.000000000000000000
             Size.PlatformDefault = False

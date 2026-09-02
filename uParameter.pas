@@ -209,6 +209,7 @@ end;
     FUUID: string;
     FCurrentWeight: Double;
     FTareWeight: Double;
+    procedure SetCurrentWeight(const AValue: Double);
   public
     class var Weights: TObjectList<TWeight>;
 
@@ -216,9 +217,9 @@ end;
     constructor Create; overload;
 
     property UUID: string read FUUID write FUUID;
-    property CurrentWeight: Double read FCurrentWeight write FCurrentWeight;
+    property CurrentWeight: Double read FCurrentWeight write SetCurrentWeight;
     property TareWeight: Double read FTareWeight write FTareWeight;
-    property CurentValue: Double read FCurrentWeight write FCurrentWeight;
+    property CurentValue: Double read FCurrentWeight write SetCurrentWeight;
   end;
 
   TScale = TWeight;
@@ -648,11 +649,19 @@ end;
   {$REGION 'TWeight'}
 
 constructor TWeight.Create;
+var
+  Settings: TMeterValueStabilitySettings;
 begin
   inherited Create('', '');
   FUUID := TGUID.NewGuid.ToString;
   FCurrentWeight := 0;
   FTareWeight := 0;
+  EnsureMeterValues;
+  Settings := Value.StabilitySettings;
+  Settings.RequireCurrentValueInRange := False;
+  Settings.RequireMeanValueInRange := False;
+  Settings.RequireForecastInRange := False;
+  Value.StabilitySettings := Settings;
 end;
 
 constructor TWeight.Create(const AScaleName: string);
@@ -661,6 +670,13 @@ begin
   Self.FName := AScaleName;
   if Weights <> nil then
     Weights.Add(Self);
+end;
+
+procedure TWeight.SetCurrentWeight(const AValue: Double);
+begin
+  FCurrentWeight := AValue;
+  EnsureMeterValues;
+  Value.SetValue(AValue);
 end;
 
   {$ENDREGION 'TWeight'}

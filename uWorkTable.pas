@@ -2356,6 +2356,7 @@ begin
   inherited Destroy;
 end;
 
+
 { Initializes channel FlowMeter links using the configured device UUID. }
 procedure TChannel.Init;
 begin
@@ -3112,7 +3113,7 @@ begin
     Ord(otCurrent):
       if FCurrentMeasurementPending then
         RecordCurrentMeasurement(FCurSec, ASource);
-    Ord(otVoltage):
+    Ord(otVoltage), Ord(otInterface):
       if FVoltageMeasurementPending then
         RecordVoltageMeasurement(FValueSec, ASource);
   end;
@@ -6692,7 +6693,6 @@ begin
     Channel.ImpResult :=0; //AIni.ReadFloat(Section, 'ImpResult', 0);
     Channel.CurSec := S2F(AIni.ReadString(Section, 'CurSec', '0'));
     Channel.CurResult := S2F(AIni.ReadString(Section, 'CurResult', '0'));
-    Channel.ValueSec := S2F(AIni.ReadString(Section, 'ValueSec', '0'));
     Channel.ValueResult := S2F(AIni.ReadString(Section, 'ValueResult', '0'));
     Channel.ValueBefore := S2F(AIni.ReadString(Section, 'ValueBefore', '0'));
     Channel.ValueAfter := S2F(AIni.ReadString(Section, 'ValueAfter', '0'));
@@ -6722,6 +6722,10 @@ begin
     if Channel.FValueInterface <> nil then Channel.FValueInterface.DeleteFromVector;
 
     Channel.InitMeterValues;
+
+    { ValueInterface can be replaced by InitMeterValues using its persisted hash.
+      Restore ValueSec only after the final ValueInterface object is assigned. }
+    Channel.ValueSec := S2F(AIni.ReadString(Section, 'ValueSec', '0'));
 {$IFDEF DEBUG}
     DebugLoadStep('TWorkTable.LoadChannelList',
       Format('%s: Channel.InitMeterValues', [Section]),
@@ -9476,7 +9480,16 @@ end;
 procedure TWorkTable.SetActiveScale(AScaleName: string);
 begin
   ActiveScale := FindScaleByName(AScaleName);
+  if (FActiveScale <> nil) and
+     (FActiveScale.Value <> nil) then
+  begin
+    var LSettings := FActiveScale.Value.StabilitySettings;
+    LSettings.Enabled := True;
+    FActiveScale.Value.StabilitySettings := LSettings;
+  end;
 end;
+
+
 
 function TWorkTable.GetCurentValue: Double;
 begin

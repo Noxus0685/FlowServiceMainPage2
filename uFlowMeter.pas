@@ -916,7 +916,7 @@ end;
 
 function TFlowMeter.GetValueFlow: TMeterValue;
 begin
-  Result := ValueVolumeFlow;
+  Result := TMeterValue.GetMeterValue(HashValueFlow);
 end;
 
 procedure TFlowMeter.SetValueImp(const AValue: TMeterValue);
@@ -977,7 +977,12 @@ end;
 
 procedure TFlowMeter.SetValueFlow(const AValue: TMeterValue);
 begin
-  ValueVolumeFlow := AValue;
+  { ValueFlow is a non-owning display selector. It must not replace
+    ValueVolumeFlow or ValueMassFlow, which are independent calculations. }
+  if AValue <> nil then
+    HashValueFlow := AValue.Hash
+  else
+    HashValueFlow := '';
 end;
 
 procedure TFlowMeter.RestoreValueVolumeFlowHash(const AHash: string);
@@ -1458,8 +1463,10 @@ begin
   begin
     ValueMassCoef.SetAsMassCoef;
     SetDescription(ValueMassCoef, 'Коэффициент массы');
+    { Новый весовой коэффициент по умолчанию равен единице. Загруженное или
+      откалиброванное значение здесь не перезаписывается. }
+    ValueMassCoef.SetValue(1);
   end;
-  ValueMassCoef.SetValue(1);
 
   ValueMassFlow := TMeterValue.GetExistedMeterValueBool(HashValueMassFlow, IsExisted, UUID, Name);
   BindSavedMeterValue(FValueMassFlow, 'Массовый расход', IsExisted);
@@ -1759,9 +1766,25 @@ begin
         if TotalSource = nil then
           TotalSource := FlowSource;
       end;
-    otInterface,
+    otInterface:
+      begin
+        { Интерфейсные весы передают массу непосредственно в килограммах. }
+        K := 1;
+
+        if Assigned(ValueInterface) then
+          case MeasuredKind of
+            mdMass,
+            mdVolume:
+              TotalSource := ValueInterface;
+
+            mdMassFlow,
+            mdVolumeFlow:
+              FlowSource := ValueInterface;
+          end;
+      end;
     otVisual:
       begin
+        { Визуальные приборы сохраняют импульсный источник. }
         FlowSource := ValueImp;
       end;
   end;

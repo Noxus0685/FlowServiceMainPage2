@@ -1,4 +1,5 @@
-﻿unit fuDeviceSelect;
+﻿//020926
+unit fuDeviceSelect;
 
 interface
 
@@ -210,6 +211,7 @@ private
   FSkipDeviceDeleteConfirm: Boolean;
   FCheckedDevices: TList<TDevice>;
   FDeletedDeviceUUIDs: TStringList;
+  FSelectionEnabled: Boolean;
 
   { ================= ОСНОВНЫЕ ПРОЦЕДУРЫ ================= }
 
@@ -258,6 +260,7 @@ private
   procedure SyncTreeAfterGridRowsRemoved;
   procedure WriteDeviceActionLog(const AAction: string; ADevice: TDevice; const ADetails: string = '');
   procedure LogDuplicateDeviceUUIDs;
+  procedure SetSelectionEnabled(const AValue: Boolean);
 
 public
   { Public declarations }
@@ -265,6 +268,9 @@ public
   function GetSelectedDevice: TDevice;
   destructor Destroy; override;
   property DeletedDeviceUUIDs: TStringList read FDeletedDeviceUUIDs;
+  { Controls whether this form may return a selected device to its caller. }
+  property SelectionEnabled: Boolean read FSelectionEnabled
+    write SetSelectionEnabled;
 
   end;
 
@@ -289,6 +295,13 @@ begin
   FDeletedDeviceUUIDs := TStringList.Create;
   FDeletedDeviceUUIDs.Duplicates := dupIgnore;
   FDeletedDeviceUUIDs.CaseSensitive := False;
+  SetSelectionEnabled(True);
+end;
+
+procedure TFormDeviceSelect.SetSelectionEnabled(const AValue: Boolean);
+begin
+  FSelectionEnabled := AValue;
+  UpdateDeviceActions(nil);
 end;
 
 destructor TFormDeviceSelect.Destroy;
@@ -1452,7 +1465,8 @@ begin
   aDevicePaste.Enabled := HasRepo and (AppServices.DataManager <> nil) and AppServices.DataManager.HasBufferDevices;
 
   CornerButtonEditDevice.Enabled := aEditType.Enabled;
-  CornerButton1.Enabled := HasSelectedRow;
+  actDeviceSelect.Enabled := FSelectionEnabled and HasSelectedRow;
+  CornerButton1.Enabled := actDeviceSelect.Enabled;
 end;
 
 function TFormDeviceSelect.GetSelectedDevices: TObjectList<TDevice>;
